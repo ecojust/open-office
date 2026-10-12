@@ -18,7 +18,8 @@ import pymupdf
 PROTOCOL_VERSION = 1
 MAX_REQUEST_BYTES = 100 * 1024 * 1024
 MAX_PDF_BYTES = 40 * 1024 * 1024
-MAX_OUTPUT_BYTES = 60 * 1024 * 1024
+# Every successful output must remain a valid input for the next edit/reopen.
+MAX_OUTPUT_BYTES = MAX_PDF_BYTES
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_PAGES = 500
 MAX_MERGE_DOCUMENTS = 20
@@ -337,7 +338,8 @@ def output_document(doc, context, options, warnings):
     doc.subset_fonts()
     data = doc.tobytes(garbage=4, deflate=True, encryption=pymupdf.PDF_ENCRYPT_KEEP)
     if len(data) > MAX_OUTPUT_BYTES:
-        fail('OUTPUT_LIMIT', '编辑结果超过 60 MiB，请分批处理页面或减小图片。')
+        fail('OUTPUT_LIMIT', '编辑结果超过可重新打开的文件大小限制，请分批处理页面或减小图片。',
+             {'maximumBytes': MAX_OUTPUT_BYTES})
     return {'base64': base64.b64encode(data).decode('ascii'), 'metadata': metadata(doc, context),
             'textBlocks': text_blocks(doc, {}, context['permissions']['copy']), 'warnings': warnings}
 

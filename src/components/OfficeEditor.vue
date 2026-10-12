@@ -71,11 +71,12 @@ async function markSaved() {
   if (bridge !== client || loaded?.id !== id || props.document.id !== id) return
   dirty.value = result.dirty; emit('dirty', dirty.value)
 }
-async function discardChanges() {
+async function discardChanges(options: { force?: boolean } = {}) {
   if (!bridge || !loaded) return
   if (loaded.id !== props.document.id) throw Error('当前标签未成功打开，不能放弃其他文档的修改。')
   const id = loaded.id, client = bridge
-  await client.request('discard', {}, id)
+  if (!options.force && (!savedExport || savedExport.id !== id)) throw Error('请先导出当前内容，再切换文档；放弃修改需要明确确认。')
+  await client.request('discard', { revision: savedExport?.revision, force: options.force === true }, id)
   if (bridge !== client || loaded?.id !== id || props.document.id !== id) return
   dirty.value = false; emit('dirty', false)
 }

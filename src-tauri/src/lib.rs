@@ -1,9 +1,9 @@
 mod files;
 mod pdf;
 mod server;
+mod smoke;
 
 use std::{
-    io::Write,
     path::PathBuf,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -14,6 +14,9 @@ struct Closing(AtomicBool);
 
 #[tauri::command]
 fn bootstrap(server: State<'_, server::AssetServer>) -> server::Bootstrap {
+    if let Some(smoke) = &server.smoke {
+        smoke.note("ipc-bootstrap", "native bootstrap command reached");
+    }
     server.info.clone()
 }
 
@@ -34,39 +37,14 @@ async fn confirm_close(
 
 #[tauri::command]
 async fn smoke_report(app: tauri::AppHandle, report: serde_json::Value) -> Result<(), String> {
-    if std::env::var("OPEN_OFFICE_SMOKE").as_deref() != Ok("1") {
-        return Err("Native smoke reporting is disabled.".into());
-    }
-    let passed = report
-        .get("ok")
-        .and_then(serde_json::Value::as_bool)
-        .ok_or("Smoke report requires an explicit ok boolean.")?;
-    let data = serde_json::to_vec_pretty(&report).map_err(|_| "Invalid smoke report.")?;
-    if data.len() > 1024 * 1024 {
-        return Err("Smoke report exceeds 1 MiB.".into());
-    }
-    // The path is a process-launch option, never a renderer-controlled IPC argument.
-    let output = PathBuf::from(
-        std::env::var_os("OPEN_OFFICE_SMOKE_OUTPUT")
-            .ok_or("Set OPEN_OFFICE_SMOKE_OUTPUT when launching the smoke test.")?,
-    );
-    if !output.is_absolute() {
-        return Err("Smoke output must be an absolute path.".into());
-    }
-    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
-        let parent = output.parent().ok_or("Invalid smoke output directory.")?;
-        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-        let mut file =
-            tempfile::NamedTempFile::new_in(parent).map_err(|error| error.to_string())?;
-        file.write_all(&data).map_err(|error| error.to_string())?;
-        file.as_file()
-            .sync_all()
-            .map_err(|error| error.to_string())?;
-        file.persist(output).map_err(|error| error.to_string())?;
-        Ok(())
-    })
-    .await
-    .map_err(|_| "Smoke output task failed.")??;
+    let diagnostic = app
+        .state::<server::AssetServer>()
+        .smoke
+        .clone()
+        .ok_or("Native smoke reporting is disabled.")?;
+    let passed = tauri::async_runtime::spawn_blocking(move || diagnostic.report(&report))
+        .await
+        .map_err(|_| "Smoke output task failed.")??;
     app.state::<Closing>().0.store(true, Ordering::Release);
     app.state::<pdf::PdfRuntime>().shutdown().await;
     app.exit(if passed { 0 } else { 1 });
@@ -106,9 +84,25 @@ pub fn run() {
             pdf::cancel_pdf,
         ])
         .setup(|app| {
+            let handle = app.handle().clone();
+            let diagnostic = smoke::Smoke::from_environment(move || {
+                let handle = handle.clone();
+                handle.state::<Closing>().0.store(true, Ordering::Release);
+                let pdf = handle.state::<pdf::PdfRuntime>().inner().clone();
+                tauri::async_runtime::spawn(async move {
+                    pdf.shutdown().await;
+                    handle.exit(1);
+                });
+            })?;
+            if let Some(smoke) = &diagnostic {
+                smoke.note("native-setup", "initializing document store");
+            }
             let appdata = app.path().app_data_dir()?;
             app.manage(files::DocumentStore::new(appdata)?);
-            let server = server::AssetServer::start(&frontend_root(app.handle())?)?;
+            let server = server::AssetServer::start_with_smoke(
+                &frontend_root(app.handle())?,
+                diagnostic.clone(),
+            )?;
             let navigation = server.info.clone();
             let url = server.url();
             // Only this randomly generated URL namespace gets native IPC access.
@@ -131,13 +125,37 @@ pub fn run() {
                     .permission("allow-cancel-pdf"),
             )?;
             app.manage(server);
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse()?))
-                .title("Open Office")
-                .inner_size(1360.0, 900.0)
-                .min_inner_size(900.0, 640.0)
-                .on_navigation(move |url| server::AssetServer::allows_navigation(&navigation, url))
-                .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
-                .build()?;
+            if let Some(smoke) = &diagnostic {
+                smoke.note("acl-ready", "native commands restricted to this session");
+            }
+            let initial_url = if diagnostic.is_some() {
+                format!("{url}?nativeSmoke=1")
+            } else {
+                url.clone()
+            };
+            let mut builder =
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::External(initial_url.parse()?))
+                    .title("Open Office")
+                    .inner_size(1360.0, 900.0)
+                    .min_inner_size(900.0, 640.0)
+                    .on_navigation(move |url| {
+                        server::AssetServer::allows_navigation(&navigation, url)
+                    })
+                    .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny);
+            if let Some(smoke) = &diagnostic {
+                let progress = smoke.clone();
+                builder = builder
+                    .initialization_script(smoke::initialization_script(&url))
+                    .on_page_load(move |_, payload| {
+                        progress.note("webview-page", &format!("{:?}", payload.event()))
+                    });
+            }
+            let window = builder.build()?;
+            if let Some(smoke) = &diagnostic {
+                smoke.note("window-created", "showing and focusing test window");
+                window.show()?;
+                window.set_focus()?;
+            }
             Ok(())
         })
         .on_window_event(|window, event| {

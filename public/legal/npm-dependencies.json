@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lockfileSha256": "5e6b851717b0baf2e302e99b7c2fe237e60abc58428ba3bf89bf97471fb70e1e",
+  "lockfileSha256": "cff70e866aeda40ebe4b3c06ebf719b7a72ffa5bdddaca01905a62ab43802d3d",
   "packages": [
     {
       "name": "@babel/helper-string-parser",
@@ -217,8 +217,11 @@
       "developmentOnly": true,
       "optional": true,
       "installedForThisAudit": true,
-      "licenseFiles": [],
-      "integrity": "sha512-4xTZr1FUmSoQW4XIWmit3tzQrUTZM+N3P0XV8xROKYF50XfI7xeO90+1bZvNwxIufQ9hDQVRJH5YhgPVF8A/HQ=="
+      "licenseFiles": [
+        "npm/esbuild@0.28.2/LICENSE.md"
+      ],
+      "integrity": "sha512-4xTZr1FUmSoQW4XIWmit3tzQrUTZM+N3P0XV8xROKYF50XfI7xeO90+1bZvNwxIufQ9hDQVRJH5YhgPVF8A/HQ==",
+      "licenseNote": "Platform binary package shares the license of its distributing wrapper esbuild; a lockfile presence alone does not mean it ships in browser resources."
     },
     {
       "name": "@esbuild/netbsd-arm64",
@@ -411,8 +414,11 @@
       "developmentOnly": false,
       "optional": true,
       "installedForThisAudit": true,
-      "licenseFiles": [],
-      "integrity": "sha512-iDapw7nFSE5tsmQxcH2+KotJhyfVPmHd6vUOQN/Em+8WNbkZJwJ/rDowlJMFnMl0SYSDSfgKCNUGi6Sn5++Smg=="
+      "licenseFiles": [
+        "npm/@napi-rs__canvas@1.0.11/LICENSE"
+      ],
+      "integrity": "sha512-iDapw7nFSE5tsmQxcH2+KotJhyfVPmHd6vUOQN/Em+8WNbkZJwJ/rDowlJMFnMl0SYSDSfgKCNUGi6Sn5++Smg==",
+      "licenseNote": "Platform binary package shares the license of its distributing wrapper @napi-rs/canvas; a lockfile presence alone does not mean it ships in browser resources."
     },
     {
       "name": "@napi-rs/canvas-linux-x64-musl",
@@ -420,9 +426,12 @@
       "license": "MIT",
       "developmentOnly": false,
       "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-26q26AyITo3CGZX4HWFIMgBMA1lu3YN07gxzBm4tW6Hglq/OVyTP50kDrmWuKybCX6dh3m8Ly+c7YhI+sqCgCQ=="
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@napi-rs__canvas@1.0.11/LICENSE"
+      ],
+      "integrity": "sha512-26q26AyITo3CGZX4HWFIMgBMA1lu3YN07gxzBm4tW6Hglq/OVyTP50kDrmWuKybCX6dh3m8Ly+c7YhI+sqCgCQ==",
+      "licenseNote": "Platform binary package shares the license of its distributing wrapper @napi-rs/canvas; a lockfile presence alone does not mean it ships in browser resources."
     },
     {
       "name": "@napi-rs/canvas-win32-arm64-msvc",
@@ -643,8 +652,11 @@
       "developmentOnly": true,
       "optional": true,
       "installedForThisAudit": true,
-      "licenseFiles": [],
-      "integrity": "sha512-dR9nd6OKnvSS60Ifz/L7Mj5zzYyoqyRn2NwTuaOONKaa3xsVGXyp8YusMbvFyEOR94DxnwgcbgsFqkHd29ZSzQ=="
+      "licenseFiles": [
+        "npm/rollup@4.64.5/LICENSE.md"
+      ],
+      "integrity": "sha512-dR9nd6OKnvSS60Ifz/L7Mj5zzYyoqyRn2NwTuaOONKaa3xsVGXyp8YusMbvFyEOR94DxnwgcbgsFqkHd29ZSzQ==",
+      "licenseNote": "Platform binary package shares the license of its distributing wrapper rollup; a lockfile presence alone does not mean it ships in browser resources."
     },
     {
       "name": "@rollup/rollup-linux-x64-musl",
@@ -652,9 +664,12 @@
       "license": "MIT",
       "developmentOnly": true,
       "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-1tzsMjaqhsh3bAO6SJiJqh8hIr9sSPRd+i2vPPxJHod8/XYnf9TEnK0z/u3r1z1AkI347X0KbRSg9dWcxeGahw=="
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/rollup@4.64.5/LICENSE.md"
+      ],
+      "integrity": "sha512-1tzsMjaqhsh3bAO6SJiJqh8hIr9sSPRd+i2vPPxJHod8/XYnf9TEnK0z/u3r1z1AkI347X0KbRSg9dWcxeGahw==",
+      "licenseNote": "Platform binary package shares the license of its distributing wrapper rollup; a lockfile presence alone does not mean it ships in browser resources."
     },
     {
       "name": "@rollup/rollup-openbsd-x64",
@@ -810,8 +825,12 @@
       "developmentOnly": true,
       "optional": true,
       "installedForThisAudit": true,
-      "licenseFiles": [],
-      "integrity": "sha512-gkXyYn3w+Xfc8nz/DleEbkm1M7bBuU2cejqUXNmI98cA2P5kp+oPmS4ALTorb1FaNWjpsKoYZBWsbS9BXxYFkQ=="
+      "licenseFiles": [
+        "npm/@tauri-apps__cli@2.12.2/LICENSE-APACHE-2.0",
+        "npm/@tauri-apps__cli@2.12.2/LICENSE-MIT"
+      ],
+      "integrity": "sha512-gkXyYn3w+Xfc8nz/DleEbkm1M7bBuU2cejqUXNmI98cA2P5kp+oPmS4ALTorb1FaNWjpsKoYZBWsbS9BXxYFkQ==",
+      "licenseNote": "Platform binary package shares the license of its distributing wrapper @tauri-apps/cli; a lockfile presence alone does not mean it ships in browser resources."
     },
     {
       "name": "@tauri-apps/cli-linux-x64-musl",
@@ -819,9 +838,13 @@
       "license": "Apache-2.0 OR MIT",
       "developmentOnly": true,
       "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-MrjgoZ09s8Hsn99XvxSNvK8NQTZxi7XiyK3FxxytzfHgz2jb3qUT69CZtsokRkN/zdi9rCgrMtq+w9XNICjcfQ=="
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@tauri-apps__cli@2.12.2/LICENSE-APACHE-2.0",
+        "npm/@tauri-apps__cli@2.12.2/LICENSE-MIT"
+      ],
+      "integrity": "sha512-MrjgoZ09s8Hsn99XvxSNvK8NQTZxi7XiyK3FxxytzfHgz2jb3qUT69CZtsokRkN/zdi9rCgrMtq+w9XNICjcfQ==",
+      "licenseNote": "Platform binary package shares the license of its distributing wrapper @tauri-apps/cli; a lockfile presence alone does not mean it ships in browser resources."
     },
     {
       "name": "@tauri-apps/cli-win32-arm64-msvc",
@@ -1212,6 +1235,42 @@
       "integrity": "sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA=="
     },
     {
+      "name": "playwright",
+      "version": "1.62.1",
+      "license": "Apache-2.0",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/playwright@1.62.1/LICENSE",
+        "npm/playwright@1.62.1/NOTICE"
+      ],
+      "integrity": "sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg=="
+    },
+    {
+      "name": "playwright-core",
+      "version": "1.62.1",
+      "license": "Apache-2.0",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/playwright-core@1.62.1/LICENSE",
+        "npm/playwright-core@1.62.1/NOTICE"
+      ],
+      "integrity": "sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw=="
+    },
+    {
+      "name": "fsevents",
+      "version": "2.3.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA=="
+    },
+    {
       "name": "postcss",
       "version": "8.5.29",
       "license": "MIT",
@@ -1333,15 +1392,15 @@
     }
   ],
   "pdfjsAssetNotices": [
-    "pdfjs/standard_fonts/LICENSE_FOXIT",
-    "pdfjs/standard_fonts/LICENSE_LIBERATION",
-    "pdfjs/cmaps/LICENSE",
-    "pdfjs/wasm/LICENSE_JBIG2",
-    "pdfjs/wasm/LICENSE_OPENJPEG",
-    "pdfjs/wasm/LICENSE_PDFJS_JBIG2",
-    "pdfjs/wasm/LICENSE_PDFJS_OPENJPEG",
     "pdfjs/wasm/LICENSE_PDFJS_QCMS",
+    "pdfjs/wasm/LICENSE_PDFJS_OPENJPEG",
+    "pdfjs/wasm/LICENSE_JBIG2",
+    "pdfjs/wasm/LICENSE_PDFJS_JBIG2",
+    "pdfjs/wasm/LICENSE_OPENJPEG",
     "pdfjs/wasm/LICENSE_QCMS",
-    "pdfjs/iccs/LICENSE"
+    "pdfjs/iccs/LICENSE",
+    "pdfjs/cmaps/LICENSE",
+    "pdfjs/standard_fonts/LICENSE_FOXIT",
+    "pdfjs/standard_fonts/LICENSE_LIBERATION"
   ]
 }

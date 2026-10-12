@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import Icon from './components/Icon.vue'
 import OfficeEditor from './components/OfficeEditor.vue'
 import PdfEditor from './components/PdfEditor.vue'
 import * as native from './native'
+import { smokeAwait, smokeFailure, smokeFeatures, smokeRequested, smokeStage } from './smoke'
 import type { NativeDocument, RecentDocument } from './types'
 import type { OfficeDocument } from './office/types'
 import { bytesToBase64, base64ToBytes, extensionOf, kindOf, withExtension, type Kind, type Extension, type EditorHandle } from './shared/document'
 
-interface Tab { key: string; document: NativeDocument; fileId?: string; dirty: boolean; ready: boolean }
+interface Tab { key: string; document: NativeDocument; fileId?: string; dirty: boolean; ready: boolean; loadError?: string }
 const buildVersion = __BUILD_VERSION__
 const brandIcon = new URL('./favicon.svg', document.baseURI).href
-const smokeMode = ref(false)
+const smokeMode = ref(smokeRequested())
+smokeStage('app-setup', 'Vue setup reached')
 const tabs = ref<Tab[]>([]), activeKey = ref(''), home = ref(true), section = ref('home')
 const active = computed(() => tabs.value.find(t => t.key === activeKey.value))
 const officeDocument = shallowRef<OfficeDocument>(), pdfDocument = shallowRef<NativeDocument>()
@@ -22,6 +24,7 @@ const recents = ref<RecentDocument[]>([]), busy = ref(''), error = ref(''), stat
 const help = ref(false), search = ref(''), closeTarget = ref<Tab | 'window' | null>(null)
 const fileInput = ref<HTMLInputElement>(), imageInput = ref<HTMLInputElement>()
 let unlisten: (() => void) | undefined
+let pendingWindowClose = false
 const editor = () => active.value?.document.kind === 'pdf' ? pdfEditor.value : officeEditor.value
 const kindNames: Record<Kind,string> = { word:'文字文档', sheet:'电子表格', pdf:'PDF 文档' }
 const icons: Record<Kind,string> = {word:'file',sheet:'sheet',pdf:'pdf'}
@@ -30,28 +33,69 @@ const message = (e:unknown) => e instanceof Error ? e.message : String(e)
 async function task(label:string, work:()=>Promise<void>) {
   if (busy.value) return
   error.value=''; busy.value=label
-  try { await work() } catch(e) { error.value=message(e) } finally { busy.value='' }
+  // A visual overlay alone leaves the iframe's keyboard focus active during exports.
+  const focused=document.activeElement
+  if(focused instanceof HTMLElement) focused.blur()
+  try { await nextTick(); await work() } catch(e) { error.value=message(e) } finally {
+    busy.value=''
+    if(pendingWindowClose) {pendingWindowClose=false;void closeWindow()}
+  }
 }
 function dirtyFor(id:string|undefined, value:boolean) {
   const tab=tabs.value.find(t=>t.key===id)
   if(tab && value) tab.dirty=true
 }
-function readyFor(id:string|undefined) { const tab=tabs.value.find(t=>t.key===id); if(tab) tab.ready=true }
+function readyFor(id:string|undefined) { const tab=tabs.value.find(t=>t.key===id); if(tab) {tab.ready=true;tab.loadError=undefined;smokeStage('editor-ready',tab.document.kind)} }
+function editorError(id:string|undefined,value:string) {
+  error.value=value
+  const tab=tabs.value.find(t=>t.key===id)
+  if(tab&&!tab.ready)tab.loadError=value
+  smokeStage('editor-error',value)
+}
+function requireEditor(tab:Tab) {
+  if(!tab.ready)throw Error(tab.loadError?'该文档未成功打开，无法保存。可以重试、关闭此标签或切回其他文档。':'文档仍在打开，请等待编辑器就绪后再保存或切换。')
+  const handle=editor()
+  if(!handle||activeKey.value!==tab.key)throw Error('当前文档尚未准备好。')
+  return handle
+}
+async function awaitReady(tab:Tab):Promise<void> {
+  if(tab.loadError)throw Error(tab.loadError)
+  if(tab.ready)return
+  await new Promise<void>((resolve,reject)=>{
+    let stop=()=>{}
+    const finish=(failure?:Error)=>{clearTimeout(timeout);stop();failure?reject(failure):resolve()}
+    const timeout=setTimeout(()=>finish(Error('文档打开超时，未保存内容仍保留，请重试或取消关闭。')),120000)
+    stop=watch(()=>[tab.ready,tab.loadError,activeKey.value] as const,([ready,failure,key])=>{
+      if(key!==tab.key)finish(Error('文档已切换，本次保存已取消。'))
+      else if(failure)finish(Error(failure))
+      else if(ready)finish()
+    },{flush:'post'})
+  })
+}
+async function capture(tab:Tab) {
+  const handle=requireEditor(tab), exported=await handle.exportFile()
+  if(activeKey.value!==tab.key)throw Error('文档已切换，旧的导出结果未被使用。')
+  if(exported.dirty)tab.dirty=true
+  return {handle,exported,document:{...tab.document,base64:exported.base64,extension:exported.extension,sizeBytes:Math.floor(exported.base64.length*.75)}}
+}
 async function stash() {
-  const tab=active.value, handle=editor()
-  if(!tab || !handle) return
-  if(tab.dirty) {
-    const exported=await handle.exportFile()
-    tab.document={...tab.document,base64:exported.base64,extension:exported.extension,sizeBytes:Math.floor(exported.base64.length*.75)}
-  }
-  await handle.discardChanges?.()
+  const tab=active.value
+  if(!tab || tab.loadError) return
+  // Dirty notifications arrive asynchronously. Always snapshot the actual loaded model.
+  // Export also refuses un-applied PDF drafts, and Office discard checks this revision.
+  const snapshot=await capture(tab)
+  await snapshot.handle.discardChanges?.()
+  tab.document=snapshot.document
 }
 async function activate(tab:Tab) {
   if(activeKey.value!==tab.key) {
     await stash()
     activeKey.value=tab.key
-    if(tab.document.kind==='pdf') pdfDocument.value=tab.document
-    else officeDocument.value=tab.document as OfficeDocument
+    if(tab.document.kind==='pdf') {tab.ready=false;tab.loadError=undefined;pdfDocument.value=tab.document}
+    else {
+      if(officeDocument.value?.id!==tab.key) {tab.ready=false;tab.loadError=undefined}
+      officeDocument.value=tab.document as OfficeDocument
+    }
     await nextTick()
   }
   home.value=false
@@ -96,8 +140,11 @@ function download(base64:string,name:string) {
   link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000)
 }
 async function saveActive(saveAs=false, format?:Extension):Promise<boolean> {
-  const tab=active.value, handle=editor(); if(!tab || !handle) return false
+  const tab=active.value;if(!tab)return false
+  const handle=requireEditor(tab)
   const exported=await handle.exportFile(format?{format}:undefined)
+  if(activeKey.value!==tab.key)throw Error('文档已切换，本次保存已取消。')
+  if(exported.dirty)tab.dirty=true
   const isCopy=format==='pdf' && tab.document.kind!=='pdf'
   const name=exported.name || withExtension(tab.document.name,exported.extension)
   if(!native.isTauri()) {
@@ -117,31 +164,54 @@ async function saveActive(saveAs=false, format?:Extension):Promise<boolean> {
 }
 function save(saveAs=false,format?:Extension) {void task(format==='pdf'?'正在导出 PDF':'正在保存文档',async()=>{await saveActive(saveAs,format)})}
 function changeTab(tab:Tab) {void task('正在切换文档',()=>activate(tab))}
-async function removeTab(tab:Tab) {
+async function removeTab(tab:Tab, discardConfirmed=false) {
   if(tab.key===activeKey.value) {
-    await editor()?.discardChanges?.()
-    tab.dirty=false
+    if(tab.ready)await editor()?.discardChanges?.({force:discardConfirmed})
     const next=tabs.value.find(t=>t.key!==tab.key)
+    // Do not ask stash() to export a tab whose close was already checked/confirmed.
+    activeKey.value=''
     if(next) await activate(next)
-    else {activeKey.value='';home.value=true;officeDocument.value=undefined;pdfDocument.value=undefined}
+    else {home.value=true;officeDocument.value=undefined;pdfDocument.value=undefined}
   }
   tabs.value=tabs.value.filter(t=>t.key!==tab.key)
 }
-function closeTab(tab:Tab) {if(tab.dirty)closeTarget.value=tab;else void task('正在关闭文档',()=>removeTab(tab))}
-function closeWindow() {if(tabs.value.some(t=>t.dirty))closeTarget.value='window';else void native.confirmClose()}
+function closeTab(tab:Tab) {
+  if(busy.value)return
+  if(tab.dirty) {closeTarget.value=tab;return}
+  void task('正在检查文档',async()=>{
+    if(tab.key===activeKey.value&&tab.ready) {
+      try {const snapshot=await capture(tab);tab.document=snapshot.document}
+      catch(e) {tab.dirty=true;error.value=message(e);closeTarget.value=tab;return}
+    }
+    if(tab.dirty) {closeTarget.value=tab;return}
+    await removeTab(tab)
+  })
+}
+async function closeWindow() {
+  if(busy.value) {pendingWindowClose=true;return}
+  await task('正在检查未保存修改',async()=>{
+    const tab=active.value
+    if(tab?.ready) {
+      try {const snapshot=await capture(tab);tab.document=snapshot.document}
+      catch(e) {tab.dirty=true;error.value=message(e)}
+    }
+    if(tabs.value.some(t=>t.dirty))closeTarget.value='window'
+    else await native.confirmClose()
+  })
+}
 async function resolveClose(action:'save'|'discard') {
   const target=closeTarget.value;if(!target)return
   await task(action==='save'?'正在保存未完成的文档':'正在关闭',async()=>{
     if(target==='window') {
-      if(action==='save') for(const tab of tabs.value.filter(t=>t.dirty)) {await activate(tab);if(!await saveActive())return}
+      if(action==='save') for(const tab of tabs.value.filter(t=>t.dirty)) {await activate(tab);await awaitReady(tab);if(!await saveActive())return}
       closeTarget.value=null;await native.confirmClose()
     } else {
-      if(action==='save') {await activate(target);if(!await saveActive())return}
-      await removeTab(target);closeTarget.value=null
+      if(action==='save') {await activate(target);await awaitReady(target);if(!await saveActive())return}
+      await removeTab(target,action==='discard');closeTarget.value=null
     }
   })
 }
-function editCommand(command:'undo'|'redo'|'print') {void task('正在处理',async()=>{const fn=editor()?.[command];if(fn)await fn();else if(command==='print')await saveActive(true,'pdf')})}
+function editCommand(command:'undo'|'redo'|'print') {void task('正在处理',async()=>{const fn=editor()?.[command];if(fn)await fn();else if(command==='print'&&await saveActive(true,'pdf'))status.value='已导出 PDF；请在系统 PDF 阅读器中打开并打印。'})}
 function insertImage() {
   if(native.isTauri()) void task('正在插入图片',async()=>{const image=await native.pickImage();if(image)await officeEditor.value?.insertImage?.(image)})
   else imageInput.value?.click()
@@ -150,15 +220,25 @@ async function browserImage(event:Event) {
   const input=event.target as HTMLInputElement,file=input.files?.[0];input.value='';if(!file)return
   await task('正在插入图片',async()=>{if(file.size>10*1024*1024)throw Error('图片不能超过 10 MB');await officeEditor.value?.insertImage?.({name:file.name,base64:bytesToBase64(new Uint8Array(await file.arrayBuffer()))})})
 }
-function officeRequest(request:{type:string}) {
+function officeRequest(request:{type:string;notice?:string}) {
   if(request.type==='open')openFile()
   else if(request.type==='new') {home.value=true;section.value='home'}
   else if(request.type==='save')save()
   else if(request.type==='save-as')save(true)
-  else if(request.type==='export-pdf')save(true,'pdf')
+  else if(request.type==='export-pdf') {
+    void task('正在导出 PDF',async()=>{
+      let saved=false
+      try {saved=await saveActive(true,'pdf')}
+      finally {if(request.notice)status.value=`${request.notice}${saved?' PDF 副本已保存。':''}`}
+    })
+  }
   else if(request.type==='insert-image')insertImage()
   else if(request.type==='close' && active.value)closeTab(active.value)
   else if(request.type==='print')editCommand('print')
+  else if(request.type==='quit') {
+    if(native.isTauri())void closeWindow()
+    else status.value='请先保存修改，再关闭当前浏览器标签页。'
+  }
 }
 function keydown(event:KeyboardEvent) {
   if(!(event.ctrlKey||event.metaKey)||event.altKey)return
@@ -168,20 +248,33 @@ function keydown(event:KeyboardEvent) {
 function beforeUnload(event:BeforeUnloadEvent){if(tabs.value.some(t=>t.dirty)){event.preventDefault();event.returnValue=''}}
 onMounted(async()=>{
   window.addEventListener('keydown',keydown);window.addEventListener('beforeunload',beforeUnload)
+  smokeStage('app-mounted',JSON.stringify(smokeMode.value?smokeFeatures():{}))
   try {
+    if(smokeMode.value&&!native.isTauri())throw Error('Native WebView has no Tauri IPC; native bootstrap cannot run')
     if(native.isTauri()) {
-      unlisten=await native.onCloseRequested(closeWindow);await refreshRecents()
-      const config=await native.bootstrap() as Awaited<ReturnType<typeof native.bootstrap>> & {smokeMode?:boolean}
+      unlisten=await smokeAwait('ipc-close-listener',()=>native.onCloseRequested(closeWindow))
+      await smokeAwait('ipc-recent-documents',refreshRecents)
+      const config=await smokeAwait('ipc-bootstrap',native.bootstrap) as Awaited<ReturnType<typeof native.bootstrap>> & {smokeMode?:boolean}
+      if(smokeMode.value&&!config.smokeMode)throw Error('Native smoke URL was not enabled by the process')
       if(config.smokeMode) {
         smokeMode.value=true
-        const report:Record<string,unknown>={crossOriginIsolated,sharedArrayBuffer:typeof SharedArrayBuffer!=='undefined',userAgent:navigator.userAgent}
+        const report:Record<string,unknown>={...smokeFeatures()}
         try {
           if(!crossOriginIsolated)throw Error('Native WebView is not cross-origin isolated')
+          smokeStage('office-start','creating Writer document')
           await addDocument({id:'',kind:'word',extension:'docx',name:'Smoke.docx',base64:'',sha256:'',sizeBytes:0})
           await nextTick()
-          for(let count=0;count<480&&!active.value?.ready;count++) await new Promise(resolve=>setTimeout(resolve,500))
+          const deadline=Date.now()+240000
+          while(!active.value?.ready&&Date.now()<deadline) {
+            if(active.value?.loadError)throw Error(active.value.loadError)
+            await new Promise(resolve=>setTimeout(resolve,250))
+          }
+          if(!active.value?.ready)throw Error('Office engine readiness timed out after 240s')
           if(!officeEditor.value?.smokeTest)throw Error('Office smoke test unavailable')
+          smokeStage('office-roundtrip','starting actual Writer and Calc edits')
           report.office=await officeEditor.value.smokeTest()
+          smokeStage('office-roundtrip','complete')
+          smokeStage('pdf-roundtrip','starting actual original text replacement')
           const {requestPdf}=await import('./pdf/protocol')
           const pdf=await requestPdf('new','',{});if(!pdf.base64)throw Error('PDF new returned no bytes')
           const added=await requestPdf('add_text',pdf.base64,{pageIndex:0,rect:[35,35,500,100],text:'OLD_NATIVE_TEXT 旧合同',fontSize:14})
@@ -194,11 +287,12 @@ onMounted(async()=>{
           const newTextPresent=text.includes('NEW_NATIVE_TEXT')&&text.includes('新的合同')
           if(!removedOldText||!newTextPresent||info.metadata?.pageCount!==1)throw Error('PDF original text replacement did not survive reopening')
           report.pdf={ok:true,reopened:true,removedOldText,newTextPresent,text,metadata:info.metadata};report.ok=true
+          smokeStage('pdf-roundtrip','complete')
         }catch(e){report.ok=false;report.error=message(e)}
-        await invoke('smoke_report',{report})
+        await smokeAwait('ipc-smoke-report',()=>invoke('smoke_report',{report}))
       }
     }
-  }catch(e){error.value=message(e)}
+  }catch(e){error.value=message(e);if(smokeMode.value)await smokeFailure(e,'app-startup')}
 })
 onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);window.removeEventListener('beforeunload',beforeUnload)})
 </script>
@@ -236,9 +330,9 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
     <section v-show="!home" class="editor-workspace">
       <div class="tab-bar"><button class="home-tab" @click="home=true" aria-label="工作台"><Icon name="home" :size="18"/></button><div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div><button class="new-tab" @click="home=true" aria-label="新建文档"><Icon name="plus" :size="18"/></button></div>
       <div class="command-bar"><button @click="openFile"><Icon name="folder" :size="17"/>打开</button><span class="separator"/><button :disabled="!active?.ready" @click="save()"><Icon name="save" :size="17"/>保存</button><button :disabled="!active?.ready" @click="save(true)">另存为</button><button v-if="active?.document.kind!=='pdf'" :disabled="!active?.ready" @click="save(true,'pdf')"><Icon name="download" :size="17"/>导出 PDF</button><span class="separator"/><button :disabled="!active?.ready" @click="editCommand('undo')" title="撤销"><Icon name="undo" :size="17"/></button><button :disabled="!active?.ready" @click="editCommand('redo')" title="重做"><Icon name="redo" :size="17"/></button><span class="command-spacer"/><span class="save-state"><i :class="{'dirty-dot':active?.dirty}"/>{{active?.dirty?'尚未保存':'已保存'}}</span></div>
-      <div class="editor-content">
-        <OfficeEditor v-if="officeDocument" v-show="active?.document.kind!=='pdf'" ref="officeEditor" :document="officeDocument" :smoke-mode="smokeMode" @dirty="dirtyFor(officeDocument?.id,$event)" @ready="readyFor(officeDocument?.id)" @error="error=$event" @status="status=$event" @request="officeRequest"/>
-        <PdfEditor v-if="pdfDocument && active?.document.kind==='pdf'" :key="pdfDocument.id" ref="pdfEditor" :document="pdfDocument" :initial-dirty="active?.dirty" @dirty="dirtyFor(pdfDocument?.id,$event)" @ready="readyFor(pdfDocument?.id)" @error="error=$event" @status="status=$event"/>
+      <div class="editor-content" :inert="!!busy">
+        <OfficeEditor v-if="officeDocument" v-show="active?.document.kind!=='pdf'" ref="officeEditor" :document="officeDocument" :smoke-mode="smokeMode" @dirty="dirtyFor(officeDocument?.id,$event)" @ready="readyFor(officeDocument?.id)" @error="editorError(officeDocument?.id,$event)" @status="status=$event" @request="officeRequest"/>
+        <PdfEditor v-if="pdfDocument && active?.document.kind==='pdf'" :key="pdfDocument.id" ref="pdfEditor" :document="pdfDocument" :initial-dirty="active?.dirty" @dirty="dirtyFor(pdfDocument?.id,$event)" @ready="readyFor(pdfDocument?.id)" @error="editorError(pdfDocument?.id,$event)" @status="status=$event"/>
       </div>
       <footer class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · 本机编辑</span></footer>
     </section>

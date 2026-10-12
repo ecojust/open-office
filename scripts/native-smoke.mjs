@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import {
-  closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync,
+  appendFileSync, closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync,
   readFileSync, readSync, realpathSync, renameSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,6 +14,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TIMEOUT_MS = 300_000;
 const MAX_REPORT_BYTES = 1024 * 1024;
+const STREAM_TAIL_BYTES = 32 * 1024;
 const PLATFORMS = Object.freeze({
   'windows-x64': { os: 'win32', arch: 'x64', target: 'x86_64-pc-windows-msvc' },
   'macos-x64': { os: 'darwin', arch: 'x64', nativeArch: 'x86_64', target: 'x86_64-apple-darwin' },
@@ -22,6 +23,59 @@ const PLATFORMS = Object.freeze({
 
 function requireCheck(value, message) {
   assert.ok(value, message);
+}
+
+export function appendLogTail(previous, chunk) {
+  const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+  if (bytes.length >= STREAM_TAIL_BYTES) return Buffer.from(bytes.subarray(-STREAM_TAIL_BYTES));
+  return Buffer.from(Buffer.concat([previous, bytes]).subarray(-STREAM_TAIL_BYTES));
+}
+
+export function decodeLogTail(bytes) {
+  // Normalize potentially split/invalid UTF-8 first, then bound the encoded text
+  // again so replacement characters cannot enlarge the artifact beyond 32 KiB.
+  const utf8 = Buffer.from(bytes.toString('utf8'));
+  let offset = Math.max(0, utf8.length - STREAM_TAIL_BYTES);
+  while (offset < utf8.length && (utf8[offset] & 0xc0) === 0x80) offset++;
+  return utf8.subarray(offset).toString('utf8');
+}
+
+export function escapeWorkflowCommand(value) {
+  // GitHub decodes command data after identifying its physical line. Escape '%' first.
+  return String(value).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+}
+
+function shortDiagnostic(value, limit) {
+  return String(value ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ').slice(0, limit);
+}
+
+export function emitFailureDiagnostics(report, env, reportPath) {
+  const phase = report.frontend?.phase ?? report.phase;
+  const lastNativeEvent = Array.isArray(report.nativeDiagnostics?.events) ? report.nativeDiagnostics.events.at(-1) : null;
+  const lines = [
+    `Open Office native GUI smoke failed (${shortDiagnostic(report.platformId, 40)}).`,
+    `Phase: ${phase == null ? 'not reported' : shortDiagnostic(phase, 160)}`,
+    `Reason: ${shortDiagnostic(report.errors?.[0] || 'No diagnostic reason was recorded', 1000)}`,
+  ];
+  if (lastNativeEvent?.phase != null) {
+    lines.push(`Last native phase: ${shortDiagnostic(lastNativeEvent.phase, 160)}`);
+    if (lastNativeEvent.detail != null) lines.push(`Native detail: ${shortDiagnostic(lastNativeEvent.detail, 400)}`);
+  }
+  if (report.frontend?.error != null) lines.push(`Frontend error: ${shortDiagnostic(report.frontend.error, 1000)}`);
+  lines.push(`Process: exit=${report.process?.exitCode ?? 'none'}, signal=${shortDiagnostic(report.process?.signal || 'none', 40)}, timedOut=${report.process?.timedOut === true}`);
+  lines.push(`Detailed diagnostics and log tails: artifacts/${basename(reportPath)}`);
+  const message = lines.join('\n');
+  console.error(`::error title=Open Office native GUI smoke::${escapeWorkflowCommand(message)}`);
+  if (env.GITHUB_STEP_SUMMARY) {
+    try {
+      requireCheck(isAbsolute(env.GITHUB_STEP_SUMMARY), 'GITHUB_STEP_SUMMARY must be an absolute path');
+      const html = message.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+      appendFileSync(env.GITHUB_STEP_SUMMARY, `\n### Open Office native GUI smoke failed\n\n<pre>${html}</pre>\n`, 'utf8');
+    } catch (error) {
+      const safeCode = shortDiagnostic(error?.code || error?.name || 'unknown error', 80);
+      console.error(`::error title=Open Office smoke summary::${escapeWorkflowCommand(`Could not append GITHUB_STEP_SUMMARY (${safeCode}); the diagnostic artifact is preserved.`)}`);
+    }
+  }
 }
 
 /** Keep this aligned with App.vue and public/office/host.js, not just report.ok. */
@@ -104,7 +158,7 @@ function nativeTool(program, args, label = basename(program)) {
   if (result.error || result.status !== 0 || result.signal) {
     // Codesign only reads our fixed local build artifacts. Its bounded diagnostic
     // tail is necessary to identify a broken resource seal/framework remotely.
-    // Application stdout/stderr, which could contain document data, stay hashed.
+    // Fixture-only application stdout/stderr tails stay in the diagnostic artifact.
     const diagnostic = program === '/usr/bin/codesign'
       ? Buffer.from(String(result.stderr || '')).subarray(-4000).toString('utf8').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
       : '';
@@ -197,6 +251,7 @@ async function runGui(executable, output, workingDirectory, env, diagnostic) {
     });
     diagnostic.pid = child.pid ?? null;
     const hashes = { stdout: createHash('sha256'), stderr: createHash('sha256') };
+    const tails = { stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) };
     diagnostic.stdoutBytes = 0; diagnostic.stderrBytes = 0;
     let finished = false, forceTimer, cleanupTimer;
     for (const stream of ['stdout', 'stderr']) {
@@ -204,6 +259,7 @@ async function runGui(executable, output, workingDirectory, env, diagnostic) {
         if (finished) return;
         diagnostic[`${stream}Bytes`] += chunk.length;
         hashes[stream].update(chunk);
+        tails[stream] = appendLogTail(tails[stream], chunk);
       });
     }
     const timeout = setTimeout(() => {
@@ -220,6 +276,8 @@ async function runGui(executable, output, workingDirectory, env, diagnostic) {
       clearTimeout(timeout); clearTimeout(forceTimer); clearTimeout(cleanupTimer);
       diagnostic.stdoutSha256 = hashes.stdout.digest('hex');
       diagnostic.stderrSha256 = hashes.stderr.digest('hex');
+      diagnostic.stdoutTail = decodeLogTail(tails.stdout);
+      diagnostic.stderrTail = decodeLogTail(tails.stderr);
       if (error) {
         // Even an OS-level kill failure must not keep Node/CI alive via pipe handles.
         child.stdout.destroy(); child.stderr.destroy(); child.unref();
@@ -248,17 +306,50 @@ async function runGui(executable, output, workingDirectory, env, diagnostic) {
   });
 }
 
-function readFrontendReport(path) {
+function readJsonEvidence(path) {
   const stat = lstatSync(path);
-  requireCheck(stat.isFile() && !stat.isSymbolicLink() && stat.size > 0 && stat.size <= MAX_REPORT_BYTES, 'Native GUI report must be a regular JSON file no larger than 1 MiB');
-  return JSON.parse(readFileSync(path, 'utf8'));
+  requireCheck(stat.isFile() && !stat.isSymbolicLink() && stat.size > 0 && stat.size <= MAX_REPORT_BYTES, 'Native evidence must be a regular JSON file no larger than 1 MiB');
+  const bytes = readFileSync(path);
+  requireCheck(bytes.length > 0 && bytes.length <= MAX_REPORT_BYTES, 'Native evidence exceeded 1 MiB while being read');
+  return { bytes, value: JSON.parse(bytes.toString('utf8')) };
+}
+
+function readFrontendReport(path) {
+  return readJsonEvidence(path).value;
+}
+
+function writeEvidence(path, bytes) {
+  mkdirSync(dirname(path), { recursive: true });
+  const temporary = `${path}.${process.pid}.tmp`;
+  writeFileSync(temporary, bytes, { flag: 'wx' });
+  renameSync(temporary, path);
 }
 
 function writeReport(path, report) {
-  mkdirSync(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  writeFileSync(temporary, `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx' });
-  renameSync(temporary, path);
+  writeEvidence(path, `${JSON.stringify(report, null, 2)}\n`);
+}
+
+export function preserveNativeDiagnostics(temporaryDirectory, root, platformId, report) {
+  const path = join(temporaryDirectory, 'diagnostics.json');
+  try {
+    const evidence = readJsonEvidence(path);
+    requireCheck(evidence.value?.schemaVersion === 1 && Array.isArray(evidence.value.events)
+      && evidence.value.events.length <= 256, 'Native diagnostics schema is invalid');
+    for (const event of evidence.value.events) {
+      requireCheck(typeof event?.phase === 'string' && event.phase.length <= 80
+        && typeof event.detail === 'string' && event.detail.length <= 400
+        && Number.isFinite(event.elapsedMs) && event.elapsedMs >= 0, 'Native diagnostic event is invalid');
+    }
+    report.nativeDiagnostics = evidence.value;
+    const artifact = join(root, 'artifacts', `${platformId}-native-diagnostics.json`);
+    // Preserve the same bounded bytes, rather than expanding them with pretty JSON.
+    writeEvidence(artifact, evidence.bytes);
+    report.nativeDiagnosticsArtifact = `artifacts/${basename(artifact)}`;
+  } catch (error) {
+    report.nativeDiagnosticsError = error?.code === 'ENOENT'
+      ? 'Native process did not produce diagnostics.json'
+      : `Native diagnostics could not be preserved (${shortDiagnostic(error?.code || error?.name || 'invalid evidence', 80)})`;
+  }
 }
 
 export async function runNativeSmoke(args = process.argv.slice(2), env = process.env, root = PROJECT_ROOT) {
@@ -270,7 +361,7 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     commit: env.GITHUB_SHA || null, runId: env.GITHUB_RUN_ID || null,
     host: { platform: process.platform, architecture: process.arch },
     startedAt: new Date(started).toISOString(), timeoutMs: TIMEOUT_MS,
-    preflight: {}, process: { exitCode: null, signal: null, timedOut: false }, frontend: null, errors: [],
+    preflight: {}, process: { exitCode: null, signal: null, timedOut: false, stdoutTail: '', stderrTail: '' }, frontend: null, errors: [],
   };
   let temporaryDirectory, rawReport;
   try {
@@ -309,19 +400,23 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     }
     report.errors.push(String(error?.message || 'Native smoke test failed').slice(0, 5000));
   } finally {
+    if (!report.ok && temporaryDirectory) preserveNativeDiagnostics(temporaryDirectory, root, platformId, report);
     report.finishedAt = new Date().toISOString();
     report.durationMs = Date.now() - started;
     writeReport(reportPath, report);
     if (temporaryDirectory) rmSync(temporaryDirectory, { recursive: true, force: true });
   }
   console.log(`Native GUI smoke ${report.ok ? 'passed' : 'failed'}: artifacts/${basename(reportPath)}`);
-  if (!report.ok) console.error(report.errors.join('\n'));
+  if (!report.ok) emitFailureDiagnostics(report, env, reportPath);
   return report;
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   runNativeSmoke().then(report => { process.exitCode = report.ok ? 0 : 1; }).catch(error => {
-    console.error(`Native smoke could not write its diagnostic report: ${error?.code || error?.name || 'unknown error'}`);
+    const message = `Native smoke could not finish writing its diagnostic report (${shortDiagnostic(error?.code || error?.name || 'unknown error', 80)}).`;
+    const platformId = Object.hasOwn(PLATFORMS, process.env.OPEN_OFFICE_PLATFORM_ID || '') ? process.env.OPEN_OFFICE_PLATFORM_ID : 'unknown-platform';
+    emitFailureDiagnostics({ platformId, errors: [message], process: {} }, process.env,
+      join(PROJECT_ROOT, 'artifacts', `${platformId}-native-smoke.json`));
     process.exitCode = 1;
   });
 }

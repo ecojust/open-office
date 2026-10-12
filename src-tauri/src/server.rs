@@ -1,5 +1,6 @@
 //! A loopback-only, read-only asset server. User documents are never served here.
 //! A fresh secret URL namespace prevents other local pages from reading app assets.
+use crate::smoke::{Smoke, REPORT_LIMIT};
 use percent_encoding::percent_decode_str;
 use serde::Serialize;
 use std::{
@@ -31,6 +32,7 @@ pub struct Bootstrap {
 
 pub struct AssetServer {
     pub info: Bootstrap,
+    pub smoke: Option<Smoke>,
     shutdown: Arc<AtomicBool>,
     listener: Option<JoinHandle<()>>,
 }
@@ -40,10 +42,15 @@ struct Assets {
     root: PathBuf,
     token: String,
     host: String,
+    smoke: Option<Smoke>,
 }
 
 impl AssetServer {
     pub fn start(root: &Path) -> Result<Self, String> {
+        Self::start_with_smoke(root, None)
+    }
+
+    pub fn start_with_smoke(root: &Path, smoke: Option<Smoke>) -> Result<Self, String> {
         let root = root.canonicalize().map_err(|_| {
             "找不到应用界面资源。开发时请先运行 npm run build，安装版请重新安装完整应用。"
         })?;
@@ -66,13 +73,17 @@ impl AssetServer {
             origin,
             base_path,
             platform: std::env::consts::OS.into(),
-            smoke_mode: std::env::var("OPEN_OFFICE_SMOKE").as_deref() == Ok("1"),
+            smoke_mode: smoke.is_some(),
         };
         let assets = Assets {
             root,
             token,
             host: address.to_string(),
+            smoke: smoke.clone(),
         };
+        if let Some(diagnostic) = &smoke {
+            diagnostic.note("http-listening", "loopback static assets ready");
+        }
         let shutdown = Arc::new(AtomicBool::new(false));
         let stop = shutdown.clone();
         let connections = Arc::new(AtomicUsize::new(0));
@@ -114,6 +125,7 @@ impl AssetServer {
             .map_err(|_| "无法启动本地资源线程。")?;
         Ok(Self {
             info,
+            smoke,
             shutdown,
             listener: Some(listener),
         })
@@ -266,20 +278,24 @@ fn error_response(
 fn serve(stream: &mut TcpStream, assets: &Assets) -> std::io::Result<()> {
     let mut input = Vec::new();
     let mut chunk = [0u8; 2048];
-    loop {
+    let header_end = loop {
         let count = stream.read(&mut chunk)?;
         if count == 0 {
             return Ok(());
         }
         input.extend_from_slice(&chunk[..count]);
+        if let Some(position) = input.windows(4).position(|bytes| bytes == b"\r\n\r\n") {
+            if position + 4 > HEADER_LIMIT {
+                return error_response(stream, 431, "Headers too large", false, None);
+            }
+            break position + 4;
+        }
         if input.len() > HEADER_LIMIT {
             return error_response(stream, 431, "Headers too large", false, None);
         }
-        if input.windows(4).any(|bytes| bytes == b"\r\n\r\n") {
-            break;
-        }
-    }
-    let request = match std::str::from_utf8(&input) {
+    };
+    let header_bytes = input[..header_end].to_vec();
+    let request = match std::str::from_utf8(&header_bytes) {
         Ok(request) => request,
         Err(_) => return error_response(stream, 400, "Bad request", false, None),
     };
@@ -289,11 +305,11 @@ fn serve(stream: &mut TcpStream, assets: &Assets) -> std::io::Result<()> {
         return error_response(stream, 400, "Bad request", false, None);
     }
     let head = parts[0] == "HEAD";
-    if !matches!(parts[0], "GET" | "HEAD") {
-        return error_response(stream, 405, "Read only", head, Some("Allow: GET, HEAD"));
-    }
     let mut host = None;
     let mut range = None;
+    let mut origin = None;
+    let mut length = None;
+    let mut content_type = None;
     for line in lines.take_while(|line| !line.is_empty()) {
         let Some((name, value)) = line.split_once(':') else {
             return error_response(stream, 400, "Bad request", head, None);
@@ -310,19 +326,129 @@ fn serve(stream: &mut TcpStream, assets: &Assets) -> std::io::Result<()> {
             }
             range = Some(value.trim());
         }
+        if name.eq_ignore_ascii_case("origin") {
+            if origin.is_some() {
+                return error_response(stream, 400, "Bad origin", head, None);
+            }
+            origin = Some(value.trim());
+        }
+        if name.eq_ignore_ascii_case("content-length") {
+            if length.is_some() {
+                return error_response(stream, 400, "Bad length", head, None);
+            }
+            length = Some(value.trim());
+        }
+        if name.eq_ignore_ascii_case("content-type") {
+            content_type = Some(value.trim());
+        }
+        if name.eq_ignore_ascii_case("transfer-encoding") {
+            return error_response(stream, 400, "Unsupported encoding", head, None);
+        }
     }
     if host != Some(assets.host.as_str()) {
         return error_response(stream, 403, "Forbidden", head, None);
     }
+    let diagnostic_route = parts[1]
+        .split('?')
+        .next()
+        .unwrap_or("")
+        .strip_prefix(&format!("/{}/__native-smoke/", assets.token));
+    if parts[0] == "POST" {
+        if let (Some(smoke), Some(route)) = (&assets.smoke, diagnostic_route) {
+            if !matches!(route, "progress" | "failure") {
+                return error_response(stream, 404, "Not found", false, None);
+            }
+            if origin != Some(format!("http://{}", assets.host).as_str())
+                || content_type != Some("application/json")
+            {
+                smoke.note("http-report-rejected", "origin or content type mismatch");
+                return error_response(stream, 403, "Forbidden", false, None);
+            }
+            let Some(length) = length
+                .and_then(|value| value.parse::<usize>().ok())
+                .filter(|length| *length <= REPORT_LIMIT)
+            else {
+                return error_response(stream, 413, "Report too large", false, None);
+            };
+            let mut body = input[header_end..].to_vec();
+            if body.len() > length {
+                return error_response(stream, 400, "Bad body", false, None);
+            }
+            while body.len() < length {
+                let read_limit = (length - body.len()).min(chunk.len());
+                let read = stream.read(&mut chunk[..read_limit])?;
+                if read == 0 {
+                    return error_response(stream, 400, "Truncated body", false, None);
+                }
+                body.extend_from_slice(&chunk[..read]);
+            }
+            let Ok(report) = serde_json::from_slice::<serde_json::Value>(&body) else {
+                return error_response(stream, 400, "Bad JSON", false, None);
+            };
+            if route == "progress" {
+                let Some(phase) = report
+                    .get("phase")
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|value| !value.is_empty() && value.len() <= 80)
+                else {
+                    return error_response(stream, 400, "Bad phase", false, None);
+                };
+                smoke.note(
+                    phase,
+                    report
+                        .get("detail")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or(""),
+                );
+            } else if let Err(error) = smoke.failure_report(&report) {
+                smoke.note("http-report-rejected", &error);
+                return error_response(stream, 400, "Invalid failure report", false, None);
+            }
+            headers(stream, 200, "OK", "application/json", 2, None)?;
+            stream.write_all(b"{}")?;
+            stream.flush()?;
+            if route == "failure" {
+                smoke.stop_after_failure();
+            }
+            return Ok(());
+        }
+    }
+    if !matches!(parts[0], "GET" | "HEAD") {
+        return error_response(stream, 405, "Read only", head, Some("Allow: GET, HEAD"));
+    }
     let path = match resolve_path(&assets.root, &assets.token, parts[1]) {
         Ok(path) => path,
-        Err(_) => return error_response(stream, 404, "Not found", head, None),
+        Err(_) => {
+            if let Some(smoke) = &assets.smoke {
+                let name = parts[1]
+                    .split('?')
+                    .next()
+                    .unwrap_or("")
+                    .strip_prefix(&format!("/{}/", assets.token))
+                    .unwrap_or("outside token namespace");
+                smoke.note("http-404", name);
+            }
+            return error_response(stream, 404, "Not found", head, None);
+        }
     };
     let mut file = match File::open(&path) {
         Ok(file) => file,
         Err(_) => return error_response(stream, 404, "Not found", head, None),
     };
     let length = file.metadata()?.len();
+    if let Some(smoke) = &assets.smoke {
+        let name = path
+            .strip_prefix(&assets.root)
+            .unwrap_or(&path)
+            .to_string_lossy();
+        if name.ends_with(".html")
+            || name.ends_with(".js")
+            || name.ends_with(".wasm")
+            || name.ends_with(".data")
+        {
+            smoke.note("http-asset", &format!("{name} ({length} bytes)"));
+        }
+    }
     let (status, reason, start, count, extra) = if let Some(range) = range {
         match byte_range(range, length) {
             Ok((start, end)) => (
@@ -457,8 +583,65 @@ mod tests {
         assert!(partial.starts_with("HTTP/1.1 206"));
         assert!(partial.ends_with("234"));
         assert!(request(&server, &server.info.base_path, "POST", "").starts_with("HTTP/1.1 405"));
+        assert!(request(
+            &server,
+            &format!("{}__native-smoke/failure", server.info.base_path),
+            "POST",
+            ""
+        )
+        .starts_with("HTTP/1.1 405"));
         assert!(request(&server, "/wrong/", "GET", "").starts_with("HTTP/1.1 404"));
         assert!(request(&server, &server.info.base_path, "HEAD", "").ends_with("\r\n\r\n"));
+    }
+
+    #[test]
+    fn smoke_fallback_requires_exact_origin_token_and_explicit_failure() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("index.html"), "home").unwrap();
+        let output = root.path().join("result/report.json");
+        let stopped = Arc::new(AtomicBool::new(false));
+        let flag = stopped.clone();
+        let smoke = Smoke::new(output.clone(), move || {
+            flag.store(true, Ordering::Release);
+        });
+        let server = AssetServer::start_with_smoke(root.path(), Some(smoke)).unwrap();
+        let post = |path: &str, origin: &str, body: &str| {
+            let address = server.info.origin.strip_prefix("http://").unwrap();
+            let mut stream = TcpStream::connect(address).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            write!(stream,"POST {path} HTTP/1.1\r\nHost: {address}\r\nOrigin: {origin}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",body.len()).unwrap();
+            let mut response = String::new();
+            stream.read_to_string(&mut response).unwrap();
+            response
+        };
+        let route = format!("{}__native-smoke/failure", server.info.base_path);
+        assert!(post(&route, "http://localhost:1", r#"{"ok":false}"#).starts_with("HTTP/1.1 403"));
+        assert!(post(
+            "/wrong/__native-smoke/failure",
+            &server.info.origin,
+            r#"{"ok":false}"#
+        )
+        .starts_with("HTTP/1.1 405"));
+        assert!(post(&route, &server.info.origin, r#"{"ok":true}"#).starts_with("HTTP/1.1 400"));
+        assert!(!output.exists());
+        assert!(!stopped.load(Ordering::Acquire));
+        let progress = format!("{}__native-smoke/progress", server.info.base_path);
+        assert!(post(
+            &progress,
+            &server.info.origin,
+            r#"{"phase":"main-entry","detail":"module loaded"}"#
+        )
+        .starts_with("HTTP/1.1 200"));
+        assert!(post(
+            &route,
+            &server.info.origin,
+            r#"{"ok":false,"error":"IPC unavailable"}"#
+        )
+        .starts_with("HTTP/1.1 200"));
+        assert!(output.is_file());
+        assert!(stopped.load(Ordering::Acquire));
     }
 
     #[test]

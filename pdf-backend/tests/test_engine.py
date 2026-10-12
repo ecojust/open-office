@@ -3,6 +3,7 @@ import base64
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 import pymupdf
 
@@ -85,6 +86,28 @@ class PdfTests(unittest.TestCase):
         with reopened(result) as doc:
             self.assertIn('新增中文 Added', doc[1].get_text())
             self.assertIn('PAGE_TWO', doc[1].get_text())
+
+    def test_output_size_limit_rejects_transaction_and_original_can_reopen(self):
+        self.assertEqual(engine.MAX_OUTPUT_BYTES, engine.MAX_PDF_BYTES)
+        with pymupdf.open() as document:
+            document.new_page(width=360, height=240)
+            original = b64(document.tobytes(garbage=4, deflate=True))
+        limit = 2048
+        self.assertLess(len(base64.b64decode(original)), limit)
+        options = {'pageIndex': 0, 'rect': [20, 35, 320, 100],
+                   'text': '真实嵌入字体使文件超过小阈值', 'fontSize': 12}
+        successful = request('add_text', original, options)
+        self.assertTrue(successful['ok'], successful)
+        self.assertGreater(len(base64.b64decode(successful['base64'])), limit)
+        with patch.multiple(engine, MAX_PDF_BYTES=limit, MAX_OUTPUT_BYTES=limit):
+            rejected = request('add_text', original, options)
+            self.assertFalse(rejected['ok'])
+            self.assertEqual(rejected['error']['code'], 'OUTPUT_LIMIT')
+            self.assertNotIn('base64', rejected)
+            intact = request('inspect', original)
+            self.assertTrue(intact['ok'], intact)
+            self.assertEqual(intact['metadata']['pageCount'], 1)
+            self.assertEqual(intact['textBlocks'], [])
 
     def test_expanded_layout_does_not_expand_original_text_redaction(self):
         result = request('replace_text', self.source, {

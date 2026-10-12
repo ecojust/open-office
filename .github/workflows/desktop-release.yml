@@ -8,6 +8,16 @@ on:
         type: boolean
         required: false
         default: false
+      platform:
+        description: Native platform to verify (publishing requires all)
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - macos-arm64
+          - windows-x64
+          - macos-x64
 
 permissions:
   contents: read
@@ -17,30 +27,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  plan:
+    name: Validate requested platforms
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      matrix: ${{ steps.platforms.outputs.matrix }}
+    steps:
+      - name: Require all native platforms before any public release
+        id: platforms
+        env:
+          SELECTED_PLATFORM: ${{ inputs.platform }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { appendFileSync } from 'node:fs';
+          const platforms = [
+            { id: 'windows-x64', runner: 'windows-2022', target: 'x86_64-pc-windows-msvc', python: 'x64', nodeArch: 'x64', bundles: 'nsis' },
+            { id: 'macos-arm64', runner: 'macos-15', target: 'aarch64-apple-darwin', python: 'arm64', nodeArch: 'arm64', bundles: 'app,dmg' },
+            { id: 'macos-x64', runner: 'macos-15-intel', target: 'x86_64-apple-darwin', python: 'x64', nodeArch: 'x64', bundles: 'app,dmg' },
+          ];
+          const selected = process.env.SELECTED_PLATFORM;
+          assert.ok(selected === 'all' || platforms.some(platform => platform.id === selected), 'Unknown native platform');
+          if (process.env.PUBLISH === 'true') assert.equal(selected, 'all', 'Publishing requires successful verification on every supported native platform');
+          const matrix = { include: selected === 'all' ? platforms : platforms.filter(platform => platform.id === selected) };
+          appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${JSON.stringify(matrix)}\n`);
+          NODE
   native:
     name: ${{ matrix.id }} native build and GUI round trip
+    needs: plan
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - id: windows-x64
-            runner: windows-2022
-            target: x86_64-pc-windows-msvc
-            python: x64
-            nodeArch: x64
-            bundles: nsis
-          - id: macos-arm64
-            runner: macos-15
-            target: aarch64-apple-darwin
-            python: arm64
-            nodeArch: arm64
-            bundles: app,dmg
-          - id: macos-x64
-            runner: macos-15-intel
-            target: x86_64-apple-darwin
-            python: x64
-            nodeArch: x64
-            bundles: app,dmg
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 75
     env:
@@ -67,6 +86,7 @@ jobs:
         with:
           workspaces: src-tauri -> target
           key: ${{ matrix.target }}
+          cache-on-failure: true
       - name: Require native architecture and record build interpreter
         run: |
           test "$(rustc -vV | sed -n 's/^host: //p')" = "$OPEN_OFFICE_TARGET"
@@ -172,8 +192,8 @@ jobs:
 
   release:
     name: Publish only after all native platforms pass
-    needs: native
-    if: ${{ inputs.publish }}
+    needs: [plan, native]
+    if: ${{ inputs.publish && inputs.platform == 'all' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

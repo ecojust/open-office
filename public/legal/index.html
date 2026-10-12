@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open Office — 开源许可与对应源码</title>
+<style>body{max-width:880px;margin:40px auto;padding:0 20px;font:16px/1.8 system-ui,sans-serif;color:#23314b}a{color:#2455aa}li{margin:.4em 0}code{font-size:.92em}footer{margin-top:3em;color:#637087}</style>
+<h1>开源许可与对应源码</h1>
+<p>Open Office 使用 ZetaOffice / LibreOffice、Qt WASM、PyMuPDF / MuPDF、Vue、PDF.js、Tauri 等开源组件。各组件保留原作者的版权、许可和免责条款，本应用不是这些项目的官方发行版。</p>
+<p>发行物含 AGPL 和 GPL 组件；本项目未使用或购买其商业授权。Qt WASM 平台插件为 GPL 第 3 版，不能以 Qt 其他部分的 LGPL 代替。</p>
+<h2>主要许可原文</h2>
+<ul>
+<li><a href="AGPL-3.0.txt">GNU AGPL 第 3 版 — PyMuPDF / MuPDF</a></li>
+<li><a href="GPL-3.0.txt">GNU GPL 第 3 版</a> · <a href="QT-WASM-LICENSE-HEADER.txt">Qt WASM 插件声明</a></li>
+<li><a href="MPL-2.0.txt">Mozilla Public License 2.0</a> · <a href="LGPL-3.0.txt">GNU LGPL 第 3 版</a></li>
+<li><a href="LIBREOFFICE-THIRD-PARTY-LICENSES.html">LibreOffice / ZetaOffice 上游完整许可及第三方版权</a></li>
+<li><a href="ZETAJS-MIT.txt">zeta.js MIT</a> · <a href="EMSCRIPTEN-LICENSE.txt">Emscripten MIT / NCSA</a></li>
+<li><a href="Apache-2.0.txt">Apache License 2.0</a> · <a href="OFL-1.1.txt">SIL Open Font License 1.1</a> · <a href="NOTO-CJK-NOTICE.txt">Noto 字体版权</a></li>
+<li><a href="PYTHON-LICENSE.txt">Python 许可</a> · <a href="PYINSTALLER-COPYING.txt">PyInstaller 许可及 bootloader 例外</a></li>
+</ul>
+<h2>逐项清单和源码</h2>
+<ul>
+<li><a href="THIRD_PARTY_NOTICES.md">本应用第三方声明</a></li>
+<li><a href="npm-dependencies.json">npm 依赖及许可索引</a> · <a href="rust-dependencies.json">Rust 依赖及许可索引</a></li>
+<li><a href="CORRESPONDING-SOURCE.md">对应源码组装与发行说明</a></li>
+<li><a href="corresponding-sources-manifest.json">固定源码提交、下载地址和 SHA-256</a></li>
+<li><a href="zetajs-local-change.patch">zeta.js 本地修改</a> · <a href="LIBREOFFICE-WASM-BUILD.md">上游 WASM 构建文档</a></li>
+</ul>
+<p>源码归档通过项目中的 <code>scripts/fetch-corresponding-sources.mjs</code> 获取，适合与发行版一同提供。清单说明了已确认的来源和仍需补齐的外部构建依赖，不将分支快照冒称为已经完成二进制可重现验证。</p>
+<footer>所有商标归各自权利人所有。第三方许可原文优先于此中文概述。软件按适用许可原样提供，不作保证。</footer>
+</html>

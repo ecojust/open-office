@@ -1,12 +1,12 @@
 # Offline Writer / Calc adapter
 
-`OfficeEditor.vue` keeps one ZetaOffice WASM engine in a same-origin iframe. It accepts `document` (id/name/kind/extension/base64/sha256/sizeBytes), emits `ready`, `dirty`, `status`, `error`, and `request` for desktop file actions. `request.type` is `open`, `new`, `save`, `save-as`, `export-pdf`, `print`, `close`, or `insert-image`.
+`OfficeEditor.vue` keeps one ZetaOffice WASM engine in a same-origin iframe. It accepts `document` (id/name/kind/extension/base64/sha256/sizeBytes), emits `ready`, `dirty`, `status`, `error`, and `request` for desktop file actions. `request.type` is `open`, `new`, `save`, `save-as`, `export-pdf`, `print`, `close`, or `insert-image`; `quit` requests the application’s existing guarded exit flow. `request.notice` must be surfaced when present. Generic Export currently routes to PDF with an explicit notice; Save a Copy routes to native Save As. Print Preview remains an engine view, while all print buttons request the shell’s explicit “export PDF, then print in a system application” guidance; no system print job is claimed.
 
 Exposed methods:
 
-- `exportFile({format?})`: returns `{base64, extension, name, revision}`. Writer supports DOCX/ODT/PDF; Calc supports XLSX/ODS/PDF. Export does **not** clear unsaved changes.
+- `exportFile({format?})`: returns `{base64, extension, name, revision, dirty}`. Writer supports DOCX/ODT/PDF; Calc supports XLSX/ODS/PDF. Export does **not** clear unsaved changes.
 - `markSaved()`: call only after the native filesystem confirms a successful save. It only clears changes if the document revision still matches the exported revision.
-- `discardChanges()`: explicitly waive the current unsaved state before switching.
+- `discardChanges()`: only clears a state already exported at the same revision, preventing edits during a save/switch from being lost. After explicit user confirmation, `discardChanges({force:true})` may discard the current document without that check.
 - `undo()`, `redo()`, `search(query?)`, `focus()`.
 - `insertImage({name,base64})`: inserts and embeds a PNG/JPEG/WebP/GIF selected by the desktop picker. Images are limited to 25 MiB. The temporary file is not a linked dependency.
 - `smokeTest()`: only enabled by the optional `smokeMode` prop or a Vite development build. Creates hidden disposable documents; edits Writer original text, saves and reopens DOCX, calculates `SUM(A1:A2)` from 40 and 2, saves and reopens XLSX, and exports both as PDF. The resulting JSON includes actual reopened text/formula/value and byte sizes/PDF signatures.

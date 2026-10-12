@@ -12,6 +12,8 @@
 
 桌面外壳提供多文档标签、最近文件、本地打开、保存、另存为、未保存退出确认。保存前检查原文件摘要，避免静默覆盖外部修改；文件写入使用同目录临时文件及原子替换。
 
+当前打印流程先导出 PDF，再由系统 PDF 阅读器执行打印；尚未集成系统打印任务管理。未应用的 PDF 编辑草稿会阻止保存或切换，需先应用或明确放弃。
+
 这不是 Microsoft Office 或 WPS 的官方产品，不宣称与其所有功能和排版完全一致。完整办公内核的高级菜单目前为英文，中文输入与中文字体已集成。Office 宏和自动外部链接更新禁用；不支持旧 DOC/XLS 直接导入。PDF 原文编辑针对可提取文字，扫描件需要独立 OCR。手绘签名不等于带证书的数字签名；修改已有数字签名的文件须另存副本。复杂排版、特殊字体和图表请在交付前检查导出结果。
 
 ## 获取安装包
@@ -22,7 +24,7 @@
 - macOS Apple Silicon（M 系列）DMG。
 - macOS Intel DMG。
 
-安装包包含办公引擎、中文字体和 PDF 内核，安装后可以离线运行。办公引擎启动时需要约 1 GiB 的共享内存，建议至少 8 GiB 内存；不同文字/表格标签复用同一个内核。PDF 会限制输入文件大小和页数，避免无界内存占用。
+安装包包含办公引擎、中文字体和 PDF 内核，安装后可以离线运行。办公引擎启动时需要约 1 GiB 的共享内存，建议至少 8 GiB 内存；不同文字/表格标签复用同一个内核。PDF 编辑支持不超过 40 MiB、500 页的文件，超过上限时会明确报错并保留原文件。
 
 尚未配置 Apple Developer ID 公证及 Windows 商业代码签名。macOS 包会做本地 ad-hoc 签名验证，但这不等于 Apple 公证。如果系统阻止打开，请先核对发布的 SHA256，再按系统“隐私与安全性”中针对该应用的提示允许打开；不建议关闭系统全局安全保护。
 
@@ -52,6 +54,7 @@ npm run dev
 
 ```bash
 npm run typecheck
+npm test
 npm run pdf:test
 npm run desktop:build
 ```
@@ -59,6 +62,15 @@ npm run desktop:build
 通过 GitHub Actions 的 Desktop release 工作流可在三种原生构建机上生成安装包。流水线需要实际启动原生 WebView，确认隔离环境与 SharedArrayBuffer 可用，再执行 Word 原文修改后保存重开、Excel 公式往返及 PDF 中文原文替换后的重开检查；任何平台失败时不发布一组标记成功的安装包。
 
 构建版本采用北京时间 `YYYY.MMDD.HHmm`，也可通过 `OFFICE_BUILD_VERSION` 固定，用于对应安装包与测试记录。
+
+真实浏览器回归（先在另一终端运行 `npm run dev`）：
+
+```bash
+npx playwright install chromium
+npm run test:browser
+```
+
+它使用真实 PDF 引擎生成测试文档、在界面编辑并导出，不接触用户自己的文件。若使用系统 Chromium，可指定 `PLAYWRIGHT_CHROMIUM_EXECUTABLE`。结果及截图保存在 `test-results/`。
 
 ## 目录
 

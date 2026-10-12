@@ -23,29 +23,34 @@ Module.zetajs.then(zetajs => {
       }
     },
   });
-  function nativeRequest(type) {
-    if (current) send({ event: 'native-request', documentId: current.id, data: { type } });
+  function nativeRequest(type, notice) {
+    if (current) send({ event: 'native-request', documentId: current.id, data: { type, ...(notice ? { notice } : {}) } });
   }
   function installInterception(document) {
     let master = null, slave = null;
     const commands = {
-      '.uno:Save': 'save', '.uno:SaveAs': 'save-as', '.uno:SaveAll': 'save',
+      '.uno:Save': 'save', '.uno:SaveAs': 'save-as', '.uno:SaveACopy': 'save-as', '.uno:SaveAll': 'save',
       '.uno:Open': 'open', '.uno:NewDoc': 'new', '.uno:CloseDoc': 'close', '.uno:CloseWin': 'close',
-      '.uno:ExportToPDF': 'export-pdf', '.uno:ExportDirectToPDF': 'export-pdf',
-      '.uno:Print': 'print', '.uno:PrintDefault': 'print', '.uno:InsertGraphic': 'insert-image',
+      '.uno:ExportTo': 'export-pdf', '.uno:ExportToPDF': 'export-pdf', '.uno:ExportDirectToPDF': 'export-pdf',
+      '.uno:Print': 'print', '.uno:PrintDefault': 'print', '.uno:PrintPagePreview': 'print',
+      '.uno:InsertGraphic': 'insert-image', '.uno:Quit': 'quit',
     };
+    const notices = { '.uno:ExportTo': '通用导出当前仅支持 PDF；原格式副本请使用“另存为”。' };
+    // PrintPreview is a local preview view, not a print job. Keep that view native,
+    // but route its PrintPagePreview button through the desktop print notice.
     const delegates = new Map();
     function dispatchFor(url) {
       const type = commands[url.Complete] || (url.Complete.startsWith('private:factory/') ? 'new' : undefined);
       if (!type) return null;
-      if (!delegates.has(type)) delegates.set(type, zetajs.unoObject([css.frame.XDispatch], {
-        dispatch() { nativeRequest(type); },
+      const notice = notices[url.Complete], key = `${type}:${notice || ''}`;
+      if (!delegates.has(key)) delegates.set(key, zetajs.unoObject([css.frame.XDispatch], {
+        dispatch() { nativeRequest(type, notice); },
         addStatusListener(listener, featureURL) {
           listener.statusChanged(new css.frame.FeatureStateEvent({ FeatureURL: featureURL, IsEnabled: true, Requery: false }));
         },
         removeStatusListener() {},
       }));
-      return delegates.get(type);
+      return delegates.get(key);
     }
     const interceptor = zetajs.unoObject([css.frame.XDispatchProviderInterceptor, css.frame.XInterceptorInfo], {
       getInterceptedURLs() { return [...Object.keys(commands), 'private:factory/*']; },
@@ -109,13 +114,16 @@ Module.zetajs.then(zetajs => {
     const filter = format === 'pdf' ? (current.kind === 'word' ? 'writer_pdf_Export' : 'calc_pdf_Export') : filters[format];
     const path = `/tmp/open-office-export-${++outputCounter}.${format}`;
     const revision = current.revision;
+    // UNO isModified is authoritative even if the UI dirty notification is still queued.
+    current.dirty = current.model.isModified();
+    const dirty = current.dirty;
     current.suppressed = true;
     try {
       current.model.storeToURL(`file://${path}`, [prop('FilterName', filter), prop('Overwrite', true),
         prop('InteractionHandler', rejectInteraction)]);
       current.model.setModified(current.dirty);
     } finally { current.suppressed = false; }
-    return { path, extension: format, name: current.name.replace(/\.[^.]+$/, '') + '.' + format, revision };
+    return { path, extension: format, name: current.name.replace(/\.[^.]+$/, '') + '.' + format, revision, dirty };
   }
   function insertImage(path) {
     const provider = css.graphic.GraphicProvider.create(context);
@@ -205,6 +213,9 @@ Module.zetajs.then(zetajs => {
       return { dirty: current.dirty, revision: current.revision };
     }
     if (message.action === 'discard') {
+      if (!message.data.force && (!Number.isInteger(message.data.revision) || message.data.revision !== current.revision)) {
+        throw Error('文档在导出后又有修改，已保留内容。请重新保存或明确放弃修改。');
+      }
       current.suppressed = true; current.model.setModified(false); current.suppressed = false;
       current.dirty = false; reportDirty(current); return { dirty: false };
     }

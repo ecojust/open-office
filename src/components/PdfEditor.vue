@@ -140,10 +140,24 @@ const canUndo = computed(() => !!undoStack.value.length && !isBusy.value)
 const canRedo = computed(() => !!redoStack.value.length && !isBusy.value)
 const currentTextBlocks = computed(() => textBlocks.value.filter(block => block.pageIndex === pageIndex.value && block.text.trim()))
 const propertyPanelVisible = computed(() => !!selectedText.value || tool.value !== 'select')
+const hasPendingEdits = computed(() => {
+  if (selectedText.value) {
+    const block = selectedText.value
+    return editText.value !== block.text || Math.abs(fontSize.value - block.fontSize) > 0.05 || color.value !== textColorHex(block)
+      || !!pendingRect.value?.some((coordinate, index) => Math.abs(coordinate - block.bbox[index]!) > 0.01)
+  }
+  if (tool.value === 'text') return !!editText.value.trim()
+  if (tool.value === 'ink') return inkPaths.value.some(path => path.length > 1)
+  if (tool.value === 'highlight' || tool.value === 'image' && image.value) {
+    return !!pendingRect.value && pendingRect.value[2] - pendingRect.value[0] > 0 && pendingRect.value[3] - pendingRect.value[1] > 0
+  }
+  return false
+})
 const pageStyle = computed(() => ({ width: `${viewport.value?.width ?? 0}px`, height: `${viewport.value?.height ?? 0}px` }))
 const selectionStyle = computed(() => pendingRect.value && viewport.value ? rectStyle(pendingRect.value) : undefined)
 const toolHint = computed(() => {
   if (!engineAvailable) return '浏览器仅提供 PDF 预览。请使用桌面应用编辑文件。'
+  if (tool.value === 'select' && permission.value?.copy === false) return '文件权限不允许提取原文，因此不能显示可编辑的文字区域。需要文档所有者授权。'
   if (tool.value === 'select') return currentTextBlocks.value.length ? '点击页面上的文字，编辑内容后应用。' : '本页没有可直接编辑的文本，可能是扫描页或轮廓文字。可新增文字或批注；编辑原文需要先进行 OCR。'
   if (tool.value === 'text') return '在页面拖出文字区域，再输入内容并应用。'
   if (tool.value === 'highlight') return '在页面拖出需要高亮的区域，点击应用保存。'
@@ -179,7 +193,7 @@ function clearEditorSelection() {
   editText.value = ''
   clearPlacement()
 }
-function announceDirty() { emit('dirty', baselineDirty || currentBytes.value !== savedBase64) }
+function announceDirty() { emit('dirty', baselineDirty || currentBytes.value !== savedBase64 || hasPendingEdits.value) }
 
 async function decodePdf(base64: string, epoch: number): Promise<pdfjs.PDFDocumentProxy> {
   const assetBase = new URL('./pdfjs/', globalThis.document.baseURI).href
@@ -411,6 +425,7 @@ async function inspectCurrentPage() {
 
 function selectPage(index: number, event?: MouseEvent) {
   if (isBusy.value || index < 0 || index >= pageCount.value) return
+  if (index !== pageIndex.value && hasPendingEdits.value) { setStatus('请先应用或清除当前编辑，再切换页面。'); return }
   if (event?.shiftKey) {
     const start = Math.min(lastSelectionAnchor, index)
     const end = Math.max(lastSelectionAnchor, index)
@@ -441,10 +456,9 @@ function changePage(event: Event) {
 function changeZoom(amount: number) {
   fitWidth.value = false
   zoom.value = Math.max(0.25, Math.min(4, Math.round((zoom.value + amount) * 100) / 100))
-  clearPlacement()
   void renderCurrentPage()
 }
-function fitPage() { fitWidth.value = true; clearPlacement(); void renderCurrentPage() }
+function fitPage() { fitWidth.value = true; void renderCurrentPage() }
 function rectStyle(rect: PdfRect) {
   if (!viewport.value) return {}
   const bounds = rectToViewport(rect, viewport.value)
@@ -491,12 +505,16 @@ function runOperation(operation: string, options: Record<string, unknown>, messa
 
 function chooseText(block: PdfTextBlock) {
   if (!canModify.value || isBusy.value || tool.value !== 'select') return
+  if (hasPendingEdits.value && selectedText.value?.id !== block.id) { setStatus('请先应用或取消当前文字编辑。'); return }
   selectedText.value = block
   editText.value = block.text
   fontSize.value = Math.round(block.fontSize * 10) / 10
-  if (typeof block.color === 'number') color.value = `#${block.color.toString(16).padStart(6, '0')}`
-  else color.value = `#${block.color.map(channel => Math.round(channel * 255).toString(16).padStart(2, '0')).join('')}`
+  color.value = textColorHex(block)
   pendingRect.value = [...block.bbox]
+}
+function textColorHex(block: PdfTextBlock) {
+  if (typeof block.color === 'number') return `#${block.color.toString(16).padStart(6, '0')}`
+  return `#${block.color.map(channel => Math.round(channel * 255).toString(16).padStart(2, '0')).join('')}`
 }
 function applyText() {
   const block = selectedText.value
@@ -526,6 +544,7 @@ async function chooseImage() {
 function toolEnabled(id: Tool) { return id === 'highlight' || id === 'ink' ? canAnnotate.value : canModify.value }
 function chooseTool(id: Tool) {
   if (isBusy.value || !toolEnabled(id)) return
+  if (hasPendingEdits.value) { setStatus('请先应用或清除当前编辑，再切换工具。'); return }
   clearEditorSelection()
   tool.value = id
   if (id === 'image' && !image.value) void chooseImage()
@@ -585,14 +604,17 @@ function inkDisplayPoints(path: PdfPoint[]) {
 }
 
 function rotateSelected() {
+  if (hasPendingEdits.value) { setStatus('请先应用或清除当前编辑，再旋转页面。'); return }
   if (canAssemble.value) runOperation('rotate', { pageIndices: selectedPages.value, degrees: 90 }, '正在旋转页面…')
 }
 function deleteSelected() {
+  if (hasPendingEdits.value) { setStatus('请先应用或清除当前编辑，再删除页面。'); return }
   if (!canAssemble.value || selectedPages.value.length >= pageCount.value) return
   runOperation('delete', { pageIndices: selectedPages.value }, '正在删除页面…')
 }
 function moveSelected(direction: -1 | 1) {
   if (!canAssemble.value || isBusy.value) return
+  if (hasPendingEdits.value) { setStatus('请先应用或清除当前编辑，再调整页序。'); return }
   const epoch = documentEpoch
   const order = movePages(pageCount.value, selectedPages.value, direction)
   if (order.every((value, index) => value === index)) return
@@ -604,6 +626,7 @@ function moveSelected(direction: -1 | 1) {
 }
 async function extractSelected() {
   if (!canCopy.value || isBusy.value) return
+  if (hasPendingEdits.value) { setStatus('请先应用或清除当前编辑，再提取页面。'); return }
   const epoch = documentEpoch
   working.value = true
   busyLabel.value = '正在提取页面…'
@@ -623,6 +646,7 @@ async function extractSelected() {
 }
 async function mergeDocument() {
   if (!canAssemble.value || isBusy.value) return
+  if (hasPendingEdits.value) { setStatus('请先应用或清除当前编辑，再合并文件。'); return }
   const epoch = documentEpoch
   try {
     const selected = await pickPdfDocument()
@@ -703,16 +727,16 @@ async function searchDocument() {
   finally { if (sequence === searchSequence) searching.value = false }
 }
 
-async function exportFile(options?: { format?: string }): Promise<{ base64: string; extension: 'pdf'; name?: string; saveAs?: boolean }> {
+async function exportFile(options?: { format?: string }): Promise<{ base64: string; extension: 'pdf'; name?: string; saveAs?: boolean; dirty: boolean }> {
   if (options?.format && options.format.toLowerCase() !== 'pdf') throw new Error('PDF 编辑器只能导出 PDF 格式。')
   const epoch = documentEpoch
   await operationTail
   if (!alive(epoch)) throw new Error('文件已切换，请重新保存当前文件。')
   if (loading.value || working.value || !currentBytes.value) throw new Error('请等待 PDF 操作完成后再保存。')
-  if (pendingRect.value || inkPaths.value.length) throw new Error('页面上还有未应用的编辑，请先应用或取消。')
+  if (hasPendingEdits.value) throw new Error('页面上还有未应用的编辑，请先应用或取消。')
   lastExportedBytes = currentBytes.value
   return {
-    base64: currentBytes.value, extension: 'pdf',
+    base64: currentBytes.value, extension: 'pdf', dirty: baselineDirty || currentBytes.value !== savedBase64,
     ...((signedSource.value || copyRequired.value) && currentBytes.value !== savedBase64 ? {
       name: `${props.document.name.replace(/\.pdf$/i, '')}_编辑副本.pdf`, saveAs: true,
     } : {}),
@@ -747,9 +771,10 @@ watch(() => [props.document.id, props.document.base64] as const, ([id, base64]) 
   }
   void openCurrentDocument()
 }, { immediate: true })
-watch(pageIndex, () => { clearEditorSelection(); void renderCurrentPage(); void inspectCurrentPage() })
+watch(pageIndex, () => { clearEditorSelection(); stage.value?.scrollTo({ top: 0, left: 0 }); void renderCurrentPage(); void inspectCurrentPage() })
 watch(showPages, () => { void nextTick().then(queueVisibleThumbnails) })
 watch(propertyPanelVisible, () => { if (fitWidth.value) void nextTick().then(renderCurrentPage) })
+watch(hasPendingEdits, value => { if (value) emit('dirty', true) })
 
 onBeforeUnmount(() => {
   disposed = true

@@ -23,6 +23,8 @@
 ** information to ensure the GNU General Public License requirements will
 ** be met: https://www.gnu.org/licenses/gpl-3.0.html.
 **
-** $QT_END_LICENSE marker follows in the upstream source.
+** $QT_END_LICENSE$
+**
+****************************************************************************/
 
 Source: https://github.com/allotropia/qtbase/blob/a320678c85ec8029d5394bcd673d4c208af1de3a/src/plugins/platforms/wasm/qwasmintegration.cpp

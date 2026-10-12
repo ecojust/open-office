@@ -12,7 +12,7 @@
     "runtime:fetch": "node scripts/fetch-office-runtime.mjs",
     "build": "npm run assets && npm run runtime:fetch && npm run typecheck && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4198 --strictPort",
-    "test": "npm run typecheck && npm run pdf:test",
+    "test": "npm run typecheck && node --test --experimental-test-isolation=none tests/*.test.mjs && npm run pdf:test",
     "pdf:build": "node scripts/build-pdf-backend.mjs",
     "pdf:ensure": "node scripts/ensure-pdf-backend.mjs",
     "desktop:prepare": "npm run runtime:fetch && npm run pdf:build",
@@ -22,7 +22,8 @@
     "desktop:build": "tauri build",
     "assets": "node scripts/copy-pdf-assets.mjs",
     "postinstall": "npm run assets",
-    "pdf:test": "node scripts/test-pdf-backend.mjs"
+    "pdf:test": "node scripts/test-pdf-backend.mjs",
+    "test:browser": "node tests/browser/pdf-ui.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.3",
@@ -33,6 +34,7 @@
     "@tauri-apps/cli": "2.12.2",
     "@types/node": "24.7.0",
     "@vitejs/plugin-vue": "6.0.1",
+    "playwright": "1.62.1",
     "typescript": "5.9.3",
     "vite": "7.3.7",
     "vue-tsc": "3.1.0"

@@ -1,10 +1,10 @@
 export type Kind = 'word'|'sheet'|'pdf'
 export type Extension = 'docx'|'odt'|'xlsx'|'ods'|'pdf'
-export type EditorExport = {base64:string; extension:Extension; name?:string; saveAs?:boolean}
+export type EditorExport = {base64:string; extension:Extension; name?:string; saveAs?:boolean; dirty?:boolean}
 export type EditorHandle = {
  exportFile(options?:{format?:Extension}):Promise<EditorExport>;
  markSaved?(base64?:string):void|Promise<void>;
- discardChanges?():void|Promise<void>;
+ discardChanges?(options?:{force?:boolean}):void|Promise<void>;
  undo?():void|Promise<void>;
  redo?():void|Promise<void>;
  search?(value:string):void|Promise<void>;
