@@ -1,0 +1,49 @@
+name: Read existing native verification diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Existing desktop build run ID (diagnostics only, no rebuild or release)
+        type: string
+        required: true
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate build identifier
+        env:
+          SOURCE_RUN_ID: ${{ inputs.run_id }}
+        run: node -e 'if(!/^[0-9]+$/.test(process.env.SOURCE_RUN_ID))throw Error("Invalid run ID")'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          pattern: open-office-native-*
+          path: diagnostics
+          merge-multiple: true
+      - name: Expose existing bounded reports through readable check annotations
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync, readdirSync, statSync } from 'node:fs';
+          import assert from 'node:assert/strict';
+          const files = readdirSync('diagnostics').filter(name => /^[a-z0-9-]+-native-smoke\.json$/.test(name));
+          assert.ok(files.length > 0, 'No existing native verification reports were found');
+          const escape = value => String(value).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+          for (const file of files) {
+            assert.ok(statSync(`diagnostics/${file}`).size <= 1024 * 1024, 'Diagnostic report exceeds 1 MiB');
+            const report = JSON.parse(readFileSync(`diagnostics/${file}`, 'utf8'));
+            const details = JSON.stringify(report, null, 2);
+            console.log(`::notice title=${escape(file)}::${escape(details.slice(0, 48_000))}`);
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### ${file}\n\n<pre>${details.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</pre>\n`);
+          }
+          NODE
