@@ -96,8 +96,15 @@ impl AssetServer {
                             if !peer.ip().is_loopback() {
                                 continue;
                             }
-                            let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
-                            let _ = stream.set_write_timeout(Some(Duration::from_secs(60)));
+                            if let Err(error) = configure_stream(&stream) {
+                                if let Some(smoke) = &assets.smoke {
+                                    smoke.note(
+                                        "http-socket-error",
+                                        &format!("{:?}: {error}", error.kind()),
+                                    );
+                                }
+                                continue;
+                            }
                             if connections.fetch_add(1, Ordering::AcqRel) >= CONNECTION_LIMIT {
                                 connections.fetch_sub(1, Ordering::AcqRel);
                                 let _ = error_response(&mut stream, 503, "Busy", false, None);
@@ -108,7 +115,14 @@ impl AssetServer {
                             let spawned = thread::Builder::new().name("office-asset".into()).spawn(
                                 move || {
                                     let _guard = ConnectionGuard(active);
-                                    let _ = serve(&mut stream, &source);
+                                    if let Err(error) = serve(&mut stream, &source) {
+                                        if let Some(smoke) = &source.smoke {
+                                            smoke.note(
+                                                "http-io-error",
+                                                &format!("{:?}: {error}", error.kind()),
+                                            );
+                                        }
+                                    }
                                 },
                             );
                             if spawned.is_err() {
@@ -164,6 +178,16 @@ impl Drop for ConnectionGuard {
     fn drop(&mut self) {
         self.0.fetch_sub(1, Ordering::AcqRel);
     }
+}
+
+fn configure_stream(stream: &TcpStream) -> std::io::Result<()> {
+    // accept() inherits O_NONBLOCK on BSD/macOS, unlike Linux. This server uses
+    // a thread per connection and blocking Read/Write, so normalize the accepted
+    // socket explicitly. Otherwise large WASM responses stop at WouldBlock.
+    // The listening socket itself remains nonblocking for prompt shutdown.
+    stream.set_nonblocking(false)?;
+    stream.set_read_timeout(Some(Duration::from_secs(10)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(60)))
 }
 
 fn resolve_path(root: &Path, token: &str, target: &str) -> Result<PathBuf, ()> {
@@ -481,7 +505,26 @@ fn serve(stream: &mut TcpStream, assets: &Assets) -> std::io::Result<()> {
     headers(stream, status, reason, mime(&path), count, Some(&extra))?;
     if !head {
         file.seek(SeekFrom::Start(start))?;
-        std::io::copy(&mut file.take(count), stream)?;
+        let copied = std::io::copy(&mut file.take(count), stream)?;
+        if copied != count {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "Static asset ended before its Content-Length",
+            ));
+        }
+        if let Some(smoke) = &assets.smoke {
+            if count >= 1024 * 1024 {
+                smoke.note(
+                    "http-asset-complete",
+                    &format!(
+                        "{} ({copied} bytes)",
+                        path.strip_prefix(&assets.root)
+                            .unwrap_or(&path)
+                            .to_string_lossy()
+                    ),
+                );
+            }
+        }
     }
     stream.flush()
 }
@@ -545,6 +588,84 @@ mod tests {
             assert!(byte_range(invalid, 10).is_err());
         }
         assert!(byte_range("bytes=0-", 0).is_err());
+    }
+
+    #[test]
+    fn slow_client_receives_complete_large_wasm_after_inherited_nonblocking_accept() {
+        use sha2::{Digest, Sha256};
+        let root = tempfile::tempdir().unwrap();
+        let bytes: Vec<u8> = (0..16 * 1024 * 1024)
+            .map(|index| (index % 251) as u8)
+            .collect();
+        let expected = Sha256::digest(&bytes);
+        std::fs::write(root.path().join("engine.wasm"), &bytes).unwrap();
+        let socket = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        socket.set_nonblocking(true).unwrap();
+        let address = socket.local_addr().unwrap();
+        let assets = Assets {
+            root: root.path().canonicalize().unwrap(),
+            token: "secret".into(),
+            host: address.to_string(),
+            smoke: None,
+        };
+        let server = thread::spawn(move || {
+            let mut stream = loop {
+                match socket.accept() {
+                    Ok((stream, _)) => break stream,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(1))
+                    }
+                    Err(error) => panic!("accept failed: {error}"),
+                }
+            };
+            // Force the BSD accepted-socket condition on Linux too. Removing
+            // configure_stream's blocking reset causes this request/read or
+            // its large response to fail with WouldBlock.
+            stream.set_nonblocking(true).unwrap();
+            configure_stream(&stream).unwrap();
+            serve(&mut stream, &assets)
+        });
+        let mut client = TcpStream::connect(address).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        // Exercise a temporarily empty request pipe as well as backpressure.
+        thread::sleep(Duration::from_millis(30));
+        write!(
+            client,
+            "GET /secret/engine.wasm HTTP/1.1\r\nHost: {address}\r\n\r\n"
+        )
+        .unwrap();
+        let mut header = vec![];
+        while !header.ends_with(b"\r\n\r\n") {
+            let mut byte = [0];
+            client.read_exact(&mut byte).unwrap();
+            header.push(byte[0]);
+            assert!(header.len() < HEADER_LIMIT);
+        }
+        let header = String::from_utf8(header).unwrap();
+        assert!(header.starts_with("HTTP/1.1 200"));
+        assert!(header.contains("Content-Type: application/wasm"));
+        assert!(header.contains(&format!("Content-Length: {}", bytes.len())));
+        let mut digest = Sha256::new();
+        let mut total = 0;
+        let mut chunk = [0; 64 * 1024];
+        loop {
+            let count = client.read(&mut chunk).unwrap();
+            if count == 0 {
+                break;
+            }
+            digest.update(&chunk[..count]);
+            total += count;
+            thread::sleep(Duration::from_millis(2));
+        }
+        server.join().unwrap().unwrap();
+        assert_eq!(
+            total,
+            bytes.len(),
+            "Large response must not be truncated by socket backpressure"
+        );
+        assert_eq!(digest.finalize(), expected);
     }
 
     fn request(server: &AssetServer, path: &str, method: &str, extra: &str) -> String {
