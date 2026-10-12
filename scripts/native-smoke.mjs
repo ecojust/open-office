@@ -1,0 +1,327 @@
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { spawn, spawnSync } from 'node:child_process';
+import {
+  closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync,
+  readFileSync, readSync, realpathSync, renameSync, rmSync, statSync, writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+// This launches the final packaged GUI, not a source executable or an isolated
+// engine substitute. A native desktop session is required on the CI runner.
+const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const TIMEOUT_MS = 300_000;
+const MAX_REPORT_BYTES = 1024 * 1024;
+const PLATFORMS = Object.freeze({
+  'windows-x64': { os: 'win32', arch: 'x64', target: 'x86_64-pc-windows-msvc' },
+  'macos-x64': { os: 'darwin', arch: 'x64', nativeArch: 'x86_64', target: 'x86_64-apple-darwin' },
+  'macos-arm64': { os: 'darwin', arch: 'arm64', nativeArch: 'arm64', target: 'aarch64-apple-darwin' },
+});
+
+function requireCheck(value, message) {
+  assert.ok(value, message);
+}
+
+/** Keep this aligned with App.vue and public/office/host.js, not just report.ok. */
+export function validateFrontendReport(report) {
+  requireCheck(report && typeof report === 'object' && !Array.isArray(report), 'Missing native frontend report');
+  requireCheck(report.ok === true, 'The native GUI reported a failed smoke test');
+  requireCheck(report.crossOriginIsolated === true, 'Native WebView is not cross-origin isolated');
+  requireCheck(report.sharedArrayBuffer === true, 'SharedArrayBuffer is unavailable in the native WebView');
+  requireCheck(typeof report.userAgent === 'string' && report.userAgent.length > 10, 'Missing native WebView user agent');
+
+  const office = report.office;
+  requireCheck(office?.ok === true, 'Office engine did not pass its document round trips');
+  requireCheck(typeof office.engine === 'string' && office.engine.includes('LibreOffice'), 'Missing actual Office engine identity');
+  const writer = office.writer;
+  requireCheck(writer?.originalTextEdited === true, 'Writer did not reopen and edit original DOCX text');
+  requireCheck(writer.text === 'Open Office edited original text · 中文测试', 'Writer DOCX round-trip text differs from the fixture');
+  requireCheck(writer.macrosDisabled === true && writer.linkUpdatesDisabled === true, 'Writer safe import settings were not exercised');
+  requireCheck(Number.isSafeInteger(writer.docxBytes) && writer.docxBytes > 100, 'Writer produced no real DOCX file');
+  requireCheck(Number.isSafeInteger(writer.pdfBytes) && writer.pdfBytes > 100 && writer.pdfHeader === '%PDF-', 'Writer PDF export failed');
+  const calc = office.calc;
+  requireCheck(calc?.a1 === 40 && calc.a2 === 2, 'Calc original cell values did not survive XLSX reopening');
+  requireCheck(calc.formula === '=SUM(A1:A2)' && calc.value === 42, 'Calc formula or computed result did not survive XLSX reopening');
+  requireCheck(Number.isSafeInteger(calc.xlsxBytes) && calc.xlsxBytes > 100, 'Calc produced no real XLSX file');
+  requireCheck(Number.isSafeInteger(calc.pdfBytes) && calc.pdfBytes > 100 && calc.pdfHeader === '%PDF-', 'Calc PDF export failed');
+
+  const pdf = report.pdf;
+  requireCheck(pdf?.ok === true && pdf.reopened === true, 'The bundled PDF engine did not reopen its edited output');
+  requireCheck(pdf.removedOldText === true && pdf.newTextPresent === true, 'PDF original-text replacement checks failed');
+  requireCheck(pdf.metadata?.pageCount === 1, 'PDF round-trip page count is incorrect');
+  requireCheck(typeof pdf.text === 'string'
+    && pdf.text.includes('NEW_NATIVE_TEXT') && pdf.text.includes('新的合同')
+    && !pdf.text.includes('OLD_NATIVE_TEXT') && !pdf.text.includes('旧合同'), 'PDF reopened text does not match the replacement fixture');
+
+  return {
+    crossOriginIsolated: true, sharedArrayBuffer: true, writerOriginalTextRoundTrip: true,
+    writerPdfExport: true, calcFormulaRoundTrip: true, calcPdfExport: true,
+    pdfOriginalTextReplacementRoundTrip: true,
+  };
+}
+
+function hashFile(path) {
+  const hash = createHash('sha256'), buffer = Buffer.allocUnsafe(1024 * 1024);
+  const descriptor = openSync(path, 'r');
+  try {
+    let bytes;
+    while ((bytes = readSync(descriptor, buffer, 0, buffer.length, null)) > 0) hash.update(buffer.subarray(0, bytes));
+    return hash.digest('hex');
+  } finally { closeSync(descriptor); }
+}
+
+function containedFile(root, path) {
+  const canonicalRoot = realpathSync(root), actual = realpathSync(path);
+  const difference = relative(canonicalRoot, actual);
+  requireCheck(difference && !difference.startsWith(`..${sep}`) && difference !== '..' && !isAbsolute(difference), 'A required application file escapes its installed layout');
+  requireCheck(statSync(actual).isFile(), `Required application file is not a regular file: ${basename(path)}`);
+  return actual;
+}
+
+/** Verify a real AMD64 PE32+ file rather than accepting a .exe filename. */
+export function verifyWindowsExecutable(path) {
+  const descriptor = openSync(path, 'r');
+  try {
+    const size = statSync(path).size, dos = Buffer.alloc(64);
+    requireCheck(size >= 90 && readSync(descriptor, dos, 0, dos.length, 0) === dos.length, 'Windows executable has a truncated DOS header');
+    requireCheck(dos.toString('ascii', 0, 2) === 'MZ', 'Windows executable is not a PE file');
+    const offset = dos.readUInt32LE(0x3c), pe = Buffer.alloc(26);
+    requireCheck(offset >= 64 && offset + pe.length <= size && readSync(descriptor, pe, 0, pe.length, offset) === pe.length, 'Windows executable has an invalid PE header offset');
+    requireCheck(pe.readUInt32LE(0) === 0x00004550, 'Windows executable PE signature is invalid');
+    requireCheck(pe.readUInt16LE(4) === 0x8664 && pe.readUInt16LE(24) === 0x20b, 'Windows executable is not native AMD64 PE32+');
+    const optionalHeaderBytes = pe.readUInt16LE(20);
+    requireCheck(optionalHeaderBytes >= 112 && offset + 24 + optionalHeaderBytes <= size, 'Windows executable has a truncated PE32+ optional header');
+    return { machine: 'AMD64', optionalHeader: 'PE32+', optionalHeaderBytes, sha256: hashFile(path), bytes: size };
+  } finally { closeSync(descriptor); }
+}
+
+function nativeTool(program, args, label = basename(program)) {
+  const result = spawnSync(program, args, {
+    shell: false, encoding: 'utf8', timeout: 25_000, maxBuffer: 512 * 1024, windowsHide: true,
+  });
+  if (result.error || result.status !== 0 || result.signal) {
+    // Codesign only reads our fixed local build artifacts. Its bounded diagnostic
+    // tail is necessary to identify a broken resource seal/framework remotely.
+    // Application stdout/stderr, which could contain document data, stay hashed.
+    const diagnostic = program === '/usr/bin/codesign'
+      ? Buffer.from(String(result.stderr || '')).subarray(-4000).toString('utf8').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
+      : '';
+    throw new Error(`${label} verification failed (exit=${result.status ?? 'none'}, signal=${result.signal ?? 'none'}, code=${result.error?.code ?? 'none'})${diagnostic ? `\n${diagnostic}` : ''}`);
+  }
+  return `${result.stdout || ''}\n${result.stderr || ''}`;
+}
+
+function macPreflight(app, mainExecutable, pdfExecutable, nativeArch) {
+  const signatures = [];
+  for (const [label, path] of [['app', app], ['main', mainExecutable], ['pdfRuntime', pdfExecutable]]) {
+    nativeTool('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=4', path], `codesign ${label} (${basename(path)})`);
+    signatures.push(label);
+  }
+  const description = nativeTool('/usr/bin/codesign', ['--display', '--verbose=4', app], `codesign app metadata (${basename(app)})`);
+  const sealed = /Sealed Resources version=(\d+)\s+rules=(\d+)\s+files=(\d+)/.exec(description);
+  requireCheck(sealed && Number(sealed[1]) >= 2 && Number(sealed[3]) > 0, 'Final macOS app has no verified sealed resources');
+  const plist = /Info\.plist entries=(\d+)/.exec(description);
+  requireCheck(plist && Number(plist[1]) > 0, 'Final macOS app signature does not bind its Info.plist');
+  requireCheck(/^Signature=adhoc\s*$/m.test(description), 'Final macOS app does not have the required ad-hoc bundle signature');
+  requireCheck(!/linker-signed/i.test(description), 'Final macOS app still has a linker-only signature instead of a sealed bundle signature');
+  const mainArchitectures = nativeTool('/usr/bin/lipo', ['-archs', mainExecutable]).trim().split(/\s+/);
+  const pdfArchitectures = nativeTool('/usr/bin/lipo', ['-archs', pdfExecutable]).trim().split(/\s+/);
+  requireCheck(mainArchitectures.includes(nativeArch) && pdfArchitectures.includes(nativeArch), 'Main app or PDF runtime has the wrong macOS architecture');
+  return {
+    strictSignatureVerification: signatures,
+    sealedResources: { version: Number(sealed[1]), rules: Number(sealed[2]), files: Number(sealed[3]) },
+    signature: 'adhoc', infoPlistEntries: Number(plist[1]), linkerSigned: false,
+    developerIdSigned: false, notarized: false,
+    mainArchitectures, pdfArchitectures, originalAppResigned: false,
+  };
+}
+
+function parseOptions(args) {
+  if (args.length === 0) return {};
+  requireCheck(args.length === 2 && args[0] === '--app' && isAbsolute(args[1]), 'Usage: node scripts/native-smoke.mjs [--app /absolute/path/Open Office.app]');
+  return { app: args[1] };
+}
+
+function locateApplication(configuration, options, env, root) {
+  let app = null, resourceRoot, executable;
+  if (configuration.os === 'win32') {
+    requireCheck(!options.app, '--app is only supported for a final macOS .app');
+    const installed = env.OPEN_OFFICE_INSTALLED_APP;
+    requireCheck(installed && isAbsolute(installed), 'OPEN_OFFICE_INSTALLED_APP must name the real NSIS installation directory; portable/source executables are not accepted');
+    resourceRoot = realpathSync(installed);
+    executable = containedFile(resourceRoot, join(resourceRoot, 'open-office.exe'));
+  } else {
+    const candidates = options.app ? [options.app] : [
+      join(root, 'src-tauri', 'target', configuration.target, 'release', 'bundle', 'macos', 'Open Office.app'),
+      join(root, 'src-tauri', 'target', 'release', 'bundle', 'macos', 'Open Office.app'),
+    ].filter(existsSync);
+    requireCheck(candidates.length === 1, 'Select exactly one final macOS app using --app; no source/portable fallback is allowed');
+    app = realpathSync(candidates[0]);
+    requireCheck(app.endsWith('.app') && statSync(app).isDirectory(), 'The selected macOS application is not a .app bundle');
+    executable = containedFile(app, join(app, 'Contents', 'MacOS', 'open-office'));
+    resourceRoot = realpathSync(join(app, 'Contents', 'Resources'));
+    containedFile(app, join(resourceRoot, 'frontend', 'index.html'));
+  }
+  containedFile(resourceRoot, join(resourceRoot, 'frontend', 'index.html'));
+  containedFile(resourceRoot, join(resourceRoot, 'frontend', 'office', 'host.html'));
+  const pdfExecutable = containedFile(resourceRoot, join(resourceRoot, 'pdf-runtime', configuration.os === 'win32' ? 'open-office-pdf.exe' : 'open-office-pdf'));
+  requireCheck(statSync(join(resourceRoot, 'pdf-runtime', '_internal')).isDirectory(), 'The installed PDF runtime is missing its onedir dependencies');
+  return { app, executable, resourceRoot, pdfExecutable };
+}
+
+function killTree(child, env, force = false) {
+  if (!child?.pid) return;
+  if (process.platform === 'win32') {
+    const systemRoot = env.SystemRoot || env.SYSTEMROOT;
+    requireCheck(systemRoot && isAbsolute(systemRoot), 'Cannot locate the fixed Windows system directory for taskkill');
+    const taskkill = join(systemRoot, 'System32', 'taskkill.exe');
+    requireCheck(existsSync(taskkill), 'Windows taskkill is unavailable for process-tree cleanup');
+    // PID is supplied by Node, not by the renderer or a shell argument string.
+    spawnSync(taskkill, ['/PID', String(child.pid), '/T', '/F'], {
+      shell: false, windowsHide: true, timeout: 10_000, stdio: 'ignore',
+    });
+  } else {
+    try { process.kill(-child.pid, force ? 'SIGKILL' : 'SIGTERM'); }
+    catch (error) { if (error.code !== 'ESRCH') throw error; }
+  }
+}
+
+async function runGui(executable, output, workingDirectory, env, diagnostic) {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(executable, [], {
+      cwd: workingDirectory, shell: false, detached: process.platform !== 'win32', windowsHide: false,
+      env: { ...env, OPEN_OFFICE_SMOKE: '1', OPEN_OFFICE_SMOKE_OUTPUT: output },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    diagnostic.pid = child.pid ?? null;
+    const hashes = { stdout: createHash('sha256'), stderr: createHash('sha256') };
+    diagnostic.stdoutBytes = 0; diagnostic.stderrBytes = 0;
+    let finished = false, forceTimer, cleanupTimer;
+    for (const stream of ['stdout', 'stderr']) {
+      child[stream].on('data', chunk => {
+        if (finished) return;
+        diagnostic[`${stream}Bytes`] += chunk.length;
+        hashes[stream].update(chunk);
+      });
+    }
+    const timeout = setTimeout(() => {
+      diagnostic.timedOut = true;
+      try { killTree(child, env); } catch { diagnostic.cleanupError = 'Could not terminate the native process tree'; }
+      forceTimer = setTimeout(() => {
+        try { killTree(child, env, true); } catch { diagnostic.cleanupError = 'Could not force-terminate the native process tree'; }
+      }, 1500);
+      cleanupTimer = setTimeout(() => finish(new Error('Native GUI exceeded 300 seconds and did not close after process-tree termination')), 12_000);
+    }, TIMEOUT_MS);
+    const finish = error => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timeout); clearTimeout(forceTimer); clearTimeout(cleanupTimer);
+      diagnostic.stdoutSha256 = hashes.stdout.digest('hex');
+      diagnostic.stderrSha256 = hashes.stderr.digest('hex');
+      if (error) {
+        // Even an OS-level kill failure must not keep Node/CI alive via pipe handles.
+        child.stdout.destroy(); child.stderr.destroy(); child.unref();
+      }
+      if (error) reject(error); else resolvePromise();
+    };
+    child.on('error', error => {
+      diagnostic.spawnErrorCode = error.code || 'UNKNOWN';
+      finish(new Error(`Cannot launch the final native app (${diagnostic.spawnErrorCode})`));
+    });
+    child.on('exit', (code, signal) => { diagnostic.exitCode = code; diagnostic.signal = signal; });
+    child.on('close', (code, signal) => {
+      diagnostic.exitCode = code; diagnostic.signal = signal;
+      if (diagnostic.timedOut) {
+        // A detached PDF worker must not survive the app's timeout/exit.
+        try { killTree(child, env, true); } catch { diagnostic.cleanupError = 'Process-tree cleanup could not be confirmed'; }
+        finish(new Error('Native GUI did not finish its smoke test within 300 seconds'));
+      } else if (code !== 0 || signal) {
+        try { killTree(child, env, true); } catch { diagnostic.cleanupError = 'Process-tree cleanup could not be confirmed'; }
+        finish(new Error(`Native GUI exited unsuccessfully (exit=${code ?? 'none'}, signal=${signal ?? 'none'})`));
+      } else {
+        diagnostic.cleanExit = true;
+        finish();
+      }
+    });
+  });
+}
+
+function readFrontendReport(path) {
+  const stat = lstatSync(path);
+  requireCheck(stat.isFile() && !stat.isSymbolicLink() && stat.size > 0 && stat.size <= MAX_REPORT_BYTES, 'Native GUI report must be a regular JSON file no larger than 1 MiB');
+  return JSON.parse(readFileSync(path, 'utf8'));
+}
+
+function writeReport(path, report) {
+  mkdirSync(dirname(path), { recursive: true });
+  const temporary = `${path}.${process.pid}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx' });
+  renameSync(temporary, path);
+}
+
+export async function runNativeSmoke(args = process.argv.slice(2), env = process.env, root = PROJECT_ROOT) {
+  const started = Date.now();
+  const platformId = Object.hasOwn(PLATFORMS, env.OPEN_OFFICE_PLATFORM_ID || '') ? env.OPEN_OFFICE_PLATFORM_ID : 'unknown-platform';
+  const reportPath = join(root, 'artifacts', `${platformId}-native-smoke.json`);
+  const report = {
+    schemaVersion: 1, kind: 'native-gui-smoke', ok: false, platformId, target: env.OPEN_OFFICE_TARGET || null,
+    commit: env.GITHUB_SHA || null, runId: env.GITHUB_RUN_ID || null,
+    host: { platform: process.platform, architecture: process.arch },
+    startedAt: new Date(started).toISOString(), timeoutMs: TIMEOUT_MS,
+    preflight: {}, process: { exitCode: null, signal: null, timedOut: false }, frontend: null, errors: [],
+  };
+  let temporaryDirectory, rawReport;
+  try {
+    const configuration = PLATFORMS[platformId], options = parseOptions(args);
+    requireCheck(configuration, 'OPEN_OFFICE_PLATFORM_ID must be windows-x64, macos-x64, or macos-arm64');
+    requireCheck(env.OPEN_OFFICE_TARGET === configuration.target, 'OPEN_OFFICE_TARGET does not match the selected platform');
+    requireCheck(process.platform === configuration.os && process.arch === configuration.arch, 'Native smoke tests must run on the matching operating system and CPU architecture');
+    requireCheck(/^[0-9a-f]{40}$/i.test(env.GITHUB_SHA || ''), 'GITHUB_SHA must identify the exact tested source commit');
+    requireCheck(/^\d+$/.test(env.GITHUB_RUN_ID || ''), 'GITHUB_RUN_ID must identify this native CI run');
+    const location = locateApplication(configuration, options, env, root);
+    report.preflight.installedResourceLayout = true;
+    report.preflight.finalExecutable = basename(location.executable);
+    report.preflight.finalExecutableSha256 = hashFile(location.executable);
+    report.preflight.pdfExecutableSha256 = hashFile(location.pdfExecutable);
+    if (configuration.os === 'darwin') {
+      report.preflight.macos = macPreflight(location.app, location.executable, location.pdfExecutable, configuration.nativeArch);
+    } else {
+      report.preflight.installedNSISLayout = true;
+      report.preflight.windows = {
+        main: verifyWindowsExecutable(location.executable), pdfRuntime: verifyWindowsExecutable(location.pdfExecutable),
+      };
+    }
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'open-office-native-smoke-'));
+    rawReport = join(temporaryDirectory, 'frontend-report.json');
+    // This path is unique, was not created beforehand, and is not reused on reruns.
+    requireCheck(!existsSync(rawReport), 'The native GUI report destination is not fresh');
+    await runGui(location.executable, rawReport, temporaryDirectory, env, report.process);
+    report.frontend = readFrontendReport(rawReport);
+    report.checks = validateFrontendReport(report.frontend);
+    requireCheck(report.process.cleanExit === true && report.process.exitCode === 0 && !report.process.signal && !report.process.timedOut, 'Native GUI did not exit cleanly after its checks');
+    report.ok = true;
+  } catch (error) {
+    // Retain a failure report from the GUI for diagnosis, even when it exited 1.
+    if (!report.frontend && rawReport && existsSync(rawReport)) {
+      try { report.frontend = readFrontendReport(rawReport); } catch { /* invalid report is not evidence */ }
+    }
+    report.errors.push(String(error?.message || 'Native smoke test failed').slice(0, 5000));
+  } finally {
+    report.finishedAt = new Date().toISOString();
+    report.durationMs = Date.now() - started;
+    writeReport(reportPath, report);
+    if (temporaryDirectory) rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+  console.log(`Native GUI smoke ${report.ok ? 'passed' : 'failed'}: artifacts/${basename(reportPath)}`);
+  if (!report.ok) console.error(report.errors.join('\n'));
+  return report;
+}
+
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+  runNativeSmoke().then(report => { process.exitCode = report.ok ? 0 : 1; }).catch(error => {
+    console.error(`Native smoke could not write its diagnostic report: ${error?.code || error?.name || 'unknown error'}`);
+    process.exitCode = 1;
+  });
+}

@@ -1,0 +1,1347 @@
+{
+  "schemaVersion": 1,
+  "lockfileSha256": "5e6b851717b0baf2e302e99b7c2fe237e60abc58428ba3bf89bf97471fb70e1e",
+  "packages": [
+    {
+      "name": "@babel/helper-string-parser",
+      "version": "7.29.7",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@babel__helper-string-parser@7.29.7/LICENSE"
+      ],
+      "integrity": "sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw=="
+    },
+    {
+      "name": "@babel/helper-validator-identifier",
+      "version": "7.29.7",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@babel__helper-validator-identifier@7.29.7/LICENSE"
+      ],
+      "integrity": "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg=="
+    },
+    {
+      "name": "@babel/parser",
+      "version": "7.29.9",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@babel__parser@7.29.9/LICENSE"
+      ],
+      "integrity": "sha512-CjXrNHTnvqBVqHgdBysY3vk2T8tpJHb5/RMeHJBTyVa9xgugCB0CJTx/3oO8RV2QRQP391RWpB7D6hLjm8V9uA=="
+    },
+    {
+      "name": "@babel/types",
+      "version": "7.29.8",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@babel__types@7.29.8/LICENSE"
+      ],
+      "integrity": "sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg=="
+    },
+    {
+      "name": "@esbuild/aix-ppc64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-XExcO+dvLKvVtNTibSTBej1NCAbaGhWn9Ww1ZPx80qsahhPFe/8jgWP0IchNe0F3HwkU7n8ejhH8bjonqht8mQ=="
+    },
+    {
+      "name": "@esbuild/android-arm",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-kXXoiPVVGQcnIYGOeaovwOURpniDBpSq4A03qkQ+BMQqtGG6HYap3xne9C1O1yo4TR3qxlCX5IqqmX6fFo2Lqg=="
+    },
+    {
+      "name": "@esbuild/android-arm64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-5YfKeeI8qWfBZIX+u2xZC3Zlb3Os/gLS2sbEKM+I4ZOcsWmHS2WLysCcQZDAFRslDUU5Oiq44gf6PYN1vGwG5A=="
+    },
+    {
+      "name": "@esbuild/android-x64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-O387ite7SzUyCcy3JQX4P4bLtEA7bLLkx+esve5JHnyYfNTxcVpXZo9jhdB0lTKN44gztELTdU7nS8Nr16Fs1Q=="
+    },
+    {
+      "name": "@esbuild/darwin-arm64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-n4KqkOQrraxHJcgjM1RvwbigfQKIKJVpM7xp+KsxiyUSrRdIXnt73VhrPAx0fV44hgfmIVKjxMN9J1t5jySVkw=="
+    },
+    {
+      "name": "@esbuild/darwin-x64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-uq6suIWYP37qzGddBKPw5QEQPi6HiLGsO7UmkpfyaYNQ3D+rN6w6WfwH+nuqcGXWvawGwxOEroO4YGnFh95azw=="
+    },
+    {
+      "name": "@esbuild/freebsd-arm64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-n+I0BTSRIoy+d6RPKnEVwql5UwBJolytvY4mAOIEJorKlqgPII8ix6slVVrfZ5Tnj7glIZvloylbB/EJPMWEXw=="
+    },
+    {
+      "name": "@esbuild/freebsd-x64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-78XJTJkvPs0kz2w61301PJjXl4g7q3JqiYMZ/M/yVI73EHBrCRTgkhu9oqG7vPqq+a/yadEW8aD+agKlk5xrmg=="
+    },
+    {
+      "name": "@esbuild/linux-arm",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-XlDnu2q5yoqems+xay6wSAcg9DDD7K9RLKZEBOMZm3ckNpJBvOX20tSfby8KfrrhINDyv9V2YVZKY/SpoGJI8w=="
+    },
+    {
+      "name": "@esbuild/linux-arm64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-pW4AC0P3it8c7do9MVM4p51FzHzdM/TZrerurgRcHJ2WTa1VQ1CIq18xncfpBJw4ojkiZZrKW2yIBWBP92j6Ug=="
+    },
+    {
+      "name": "@esbuild/linux-ia32",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-CYbnj78HsIeA+DhgUKgFCfvNsTHFhMMrinUrMZpDXJXKN8T3XViTZ/+wtHeVxEWY8ewSzTFN+nRmSwO2tZaLUQ=="
+    },
+    {
+      "name": "@esbuild/linux-loong64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-buwkd8nsph4R+ajRvw0qM5Hja/TXQow3ptzWO2EbG/cqcIkHloRrdlBtQlshyYGTNFvfkfJ5tpPLVkY4DtsPfQ=="
+    },
+    {
+      "name": "@esbuild/linux-mips64el",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-ZVykbDyk7519VwiNb9Lcj9m8XM6v5V9uKPvrEMkkEedVewf+0itkhahp4HDpgERXhwLRpWFypsGbG/J8s0QjJA=="
+    },
+    {
+      "name": "@esbuild/linux-ppc64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-CAXl+Dtd9UUuJd8pKKdwh6MLm3MUMiqMPmhZ3tTSXPqfyQ3vDl6R5hZdZ/kYojK4ofXtdfSv1tFq8XzWx3heNQ=="
+    },
+    {
+      "name": "@esbuild/linux-riscv64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-GeXCej4IQtU1B+QlDV8W/RRvbzI3O/Stss+/bCXv4lZls5WGRtu2a+3JkA3i4qIUlMXpcHebWpF8AkJhATowuA=="
+    },
+    {
+      "name": "@esbuild/linux-s390x",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-3H1weTYZPxt/WOhByszQZybS9w5lKzUn1FDMsgEChbHWQwHYQQRfBxgCcZvPhjHfKyJjIievvMmEUawJrdY9Dg=="
+    },
+    {
+      "name": "@esbuild/linux-x64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": true,
+      "licenseFiles": [],
+      "integrity": "sha512-4xTZr1FUmSoQW4XIWmit3tzQrUTZM+N3P0XV8xROKYF50XfI7xeO90+1bZvNwxIufQ9hDQVRJH5YhgPVF8A/HQ=="
+    },
+    {
+      "name": "@esbuild/netbsd-arm64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-sSATRjPeDBg3pdgHoQfoYBob11Kk1FGa9lui5RIHZCoCkJa9QKlvl3/vKz2usCmYYjs7ymJR/2Nnsqe+Hjt5nw=="
+    },
+    {
+      "name": "@esbuild/netbsd-x64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-lqnzCV+mM0gIADaKihiCg6ifgfU2L3h5E33rNQBN1Y4MaVGnzryzmvvf7UHxprpQdE8hpqLolJ9Rl+SkIRDpyw=="
+    },
+    {
+      "name": "@esbuild/openbsd-arm64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-AL2qJILH7lNjrDmCQDvdxMfAUIv8KMNZOvrwAQ8i8//ntL9FflhOyMJ8OZSMBb8/AWXe3/5v5S20y3zCoZWKoQ=="
+    },
+    {
+      "name": "@esbuild/openbsd-x64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-QtiuPytchRyC4rwUKhexJdQKvDuZ6hWloi3igqPQNUJCS1/v9EiO3UTOXR6A3FoMo4fnAKbWJdqaIwhOzh8qEw=="
+    },
+    {
+      "name": "@esbuild/openharmony-arm64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-WkhYDmpTjLvGlScA1rwjRUmhl4k8oXR3cIbtqWmELgU/dFeHHlEllxDvdWcNJV9rbzCexB5vz8gtNewWLgCT7Q=="
+    },
+    {
+      "name": "@esbuild/sunos-x64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-GPMSkTOtMnv2U2F8gxe4Io6qmVs+YKyp832Etqqxr0hFngmXQ3rzwytelm3GIn7T4VviRUlf3sOgBOiTdvaf7g=="
+    },
+    {
+      "name": "@esbuild/win32-arm64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-PIhhEkE9uPBleRBrQEJpUn7MBnibZzbGzYWPmY3x+YoVg/95zbjB4CxPPOQ8l5tYYM4mMaCthF8/1DIfBQQyWQ=="
+    },
+    {
+      "name": "@esbuild/win32-ia32",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-YmJbfTlvU7Sdn9BB+4PRES4oB6pxgS37MAONj+hBr/cpXS1aBPKXxNnDbu+QCWPj0o9dgyxeq79g6c5P8KeuYA=="
+    },
+    {
+      "name": "@esbuild/win32-x64",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-5ebpxr3nWMzrL/rnUI755Jkuee0bHL/Gq0WTF9lvcpv73wAp5eu8MfBUgWK9bhWvZjj7yX8etf/8tI8Ney695g=="
+    },
+    {
+      "name": "@jridgewell/sourcemap-codec",
+      "version": "1.6.0",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@jridgewell__sourcemap-codec@1.6.0/LICENSE"
+      ],
+      "integrity": "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="
+    },
+    {
+      "name": "@napi-rs/canvas",
+      "version": "1.0.11",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": true,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@napi-rs__canvas@1.0.11/LICENSE"
+      ],
+      "integrity": "sha512-vt5tog1cr+QKadIddGe+3LrcX0EmjEd0izF717Uwf92mBmgYfq2XRmL2r4bZU40spB69exxhrBn9I91HYEr/7w=="
+    },
+    {
+      "name": "@napi-rs/canvas-android-arm64",
+      "version": "1.0.11",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-dtJS4FQEfH9OwSYLtMrEnj7T8DzBbJc/97LI/OkiWOYpW/iW5t6R/gcxVrUXS8l45gCVpwMufgucRe/pe0ISqA=="
+    },
+    {
+      "name": "@napi-rs/canvas-darwin-arm64",
+      "version": "1.0.11",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-J/JylWoJTG8OQqZaiqly4IODyAxNofUlZo0wtSBJtHk6AdymbdIkPynAM1JvQaZpPaG5h+msk9QuK8y4i1ooqw=="
+    },
+    {
+      "name": "@napi-rs/canvas-darwin-x64",
+      "version": "1.0.11",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-nlecCk3xy06eAGC7krZtzNDm9UNTHKuHQYK8ZYegdjzgSL8anGt/eLJZm86OWaNgZkwQwvDqfSmG8Nqe6MPZNQ=="
+    },
+    {
+      "name": "@napi-rs/canvas-linux-arm-gnueabihf",
+      "version": "1.0.11",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-DKImmG+sTPolE0kGPsYPBxTtOjb3INALp32O2lW2CfSr0bAzSEKKuu+GrQbtilClyoPOahUErS3OrznFDraoWA=="
+    },
+    {
+      "name": "@napi-rs/canvas-linux-arm64-gnu",
+      "version": "1.0.11",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-55sykACGENj5j1rhj+81AO8JbR9HYgGjRZ7/H+pNr4VE1DvINKYNMTcutk8ZmWxk276jAQvUKJ3+Kdj9GXU3lQ=="
+    },
+    {
+      "name": "@napi-rs/canvas-linux-arm64-musl",
+      "version": "1.0.11",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-6Jz6jys17yXydO+WdJgu7JhoB4K7/w9sWHByzzTmLjQghUx3TDMWvLv+UcCdnWhg4oprET67EMymnrETdeGNAg=="
+    },
+    {
+      "name": "@napi-rs/canvas-linux-riscv64-gnu",
+      "version": "1.0.11",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-lf2XeEebWiUYVOVEjLXxF7dfXrBBSEOBn9AqBh39VYXrPt5cDqI+1t58IFSjn8npqkg5jIOs8TQbjKABbFW1gQ=="
+    },
+    {
+      "name": "@napi-rs/canvas-linux-x64-gnu",
+      "version": "1.0.11",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": true,
+      "installedForThisAudit": true,
+      "licenseFiles": [],
+      "integrity": "sha512-iDapw7nFSE5tsmQxcH2+KotJhyfVPmHd6vUOQN/Em+8WNbkZJwJ/rDowlJMFnMl0SYSDSfgKCNUGi6Sn5++Smg=="
+    },
+    {
+      "name": "@napi-rs/canvas-linux-x64-musl",
+      "version": "1.0.11",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-26q26AyITo3CGZX4HWFIMgBMA1lu3YN07gxzBm4tW6Hglq/OVyTP50kDrmWuKybCX6dh3m8Ly+c7YhI+sqCgCQ=="
+    },
+    {
+      "name": "@napi-rs/canvas-win32-arm64-msvc",
+      "version": "1.0.11",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-cUO96IdsfvIj2S+2PNcDSkTcLhjPj8pIOEWRV1Kj70MOP4wnE9zSk7N4C1EKHlFGRcgdR5AkbnBZj0dfHK9nbQ=="
+    },
+    {
+      "name": "@napi-rs/canvas-win32-x64-msvc",
+      "version": "1.0.11",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-DFYp/ZQRdKunI/LPc0UkRXG1vlNjJKOJf8O8Ctb8+wm2Nt2ELg9Eamc31D2VoakkfGo8L+z0Iejz6WtFbQwyGw=="
+    },
+    {
+      "name": "@napi-rs/lzma-linux-x64-gnu",
+      "version": "1.5.1",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": true,
+      "licenseFiles": [],
+      "integrity": "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ=="
+    },
+    {
+      "name": "@rolldown/pluginutils",
+      "version": "1.0.0-beta.29",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@rolldown__pluginutils@1.0.0-beta.29/LICENSE"
+      ],
+      "integrity": "sha512-NIJgOsMjbxAXvoGq/X0gD7VPMQ8j9g0BiDaNjVNVjvl+iKXxL3Jre0v31RmBYeLEmkbj2s02v8vFTbUXi5XS2Q=="
+    },
+    {
+      "name": "@rollup/rollup-android-arm-eabi",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-MrfgRQSpD5hkkRg6XI16B6EDLb+6+xp8xje6bpdSwkYw+qxrBKbUVrRAQu9h82UT+QumSIVQ8HXsXjPd2dlhqw=="
+    },
+    {
+      "name": "@rollup/rollup-android-arm64",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-+uu2p/R9Tzn8GpoQyX1pAo5dmKT1DhXevfaCzqzmPFhnLjHLWw7uWkaVGlxmhwYoRiYYhsGfRcD5cTBpL7rgSw=="
+    },
+    {
+      "name": "@rollup/rollup-darwin-arm64",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-17dys+YEmzwzzFVHQAVDONg5FALXY9kd99HFEpfk4gJVHYxoh5bGea3D4t1fXXnwkTcOe25wPyd6nWS0I8IdLQ=="
+    },
+    {
+      "name": "@rollup/rollup-darwin-x64",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-wg0zQEKkEvFZf1UaaX1UELOoPs//OSKUG7D+yITuqOsAvza7LvHTv5Wu4nmMfzNG7EYI2jp2PJC7Id6OETmsYQ=="
+    },
+    {
+      "name": "@rollup/rollup-freebsd-arm64",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-CoJmWcpEMuwin+TZ/ev/H9uDyF/uxUKQSWXdmIPn/UBx/uGV9+4ebMp0FwnlhWR9PE1AdzYsKf3bZevhif38+A=="
+    },
+    {
+      "name": "@rollup/rollup-freebsd-x64",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-PxZnLAaTUAL5xG0W2BXLeYPKrK2b3LIASV2/e/Kf7PZvSLI1iAQIm9B9aJD+YyFIT7hc6qaMV3+OOO35R28LfA=="
+    },
+    {
+      "name": "@rollup/rollup-linux-arm-gnueabihf",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-uPo3IvnONjhbFXwWgroBeFwOicuhT7ZwQrnzkzmOtBJzeQbkUJUE1SJDfDI31ijQ5+ZUIA6sPrdUMxTSnxUWAg=="
+    },
+    {
+      "name": "@rollup/rollup-linux-arm-musleabihf",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-ywI8Jyuc4LyHYTjC0mw4yA1ulvZBkHusdpWnoiEBsmBuHvSnt90btTBGCZ+s/2y+YNNfVAEKy33nPo5UI9zTmg=="
+    },
+    {
+      "name": "@rollup/rollup-linux-arm64-gnu",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-tmuXJoQ/3ovSr637aykZMdQteU/CB2APAz2CrvsbibuoHZi1BS1Db13cVViBdEARGwXCLn1DSJ8wsjoThLJPGA=="
+    },
+    {
+      "name": "@rollup/rollup-linux-arm64-musl",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-5FMjSYNcUOHx7oW8Qu9KB6jGPpvF/8sG7+BDHwU/Ihh1/6FMJ9ySmsFG4tJ1qbNRuP8OLzCBDso4sF0mQaLuFQ=="
+    },
+    {
+      "name": "@rollup/rollup-linux-loong64-gnu",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-K8ZJ+neLDbUkIrL8dqF/5LtuVCrKwo27kREgOlxjBEjlOXwHvDnHLU8Z/UKv/B49qi7e8hsSDOyoJwhwqhvX4w=="
+    },
+    {
+      "name": "@rollup/rollup-linux-loong64-musl",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-NlVxsq7PFPv0DBKGuNWRDKixQYQCjM53zl04mxEcKMBmJbCBIUm1JdPfIWDRHyOOFzzYPmLQzfeEwh4716ayQg=="
+    },
+    {
+      "name": "@rollup/rollup-linux-ppc64-gnu",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-ARhRHJYs5eCFet5azfrHD97vOkD8OzNW2RSMlvo5CcBqXaTOLfp0OHDtUQh7/K5AL5fUYoFp2fgC9KDg4vVYMQ=="
+    },
+    {
+      "name": "@rollup/rollup-linux-ppc64-musl",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-atSgreM5C7jpxd9aEXN+6vJ5wTd05iYw+S3FiQpw7VsoEl8B90llbq35ARON+GOHj5QlVQEq2vOKWCHTob/BSQ=="
+    },
+    {
+      "name": "@rollup/rollup-linux-riscv64-gnu",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-vmlmwBFGnjVWxSRoVabNkyYuscSmg52Pd0fM8jEbNT3Jmka4A6HcB84x4uAmuumznWfBVaxKOqU6jbEgomWKCA=="
+    },
+    {
+      "name": "@rollup/rollup-linux-riscv64-musl",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-hhJrP6S9WkbsbcHgUkvCBS5Cn8IdsG8XjlLZyxjnv9+NdoYfbbZE4TWJYr8apdaj1M5t5Y1id2StnEslxpNFyA=="
+    },
+    {
+      "name": "@rollup/rollup-linux-s390x-gnu",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-NNVCyN9pGrwFmQa4bf+Cnf5aVH3g6ZpnlOg1Cs/H9swIHT9bRixijfzUqyEIWm1WtiAuR1LJ+rJH6zpBm8kgQA=="
+    },
+    {
+      "name": "@rollup/rollup-linux-x64-gnu",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": true,
+      "licenseFiles": [],
+      "integrity": "sha512-dR9nd6OKnvSS60Ifz/L7Mj5zzYyoqyRn2NwTuaOONKaa3xsVGXyp8YusMbvFyEOR94DxnwgcbgsFqkHd29ZSzQ=="
+    },
+    {
+      "name": "@rollup/rollup-linux-x64-musl",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-1tzsMjaqhsh3bAO6SJiJqh8hIr9sSPRd+i2vPPxJHod8/XYnf9TEnK0z/u3r1z1AkI347X0KbRSg9dWcxeGahw=="
+    },
+    {
+      "name": "@rollup/rollup-openbsd-x64",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-01mWMQblKoXXsmk28KXtpbA96w7g/aOWUoV3AC16fdHdqkykGalqyyM+5u8M7uP5/MEMiiPv69Hv7iv/hEH/dA=="
+    },
+    {
+      "name": "@rollup/rollup-openharmony-arm64",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-trdnMPb/DNm4V/CgsaoGgr90HfQQ071wfK0KoIs4YpLvjBgVQGXhGabg2Z6nK4EcYNilrb9ZZPcsP6+zpJIdxQ=="
+    },
+    {
+      "name": "@rollup/rollup-win32-arm64-msvc",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-x2LxZlfdfsw99T6/qb9EqE/Qi84JWzibjyOJyhJsgFJy6CafaTiqIXCCnslCGrV5XWNh7fwrS3FbRENcuKnooA=="
+    },
+    {
+      "name": "@rollup/rollup-win32-ia32-msvc",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-/Qd/9aDQIo0+jmItgBmPIs8195YVbDxRRApn47GyufgbutCDOh7eP5vSKKlI4QNFeaI+wKQAkSMsPnF3EuMpaA=="
+    },
+    {
+      "name": "@rollup/rollup-win32-x64-gnu",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-ngUJ/XvOWrqbd2IMsfXfh2xXFLTP3sY7sCKvxbGvYdBZ1KmXFd3ewDZ9n3/GNzAUgzRuhLT/UvJRivbNoAQRBw=="
+    },
+    {
+      "name": "@rollup/rollup-win32-x64-msvc",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-IhV6ew/DuzUWwHaYmlh7MrPCV3lKFUq/amTEwysi4r/mwNPAEfAMh5dYWeTSPTeMy2pFHGMEWYtPkHzfX3tG5A=="
+    },
+    {
+      "name": "@tauri-apps/api",
+      "version": "2.12.3",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@tauri-apps__api@2.12.3/LICENSE-APACHE-2.0",
+        "npm/@tauri-apps__api@2.12.3/LICENSE-MIT",
+        "npm/@tauri-apps__api@2.12.3/LICENSE.spdx"
+      ],
+      "integrity": "sha512-9s0PKw0p4r3kFq92jhpivYSp+cSht15o0gXpZxuQd0+dV9KCexEVkNaLELVoLdJWyoH4KlfQo5h3W2LIM8siJg=="
+    },
+    {
+      "name": "@tauri-apps/cli",
+      "version": "2.12.2",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@tauri-apps__cli@2.12.2/LICENSE-APACHE-2.0",
+        "npm/@tauri-apps__cli@2.12.2/LICENSE-MIT"
+      ],
+      "integrity": "sha512-PMSppzAnlT+BvZtRKuidxjRSm2r5t8kDpJ/czmmQUa0AtDNTwrjLE8vApK3phCWGg7isfnYL46Dl1jB4ArI0hA=="
+    },
+    {
+      "name": "@tauri-apps/cli-darwin-arm64",
+      "version": "2.12.2",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-Lk3zaBTfzNvA7670Al5PNgo2M/95uaDPe1yp+ILJeDOmol87XiYuK5E5+FUbK5e6U6OORx9qpZdOo2U+5tETtQ=="
+    },
+    {
+      "name": "@tauri-apps/cli-darwin-x64",
+      "version": "2.12.2",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-2CyYjJ833JB3sKRz4B0W/Tv4oOVC16ws1bxdSCWj1XvrmanWwvZi99e5tNIoCHwHhcOm0jh+sh0PCGQyls6Z+w=="
+    },
+    {
+      "name": "@tauri-apps/cli-linux-arm-gnueabihf",
+      "version": "2.12.2",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-uvt2xbone4JftKarelssi86Kqnl7JiG1Smh5+Ae+nZmtM+JUhTGmqkcqfUPXRW8Ygwog92POZvd4oGDN9j8eXQ=="
+    },
+    {
+      "name": "@tauri-apps/cli-linux-arm64-gnu",
+      "version": "2.12.2",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-DZlDJ24u3tlocKOYqzR+b2M+Qr+5WFcoMBZ7EfdhHN5j3ZXwBBpms4G4gyNvPCrak5vMzmdZ65ecBXPJcC+5sA=="
+    },
+    {
+      "name": "@tauri-apps/cli-linux-arm64-musl",
+      "version": "2.12.2",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-pb+RTZUYH/p0gR4j4ecCCq+FNfz3W3eKuUQvVEBn7MQZx6DzfLO7FaYzt2NyDKWpdNN3lP10mdzOvw3R5P5aAQ=="
+    },
+    {
+      "name": "@tauri-apps/cli-linux-riscv64-gnu",
+      "version": "2.12.2",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-nidEvDUJyHYNbIv9MUk6KiEix8IXfRh4Wj2G2SA5g8nFmgbBCwazUNWYiG/LhNeNbfZpBMLerRBUtoQ5K0GidA=="
+    },
+    {
+      "name": "@tauri-apps/cli-linux-x64-gnu",
+      "version": "2.12.2",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": true,
+      "licenseFiles": [],
+      "integrity": "sha512-gkXyYn3w+Xfc8nz/DleEbkm1M7bBuU2cejqUXNmI98cA2P5kp+oPmS4ALTorb1FaNWjpsKoYZBWsbS9BXxYFkQ=="
+    },
+    {
+      "name": "@tauri-apps/cli-linux-x64-musl",
+      "version": "2.12.2",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-MrjgoZ09s8Hsn99XvxSNvK8NQTZxi7XiyK3FxxytzfHgz2jb3qUT69CZtsokRkN/zdi9rCgrMtq+w9XNICjcfQ=="
+    },
+    {
+      "name": "@tauri-apps/cli-win32-arm64-msvc",
+      "version": "2.12.2",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-BR+CYM7iF3lkfyTtVkwMQU/s9hwegLpj3UqDjaxKCPmixQCa1csBBPy3C75V+FhLtOjIXNna4Gt6Vm9oxbV+qA=="
+    },
+    {
+      "name": "@tauri-apps/cli-win32-ia32-msvc",
+      "version": "2.12.2",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-zODJo9l3TbNBM+GrO/yPqGeELNMK5cjIc+QHh1WQc3l8tD+jDZGTQyYuAxViCsM6Uh5uWJ//RnCZG9LXrvsXww=="
+    },
+    {
+      "name": "@tauri-apps/cli-win32-x64-msvc",
+      "version": "2.12.2",
+      "license": "Apache-2.0 OR MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-cQXI2ZaZmwBDt0XATCqASVanYizxkEE3ceQVlVHXaQ51HzsQUWA04c9Nz7LrrY2lgAu3jFMyat+8Yz3Z2R2qBA=="
+    },
+    {
+      "name": "@types/estree",
+      "version": "1.0.9",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@types__estree@1.0.9/LICENSE"
+      ],
+      "integrity": "sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg=="
+    },
+    {
+      "name": "@types/node",
+      "version": "24.7.0",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@types__node@24.7.0/LICENSE"
+      ],
+      "integrity": "sha512-IbKooQVqUBrlzWTi79E8Fw78l8k1RNtlDDNWsFZs7XonuQSJ8oNYfEeclhprUldXISRMLzBpILuKgPlIxm+/Yw=="
+    },
+    {
+      "name": "@vitejs/plugin-vue",
+      "version": "6.0.1",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@vitejs__plugin-vue@6.0.1/LICENSE"
+      ],
+      "integrity": "sha512-+MaE752hU0wfPFJEUAIxqw18+20euHHdxVtMvbFcOEpjEyfqXH/5DCoTHiVJ0J29EhTJdoTkjEv5YBKU9dnoTw=="
+    },
+    {
+      "name": "@volar/language-core",
+      "version": "2.4.23",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@volar__language-core@2.4.23/LICENSE"
+      ],
+      "integrity": "sha512-hEEd5ET/oSmBC6pi1j6NaNYRWoAiDhINbT8rmwtINugR39loROSlufGdYMF9TaKGfz+ViGs1Idi3mAhnuPcoGQ=="
+    },
+    {
+      "name": "@volar/source-map",
+      "version": "2.4.23",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@volar__source-map@2.4.23/LICENSE"
+      ],
+      "integrity": "sha512-Z1Uc8IB57Lm6k7q6KIDu/p+JWtf3xsXJqAX/5r18hYOTpJyBn0KXUR8oTJ4WFYOcDzWC9n3IflGgHowx6U6z9Q=="
+    },
+    {
+      "name": "@volar/typescript",
+      "version": "2.4.23",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@volar__typescript@2.4.23/LICENSE"
+      ],
+      "integrity": "sha512-lAB5zJghWxVPqfcStmAP1ZqQacMpe90UrP5RJ3arDyrhy4aCUQqmxPPLB2PWDKugvylmO41ljK7vZ+t6INMTag=="
+    },
+    {
+      "name": "@vue/compiler-core",
+      "version": "3.5.22",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@vue__compiler-core@3.5.22/LICENSE"
+      ],
+      "integrity": "sha512-jQ0pFPmZwTEiRNSb+i9Ow/I/cHv2tXYqsnHKKyCQ08irI2kdF5qmYedmF8si8mA7zepUFmJ2hqzS8CQmNOWOkQ=="
+    },
+    {
+      "name": "@vue/compiler-dom",
+      "version": "3.5.22",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@vue__compiler-dom@3.5.22/LICENSE"
+      ],
+      "integrity": "sha512-W8RknzUM1BLkypvdz10OVsGxnMAuSIZs9Wdx1vzA3mL5fNMN15rhrSCLiTm6blWeACwUwizzPVqGJgOGBEN/hA=="
+    },
+    {
+      "name": "@vue/compiler-sfc",
+      "version": "3.5.22",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@vue__compiler-sfc@3.5.22/LICENSE"
+      ],
+      "integrity": "sha512-tbTR1zKGce4Lj+JLzFXDq36K4vcSZbJ1RBu8FxcDv1IGRz//Dh2EBqksyGVypz3kXpshIfWKGOCcqpSbyGWRJQ=="
+    },
+    {
+      "name": "@vue/compiler-ssr",
+      "version": "3.5.22",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@vue__compiler-ssr@3.5.22/LICENSE"
+      ],
+      "integrity": "sha512-GdgyLvg4R+7T8Nk2Mlighx7XGxq/fJf9jaVofc3IL0EPesTE86cP/8DD1lT3h1JeZr2ySBvyqKQJgbS54IX1Ww=="
+    },
+    {
+      "name": "@vue/language-core",
+      "version": "3.1.0",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@vue__language-core@3.1.0/LICENSE"
+      ],
+      "integrity": "sha512-a7ns+X9vTbdmk7QLrvnZs8s4E1wwtxG/sELzr6F2j4pU+r/OoAv6jJGSz+5tVTU6e4+3rjepGhSP8jDmBBcb3w=="
+    },
+    {
+      "name": "@vue/reactivity",
+      "version": "3.5.22",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@vue__reactivity@3.5.22/LICENSE"
+      ],
+      "integrity": "sha512-f2Wux4v/Z2pqc9+4SmgZC1p73Z53fyD90NFWXiX9AKVnVBEvLFOWCEgJD3GdGnlxPZt01PSlfmLqbLYzY/Fw4A=="
+    },
+    {
+      "name": "@vue/runtime-core",
+      "version": "3.5.22",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@vue__runtime-core@3.5.22/LICENSE"
+      ],
+      "integrity": "sha512-EHo4W/eiYeAzRTN5PCextDUZ0dMs9I8mQ2Fy+OkzvRPUYQEyK9yAjbasrMCXbLNhF7P0OUyivLjIy0yc6VrLJQ=="
+    },
+    {
+      "name": "@vue/runtime-dom",
+      "version": "3.5.22",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@vue__runtime-dom@3.5.22/LICENSE"
+      ],
+      "integrity": "sha512-Av60jsryAkI023PlN7LsqrfPvwfxOd2yAwtReCjeuugTJTkgrksYJJstg1e12qle0NarkfhfFu1ox2D+cQotww=="
+    },
+    {
+      "name": "@vue/server-renderer",
+      "version": "3.5.22",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@vue__server-renderer@3.5.22/LICENSE"
+      ],
+      "integrity": "sha512-gXjo+ao0oHYTSswF+a3KRHZ1WszxIqO7u6XwNHqcqb9JfyIL/pbWrrh/xLv7jeDqla9u+LK7yfZKHih1e1RKAQ=="
+    },
+    {
+      "name": "@vue/shared",
+      "version": "3.5.22",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@vue__shared@3.5.22/LICENSE"
+      ],
+      "integrity": "sha512-F4yc6palwq3TT0u+FYf0Ns4Tfl9GRFURDN2gWG7L1ecIaS/4fCIuFOjMTnCyjsu/OK6vaDKLCrGAa+KvvH+h4w=="
+    },
+    {
+      "name": "alien-signals",
+      "version": "3.2.1",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/alien-signals@3.2.1/LICENSE"
+      ],
+      "integrity": "sha512-I8FjmltrfnDFoZedi5CG8DghVYNhzb/Ijluz7tCSJH0xpd0484Kowhbb1XDYOxfJpU1p5wnM2X54dA+IfGyD1g=="
+    },
+    {
+      "name": "csstype",
+      "version": "3.2.3",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/csstype@3.2.3/LICENSE"
+      ],
+      "integrity": "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="
+    },
+    {
+      "name": "entities",
+      "version": "4.5.0",
+      "license": "BSD-2-Clause",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/entities@4.5.0/LICENSE"
+      ],
+      "integrity": "sha512-V0hjH4dGPh9Ao5p0MoRY6BVqtwCjhz6vI5LT8AJ55H+4g9/4vbHx1I54fS0XuclLhDHArPQCiMjDxjaL8fPxhw=="
+    },
+    {
+      "name": "esbuild",
+      "version": "0.28.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/esbuild@0.28.2/LICENSE.md"
+      ],
+      "integrity": "sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA=="
+    },
+    {
+      "name": "estree-walker",
+      "version": "2.0.2",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/estree-walker@2.0.2/LICENSE"
+      ],
+      "integrity": "sha512-Rfkk/Mp/DL7JVje3u18FxFujQlTNR2q6QfMSMB7AvCBx91NGj/ba3kCfza0f6dVDbw7YlRf/nDrn7pQrCCyQ/w=="
+    },
+    {
+      "name": "fdir",
+      "version": "6.5.0",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/fdir@6.5.0/LICENSE"
+      ],
+      "integrity": "sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg=="
+    },
+    {
+      "name": "fsevents",
+      "version": "2.3.3",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="
+    },
+    {
+      "name": "magic-string",
+      "version": "0.30.21",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/magic-string@0.30.21/LICENSE"
+      ],
+      "integrity": "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="
+    },
+    {
+      "name": "muggle-string",
+      "version": "0.4.1",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/muggle-string@0.4.1/LICENSE"
+      ],
+      "integrity": "sha512-VNTrAak/KhO2i8dqqnqnAHOa3cYBwXEZe9h+D5h/1ZqFSTEFHdM65lR7RoIqq3tBBYavsOXV84NoHXZ0AkPyqQ=="
+    },
+    {
+      "name": "nanoid",
+      "version": "3.3.20",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/nanoid@3.3.20/LICENSE"
+      ],
+      "integrity": "sha512-uKdg2G3GNCKQn9byYOpxbGqrT2fGO5KRt5J/8b3pok8rT6qxGWF6hxMyJiEYtAf+FVyYuD9hRaDqX5uPFYJ4ZQ=="
+    },
+    {
+      "name": "path-browserify",
+      "version": "1.0.1",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/path-browserify@1.0.1/LICENSE"
+      ],
+      "integrity": "sha512-b7uo2UCUOYZcnF/3ID0lulOJi/bafxa1xPe7ZPsammBSpjSWQkjNxlt635YGS2MiR9GjvuXCtz2emr3jbsz98g=="
+    },
+    {
+      "name": "pdfjs-dist",
+      "version": "6.4.299",
+      "license": "Apache-2.0",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/pdfjs-dist@6.4.299/LICENSE"
+      ],
+      "integrity": "sha512-AVl138zALtfaAPvADulE0PZThbYzCBS79nL4pOSL/6Sm/4AH5A21BD9VHt97OlCuzJuCpmeZtAtkinisF4Vb1g=="
+    },
+    {
+      "name": "picocolors",
+      "version": "1.1.1",
+      "license": "ISC",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/picocolors@1.1.1/LICENSE"
+      ],
+      "integrity": "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
+    },
+    {
+      "name": "picomatch",
+      "version": "4.0.7",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/picomatch@4.0.7/LICENSE"
+      ],
+      "integrity": "sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA=="
+    },
+    {
+      "name": "postcss",
+      "version": "8.5.29",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/postcss@8.5.29/LICENSE"
+      ],
+      "integrity": "sha512-49cGhUbXj8Qenv0iTMxA1cFBzxXoctpC9Ujd77t1WcbJIr6nF/eI7g/8MgxrYldFRuAXvja7xQRwavoW7kgrxQ=="
+    },
+    {
+      "name": "rollup",
+      "version": "4.64.5",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/rollup@4.64.5/LICENSE.md"
+      ],
+      "integrity": "sha512-EAP5ZHcz2ijbgCWwPkpI7zh6bfsri2Ez5FtCy2dCp1k62duXzfG7DLGGh7RU2QQXWwavT+u4qpvDF/TWOiiGTw=="
+    },
+    {
+      "name": "source-map-js",
+      "version": "1.2.2",
+      "license": "BSD-3-Clause",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/source-map-js@1.2.2/LICENSE"
+      ],
+      "integrity": "sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw=="
+    },
+    {
+      "name": "tinyglobby",
+      "version": "0.2.17",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/tinyglobby@0.2.17/LICENSE"
+      ],
+      "integrity": "sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g=="
+    },
+    {
+      "name": "typescript",
+      "version": "5.9.3",
+      "license": "Apache-2.0",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/typescript@5.9.3/LICENSE.txt"
+      ],
+      "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
+    },
+    {
+      "name": "undici-types",
+      "version": "7.14.0",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/undici-types@7.14.0/LICENSE"
+      ],
+      "integrity": "sha512-QQiYxHuyZ9gQUIrmPo3IA+hUl4KYk8uSA7cHrcKd/l3p1OTpZcM0Tbp9x7FAtXdAYhlasd60ncPpgu6ihG6TOA=="
+    },
+    {
+      "name": "vite",
+      "version": "7.3.7",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/vite@7.3.7/LICENSE.md"
+      ],
+      "integrity": "sha512-AHEzTORMbi7/7aXp7w7KZ5+DCUdSeLsJz0grY8xHpc9DHdYb0vQu6DqJfm2tOw3gDExNgPgnJTXxM6syYFHaCA=="
+    },
+    {
+      "name": "vscode-uri",
+      "version": "3.2.0",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/vscode-uri@3.2.0/LICENSE.md"
+      ],
+      "integrity": "sha512-m2gXo3bn0G1kT9InzMf07fTbqMbGtyckj3bH5ktLO+1Ssv+yiATZ4dhwaQv9UZWxJh6E9IFGnQyjgWVDWVBDrg=="
+    },
+    {
+      "name": "vue",
+      "version": "3.5.22",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/vue@3.5.22/LICENSE"
+      ],
+      "integrity": "sha512-toaZjQ3a/G/mYaLSbV+QsQhIdMo9x5rrqIpYRObsJ6T/J+RyCSFwN2LHNVH9v8uIcljDNa3QzPVdv3Y6b9hAJQ=="
+    },
+    {
+      "name": "vue-tsc",
+      "version": "3.1.0",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/vue-tsc@3.1.0/LICENSE"
+      ],
+      "integrity": "sha512-fbMynMG7kXSnqZTRBSCh9ROYaVpXfCZbEO0gY3lqOjLbp361uuS88n6BDajiUriDIF+SGLWoinjvf6stS2J3Gg=="
+    }
+  ],
+  "pdfjsAssetNotices": [
+    "pdfjs/standard_fonts/LICENSE_FOXIT",
+    "pdfjs/standard_fonts/LICENSE_LIBERATION",
+    "pdfjs/cmaps/LICENSE",
+    "pdfjs/wasm/LICENSE_JBIG2",
+    "pdfjs/wasm/LICENSE_OPENJPEG",
+    "pdfjs/wasm/LICENSE_PDFJS_JBIG2",
+    "pdfjs/wasm/LICENSE_PDFJS_OPENJPEG",
+    "pdfjs/wasm/LICENSE_PDFJS_QCMS",
+    "pdfjs/wasm/LICENSE_QCMS",
+    "pdfjs/iccs/LICENSE"
+  ]
+}

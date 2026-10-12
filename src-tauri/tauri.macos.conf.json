@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "resources": [],
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "signingIdentity": "-",
+      "files": { "Resources/frontend": "../dist", "Resources/pdf-runtime": "pdf-runtime" }
+    }
+  }
+}

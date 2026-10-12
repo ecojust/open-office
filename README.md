@@ -1,0 +1,81 @@
+# Open Office
+
+基于 Vue 3、Tauri 2 的本地办公桌面应用。一个窗口打开文字文档、电子表格与 PDF，文件处理在设备内完成，无需账户或远程文档服务。
+
+## 可用功能
+
+| 工作区 | 文件格式 | 编辑方式 |
+| --- | --- | --- |
+| 文字文档 | DOCX、ODT | 完整 LibreOffice Writer 内核：段落、样式、表格、图片、页眉页脚、分页等；导出 PDF |
+| 电子表格 | XLSX、ODS | 完整 Calc 内核：单元格、公式、工作表、排序、筛选、图表等；导出 PDF |
+| PDF 工作室 | PDF | 原有文字删除与替换、新增文字/图片、高亮、手绘签名、搜索、旋转、删除、排序、提取和合并页面 |
+
+桌面外壳提供多文档标签、最近文件、本地打开、保存、另存为、未保存退出确认。保存前检查原文件摘要，避免静默覆盖外部修改；文件写入使用同目录临时文件及原子替换。
+
+这不是 Microsoft Office 或 WPS 的官方产品，不宣称与其所有功能和排版完全一致。完整办公内核的高级菜单目前为英文，中文输入与中文字体已集成。Office 宏和自动外部链接更新禁用；不支持旧 DOC/XLS 直接导入。PDF 原文编辑针对可提取文字，扫描件需要独立 OCR。手绘签名不等于带证书的数字签名；修改已有数字签名的文件须另存副本。复杂排版、特殊字体和图表请在交付前检查导出结果。
+
+## 获取安装包
+
+在 [GitHub Releases](https://github.com/ecojust/open-office/releases) 下载对应平台：
+
+- Windows x64 安装程序。
+- macOS Apple Silicon（M 系列）DMG。
+- macOS Intel DMG。
+
+安装包包含办公引擎、中文字体和 PDF 内核，安装后可以离线运行。办公引擎启动时需要约 1 GiB 的共享内存，建议至少 8 GiB 内存；不同文字/表格标签复用同一个内核。PDF 会限制输入文件大小和页数，避免无界内存占用。
+
+尚未配置 Apple Developer ID 公证及 Windows 商业代码签名。macOS 包会做本地 ad-hoc 签名验证，但这不等于 Apple 公证。如果系统阻止打开，请先核对发布的 SHA256，再按系统“隐私与安全性”中针对该应用的提示允许打开；不建议关闭系统全局安全保护。
+
+## 开发
+
+需要 Node.js 24、Python 3.12、Rust stable，以及 Tauri 对应系统的原生构建依赖。macOS 需要 Xcode Command Line Tools；Windows 需要 Visual Studio C++ Build Tools 与 WebView2。
+
+```bash
+npm ci
+npm run desktop:prepare
+npm run desktop:dev
+```
+
+首次准备会下载已固定 SHA256 的 ZetaOffice WASM 与 Noto 中文字体，并用 PyInstaller 构建本机架构的 PDF 内核。Python 不需要在最终用户设备上额外安装。不要把其他架构的 `pdf-runtime` 复制过来。
+
+仅调试 Vue 界面：
+
+```bash
+npm run runtime:fetch
+npm run pdf:ensure
+npm run dev
+```
+
+开发服务器只在 `127.0.0.1:5198` 提供 PDF 测试桥。生产桌面应用通过 Tauri 的受控命令调用固定的本地 PDF 进程，不开放通用命令执行。直接将 `dist` 放在普通静态站点，不能获得桌面文件保存与 PDF 后端功能。
+
+## 构建与验证
+
+```bash
+npm run typecheck
+npm run pdf:test
+npm run desktop:build
+```
+
+通过 GitHub Actions 的 Desktop release 工作流可在三种原生构建机上生成安装包。流水线需要实际启动原生 WebView，确认隔离环境与 SharedArrayBuffer 可用，再执行 Word 原文修改后保存重开、Excel 公式往返及 PDF 中文原文替换后的重开检查；任何平台失败时不发布一组标记成功的安装包。
+
+构建版本采用北京时间 `YYYY.MMDD.HHmm`，也可通过 `OFFICE_BUILD_VERSION` 固定，用于对应安装包与测试记录。
+
+## 目录
+
+```text
+src/                    Vue 外壳、原生文件桥、PDF 工作室
+src/office/             办公内核消息桥与类型
+public/office/          独立办公内核宿主与线程适配
+public/office-runtime/  校验后下载的 WASM、数据与字体（不入 Git）
+public/legal/           随应用分发的许可文本
+pdf-backend/            受控 JSON 协议的本地 PDF 编辑器及真实文件测试
+src-tauri/              Rust 文件保存、隔离静态服务器、窗口与进程管理
+scripts/                资源准备、PDF 冻结、签名及原生冒烟验证
+vendor/                 固定版本与资源摘要
+```
+
+## 许可与源码
+
+原始仓库的 MIT 许可与作者版权声明保留在 `LICENSE`。集成发行包包含 AGPL、GPL、MPL/LGPL、Apache 2.0、MIT 和 OFL 等许可组件，不能仅按 MIT 二进制软件分发。请阅读 `DISTRIBUTION_LICENSE.md`、`THIRD_PARTY_NOTICES.md` 和 `public/legal/` 中的完整许可。源码与构建脚本公开在本仓库；对应第三方源码获取脚本与发布来源说明一并提供。
+
+项目与 Apache OpenOffice、Microsoft Office、WPS 均无隶属关系。

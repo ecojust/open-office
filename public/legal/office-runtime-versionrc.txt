@@ -1,0 +1,6 @@
+[Version]
+buildid=efaf0670b4d055f838a2849becb10f08aa06a257
+Vendor=allotropia software GmbH
+
+Evidence: public/office-runtime/soffice.data bytes 1931141..1931503,
+entry /instdir/program/versionrc in soffice.data.js.metadata.

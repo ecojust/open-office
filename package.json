@@ -1,0 +1,40 @@
+{
+  "name": "open-office",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5198 --strictPort",
+    "typecheck": "vue-tsc --noEmit",
+    "runtime:fetch": "node scripts/fetch-office-runtime.mjs",
+    "build": "npm run assets && npm run runtime:fetch && npm run typecheck && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4198 --strictPort",
+    "test": "npm run typecheck && npm run pdf:test",
+    "pdf:build": "node scripts/build-pdf-backend.mjs",
+    "pdf:ensure": "node scripts/ensure-pdf-backend.mjs",
+    "desktop:prepare": "npm run runtime:fetch && npm run pdf:build",
+    "predesktop:dev": "npm run runtime:fetch && npm run pdf:ensure",
+    "desktop:dev": "tauri dev",
+    "predesktop:build": "npm run pdf:ensure",
+    "desktop:build": "tauri build",
+    "assets": "node scripts/copy-pdf-assets.mjs",
+    "postinstall": "npm run assets",
+    "pdf:test": "node scripts/test-pdf-backend.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.12.3",
+    "pdfjs-dist": "6.4.299",
+    "vue": "3.5.22"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.2",
+    "@types/node": "24.7.0",
+    "@vitejs/plugin-vue": "6.0.1",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vue-tsc": "3.1.0"
+  }
+}

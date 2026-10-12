@@ -1,0 +1,11 @@
+--- a/source/zeta.js
++++ b/source/zeta.js
+@@ -540,7 +540,7 @@
+             new uno.com.sun.star.uno.DeploymentException(
+               {Message: 'cannot get singeleton ' + name}));
+         }
+-        return any.val;
++        return fromAny(any);
+       };
+     };
+     function service(name, td) {

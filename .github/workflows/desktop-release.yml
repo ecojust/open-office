@@ -1,0 +1,287 @@
+name: Build and verify offline desktop apps
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish verified installers as a prerelease after all platforms pass
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: open-office-desktop-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  native:
+    name: ${{ matrix.id }} native build and GUI round trip
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: windows-x64
+            runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            python: x64
+            nodeArch: x64
+            bundles: nsis
+          - id: macos-arm64
+            runner: macos-15
+            target: aarch64-apple-darwin
+            python: arm64
+            nodeArch: arm64
+            bundles: app,dmg
+          - id: macos-x64
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            python: x64
+            nodeArch: x64
+            bundles: app,dmg
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    env:
+      OPEN_OFFICE_PLATFORM_ID: ${{ matrix.id }}
+      OPEN_OFFICE_TARGET: ${{ matrix.target }}
+      EXPECTED_NODE_ARCH: ${{ matrix.nodeArch }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pdf-backend/requirements.txt
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.target }}
+      - name: Require native architecture and record build interpreter
+        run: |
+          test "$(rustc -vV | sed -n 's/^host: //p')" = "$OPEN_OFFICE_TARGET"
+          node -e 'if(process.arch!==process.env.EXPECTED_NODE_ARCH)throw Error("Wrong native Node architecture");console.log(process.platform,process.arch)'
+          python - <<'PY'
+          import os, platform, sys
+          architecture = {'AMD64':'x86_64','amd64':'x86_64','x86_64':'x86_64','arm64':'aarch64','aarch64':'aarch64'}[platform.machine()]
+          system = {'win32':'pc-windows-msvc','darwin':'apple-darwin'}[sys.platform]
+          assert f'{architecture}-{system}' == os.environ['OPEN_OFFICE_TARGET']
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              output.write(f'OPEN_OFFICE_PYTHON={sys.executable}\n')
+          print(sys.version, platform.platform())
+          PY
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Restore verified offline office assets
+        uses: actions/cache@v4
+        with:
+          path: public/office-runtime
+          key: offline-office-${{ hashFiles('vendor/office-runtime-manifest.json') }}
+      - name: Fetch and verify all bundled office resources
+        run: npm run runtime:fetch
+      - name: Prepare local PDF engine
+        run: node scripts/ensure-pdf-backend.mjs --dev
+      - name: Check frontend types and real PDF editing round trips
+        run: npm test
+      - name: Freeze and verify native PDF runtime
+        run: node scripts/build-pdf-backend.mjs
+      - name: Build complete frontend resources before native resource validation
+        run: npm run build
+      - name: Run Rust file bridge and process tests
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml -- --include-ignored
+      - name: Build native installation package
+        run: npm run desktop:build -- --bundles ${{ matrix.bundles }}
+      - name: Install Windows package to verify the delivered resource layout
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installers = @(Get-ChildItem 'src-tauri/target/release/bundle/nsis/*.exe')
+          if ($installers.Count -ne 1) { throw "Expected one NSIS installer, found $($installers.Count)" }
+          $installDirectory = Join-Path $env:RUNNER_TEMP 'open-office-native-install'
+          if (Test-Path $installDirectory) { throw 'Refusing to reuse a previous installation directory' }
+          $process = Start-Process -FilePath $installers[0].FullName -ArgumentList @('/S', "/D=$installDirectory") -PassThru
+          if (-not $process.WaitForExit(180000)) {
+            & "$env:SystemRoot/System32/taskkill.exe" /PID $process.Id /T /F
+            throw 'NSIS installation timed out'
+          }
+          if ($process.ExitCode -notin @(0, 3010)) { throw "NSIS installation failed: $($process.ExitCode)" }
+          if (-not (Test-Path (Join-Path $installDirectory 'open-office.exe'))) { throw 'Installed desktop executable is missing' }
+          "OPEN_OFFICE_INSTALLED_APP=$installDirectory" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Verify final desktop GUI, office round trips, and real PDF edits
+        timeout-minutes: 8
+        run: node scripts/native-smoke.mjs
+      - name: Collect verified installer and internal build evidence
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+          import { join } from 'node:path';
+          const id = process.env.OPEN_OFFICE_PLATFORM_ID;
+          const target = process.env.OPEN_OFFICE_TARGET;
+          const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
+          assert.match(version, /^\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?$/);
+          const smoke = JSON.parse(readFileSync(`artifacts/${id}-native-smoke.json`, 'utf8'));
+          assert.equal(smoke.ok, true);
+          assert.equal(smoke.commit, process.env.GITHUB_SHA);
+          assert.equal(smoke.runId, process.env.GITHUB_RUN_ID);
+          assert.equal(smoke.target, target);
+          assert.equal(smoke.platformId, id);
+          assert.equal(smoke.frontend.ok, true);
+          assert.equal(smoke.process.exitCode, 0);
+          assert.equal(smoke.process.timedOut, false);
+          const windows = id === 'windows-x64';
+          const folder = windows ? 'nsis' : 'dmg';
+          const extension = windows ? '.exe' : '.dmg';
+          const bundle = `src-tauri/target/release/bundle/${folder}`;
+          const files = readdirSync(bundle).filter(file => file.endsWith(extension));
+          assert.equal(files.length, 1);
+          mkdirSync('artifacts', { recursive: true });
+          const installer = `Open-Office-${version}-${id}${windows ? '-setup.exe' : '.dmg'}`;
+          copyFileSync(join(bundle, files[0]), join('artifacts', installer));
+          const manifest = JSON.parse(readFileSync(`pdf-backend/build/${target}/manifest.json`, 'utf8'));
+          assert.equal(manifest.target, target);
+          assert.equal(manifest.info.version, '1.28.2');
+          assert.equal(manifest.selfTest.status, 'PASSED');
+          writeFileSync(`artifacts/${id}-pdf-runtime-manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+          console.log(`Verified final installer: ${installer}`);
+          NODE
+      - name: Retain diagnostic evidence in Actions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-office-native-${{ matrix.id }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 0
+      - name: Explain unsuccessful native verification
+        if: failure()
+        run: |
+          printf '### %s build or verification failed\n\nNo release will be published. Review the failed step above and the `open-office-native-%s` artifact when present. Native smoke checks have a 300-second deadline and retain structured errors.\n' "$OPEN_OFFICE_PLATFORM_ID" "$OPEN_OFFICE_PLATFORM_ID" >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Publish only after all native platforms pass
+    needs: native
+    if: ${{ inputs.publish }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: open-office-native-*
+          path: artifacts
+          merge-multiple: true
+      - name: Validate all native reports and create exact source archive
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, statSync, writeFileSync } from 'node:fs';
+          const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
+          assert.match(version, /^\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?$/);
+          const required = [];
+          for (const [id, target] of [['windows-x64', 'x86_64-pc-windows-msvc'], ['macos-arm64', 'aarch64-apple-darwin'], ['macos-x64', 'x86_64-apple-darwin']]) {
+            const report = JSON.parse(readFileSync(`artifacts/${id}-native-smoke.json`, 'utf8'));
+            assert.equal(report.ok, true, `${id} did not pass native checks`);
+            assert.equal(report.commit, process.env.GITHUB_SHA);
+            assert.equal(report.runId, process.env.GITHUB_RUN_ID);
+            assert.equal(report.target, target);
+            assert.equal(report.platformId, id);
+            assert.equal(report.process.exitCode, 0);
+            assert.equal(report.process.timedOut, false);
+            assert.equal(report.frontend.ok, true);
+            const file = `Open-Office-${version}-${id}${id === 'windows-x64' ? '-setup.exe' : '.dmg'}`;
+            assert.ok(statSync(`artifacts/${file}`).size > 0);
+            required.push(file);
+          }
+          const source = `Open-Office-${version}-source.zip`;
+          execFileSync('git', ['archive', '--format=zip', '--prefix=open-office/', `--output=artifacts/${source}`, process.env.GITHUB_SHA], { stdio: 'inherit' });
+          required.push(source);
+          const checksums = required.map(file => `${createHash('sha256').update(readFileSync(`artifacts/${file}`)).digest('hex')}  ${file}`).join('\n');
+          writeFileSync('artifacts/SHA256SUMS', `${checksums}\n`);
+          required.push('SHA256SUMS');
+          writeFileSync('release-assets.json', `${JSON.stringify(required)}\n`);
+          writeFileSync('release-version.txt', version);
+          NODE
+          (cd artifacts && sha256sum --check SHA256SUMS)
+      - name: Publish installers, source, and checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(cat release-version.txt)"
+          tag="desktop-v${version}-${GITHUB_RUN_ID}"
+          cat > release-notes.md <<EOF
+          Open Office ${version} · 离线桌面办公套件
+
+          安装包：Windows x64、Apple Silicon Mac、Intel Mac。安装后，Word / Excel 文档编辑和 PDF 工具使用随包本地引擎，不需要用户安装 Python 或 Microsoft Office。
+
+          三个平台均已通过原生构建与应用内自检：跨源隔离与 SharedArrayBuffer、Writer 文档编辑和 DOCX/PDF 往返、Calc 公式计算和 XLSX/PDF 往返、PDF 原文删除替换后重新读取。
+          原生验证使用 Windows Server 2022、macOS 15 的对应架构，不代表已测试所有系统版本或所有复杂 Office 文档。
+
+          macOS 应用使用 ad-hoc 签名并检查完整资源封印，未进行 Apple Developer ID 签名或公证；首次打开可能需要在「隐私与安全性」中单独批准。Windows 安装包未进行商业代码签名。
+
+          选择与你电脑对应的安装包即可。源码 ZIP 对应精确构建提交，SHA256SUMS 用于校验下载文件。
+          JSON 诊断和原生自检报告仅保留在本次 Actions artifacts（14 天），不作为 Release 附件。
+
+          许可与第三方源码：本集成分发包含 AGPL / GPL 组件，不能作为仅 MIT 授权的产品再分发。具体条款、完整许可文本和精确版本的官方对应源码地址见 [THIRD_PARTY_NOTICES.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/THIRD_PARTY_NOTICES.md) 与 [集成分发许可说明](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/DISTRIBUTION_LICENSE.md)。应用源码 ZIP 对应本提交，第三方对应源码可按随包清单与下载脚本获取。
+
+          源码提交：${GITHUB_SHA}
+          构建记录：https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" > existing-tag.json 2> tag-error.txt; then
+            test "$(gh api "repos/${GITHUB_REPOSITORY}/commits/${tag}" --jq .sha)" = "$GITHUB_SHA"
+          elif ! grep -q 'HTTP 404' tag-error.txt; then
+            cat tag-error.txt >&2
+            exit 1
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,targetCommitish,tagName > existing-release.json; then
+            node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const release = JSON.parse(readFileSync('existing-release.json', 'utf8'));
+          assert.equal(release.targetCommitish, process.env.GITHUB_SHA, 'Refusing to reuse another source commit');
+          assert.equal(release.isPrerelease, true, 'Refusing to alter a stable release');
+          NODE
+          else
+            mapfile -t assets < <(node -e 'for (const file of require("./release-assets.json")) console.log(`artifacts/${file}`)')
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --title "Open Office ${version} · Windows / macOS" --notes-file release-notes.md "${assets[@]}"
+          fi
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,targetCommitish,assets > release-ready.json
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const release = JSON.parse(readFileSync('release-ready.json', 'utf8'));
+          const required = JSON.parse(readFileSync('release-assets.json', 'utf8'));
+          assert.equal(release.targetCommitish, process.env.GITHUB_SHA);
+          assert.equal(release.isPrerelease, true);
+          assert.equal(release.assets.length, required.length, 'Public release must only contain installers, source and checksums');
+          for (const file of required) {
+            const matches = release.assets.filter(asset => asset.name === file);
+            assert.equal(matches.length, 1, `Missing or duplicate release asset: ${file}`);
+            assert.ok(matches[0].size > 0, `Empty release asset: ${file}`);
+          }
+          NODE
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+          test "$(gh api "repos/${GITHUB_REPOSITORY}/commits/${tag}" --jq .sha)" = "$GITHUB_SHA"
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,isDraft,isPrerelease,assets

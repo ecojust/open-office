@@ -1,0 +1,6 @@
+Noto Sans CJK SC Regular
+Copyright © 2014–2021 Adobe (http://www.adobe.com/).
+License: SIL Open Font License, Version 1.1.
+Copyright and license URL extracted from the bundled font name table.
+Bundled SHA-256: 2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b
+Full license: OFL-1.1.txt

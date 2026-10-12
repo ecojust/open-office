@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-12",
+  "runtimeBuildId": "efaf0670b4d055f838a2849becb10f08aa06a257",
+  "runtimeManifestSha256": "d102bbe5549b0f51bf967d903c1f14cd269781372ffe3ee1a7d0c99e0bb4ba3a",
+  "runtimeAssetSha256": {
+    "soffice.js": "5143e5354f470b87f86ba272bcfef857bd13e6f07b59666e48a7ccb89643cd77",
+    "soffice.wasm": "9ebd9a487e849a24b9c69f843ebdb451709c27b7722c010e36846433474a5bd4",
+    "soffice.data": "3dab0a5448e599dccc1b1e69f4f86ea9eb30777c3f1ed7b9c386a5f4163e361c",
+    "soffice.data.js.metadata": "5d9d909d0b9b38443c0f19704032d0fc12d654f6c9c24c2c3b237739c4848ae3",
+    "NotoSansCJKsc-Regular.otf": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b"
+  },
+  "zetaJsShippedSha256": "ee633709bfa1de3221e8f68beb395f68fd5ff00cab9e33ba22e97e8271b348b4",
+  "zetaJsUpstreamSha256": "b70ee7022908822c512535bbf43c4e44c297acc364e7542abba0d3071f5f9bfd",
+  "archives": [
+    {
+      "id": "libreoffice-core",
+      "version": "24.2.8.0",
+      "license": "MPL-2.0 AND LGPL-3.0-or-later AND other per-file licenses",
+      "repository": "https://github.com/LibreOffice/core",
+      "sourceRef": "distro/allotropia/zeta-24-2",
+      "commit": "efaf0670b4d055f838a2849becb10f08aa06a257",
+      "provenance": "Build ID extracted from the shipped soffice.data /instdir/program/versionrc.",
+      "file": "libreoffice-core-efaf0670b4d055f838a2849becb10f08aa06a257.tar.gz",
+      "url": "https://codeload.github.com/LibreOffice/core/tar.gz/efaf0670b4d055f838a2849becb10f08aa06a257",
+      "bytes": 334795672,
+      "sha256": "e6fc088020f268e78fb06fc72bfb1cefd81a5de8a3fb815fdd4bd538816c96c2"
+    },
+    {
+      "id": "qt5",
+      "version": "5.15.2+wasm",
+      "license": "GPL-3.0-only OR LGPL-3.0-only; see per-file licenses",
+      "repository": "https://github.com/allotropia/qt5",
+      "sourceRef": "5.15.2+wasm",
+      "commit": "3d440b7787f9b5ba15e5f8bcd7aef39b388f94fa",
+      "provenance": "Pinned snapshot of the upstream-published source branch; qtbase gitlink exactly matches the pinned qtbase archive. Not independently proven as CDN compiler input.",
+      "file": "qt5-3d440b7787f9b5ba15e5f8bcd7aef39b388f94fa.tar.gz",
+      "url": "https://codeload.github.com/allotropia/qt5/tar.gz/3d440b7787f9b5ba15e5f8bcd7aef39b388f94fa",
+      "bytes": 2086827,
+      "sha256": "d976efcdceb7fa3f31cef50fefaca9be4c5dfaa792db1e3016570f2176894772"
+    },
+    {
+      "id": "qtbase",
+      "version": "5.15.2+wasm",
+      "license": "GPL-3.0-only for the WASM platform plugin; LGPL-3.0-only and other licenses elsewhere",
+      "repository": "https://github.com/allotropia/qtbase",
+      "sourceRef": "5.15.2+wasm",
+      "commit": "a320678c85ec8029d5394bcd673d4c208af1de3a",
+      "provenance": "Pinned snapshot of the upstream-published source branch. Qt WASM plugin license verified in src/plugins/platforms/wasm/qwasmintegration.cpp.",
+      "file": "qtbase-a320678c85ec8029d5394bcd673d4c208af1de3a.tar.gz",
+      "url": "https://codeload.github.com/allotropia/qtbase/tar.gz/a320678c85ec8029d5394bcd673d4c208af1de3a",
+      "bytes": 67938669,
+      "sha256": "59f13761f9892aac0c7bf7b513fb3c279941d74bb38cbe16562441dd0a7d9c66"
+    },
+    {
+      "id": "emscripten",
+      "version": "fixed-3.1.65",
+      "license": "MIT OR NCSA; additional bundled-library licenses",
+      "repository": "https://github.com/allotropia/emscripten",
+      "sourceRef": "fixed-3.1.65",
+      "commit": "949ee1d40467b80e90a9fdc67155d443426fef2d",
+      "provenance": "Pinned snapshot of the upstream-published toolchain branch.",
+      "file": "emscripten-949ee1d40467b80e90a9fdc67155d443426fef2d.tar.gz",
+      "url": "https://codeload.github.com/allotropia/emscripten/tar.gz/949ee1d40467b80e90a9fdc67155d443426fef2d",
+      "bytes": 29625655,
+      "sha256": "f0d0fc3f71fe0d1852c9d04cabcafefd5863f6d0a353ae8d98fbf50da486af6e"
+    },
+    {
+      "id": "zetajs",
+      "version": "1.2.0",
+      "license": "MIT",
+      "repository": "https://github.com/allotropia/zetajs",
+      "sourceRef": "v1.2.0",
+      "commit": "57360bcb0e7726ffa0e66567c8041261b959f8dd",
+      "provenance": "Annotated v1.2.0 tag resolved to its commit. The locally shipped zeta.js includes the recorded one-line patch.",
+      "file": "zetajs-57360bcb0e7726ffa0e66567c8041261b959f8dd.tar.gz",
+      "url": "https://codeload.github.com/allotropia/zetajs/tar.gz/57360bcb0e7726ffa0e66567c8041261b959f8dd",
+      "bytes": 820266,
+      "sha256": "fc8d68cab83c0de567fea5ae68c9a5c635c156d0f6dd0af238b045d536587225"
+    },
+    {
+      "id": "pymupdf",
+      "version": "1.28.2",
+      "license": "AGPL-3.0-only",
+      "repository": "https://github.com/pymupdf/PyMuPDF",
+      "sourceRef": "1.28.2",
+      "commit": null,
+      "provenance": "Official PyPI source distribution; SHA-256 agrees with PyPI release metadata.",
+      "file": "pymupdf-1.28.2.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/a3/fb/b6761fa2d5266f2cdb24c3b91f4023070ab7848381417678e7a289a1d52a/pymupdf-1.28.2.tar.gz",
+      "bytes": 87903557,
+      "sha256": "5e0be7908a715aa20333caddd73f1d6f01e4cd0c26e869fa2dd0b7f344da2249"
+    },
+    {
+      "id": "mupdf",
+      "version": "1.28.2",
+      "license": "AGPL-3.0-or-later; additional bundled-library licenses",
+      "repository": "https://mupdf.com",
+      "sourceRef": "1.28.2",
+      "commit": null,
+      "provenance": "Official full MuPDF source archive referenced by PyMuPDF setup.py; contains its thirdparty source tree.",
+      "file": "mupdf-1.28.2-source.tar.gz",
+      "url": "https://mupdf.com/downloads/archive/mupdf-1.28.2-source.tar.gz",
+      "bytes": 68898646,
+      "sha256": "44075a84e329db55b9bef5f342a70fd26d69e48ad1d33cb89d9664581c641156"
+    },
+    {
+      "id": "python",
+      "version": "3.12.14",
+      "license": "PSF-2.0 and historical Python licenses",
+      "repository": "https://www.python.org",
+      "sourceRef": "3.12.14",
+      "commit": null,
+      "provenance": "Version used by the current native backend build environment. Other Python versions require their own matching source/notices.",
+      "file": "Python-3.12.14.tar.xz",
+      "url": "https://www.python.org/ftp/python/3.12.14/Python-3.12.14.tar.xz",
+      "bytes": 20820300,
+      "sha256": "5c8462af5790baf43a321a1559dbe0db06d1be4300fb85fb53c40060668e548a"
+    }
+  ],
+  "scopeNotes": [
+    "This is a checksum-verified upstream source snapshot set, not a claim that the CDN binaries have been independently rebuilt byte-for-byte.",
+    "LibreOffice core build ID is embedded in the binary filesystem. Qt/Emscripten branches are publicly identified by the distributor, but an exact per-component CDN build SBOM is not provided.",
+    "LibreOffice external source tarballs are not inside the core Git archive. LIBREOFFICE-EXTERNAL-SOURCES.lst records the upstream filenames/checksums; source releases must additionally include the dependencies selected by the actual build configuration.",
+    "A complete distribution must also include this application source, its build scripts/lockfiles, the local zeta.js patch, applicable notices, and any source/object material required by the selected licenses.",
+    "Python runtime versions are platform-specific build facts; 3.12.14 must not be relabeled as corresponding source for another installed Python version."
+  ]
+}
