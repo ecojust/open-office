@@ -43,7 +43,24 @@ jobs:
             assert.ok(statSync(`diagnostics/${file}`).size <= 1024 * 1024, 'Diagnostic report exceeds 1 MiB');
             const report = JSON.parse(readFileSync(`diagnostics/${file}`, 'utf8'));
             const details = JSON.stringify(report, null, 2);
-            console.log(`::notice title=${escape(file)}::${escape(details.slice(0, 48_000))}`);
+            // GitHub truncates each annotation message at 4096 bytes. Preserve
+            // valid JSON through numbered ASCII chunks instead of cutting JSON
+            // in the middle of an error or losing the final resource events.
+            const { stdoutTail, stderrTail, ...processInfo } = report.process || {};
+            const excerpt = { ...report, process: processInfo,
+              annotationLogTailsOmitted: true,
+              ...(report.nativeDiagnostics ? { nativeDiagnostics: {
+                ...report.nativeDiagnostics,
+                events: report.nativeDiagnostics.events?.slice(-60),
+                earlierEventsOmitted: Math.max(0, (report.nativeDiagnostics.events?.length || 0) - 60),
+              } } : {}),
+            };
+            const encoded = Buffer.from(JSON.stringify(excerpt), 'utf8').toString('base64');
+            const count = Math.ceil(encoded.length / 3000);
+            for (let index = 0; index < count; index++) {
+              const title = `${file}.base64-part-${String(index + 1).padStart(3, '0')}-of-${String(count).padStart(3, '0')}`;
+              console.log(`::notice title=${escape(title)}::${encoded.slice(index * 3000, (index + 1) * 3000)}`);
+            }
             appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### ${file}\n\n<pre>${details.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</pre>\n`);
           }
           NODE
