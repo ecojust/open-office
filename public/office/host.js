@@ -38,6 +38,14 @@ const fail = (error, prefix = '') => {
     ...diagnosticError(error) }, true);
   send({ event: 'error', error: message });
 };
+const restoreClipboardPermissionQuery = installOfficeClipboardPermissionCompatibility(navigator.permissions,
+  (name, error) => {
+    // This is an unsupported permission-status query, not clipboard access.
+    // Browser/OS permission checks for actual copy and paste remain in place.
+    console.info(`Clipboard permission query ${name} is unsupported; browser access checks remain active.`);
+    smokeDiagnostic('clipboard-query-unsupported', { name, ...diagnosticError(error) });
+  });
+window.addEventListener('pagehide', restoreClipboardPermissionQuery, { once: true });
 if (smokeMode) {
   window.addEventListener('error', event => fail(event.error ?? event.message ?? 'unknown', '页面脚本错误：'));
   window.addEventListener('unhandledrejection', event => fail(event.reason, '未处理的异步错误：'));
