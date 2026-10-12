@@ -13,26 +13,49 @@ if (smokeMode) allowed.add('smoke-test');
 const send = (message) => { if (!disposed) parent.postMessage({ channel: CHANNEL, session, ...message }, location.origin); };
 const progress = (text, percent) => send({ event: 'progress', data: { text, percent } });
 const errorText = error => String(error?.message || error || '未知错误').slice(0, 1500);
-let diagnosticPhase = 'host-created', diagnosticDependencies = null, diagnosticUnoReady = false;
+let diagnosticPhase = 'host-created', diagnosticDependencies = null, diagnosticUnoReady = false, diagnosticFailure = null;
 const diagnosticWarnings = [];
 function smokeDiagnostic(phase, detail = {}, failure = false) {
-  if (!smokeMode || disposed) return;
+  if (!smokeMode || disposed || diagnosticFailure) return;
   diagnosticPhase = phase;
   const body = { phase: `office-host:${phase}`, detail: JSON.stringify(detail).slice(0, 400), at: Date.now(),
-    ...(failure ? { ok: false, error: String(detail.error || phase) } : {}) };
+    ...(failure ? { ok: false, error: String(detail.error || phase), errorName: detail.errorName || '',
+      stack: String(detail.stack || '').slice(0, 8192), previousPhase: detail.previousPhase || '' } : {}) };
+  if (failure) diagnosticFailure = body;
   // Test-only reporting bypasses Tauri IPC, so an IPC failure cannot hide an engine failure.
   void fetch(new URL(`../__native-smoke/${failure ? 'failure' : 'progress'}`, location.href), {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).catch(() => {});
 }
-const fail = error => {
-  const message = errorText(error);
-  smokeDiagnostic('failure', { error: message, previousPhase: diagnosticPhase, warnings: diagnosticWarnings }, true);
+function diagnosticError(error) {
+  return { errorName: String(error?.name || error?.constructor?.name || typeof error).slice(0, 100),
+    stack: typeof error?.stack === 'string' ? error.stack.slice(0, 8192) : '' };
+}
+const fail = (error, prefix = '') => {
+  if (smokeMode && diagnosticFailure) return;
+  const message = prefix + errorText(error);
+  smokeDiagnostic('failure', { error: message, previousPhase: diagnosticPhase, warnings: diagnosticWarnings,
+    ...diagnosticError(error) }, true);
   send({ event: 'error', error: message });
 };
 if (smokeMode) {
-  window.addEventListener('error', event => fail(`页面脚本错误：${event.message || 'unknown'} @ ${event.filename || ''}:${event.lineno || 0}`));
-  window.addEventListener('unhandledrejection', event => fail(`未处理的异步错误：${errorText(event.reason)}`));
+  window.addEventListener('error', event => fail(event.error ?? event.message ?? 'unknown', '页面脚本错误：'));
+  window.addEventListener('unhandledrejection', event => fail(event.reason, '未处理的异步错误：'));
+  // Preserve native Worker objects and the original call/throw behavior. Only
+  // Emscripten control-message metadata is observed; document data is never logged.
+  const originalWorkerPostMessage = Worker.prototype.postMessage;
+  Worker.prototype.postMessage = function (...args) {
+    const message = args[0], tracked = message && ['load', 'run', 'LOWA-channel'].includes(message.cmd);
+    if (tracked) smokeDiagnostic('worker-post', { cmd: message.cmd,
+      wasmModule: message.wasmModule instanceof WebAssembly.Module,
+      wasmMemory: message.wasmMemory instanceof WebAssembly.Memory,
+      memoryBytes: message.wasmMemory?.buffer?.byteLength || 0,
+      sharedMemory: message.wasmMemory?.buffer instanceof SharedArrayBuffer,
+      transferCount: Array.isArray(args[1]) ? args[1].length : 0 });
+    try { return originalWorkerPostMessage.apply(this, args); }
+    catch (error) { if (tracked) fail(error, `Worker ${message.cmd} 消息失败：`); throw error; }
+  };
+  window.addEventListener('pagehide', () => { Worker.prototype.postMessage = originalWorkerPostMessage; }, { once: true });
   const heartbeat = setInterval(() => {
     const previousPhase = diagnosticPhase;
     smokeDiagnostic('heartbeat', { previousPhase, calledRun: !!window.Module?.calledRun,
@@ -48,13 +71,24 @@ async function diagnoseFeatures() {
     isolated: crossOriginIsolated, sharedArrayBuffer: typeof SharedArrayBuffer,
     offscreenCanvas: typeof OffscreenCanvas, transferCanvas: typeof HTMLCanvasElement.prototype.transferControlToOffscreen,
     wasmException: typeof WebAssembly.Exception, atomicsWaitAsync: typeof Atomics.waitAsync };
+  let sharedMemory;
   try {
     // A single 64 KiB page, not a second copy of the engine's 1 GiB memory.
-    const memory = new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true });
-    features.sharedWasmMemory = memory.buffer instanceof SharedArrayBuffer;
+    sharedMemory = new WebAssembly.Memory({ initial: 1, maximum: 1, shared: true });
+    features.sharedWasmMemory = sharedMemory.buffer instanceof SharedArrayBuffer;
   } catch (error) { features.sharedWasmMemoryError = errorText(error); }
   features.userAgent = navigator.userAgent;
   smokeDiagnostic('features', features);
+  for (const type of ['webgl', 'webgl2']) {
+    const probe = document.createElement('canvas'); probe.width = probe.height = 1;
+    let context;
+    try {
+      context = probe.getContext(type);
+      const renderer = context?.getParameter(context.RENDERER);
+      smokeDiagnostic('webgl-feature', { type, available: !!context, renderer: String(renderer || '') });
+    } catch (error) { smokeDiagnostic('webgl-feature', { type, error: errorText(error), ...diagnosticError(error) }); }
+    finally { context?.getExtension('WEBGL_lose_context')?.loseContext(); }
+  }
   if (typeof SharedArrayBuffer === 'undefined') return;
   await new Promise(resolve => {
     let worker, timer, url, finished = false;
@@ -64,14 +98,26 @@ async function diagnoseFeatures() {
       smokeDiagnostic('worker-features', detail); resolve();
     };
     try {
-      const source = `onmessage = event => postMessage({ isolated: crossOriginIsolated, sharedArrayBuffer: typeof SharedArrayBuffer, receivedShared: event.data instanceof SharedArrayBuffer, name: self.name, offscreenCanvas: typeof OffscreenCanvas, wasmException: typeof WebAssembly.Exception });`;
+      const source = `onmessage = event => {
+        const data = event.data;
+        const result = { isolated: crossOriginIsolated, receivedShared: data.buffer instanceof SharedArrayBuffer,
+          receivedMemory: data.memory instanceof WebAssembly.Memory, receivedModule: data.module instanceof WebAssembly.Module,
+          name: self.name, offscreenCanvas: typeof OffscreenCanvas };
+        try { if (typeof OffscreenCanvas === 'function') {
+          const gl = new OffscreenCanvas(1, 1).getContext('webgl');
+          result.workerWebgl = !!gl; result.renderer = gl ? gl.getParameter(gl.RENDERER) : '';
+          gl?.getExtension('WEBGL_lose_context')?.loseContext();
+        } } catch (error) { result.webglError = String(error); }
+        postMessage(result);
+      };`;
       url = URL.createObjectURL(new Blob([source], { type: 'application/javascript' }));
       worker = new Worker(url, { name: 'office-smoke-capabilities' });
       worker.onmessage = event => finish(event.data);
       worker.onerror = event => finish({ error: event.message || 'worker error' });
       timer = setTimeout(() => finish({ error: 'worker capability probe timed out' }), 4000);
-      worker.postMessage(new SharedArrayBuffer(16));
-    } catch (error) { finish({ error: errorText(error) }); }
+      worker.postMessage({ buffer: new SharedArrayBuffer(16), memory: sharedMemory,
+        module: new WebAssembly.Module(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0])) });
+    } catch (error) { finish({ error: errorText(error), ...diagnosticError(error) }); }
   });
 }
 function fromBase64(value) {
@@ -188,7 +234,7 @@ async function start() {
     },
     ...(smokeMode ? { onRuntimeInitialized: () => smokeDiagnostic('runtime-initialized'),
       monitorRunDependencies: count => { diagnosticDependencies = count; } } : {}),
-    onAbort: reason => fail(`办公引擎已停止：${errorText(reason)}`),
+    onAbort: reason => fail(reason, '办公引擎已停止：'),
     print: () => {}, printErr: value => {
       console.warn('[Office engine]', value);
       if (smokeMode && /error|failed|abort|unsupported|memory|pthread/i.test(String(value))) {
