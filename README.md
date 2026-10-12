@@ -59,7 +59,9 @@ npm run pdf:test
 npm run desktop:build
 ```
 
-通过 GitHub Actions 的 Desktop release 工作流可在三种原生构建机上生成安装包。流水线需要实际启动原生 WebView，确认隔离环境与 SharedArrayBuffer 可用，再执行 Word 原文修改后保存重开、Excel 公式往返及 PDF 中文原文替换后的重开检查；任何平台失败时不发布一组标记成功的安装包。
+通过 GitHub Actions 的 Desktop release 工作流可在 Windows x64、Apple Silicon 和 Intel 三种原生构建机上生成对应安装包。发布前必须实际启动应用，确认隔离环境与 SharedArrayBuffer 可用，再执行 Word 原文修改后保存重开、Excel 公式往返及 PDF 中文原文替换后的重开检查；任何一种安装包未通过时不发布。
+
+Windows 与 Apple Silicon 包在对应架构上运行上述检查。Intel 包保留原生构建、PDF 引擎测试、x86_64 架构与严格签名检查；由于 GitHub Intel 虚拟机的原生 WebGL 图形环境不可用，完整界面检查使用同一次构建的原封 Intel DMG，在 Apple Silicon macOS 15 上通过 Rosetta 运行真实 x64 App 与 PDF 进程。搬运前后校验 DMG 摘要、App 全部文件、符号链接和签名，不重建、不换成 ARM 包。报告分别记录目标架构、宿主架构与执行模式。**这不等同于已在真实 Intel GPU 上实测**，也不保证所有显卡、系统版本或复杂文档均兼容。
 
 构建版本采用北京时间 `YYYY.MMDD.HHmm`，也可通过 `OFFICE_BUILD_VERSION` 固定，用于对应安装包与测试记录。
 

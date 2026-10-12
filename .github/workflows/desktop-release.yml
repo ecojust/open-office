@@ -55,7 +55,7 @@ jobs:
           appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${JSON.stringify(matrix)}\n`);
           NODE
   native:
-    name: ${{ matrix.id }} native build and GUI round trip
+    name: ${{ matrix.id }} native build and verification
     needs: plan
     strategy:
       fail-fast: false
@@ -139,6 +139,7 @@ jobs:
           if (-not (Test-Path (Join-Path $installDirectory 'open-office.exe'))) { throw 'Installed desktop executable is missing' }
           "OPEN_OFFICE_INSTALLED_APP=$installDirectory" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Verify final desktop GUI, office round trips, and real PDF edits
+        if: matrix.id != 'macos-x64'
         timeout-minutes: 8
         run: node scripts/native-smoke.mjs
       - name: Collect verified installer and internal build evidence
@@ -151,15 +152,20 @@ jobs:
           const target = process.env.OPEN_OFFICE_TARGET;
           const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
           assert.match(version, /^\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?$/);
-          const smoke = JSON.parse(readFileSync(`artifacts/${id}-native-smoke.json`, 'utf8'));
-          assert.equal(smoke.ok, true);
-          assert.equal(smoke.commit, process.env.GITHUB_SHA);
-          assert.equal(smoke.runId, process.env.GITHUB_RUN_ID);
-          assert.equal(smoke.target, target);
-          assert.equal(smoke.platformId, id);
-          assert.equal(smoke.frontend.ok, true);
-          assert.equal(smoke.process.exitCode, 0);
-          assert.equal(smoke.process.timedOut, false);
+          if (id !== 'macos-x64') {
+            const smoke = JSON.parse(readFileSync(`artifacts/${id}-native-smoke.json`, 'utf8'));
+            assert.equal(smoke.ok, true);
+            assert.equal(smoke.commit, process.env.GITHUB_SHA);
+            assert.equal(smoke.runId, process.env.GITHUB_RUN_ID);
+            assert.equal(smoke.target, target);
+            assert.equal(smoke.platformId, id);
+            assert.equal(smoke.executionMode, 'native');
+            assert.equal(smoke.hostArch, process.arch);
+            assert.equal(smoke.targetArch, process.arch);
+            assert.equal(smoke.frontend.ok, true);
+            assert.equal(smoke.process.exitCode, 0);
+            assert.equal(smoke.process.timedOut, false);
+          }
           const windows = id === 'windows-x64';
           const folder = windows ? 'nsis' : 'dmg';
           const extension = windows ? '.exe' : '.dmg';
@@ -174,13 +180,16 @@ jobs:
           assert.equal(manifest.info.version, '1.28.2');
           assert.equal(manifest.selfTest.status, 'PASSED');
           writeFileSync(`artifacts/${id}-pdf-runtime-manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
-          console.log(`Verified final installer: ${installer}`);
+          console.log(`Collected native installer: ${installer}`);
           NODE
+      - name: Record Intel package signatures, complete App inventory, and actual Metal availability
+        if: matrix.id == 'macos-x64'
+        run: node scripts/macos-intel-transfer.mjs record
       - name: Retain diagnostic evidence in Actions
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: open-office-native-${{ matrix.id }}
+          name: ${{ matrix.id == 'macos-x64' && 'open-office-build-macos-x64' || format('open-office-native-{0}', matrix.id) }}
           path: artifacts/
           if-no-files-found: warn
           retention-days: 14
@@ -190,9 +199,90 @@ jobs:
         run: |
           printf '### %s build or verification failed\n\nNo release will be published. Review the failed step above and the `open-office-native-%s` artifact when present. Native smoke checks have a 300-second deadline and retain structured errors.\n' "$OPEN_OFFICE_PLATFORM_ID" "$OPEN_OFFICE_PLATFORM_ID" >> "$GITHUB_STEP_SUMMARY"
 
+  intel_rosetta:
+    name: Unchanged Intel DMG / Rosetta real GUI round trip
+    needs: [plan, native]
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'macos-x64' }}
+    runs-on: macos-15
+    timeout-minutes: 18
+    env:
+      OPEN_OFFICE_PLATFORM_ID: macos-x64
+      OPEN_OFFICE_TARGET: x86_64-apple-darwin
+      OPEN_OFFICE_ALLOW_ROSETTA: '1'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Require an ARM verification host and available Rosetta translation
+        run: |
+          test "$(uname -m)" = arm64
+          node -e 'if(process.platform!=="darwin"||process.arch!=="arm64")throw Error("Rosetta verifier must be native ARM Node")'
+          test "$(/usr/sbin/sysctl -in hw.optional.arm64)" = 1
+          if ! /usr/bin/arch -x86_64 /usr/sbin/sysctl -in sysctl.proc_translated > "$RUNNER_TEMP/rosetta-status.txt"; then
+            /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+            /usr/bin/arch -x86_64 /usr/sbin/sysctl -in sysctl.proc_translated > "$RUNNER_TEMP/rosetta-status.txt"
+          fi
+          test "$(cat "$RUNNER_TEMP/rosetta-status.txt")" = 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: open-office-build-macos-x64
+          path: artifacts
+      - name: Verify original Intel DMG and copy its unchanged App with signatures intact
+        run: node scripts/macos-intel-transfer.mjs verify-and-copy
+      - name: Run actual Intel App and PDF processes under Rosetta for full document round trips
+        timeout-minutes: 8
+        run: node scripts/native-smoke.mjs --app "$OPEN_OFFICE_VERIFIED_APP"
+      - name: Check matching package, signatures, architecture, and successful real edits
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { validateFrontendReport } from './scripts/native-smoke.mjs';
+          import { sha256File, verifyTransferProof } from './scripts/macos-intel-transfer.mjs';
+          const report = JSON.parse(readFileSync('artifacts/macos-x64-native-smoke.json', 'utf8'));
+          const proof = JSON.parse(readFileSync('artifacts/macos-x64-build-proof.json', 'utf8'));
+          const transfer = JSON.parse(readFileSync('artifacts/macos-x64-transfer-validation.json', 'utf8'));
+          verifyTransferProof(proof, { commit: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, dmgPath: `artifacts/${proof.dmg.name}` });
+          assert.equal(report.ok, true);
+          assert.equal(report.commit, process.env.GITHUB_SHA);
+          assert.equal(report.runId, process.env.GITHUB_RUN_ID);
+          assert.equal(report.platformId, 'macos-x64');
+          assert.equal(report.target, 'x86_64-apple-darwin');
+          assert.equal(report.targetArch, 'x64');
+          assert.equal(report.hostArch, 'arm64');
+          assert.equal(report.executionMode, 'rosetta2');
+          assert.deepEqual(report.preflight.macos.mainArchitectures, ['x86_64']);
+          assert.deepEqual(report.preflight.macos.pdfArchitectures, ['x86_64']);
+          assert.deepEqual(report.preflight.macos.cdHashes, proof.signatures);
+          assert.equal(report.process.exitCode, 0);
+          assert.equal(report.process.timedOut, false);
+          assert.equal(transfer.ok, true);
+          assert.equal(transfer.buildProofSha256, sha256File('artifacts/macos-x64-build-proof.json'));
+          assert.equal(transfer.appInventorySha256, proof.app.sha256);
+          assert.equal(transfer.dmg.sha256, proof.dmg.sha256);
+          validateFrontendReport(report.frontend);
+          NODE
+      - name: Retain Intel package and Rosetta validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-office-native-macos-x64
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 0
+      - name: Explain unsuccessful Intel application validation
+        if: failure()
+        run: |
+          printf '### Intel application verification failed\n\nThe unchanged x86_64 package did not pass the required Rosetta GUI checks on the ARM macOS runner. No release is permitted. Check the native report, transfer proof, and structured diagnostics in the artifact. This check is not a physical Intel GPU test.\n' >> "$GITHUB_STEP_SUMMARY"
+
   release:
     name: Publish only after all native platforms pass
-    needs: [plan, native]
+    needs: [plan, native, intel_rosetta]
     if: ${{ inputs.publish && inputs.platform == 'all' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -217,6 +307,8 @@ jobs:
           import { createHash } from 'node:crypto';
           import { execFileSync } from 'node:child_process';
           import { readFileSync, statSync, writeFileSync } from 'node:fs';
+          import { validateFrontendReport } from './scripts/native-smoke.mjs';
+          import { sha256File, verifyTransferProof } from './scripts/macos-intel-transfer.mjs';
           const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
           assert.match(version, /^\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?$/);
           const required = [];
@@ -230,6 +322,35 @@ jobs:
             assert.equal(report.process.exitCode, 0);
             assert.equal(report.process.timedOut, false);
             assert.equal(report.frontend.ok, true);
+            validateFrontendReport(report.frontend);
+            assert.equal(report.targetArch, id === 'macos-arm64' ? 'arm64' : 'x64');
+            assert.equal(report.hostArch, id === 'windows-x64' ? 'x64' : 'arm64');
+            assert.equal(report.executionMode, id === 'macos-x64' ? 'rosetta2' : 'native');
+            if (id === 'macos-x64') {
+              const proof = JSON.parse(readFileSync('artifacts/macos-x64-build-proof.json', 'utf8'));
+              const transfer = JSON.parse(readFileSync('artifacts/macos-x64-transfer-validation.json', 'utf8'));
+              assert.equal(proof.dmg.name, `Open-Office-${version}-macos-x64.dmg`);
+              verifyTransferProof(proof, { commit: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, dmgPath: `artifacts/${proof.dmg.name}` });
+              assert.equal(transfer.ok, true);
+              assert.equal(transfer.commit, process.env.GITHUB_SHA);
+              assert.equal(transfer.runId, process.env.GITHUB_RUN_ID);
+              assert.equal(transfer.target, target);
+              assert.equal(transfer.executionMode, 'rosetta2');
+              assert.equal(transfer.targetArch, 'x64');
+              assert.equal(transfer.hostArch, 'arm64');
+              assert.equal(transfer.unchangedAppBytesAndSymlinks, true);
+              assert.equal(transfer.originalAppResigned, false);
+              assert.equal(transfer.buildProofSha256, sha256File('artifacts/macos-x64-build-proof.json'));
+              assert.equal(transfer.appInventorySha256, proof.app.sha256);
+              assert.equal(transfer.dmg.sha256, proof.dmg.sha256);
+              assert.deepEqual(transfer.signatures, proof.signatures);
+              assert.deepEqual(report.preflight.macos.cdHashes, proof.signatures);
+              assert.deepEqual(report.preflight.macos.mainArchitectures, ['x86_64']);
+              assert.deepEqual(report.preflight.macos.pdfArchitectures, ['x86_64']);
+              assert.equal(report.preflight.rosetta.hardwareArm64, 1);
+              assert.equal(report.preflight.rosetta.nodeProcessTranslated, 0);
+              assert.equal(report.preflight.rosetta.x86ProbeTranslated, 1);
+            }
             const file = `Open-Office-${version}-${id}${id === 'windows-x64' ? '-setup.exe' : '.dmg'}`;
             assert.ok(statSync(`artifacts/${file}`).size > 0);
             required.push(file);
@@ -256,8 +377,9 @@ jobs:
 
           安装包：Windows x64、Apple Silicon Mac、Intel Mac。安装后，Word / Excel 文档编辑和 PDF 工具使用随包本地引擎，不需要用户安装 Python 或 Microsoft Office。
 
-          三个平台均已通过原生构建与应用内自检：跨源隔离与 SharedArrayBuffer、Writer 文档编辑和 DOCX/PDF 往返、Calc 公式计算和 XLSX/PDF 往返、PDF 原文删除替换后重新读取。
-          原生验证使用 Windows Server 2022、macOS 15 的对应架构，不代表已测试所有系统版本或所有复杂 Office 文档。
+          三种安装包均通过实际应用内自检：跨源隔离与 SharedArrayBuffer、Writer 文档编辑和 DOCX/PDF 往返、Calc 公式计算和 XLSX/PDF 往返、PDF 原文删除替换后重新读取。
+          Windows x64 在 Windows Server 2022 上验证，Apple Silicon 包在 macOS 15 ARM 上验证。Intel x64 包在 Intel 构建机原生编译并检查 PDF、架构与签名，随后将原封 DMG 转移到 Apple Silicon macOS 15，通过 Rosetta 运行真实 x64 App 与 PDF 进程完成相同自检；校验安装包摘要、App 全部文件、链接与签名一致，无重建或重签。
+          Intel 包尚未在真实 Intel GPU 上实测；GitHub 的 Intel 虚拟机未提供可用的原生 WebGL 图形环境。本验证不代表已测试所有系统版本、显卡或复杂 Office 文档。
 
           macOS 应用使用 ad-hoc 签名并检查完整资源封印，未进行 Apple Developer ID 签名或公证；首次打开可能需要在「隐私与安全性」中单独批准。Windows 安装包未进行商业代码签名。
 

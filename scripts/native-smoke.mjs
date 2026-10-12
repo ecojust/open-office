@@ -25,6 +25,34 @@ function requireCheck(value, message) {
   assert.ok(value, message);
 }
 
+export function selectExecution(platformId, target, hostPlatform, hostArch, allowRosetta) {
+  const configuration = PLATFORMS[platformId];
+  requireCheck(configuration, 'OPEN_OFFICE_PLATFORM_ID must be windows-x64, macos-x64, or macos-arm64');
+  requireCheck(target === configuration.target, 'OPEN_OFFICE_TARGET does not match the selected platform');
+  requireCheck(hostPlatform === configuration.os, 'Native smoke tests must run on the matching operating system');
+  if (hostArch === configuration.arch) {
+    return { targetArch: configuration.arch, hostArch, executionMode: 'native' };
+  }
+  requireCheck(allowRosetta === '1' && platformId === 'macos-x64'
+    && target === 'x86_64-apple-darwin' && hostPlatform === 'darwin' && hostArch === 'arm64',
+  'Host and target CPU architectures differ; only explicitly enabled Intel macOS on a native Apple Silicon Node host may use Rosetta 2');
+  return { targetArch: 'x64', hostArch: 'arm64', executionMode: 'rosetta2' };
+}
+
+export function validateRosettaProbe(probe) {
+  requireCheck(probe.hardwareArm64 === '1', 'Rosetta validation requires actual Apple Silicon hardware');
+  requireCheck(probe.nodeProcessTranslated === '0', 'Rosetta validation must be orchestrated by native ARM Node, not translated Node');
+  requireCheck(probe.x86ProbeTranslated === '1', 'The explicitly launched x86_64 probe is not running under Rosetta 2');
+  return { hardwareArm64: 1, nodeProcessTranslated: 0, x86ProbeTranslated: 1, verified: true };
+}
+
+export function guiLaunchCommand(executable, executionMode) {
+  requireCheck(executionMode === 'native' || executionMode === 'rosetta2', 'Unknown native GUI execution mode');
+  return executionMode === 'rosetta2'
+    ? { command: '/usr/bin/arch', args: ['-x86_64', executable] }
+    : { command: executable, args: [] };
+}
+
 export function appendLogTail(previous, chunk) {
   const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
   if (bytes.length >= STREAM_TAIL_BYTES) return Buffer.from(bytes.subarray(-STREAM_TAIL_BYTES));
@@ -167,13 +195,38 @@ function nativeTool(program, args, label = basename(program)) {
   return `${result.stdout || ''}\n${result.stderr || ''}`;
 }
 
+function rosettaPreflight(evidence) {
+  requireCheck(process.platform === 'darwin' && process.arch === 'arm64', 'Rosetta probes require native Apple Silicon Node');
+  Object.assign(evidence, {
+    verified: false, nodeArchitecture: process.arch, raw: {},
+    translatedProbeExecutable: '/usr/bin/arch',
+    translatedProbeArguments: ['-x86_64', '/usr/sbin/sysctl', '-in', 'sysctl.proc_translated'],
+  });
+  evidence.raw.hardwareArm64 = nativeTool('/usr/sbin/sysctl', ['-in', 'hw.optional.arm64'], 'Apple Silicon hardware probe').trim();
+  evidence.raw.nodeProcessTranslated = nativeTool('/usr/sbin/sysctl', ['-in', 'sysctl.proc_translated'], 'Native ARM orchestration probe').trim();
+  evidence.raw.x86ProbeTranslated = nativeTool('/usr/bin/arch', ['-x86_64', '/usr/sbin/sysctl', '-in', 'sysctl.proc_translated'], 'Rosetta 2 x86_64 execution probe').trim();
+  Object.assign(evidence, validateRosettaProbe(evidence.raw));
+}
+
+export function validateMacArchitectures(mainArchitectures, pdfArchitectures, nativeArch) {
+  requireCheck(mainArchitectures.length === 1 && mainArchitectures[0] === nativeArch
+    && pdfArchitectures.length === 1 && pdfArchitectures[0] === nativeArch,
+  'Main app and PDF runtime must each contain exactly the selected macOS architecture');
+}
+
 function macPreflight(app, mainExecutable, pdfExecutable, nativeArch) {
-  const signatures = [];
+  const signatures = [], descriptions = {}, cdHashes = {};
   for (const [label, path] of [['app', app], ['main', mainExecutable], ['pdfRuntime', pdfExecutable]]) {
     nativeTool('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=4', path], `codesign ${label} (${basename(path)})`);
+    const description = nativeTool('/usr/bin/codesign', ['--display', '--verbose=4', path], `codesign ${label} metadata (${basename(path)})`);
+    const cdHash = /^CDHash=([a-f0-9]{40})\s*$/mi.exec(description);
+    requireCheck(cdHash, `The ${label} signature has no verifiable CodeDirectory hash`);
+    descriptions[label] = description;
+    cdHashes[label] = cdHash[1].toLowerCase();
     signatures.push(label);
   }
-  const description = nativeTool('/usr/bin/codesign', ['--display', '--verbose=4', app], `codesign app metadata (${basename(app)})`);
+  requireCheck(cdHashes.app === cdHashes.main, 'The application bundle and main executable signature hashes differ');
+  const description = descriptions.app;
   const sealed = /Sealed Resources version=(\d+)\s+rules=(\d+)\s+files=(\d+)/.exec(description);
   requireCheck(sealed && Number(sealed[1]) >= 2 && Number(sealed[3]) > 0, 'Final macOS app has no verified sealed resources');
   const plist = /Info\.plist entries=(\d+)/.exec(description);
@@ -182,9 +235,10 @@ function macPreflight(app, mainExecutable, pdfExecutable, nativeArch) {
   requireCheck(!/linker-signed/i.test(description), 'Final macOS app still has a linker-only signature instead of a sealed bundle signature');
   const mainArchitectures = nativeTool('/usr/bin/lipo', ['-archs', mainExecutable]).trim().split(/\s+/);
   const pdfArchitectures = nativeTool('/usr/bin/lipo', ['-archs', pdfExecutable]).trim().split(/\s+/);
-  requireCheck(mainArchitectures.includes(nativeArch) && pdfArchitectures.includes(nativeArch), 'Main app or PDF runtime has the wrong macOS architecture');
+  validateMacArchitectures(mainArchitectures, pdfArchitectures, nativeArch);
   return {
     strictSignatureVerification: signatures,
+    cdHashes,
     sealedResources: { version: Number(sealed[1]), rules: Number(sealed[2]), files: Number(sealed[3]) },
     signature: 'adhoc', infoPlistEntries: Number(plist[1]), linkerSigned: false,
     developerIdSigned: false, notarized: false,
@@ -242,13 +296,16 @@ function killTree(child, env, force = false) {
   }
 }
 
-async function runGui(executable, output, workingDirectory, env, diagnostic) {
+async function runGui(executable, output, workingDirectory, env, diagnostic, executionMode = 'native') {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(executable, [], {
+    const launch = guiLaunchCommand(executable, executionMode);
+    const child = spawn(launch.command, launch.args, {
       cwd: workingDirectory, shell: false, detached: process.platform !== 'win32', windowsHide: false,
       env: { ...env, OPEN_OFFICE_SMOKE: '1', OPEN_OFFICE_SMOKE_OUTPUT: output },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    diagnostic.launchExecutable = launch.command;
+    diagnostic.launchArguments = launch.args;
     diagnostic.pid = child.pid ?? null;
     const hashes = { stdout: createHash('sha256'), stderr: createHash('sha256') };
     const tails = { stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) };
@@ -360,15 +417,15 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     schemaVersion: 1, kind: 'native-gui-smoke', ok: false, platformId, target: env.OPEN_OFFICE_TARGET || null,
     commit: env.GITHUB_SHA || null, runId: env.GITHUB_RUN_ID || null,
     host: { platform: process.platform, architecture: process.arch },
+    targetArch: PLATFORMS[platformId]?.arch || null, hostArch: process.arch, executionMode: 'native',
     startedAt: new Date(started).toISOString(), timeoutMs: TIMEOUT_MS,
     preflight: {}, process: { exitCode: null, signal: null, timedOut: false, stdoutTail: '', stderrTail: '' }, frontend: null, errors: [],
   };
   let temporaryDirectory, rawReport;
   try {
     const configuration = PLATFORMS[platformId], options = parseOptions(args);
-    requireCheck(configuration, 'OPEN_OFFICE_PLATFORM_ID must be windows-x64, macos-x64, or macos-arm64');
-    requireCheck(env.OPEN_OFFICE_TARGET === configuration.target, 'OPEN_OFFICE_TARGET does not match the selected platform');
-    requireCheck(process.platform === configuration.os && process.arch === configuration.arch, 'Native smoke tests must run on the matching operating system and CPU architecture');
+    const execution = selectExecution(platformId, env.OPEN_OFFICE_TARGET, process.platform, process.arch, env.OPEN_OFFICE_ALLOW_ROSETTA);
+    Object.assign(report, execution);
     requireCheck(/^[0-9a-f]{40}$/i.test(env.GITHUB_SHA || ''), 'GITHUB_SHA must identify the exact tested source commit');
     requireCheck(/^\d+$/.test(env.GITHUB_RUN_ID || ''), 'GITHUB_RUN_ID must identify this native CI run');
     const location = locateApplication(configuration, options, env, root);
@@ -378,6 +435,10 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     report.preflight.pdfExecutableSha256 = hashFile(location.pdfExecutable);
     if (configuration.os === 'darwin') {
       report.preflight.macos = macPreflight(location.app, location.executable, location.pdfExecutable, configuration.nativeArch);
+      if (execution.executionMode === 'rosetta2') {
+        report.preflight.rosetta = {};
+        rosettaPreflight(report.preflight.rosetta);
+      }
     } else {
       report.preflight.installedNSISLayout = true;
       report.preflight.windows = {
@@ -388,7 +449,7 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     rawReport = join(temporaryDirectory, 'frontend-report.json');
     // This path is unique, was not created beforehand, and is not reused on reruns.
     requireCheck(!existsSync(rawReport), 'The native GUI report destination is not fresh');
-    await runGui(location.executable, rawReport, temporaryDirectory, env, report.process);
+    await runGui(location.executable, rawReport, temporaryDirectory, env, report.process, execution.executionMode);
     report.frontend = readFrontendReport(rawReport);
     report.checks = validateFrontendReport(report.frontend);
     requireCheck(report.process.cleanExit === true && report.process.exitCode === 0 && !report.process.signal && !report.process.timedOut, 'Native GUI did not exit cleanly after its checks');
