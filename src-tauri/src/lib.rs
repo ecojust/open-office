@@ -105,13 +105,14 @@ pub fn run() {
             )?;
             let navigation = server.info.clone();
             let url = server.url();
-            // Only this randomly generated URL namespace gets native IPC access.
-            // A wildcard localhost capability would grant unrelated local web pages access.
+            // Fetch IPC supplies only Origin (no token path) to Tauri's ACL.
+            // Restrict it to this exact random loopback port and main window;
+            // HTTP asset access and window navigation still require the token.
             app.add_capability(
                 tauri::ipc::CapabilityBuilder::new("session-ui")
                     .local(false)
                     .window("main")
-                    .remote(format!("{url}*"))
+                    .remote(server.ipc_origin_pattern())
                     .permission("core:default")
                     .permission("allow-bootstrap")
                     .permission("allow-confirm-close")

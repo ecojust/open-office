@@ -135,6 +135,13 @@ impl AssetServer {
         format!("{}{}", self.info.origin, self.info.base_path)
     }
 
+    pub fn ipc_origin_pattern(&self) -> String {
+        // Tauri's fetch IPC derives the caller URL from the Origin header, which
+        // has no pathname. Bind IPC to this exact per-launch host/port; the HTTP
+        // server and the main-window navigation guard separately enforce token.
+        format!("{}/*", self.info.origin)
+    }
+
     pub fn allows_navigation(info: &Bootstrap, url: &tauri::Url) -> bool {
         url.origin().ascii_serialization() == info.origin
             && url.username().is_empty()
@@ -592,6 +599,48 @@ mod tests {
         .starts_with("HTTP/1.1 405"));
         assert!(request(&server, "/wrong/", "GET", "").starts_with("HTTP/1.1 404"));
         assert!(request(&server, &server.info.base_path, "HEAD", "").ends_with("\r\n\r\n"));
+    }
+
+    #[test]
+    fn ipc_capability_matches_fetch_origin_without_token_path_and_rejects_other_servers() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("index.html"), "home").unwrap();
+        let server = AssetServer::start(root.path()).unwrap();
+        let capability: tauri::utils::acl::RemoteUrlPattern =
+            server.ipc_origin_pattern().parse().unwrap();
+        // Mirrors tauri 2.12's ipc/protocol.rs parse_invoke_request: Origin is
+        // parsed as a URL, not the full webview page URL, so its path is just /.
+        let caller: tauri::Url = server.info.origin.parse().unwrap();
+        assert_eq!(caller.path(), "/");
+        assert!(capability.test(&caller));
+        let old_token_pattern: tauri::utils::acl::RemoteUrlPattern =
+            format!("{}*", server.url()).parse().unwrap();
+        assert!(
+            !old_token_pattern.test(&caller),
+            "The old path ACL rejects real fetch IPC"
+        );
+        assert!(capability.test(&format!("{}?nativeSmoke=1", server.url()).parse().unwrap()));
+        let port = caller.port().unwrap();
+        for foreign in [
+            format!(
+                "http://127.0.0.1:{}/",
+                if port == 65535 { port - 1 } else { port + 1 }
+            ),
+            format!("http://localhost:{port}/"),
+            format!("https://127.0.0.1:{port}/"),
+            "https://example.com/".into(),
+        ] {
+            assert!(
+                !capability.test(&foreign.parse().unwrap()),
+                "Accepted foreign origin: {foreign}"
+            );
+        }
+        // Origin ACL must not accidentally relax the separate navigation guard.
+        assert!(!AssetServer::allows_navigation(&server.info, &caller));
+        assert!(!AssetServer::allows_navigation(
+            &server.info,
+            &format!("{}/wrong/", server.info.origin).parse().unwrap()
+        ));
     }
 
     #[test]
