@@ -1,0 +1,480 @@
+{
+  "date": "2026-10-13",
+  "scope": "Independent complex PPTX fixtures: package preservation, production-model semantics and actual Vue screenshots recorded separately",
+  "okMeaning": "All declared preservation, semantic and edit-safety assertions passed; this is not a claim of full visual fidelity or playback support.",
+  "sourceState": "Local source tested; no new desktop package release or native WebView verification in this run.",
+  "summary": {
+    "fixtureCount": 12,
+    "noOpCycles": 36,
+    "exportedFixturePptx": 65,
+    "independentOutputReads": 65,
+    "independentAssertions": 900,
+    "independentPassed": 900,
+    "ok": true
+  },
+  "browserStartedAt": "2026-10-13T11:52:22.481Z",
+  "browserFinishedAt": "2026-10-13T11:53:11.741Z",
+  "independentAuditRecheck": {
+    "at": "2026-10-13T11:56:20.499533+00:00",
+    "scenario": "nested-format-color",
+    "reason": "Inspector previously treated the empty pPr wrapper introduced only to carry the requested color as an unrelated XML change. Only the target formatting mask was corrected; bodyPr, child-transform, sibling-color and field-structure negative controls still reject damage.",
+    "productionOrSourceFilesChanged": false,
+    "exportedArtifactHashesReverified": true,
+    "browserRunRepeated": false
+  },
+  "verification": {
+    "typecheck": "passed",
+    "nodeTests": {
+      "passed": 438,
+      "failed": 0
+    },
+    "pdfPythonTests": {
+      "passed": 28,
+      "failed": 0
+    },
+    "baselineBrowserChecks": 24,
+    "independentInspectorControls": 12,
+    "productionBuild": "passed"
+  },
+  "runtime": {
+    "pageErrors": [],
+    "consoleErrors": [],
+    "externalRequests": [],
+    "officeRuntimeRequests": []
+  },
+  "additionalRegressions": {
+    "documentClipboard": {
+      "ok": true,
+      "copiedFrom": "typography-rich",
+      "pastedInto": "text-layout-vertical",
+      "countBefore": 7,
+      "countAfter": 7,
+      "savedBefore": "尚未保存",
+      "savedAfter": "尚未保存"
+    },
+    "hiddenLineWidth": {
+      "ok": true,
+      "hiddenWidth": 0.4,
+      "coloredWidth": 0.4,
+      "strokeWidths": [
+        0.4
+      ],
+      "independentPythonReport": "regression-probes/independent-python.json"
+    }
+  },
+  "fixtures": [
+    {
+      "id": "typography-rich",
+      "source": {
+        "path": "tests/compatibility/presentation-complex/fixtures/generated/typography-rich.pptx",
+        "sha256": "3f1b8c8598a5073111a0e9d06264b3269ad79eaff95d4a00c6029f8de27a34cf",
+        "bytes": 33717
+      },
+      "independentAudit": {
+        "id": "typography-rich",
+        "reports": 5,
+        "outputs": 7,
+        "checks": 89,
+        "passed": true
+      },
+      "noOpPartChangesPerCycle": [
+        8,
+        0,
+        0
+      ],
+      "noOpRemovedParts": [
+        [],
+        [],
+        []
+      ],
+      "noOpProtectedPartChanges": [
+        [],
+        [],
+        []
+      ],
+      "visualStatus": "partial",
+      "visualObservation": "Text is visible, but mixed run styling is flattened and bullet symbols/levels are not reproduced. XML style preservation is audited separately."
+    },
+    {
+      "id": "text-layout-vertical",
+      "source": {
+        "path": "tests/compatibility/presentation-complex/fixtures/generated/text-layout-vertical.pptx",
+        "sha256": "3c03ecb055aefbbf11b5814ad4e6bb622aa5ca00616c6c23159f2dae1462b831",
+        "bytes": 33457
+      },
+      "independentAudit": {
+        "id": "text-layout-vertical",
+        "reports": 3,
+        "outputs": 5,
+        "checks": 65,
+        "passed": true
+      },
+      "noOpPartChangesPerCycle": [
+        8,
+        0,
+        0
+      ],
+      "noOpRemovedParts": [
+        [],
+        [],
+        []
+      ],
+      "noOpProtectedPartChanges": [
+        [],
+        [],
+        []
+      ],
+      "visualStatus": "partial",
+      "visualObservation": "Top/middle/bottom text positioning and the editable middle/bottom baseline are exercised. East Asian vertical text remains horizontal. Independently rotated long text extends outside its original box; no desktop-renderer equivalence claim."
+    },
+    {
+      "id": "nested-groups-images",
+      "source": {
+        "path": "tests/compatibility/presentation-complex/fixtures/generated/nested-groups-images.pptx",
+        "sha256": "bb6820325e97cb3a848c355ecc36493c1835bf313d8ae12e9a99e47fcce36e6d",
+        "bytes": 34758
+      },
+      "independentAudit": {
+        "id": "nested-groups-images",
+        "reports": 4,
+        "outputs": 6,
+        "checks": 81,
+        "passed": true
+      },
+      "noOpPartChangesPerCycle": [
+        8,
+        0,
+        0
+      ],
+      "noOpRemovedParts": [
+        [],
+        [],
+        []
+      ],
+      "noOpProtectedPartChanges": [
+        [],
+        [],
+        []
+      ],
+      "visualStatus": "partial",
+      "visualObservation": "Some grouped shapes, images and a connector render; protected unsupported members use placeholders. Crop, flip, transparency and full group affine appearance are not validated against PowerPoint."
+    },
+    {
+      "id": "merged-styled-tables",
+      "source": {
+        "path": "tests/compatibility/presentation-complex/fixtures/generated/merged-styled-tables.pptx",
+        "sha256": "4fe9d3b3235d7060cc1dd11ec252dd92573585161394f8886195c4d5974f2b75",
+        "bytes": 33706
+      },
+      "independentAudit": {
+        "id": "merged-styled-tables",
+        "reports": 3,
+        "outputs": 5,
+        "checks": 65,
+        "passed": true
+      },
+      "noOpPartChangesPerCycle": [
+        8,
+        0,
+        0
+      ],
+      "noOpRemovedParts": [
+        [],
+        [],
+        []
+      ],
+      "noOpProtectedPartChanges": [
+        [],
+        [],
+        []
+      ],
+      "visualStatus": "partial",
+      "visualObservation": "Cell text appears in a simplified rectangular grid; original merged-cell geometry and complex styling are not reproduced. The object is protected and original table XML is preserved."
+    },
+    {
+      "id": "combo-and-doughnut-charts",
+      "source": {
+        "path": "tests/compatibility/presentation-complex/fixtures/generated/combo-and-doughnut-charts.pptx",
+        "sha256": "cbc9d85d39d2576f762f7c4da4692dafeb15345c96157a5855dc01a8f3cecac3",
+        "bytes": 45667
+      },
+      "independentAudit": {
+        "id": "combo-and-doughnut-charts",
+        "reports": 3,
+        "outputs": 5,
+        "checks": 65,
+        "passed": true
+      },
+      "noOpPartChangesPerCycle": [
+        8,
+        0,
+        0
+      ],
+      "noOpRemovedParts": [
+        [],
+        [],
+        []
+      ],
+      "noOpProtectedPartChanges": [
+        [],
+        [],
+        []
+      ],
+      "visualStatus": "unsupported-preview",
+      "visualObservation": "Both charts show explicit unsupported-preview placeholders. Chart XML and embedded workbook data remain independently verified; this is not chart rendering support."
+    },
+    {
+      "id": "motion-triggers-connectors",
+      "source": {
+        "path": "tests/compatibility/presentation-complex/fixtures/generated/motion-triggers-connectors.pptx",
+        "sha256": "99c1d2e0b8dc9991c6da11da1f46d2bb29fd66ca42008f1d0798b621afa3e0a1",
+        "bytes": 36079
+      },
+      "independentAudit": {
+        "id": "motion-triggers-connectors",
+        "reports": 3,
+        "outputs": 5,
+        "checks": 85,
+        "passed": true
+      },
+      "noOpPartChangesPerCycle": [
+        12,
+        0,
+        0
+      ],
+      "noOpRemovedParts": [
+        [],
+        [],
+        []
+      ],
+      "noOpProtectedPartChanges": [
+        [],
+        [],
+        []
+      ],
+      "visualStatus": "unsupported-playback",
+      "visualObservation": "Static shapes/connector are visible and an unsupported-animation warning appears. Complex source animations and triggers do not play; unsafe target/trigger edits are rejected."
+    },
+    {
+      "id": "slide-links-inheritance",
+      "source": {
+        "path": "tests/compatibility/presentation-complex/fixtures/generated/slide-links-inheritance.pptx",
+        "sha256": "224ca6c6867a7c8f7328f0ff407606b05905695127cac857921ed42892a0bce2",
+        "bytes": 37986
+      },
+      "independentAudit": {
+        "id": "slide-links-inheritance",
+        "reports": 3,
+        "outputs": 5,
+        "checks": 105,
+        "passed": true
+      },
+      "noOpPartChangesPerCycle": [
+        16,
+        0,
+        0
+      ],
+      "noOpRemovedParts": [
+        [],
+        [],
+        []
+      ],
+      "noOpProtectedPartChanges": [
+        [],
+        [],
+        []
+      ],
+      "visualStatus": "partial",
+      "visualObservation": "Static content, slide order and inherited data are exercised. Stored links/custom shows do not establish complete interactive hyperlink or custom-show playback support."
+    },
+    {
+      "id": "placeholder-inheritance",
+      "source": {
+        "path": "tests/compatibility/presentation-complex/fixtures/generated/placeholder-inheritance.pptx",
+        "sha256": "d046fbce07fe6a1b539c615ea2ef81779303c2147cb532290f94d6a534b63188",
+        "bytes": 33175
+      },
+      "independentAudit": {
+        "id": "placeholder-inheritance",
+        "reports": 3,
+        "outputs": 5,
+        "checks": 65,
+        "passed": true
+      },
+      "noOpPartChangesPerCycle": [
+        8,
+        0,
+        0
+      ],
+      "noOpRemovedParts": [
+        [],
+        [],
+        []
+      ],
+      "noOpProtectedPartChanges": [
+        [],
+        [],
+        []
+      ],
+      "visualStatus": "partial",
+      "visualObservation": "Inherited transform/body properties survive independent structural checks. The long rotated line visibly overflows/crops at slide edges; full typography fidelity is not established."
+    },
+    {
+      "id": "poi-smartart-default-list",
+      "source": {
+        "path": "tests/compatibility/presentation-complex/fixtures/upstream/apache-poi/SmartArt.pptx",
+        "sha256": "b97e4c6d2ee1dd4094f50f9043820610268dd452d7717c537f5456636adcc353",
+        "bytes": 41382
+      },
+      "independentAudit": {
+        "id": "poi-smartart-default-list",
+        "reports": 3,
+        "outputs": 5,
+        "checks": 62,
+        "passed": true
+      },
+      "noOpPartChangesPerCycle": [
+        6,
+        0,
+        0
+      ],
+      "noOpRemovedParts": [
+        [],
+        [],
+        []
+      ],
+      "noOpProtectedPartChanges": [
+        [],
+        [],
+        []
+      ],
+      "visualStatus": "unsupported-preview",
+      "visualObservation": "The actual editor shows a locked Diagram placeholder, not the original SmartArt artwork."
+    },
+    {
+      "id": "poi-smartart-alternating-hexagons",
+      "source": {
+        "path": "tests/compatibility/presentation-complex/fixtures/upstream/apache-poi/smartart-rotated-text.pptx",
+        "sha256": "a357985aec81b0bfa8a71138bbe94c9b3f6e00dee110c0da34302e22253de260",
+        "bytes": 43459
+      },
+      "independentAudit": {
+        "id": "poi-smartart-alternating-hexagons",
+        "reports": 3,
+        "outputs": 5,
+        "checks": 62,
+        "passed": true
+      },
+      "noOpPartChangesPerCycle": [
+        6,
+        0,
+        0
+      ],
+      "noOpRemovedParts": [
+        [],
+        [],
+        []
+      ],
+      "noOpProtectedPartChanges": [
+        [],
+        [],
+        []
+      ],
+      "visualStatus": "unsupported-preview",
+      "visualObservation": "The actual editor shows a locked SmartArt placeholder; the diagram source/dependencies are preserved independently."
+    },
+    {
+      "id": "poi-smartart-venn",
+      "source": {
+        "path": "tests/compatibility/presentation-complex/fixtures/upstream/apache-poi/smartart-simple.pptx",
+        "sha256": "238ff6433dac00b2722edb9a29d97f56ab4f3c9c37f33a73d6f53baf494916aa",
+        "bytes": 71102
+      },
+      "independentAudit": {
+        "id": "poi-smartart-venn",
+        "reports": 3,
+        "outputs": 5,
+        "checks": 62,
+        "passed": true
+      },
+      "noOpPartChangesPerCycle": [
+        6,
+        0,
+        0
+      ],
+      "noOpRemovedParts": [
+        [],
+        [],
+        []
+      ],
+      "noOpProtectedPartChanges": [
+        [],
+        [],
+        []
+      ],
+      "visualStatus": "unsupported-preview",
+      "visualObservation": "The actual editor shows a locked SmartArt placeholder; the diagram source/dependencies are preserved independently."
+    },
+    {
+      "id": "affine-group-mc-custom",
+      "source": {
+        "path": "tests/compatibility/presentation-complex/fixtures/generated/affine-group-mc-custom.pptx",
+        "sha256": "b6f19bd0ef4a394c371ce209cc7c23917bbbec9b326080e250feeba0e691fd1e",
+        "bytes": 33966
+      },
+      "independentAudit": {
+        "id": "affine-group-mc-custom",
+        "reports": 5,
+        "outputs": 7,
+        "checks": 94,
+        "passed": true
+      },
+      "noOpPartChangesPerCycle": [
+        8,
+        0,
+        0
+      ],
+      "noOpRemovedParts": [
+        [],
+        [],
+        []
+      ],
+      "noOpProtectedPartChanges": [
+        [],
+        [],
+        []
+      ],
+      "visualStatus": "partial",
+      "visualObservation": "Ordinary grouped shapes and free connectors render. AlternateContent and custom Bezier shapes show protected placeholders; affine source preservation does not imply complete visual affine fidelity."
+    }
+  ],
+  "limitations": [
+    "Preserved XML is not evidence of complete rendering or playback.",
+    "Screenshots show the implemented editor rendering; no PowerPoint pixel-equivalence claim.",
+    "Browser verification does not replace packaged native WebView validation.",
+    "Preservation of original OOXML does not provide SmartArt/chart/animation playback.",
+    "Identical screenshots before/after repeated saves demonstrate stability of this renderer only.",
+    "Nested child color edit is a controlled codec-model regression; nested editing is not exposed by the UI.",
+    "Connector copy coverage is grouped connectors; unsafe free sibling connector-plus-endpoint copies are explicitly rejected."
+  ],
+  "savedImages": {
+    "docs/screenshots/presentation-complex-smartart.png": "ae6cf328e7cc2b1455dc59d7970f52adf16d684d6aabc249312fe2a7ad8b6ed1",
+    "docs/screenshots/presentation-complex-text-layout.png": "cc61f59dbc8fa3377fad9af75d121a5c272573df5980b84223e4c08fc254d8ae",
+    "docs/screenshots/presentation-complex-glyph-clipping.png": "e6d991123390321532c3220c42c5b1bec99456a10033a9bb3ce63952d2aed2b5"
+  },
+  "productionSha256": {
+    "src/components/StandalonePresentationEditor.vue": "314a6d2d18cc08e682f5445c31e0b06ab3596b249f8692157c9ee4265d8a87dc",
+    "src/presentation/core/fontkit-compat.ts": "bef23fc51f6796e59380e3f8d8a4c4bb12ecc83e3fcd812dc7fb5d5d0d68aed2",
+    "src/presentation/core/model.ts": "d3be4944390ada1eeb8e91392d98c44b21b43b541f8e55503b545c1b6484fd1e",
+    "src/presentation/core/pdf.ts": "869cae66eaf9102a49366aa1b09011f70b30bcc55df1ac49fc23e8d33dd2294c",
+    "src/presentation/core/pptx-common.ts": "4b3aa7485f1dcc37f0c3eaa89ef61506fb4b5443322321f3e6ebe18437f468ff",
+    "src/presentation/core/pptx-export.ts": "37bbfed3e609be5578c2487e499b20b5559ba875deacef847f70d00219d884de",
+    "src/presentation/core/pptx-import.ts": "1a82c0121bb2432eaad6a473e6432921b8073587cb46d6558172552a934c9e7d",
+    "src/presentation/core/pptx-notes.ts": "7057a1d5d6122dc23484079d904abff244c72075af46b73c513f178a7df3b53e",
+    "src/presentation/core/pptx.ts": "dc7d4a62add2f6db0a84efef6f099423358badf55a9760ade20740c35c52c42b",
+    "src/presentation/core/render.ts": "5f3ade70c213f4e3c60f264727fd682f0657b41d14c9b6442f17524569411728",
+    "src/presentation/core/scene.ts": "532e02c4e2f7043a82b0f0971bef507a6127c075f6e15c11f3c9cd2939b64545",
+    "src/presentation/core/types.ts": "1dcbb23ed4275f7487ca5229e14695cae1c89ff2e6c2b66e4c56910f3c317c1c"
+  },
+  "fullArtifacts": "test-results/standalone-presentation-complex/"
+}

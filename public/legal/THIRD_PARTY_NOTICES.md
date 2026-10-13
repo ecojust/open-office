@@ -2,7 +2,7 @@
 
 本应用包含具有独立版权和许可的第三方软件。根目录 `LICENSE` 适用于其注明的项目代码，不替代以下组件的许可。本发行物包含 AGPL、GPL、MPL 和 LGPL 组件，不能将整个安装包标为“全部 MIT”。本项目未购买或假定持有 Artifex、Qt 或 ZetaOffice 的商业授权。
 
-完整许可随网页和桌面资源放在 [`public/legal/`](index.html)。这些组件按各自许可原样提供，不作保证；商标仍归原权利人所有。Open Office 不是 Apache OpenOffice、LibreOffice、Artifex 或 Qt 的官方产品，也未声称获得其背书。
+完整许可随网页和桌面资源放在 [`public/legal/`](public/legal/index.html)。这些组件按各自许可原样提供，不作保证；商标仍归原权利人所有。Open Office 不是 Apache OpenOffice、LibreOffice、Artifex 或 Qt 的官方产品，也未声称获得其背书。
 
 ## 主要运行时
 
@@ -25,6 +25,8 @@
 | --- | --- | --- |
 | Vue | 3.5.22 | MIT；包含 Evan You 及 Vue 贡献者的原始许可。 |
 | PDF.js | 6.4.299 | Apache-2.0；保留 Mozilla Foundation 的许可。离线 CMaps、标准字体及 WASM 编解码器另见 `pdfjs/` 下的原始许可。 |
+| pdf-lib | 1.17.1 | MIT；用于独立演示文稿的本地向量 PDF 导出，原始许可见 `npm/pdf-lib@1.17.1/LICENSE.md`。 |
+| @pdf-lib/fontkit | 1.1.1 | 包声明 MIT；用于中文字体嵌入与子集化，保留包内 README 许可声明及作者/贡献者元数据于 `npm/@pdf-lib__fontkit@1.1.1/`。 |
 | fflate | 0.8.2 | MIT；Copyright © 2023 Arjun Barrett。用于本地 PPTX ZIP 解压与原位包编辑，原始许可见 `npm/fflate@0.8.2/LICENSE`。 |
 | Noto Sans CJK SC Regular | 文件 SHA-256 `2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b` | SIL Open Font License 1.1；字体内版权为 © 2014–2021 Adobe。见 `NOTO-CJK-NOTICE.txt` 与 `OFL-1.1.txt`。 |
 | Tauri JavaScript API | 2.12.3 | Apache-2.0 OR MIT；两份原始文本均保留。 |
@@ -36,7 +38,7 @@ PDF.js 资产的许可证并不全是 Apache-2.0：例如 Liberation 标准字�
 
 ## 对应源码与复现依据
 
-固定源码、下载地址、字节数、SHA-256 和关联证据保存在 [`public/legal/corresponding-sources-manifest.json`](corresponding-sources-manifest.json)。执行：
+固定源码、下载地址、字节数、SHA-256 和关联证据保存在 [`public/legal/corresponding-sources-manifest.json`](public/legal/corresponding-sources-manifest.json)。执行：
 
 ```sh
 node scripts/fetch-corresponding-sources.mjs
@@ -54,4 +56,4 @@ node scripts/fetch-corresponding-sources.mjs --offline --out-dir /path/to/source
 - LibreOffice 核心 Git 归档不含 `make fetch` 获取的外部依赖源码。`LIBREOFFICE-EXTERNAL-SOURCES.lst` 保留该核心提交规定的名称与校验值；完整源码发行还须包括实际配置选择的外部依赖、必要修改与构建材料。
 - 本应用源码、锁文件、构建脚本和本地 zeta.js 补丁必须随对应源码交付。仅下载这 8 个归档，不等于已经证明整个发行物的对应源码完整性。
 
-更详细的源码组装说明见 [`public/legal/CORRESPONDING-SOURCE.md`](CORRESPONDING-SOURCE.md)。
+更详细的源码组装说明见 [`public/legal/CORRESPONDING-SOURCE.md`](public/legal/CORRESPONDING-SOURCE.md)。

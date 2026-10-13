@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lockfileSha256": "32c8199eac4da8ac3b367d2a1754a1ff24ba0aad1c67d2afa0f917c6036bb3c4",
+  "lockfileSha256": "ae3eac2e166d790e5c0c2b367e70727b80d2df0c006eb37791543c216a45b13a",
   "packages": [
     {
       "name": "@babel/helper-string-parser",
@@ -462,6 +462,43 @@
       "installedForThisAudit": true,
       "licenseFiles": [],
       "integrity": "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ=="
+    },
+    {
+      "name": "@pdf-lib/fontkit",
+      "version": "1.1.1",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@pdf-lib__fontkit@1.1.1/README.md",
+        "npm/@pdf-lib__fontkit@1.1.1/package.json"
+      ],
+      "integrity": "sha512-KjMd7grNapIWS/Dm0gvfHEilSyAmeLvrEGVcqLGi0VYebuqqzTbgF29efCx7tvx+IEbG3zQciRSWl3GkUSvjZg=="
+    },
+    {
+      "name": "@pdf-lib/standard-fonts",
+      "version": "1.0.0",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@pdf-lib__standard-fonts@1.0.0/LICENSE.md"
+      ],
+      "integrity": "sha512-hU30BK9IUN/su0Mn9VdlVKsWBS6GyhVfqjwl1FjZN4TxP6cCw0jP2w7V3Hf5uX7M0AZJ16vey9yE0ny7Sa59ZA=="
+    },
+    {
+      "name": "@pdf-lib/upng",
+      "version": "1.0.1",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@pdf-lib__upng@1.0.1/LICENSE"
+      ],
+      "integrity": "sha512-dQK2FUMQtowVP00mtIksrlZhdFXQZPC+taih1q4CvPZ5vqdxR/LKBaFg0oAfzd1GlHZXXSPdQfzQnt+ViGvEIQ=="
     },
     {
       "name": "@rolldown/pluginutils",
@@ -1154,6 +1191,16 @@
     },
     {
       "name": "fsevents",
+      "version": "2.3.2",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": true,
+      "installedForThisAudit": false,
+      "licenseFiles": [],
+      "integrity": "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA=="
+    },
+    {
+      "name": "fsevents",
       "version": "2.3.3",
       "license": "MIT",
       "developmentOnly": true,
@@ -1199,6 +1246,18 @@
       "integrity": "sha512-uKdg2G3GNCKQn9byYOpxbGqrT2fGO5KRt5J/8b3pok8rT6qxGWF6hxMyJiEYtAf+FVyYuD9hRaDqX5uPFYJ4ZQ=="
     },
     {
+      "name": "pako",
+      "version": "1.0.11",
+      "license": "(MIT AND Zlib)",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/pako@1.0.11/LICENSE"
+      ],
+      "integrity": "sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw=="
+    },
+    {
       "name": "path-browserify",
       "version": "1.0.1",
       "license": "MIT",
@@ -1209,6 +1268,18 @@
         "npm/path-browserify@1.0.1/LICENSE"
       ],
       "integrity": "sha512-b7uo2UCUOYZcnF/3ID0lulOJi/bafxa1xPe7ZPsammBSpjSWQkjNxlt635YGS2MiR9GjvuXCtz2emr3jbsz98g=="
+    },
+    {
+      "name": "pdf-lib",
+      "version": "1.17.1",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/pdf-lib@1.17.1/LICENSE.md"
+      ],
+      "integrity": "sha512-V/mpyJAoTsN4cnP31vc0wfNA1+p20evqqnap0KLoRUN0Yk/p3wN52DOEsL4oBFcLdb76hlpKPtzJIgo67j/XLw=="
     },
     {
       "name": "pdfjs-dist",
@@ -1273,16 +1344,6 @@
       "integrity": "sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw=="
     },
     {
-      "name": "fsevents",
-      "version": "2.3.2",
-      "license": "MIT",
-      "developmentOnly": true,
-      "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA=="
-    },
-    {
       "name": "postcss",
       "version": "8.5.29",
       "license": "MIT",
@@ -1329,6 +1390,19 @@
         "npm/tinyglobby@0.2.17/LICENSE"
       ],
       "integrity": "sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g=="
+    },
+    {
+      "name": "tslib",
+      "version": "1.14.1",
+      "license": "0BSD",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/tslib@1.14.1/CopyrightNotice.txt",
+        "npm/tslib@1.14.1/LICENSE.txt"
+      ],
+      "integrity": "sha512-Xni35NKzjgMrwevysHTCArtLDpPvye8zV/0E4EyYn43P7/7qvQwPh9BGkHewbMulVntbigmcT7rdX3BNo9wRJg=="
     },
     {
       "name": "typescript",

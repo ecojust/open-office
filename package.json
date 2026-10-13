@@ -27,6 +27,8 @@
     "test:browser:pdf-memory": "node tests/browser/pdf-memory.cjs",
     "test:browser:office-memory": "node tests/browser/office-memory.cjs",
     "test:browser:ppt": "node tests/browser/presentation-ui.cjs",
+    "test:browser:ppt-independent": "node tests/browser/standalone-presentation.cjs",
+    "test:browser:ppt-complex": "node tests/browser/standalone-presentation-complex.cjs",
     "test:browser:impress": "node tests/browser/impress-engine.cjs",
     "test:browser:ppt-workbench": "node tests/browser/presentation-workbench.cjs",
     "test:browser:ppt-workbench-ui": "node tests/browser/presentation-workbench-ui.cjs",
@@ -44,8 +46,10 @@
     "test:compatibility": "node tests/compatibility/run.cjs"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "1.1.1",
     "@tauri-apps/api": "2.12.3",
     "fflate": "0.8.2",
+    "pdf-lib": "1.17.1",
     "pdfjs-dist": "6.4.299",
     "vue": "3.5.22"
   },

@@ -20,7 +20,29 @@ node tests/browser/pdf-ui.cjs
 
 The runner generates its own PDFs and image with `pdf-backend/.venv/bin/python` (Windows: `.venv/Scripts/python.exe`). It verifies editing, text removal, Chinese text, undo/redo, annotations, images, page management, search, extraction, merging, passwords, permissions, scanned and rotated/cropped documents, pending-edit guards, tab restoration, and narrow viewports. The exported files are independently reopened and inspected by `pdf-verify.py`. Screenshots, PDFs, and JSON reports are written under the output directory.
 
-## Presentation regression
+## Independent presentation regression
+
+With the Vite server and Python environment above available:
+
+```sh
+npm run test:browser:ppt-independent
+```
+
+This opens one Chromium session and exercises the actual independent PPTX editor: text, pointer movement and resizing, undo/redo, slide management, editable tables/charts, real rich and 20-slide fixtures, save/reopen, Chinese PDF readback, slideshow shortcuts, hidden slides, unsaved-tab guards, and 640/900/1360-pixel layouts. The same page runs the production codec fixture checks, including real embedded XLSX chart workbooks. It asserts zero iframes, Office/WASM runtime requests, external requests and page errors; the local PDF font is the only allowed `/office-runtime/` resource.
+
+The default output is `test-results/standalone-presentation/`. `STANDALONE_PRESENTATION_URL`, `STANDALONE_PRESENTATION_OUTPUT`, and `PLAYWRIGHT_CHROMIUM_EXECUTABLE` override the local URL, artifact directory, and Chromium executable. The JSON report includes operation timings and browser JS heap measurements; these are not native process-memory measurements or packaged WebView validation. Optional `STANDALONE_PRESENTATION_MODE=layout`, `final`, or `codec` runs the corresponding targeted regression after a relevant change.
+
+## Complex presentation preservation and rendering evidence
+
+```sh
+npm run test:browser:ppt-complex
+```
+
+This uses one Chromium session and the independent corpus in `tests/compatibility/presentation-complex/manifest.json`, including unchanged upstream PowerPoint SmartArt files with provenance and hashes. Each source undergoes three real export/reopen cycles, an unrelated text and notes edit, slide duplication and reordering, and relevant rich-text, grouped-connector or animation edit guards. The runner saves actual PPTX files, per-part byte changes, warnings and locked-object descriptions, model comparisons, and real Vue screenshots. Python's `python-pptx` and `lxml` independently inspect every exported package and protected XML/data relationships.
+
+`PRESENTATION_COMPLEX_URL`, `PRESENTATION_COMPLEX_OUTPUT`, `PRESENTATION_COMPLEX_MANIFEST`, and comma-separated `PRESENTATION_COMPLEX_CASES` override the default local server, `test-results/standalone-presentation-complex/`, manifest, or fixture selection. `PYTHON` selects a Python interpreter with `python-pptx` and `lxml` installed. The report's success means the declared preservation, semantic and edit-safety checks passed. It does **not** mean that all input features render faithfully or play: SmartArt, complex charts, vertical text and source animations have separate limitations, shown by the screenshots and warnings. Identical screenshots across saves only demonstrate stability of this editor's renderer; they are not a comparison with PowerPoint.
+
+## Legacy Impress presentation regression
 
 With the same local development server and Python environment available:
 

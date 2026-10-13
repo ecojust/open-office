@@ -1,0 +1,367 @@
+{
+  "schemaVersion": 1,
+  "pathBase": "Directory containing this SOURCES.json",
+  "repository": "https://github.com/apache/poi",
+  "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+  "licenseScope": "Apache POI source repository test-data, with complete upstream legal/LICENSE and legal/NOTICE retained. No separate file-specific license was listed.",
+  "legalFiles": [
+    {
+      "path": "apache-poi/LICENSE",
+      "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/legal/LICENSE",
+      "bytes": 14416,
+      "sha256": "6e7c918e5a49f677c1b85a9eb2d035cd85c217fc42af6b4a336964a434001a9c",
+      "verifiedExactMatchToPinnedUpstream": true
+    },
+    {
+      "path": "apache-poi/NOTICE",
+      "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/legal/NOTICE",
+      "bytes": 1571,
+      "sha256": "a89ff8b670bcacd3e98ebee64979e0569181c7942e9ad795f4222b25e5637a61",
+      "verifiedExactMatchToPinnedUpstream": true
+    }
+  ],
+  "fixtureCount": 3,
+  "newSourceCountRelativeToExistingCorpus": 2,
+  "distinctSmartArtLayoutCount": 3,
+  "files": [
+    {
+      "id": "poi-smartart-default-list",
+      "path": "apache-poi/SmartArt.pptx",
+      "bytes": 41382,
+      "sha256": "b97e4c6d2ee1dd4094f50f9043820610268dd452d7717c537f5456636adcc353",
+      "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/slideshow/SmartArt.pptx",
+      "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+      "license": "Apache-2.0",
+      "licensePath": "apache-poi/LICENSE",
+      "noticePath": "apache-poi/NOTICE",
+      "modified": false,
+      "producerDeclared": "Microsoft Office PowerPoint",
+      "producerVerification": "Declared document metadata only; no authoring application was executed.",
+      "reusedFromExistingCorpus": false,
+      "zipInspection": {
+        "method": "Python standard library zipfile + ElementTree, independently of the application codec",
+        "zipCrcPassed": true,
+        "xmlWellFormedParts": 41,
+        "slideCount": 1,
+        "internalRelationshipCount": 39,
+        "missingInternalTargets": [],
+        "externalRelationships": [],
+        "diagramRelationships": [
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId3",
+            "type": "diagramLayout",
+            "target": "ppt/diagrams/layout1.xml"
+          },
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId2",
+            "type": "diagramData",
+            "target": "ppt/diagrams/data1.xml"
+          },
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId6",
+            "type": "diagramDrawing",
+            "target": "ppt/diagrams/drawing1.xml"
+          },
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId5",
+            "type": "diagramColors",
+            "target": "ppt/diagrams/colors1.xml"
+          },
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId4",
+            "type": "diagramQuickStyle",
+            "target": "ppt/diagrams/quickStyle1.xml"
+          }
+        ],
+        "layouts": [
+          {
+            "part": "ppt/diagrams/layout1.xml",
+            "sha256": "a18d172057e2ce005261f430a63d9311f65a9bf1cd396cce9a8ca03f1f613550",
+            "uniqueId": "urn:microsoft.com/office/officeart/2005/8/layout/default",
+            "layoutName": "default",
+            "layoutNamePrefix": "default",
+            "categories": [
+              "list"
+            ],
+            "layoutNodeNamePrefix": [
+              "diagram",
+              "node",
+              "sibTrans"
+            ]
+          }
+        ],
+        "dataModels": [
+          {
+            "part": "ppt/diagrams/data1.xml",
+            "sha256": "d86c9c53c9409a92df26655264e903a46498eb79f269e324528b99bb144e41be",
+            "pointCount": 26,
+            "pointTypes": {
+              "doc": 1,
+              "node": 5,
+              "parTrans": 5,
+              "sibTrans": 5,
+              "pres": 10
+            },
+            "connectionCount": 20,
+            "text": [],
+            "placeholderCount": 5,
+            "declaredLayoutIds": [
+              "urn:microsoft.com/office/officeart/2005/8/layout/default"
+            ]
+          }
+        ],
+        "drawings": [
+          {
+            "part": "ppt/diagrams/drawing1.xml",
+            "sha256": "70827778dae1ff8212bf74bd17defb6b0e43f903b82289bf7f4697173098f4c2",
+            "shapeCount": 5,
+            "presetGeometries": {
+              "rect": 5
+            },
+            "rotatedShapeTransformCount": 0,
+            "rotatedTextTransformCount": 0
+          }
+        ]
+      },
+      "coverageNote": "Default list SmartArt contains five blank placeholder nodes and native rectangular drawing shapes. Exercise layout/data/drawing preservation; do not assert invented text."
+    },
+    {
+      "id": "poi-smartart-alternating-hexagons",
+      "path": "apache-poi/smartart-rotated-text.pptx",
+      "bytes": 43459,
+      "sha256": "a357985aec81b0bfa8a71138bbe94c9b3f6e00dee110c0da34302e22253de260",
+      "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/slideshow/smartart-rotated-text.pptx",
+      "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+      "license": "Apache-2.0",
+      "licensePath": "apache-poi/LICENSE",
+      "noticePath": "apache-poi/NOTICE",
+      "modified": false,
+      "producerDeclared": "Microsoft Macintosh PowerPoint",
+      "producerVerification": "Declared document metadata only; no authoring application was executed.",
+      "reusedFromExistingCorpus": false,
+      "zipInspection": {
+        "method": "Python standard library zipfile + ElementTree, independently of the application codec",
+        "zipCrcPassed": true,
+        "xmlWellFormedParts": 41,
+        "slideCount": 1,
+        "internalRelationshipCount": 39,
+        "missingInternalTargets": [],
+        "externalRelationships": [],
+        "diagramRelationships": [
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId3",
+            "type": "diagramLayout",
+            "target": "ppt/diagrams/layout1.xml"
+          },
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId2",
+            "type": "diagramData",
+            "target": "ppt/diagrams/data1.xml"
+          },
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId6",
+            "type": "diagramDrawing",
+            "target": "ppt/diagrams/drawing1.xml"
+          },
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId5",
+            "type": "diagramColors",
+            "target": "ppt/diagrams/colors1.xml"
+          },
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId4",
+            "type": "diagramQuickStyle",
+            "target": "ppt/diagrams/quickStyle1.xml"
+          }
+        ],
+        "layouts": [
+          {
+            "part": "ppt/diagrams/layout1.xml",
+            "sha256": "c516a3ba037c27121e0f583cd07d3a941cb742672d141b83ef188453747cacfd",
+            "uniqueId": "urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons",
+            "layoutName": "AlternatingHexagons",
+            "layoutNamePrefix": "AlternatingHexagons",
+            "categories": [
+              "list"
+            ],
+            "layoutNodeNamePrefix": [
+              "Name0",
+              "composite",
+              "Parent1",
+              "Childtext1",
+              "BalanceSpacing",
+              "BalanceSpacing1",
+              "Accent1Text",
+              "spaceBetweenRectangles"
+            ]
+          }
+        ],
+        "dataModels": [
+          {
+            "part": "ppt/diagrams/data1.xml",
+            "sha256": "74b1602e921f56506037da84905d1a85620046f1c044bf5859ae9e78ab2ce2b8",
+            "pointCount": 40,
+            "pointTypes": {
+              "doc": 1,
+              "node": 6,
+              "parTrans": 6,
+              "sibTrans": 6,
+              "pres": 21
+            },
+            "connectionCount": 36,
+            "text": [
+              "abc",
+              "def",
+              "ghi",
+              "jkl"
+            ],
+            "placeholderCount": 3,
+            "declaredLayoutIds": [
+              "urn:microsoft.com/office/officeart/2008/layout/AlternatingHexagons"
+            ]
+          }
+        ],
+        "drawings": [
+          {
+            "part": "ppt/diagrams/drawing1.xml",
+            "sha256": "091a6654415a7ee12116d51378f76544175365e4411617b8da09e3ebe3af0f25",
+            "shapeCount": 9,
+            "presetGeometries": {
+              "hexagon": 6,
+              "rect": 3
+            },
+            "rotatedShapeTransformCount": 7,
+            "rotatedTextTransformCount": 6
+          }
+        ]
+      },
+      "coverageNote": "AlternatingHexagons layout; data text abc/def/ghi/jkl; native hexagon and rotated text transforms."
+    },
+    {
+      "id": "poi-smartart-venn",
+      "path": "apache-poi/smartart-simple.pptx",
+      "bytes": 71102,
+      "sha256": "238ff6433dac00b2722edb9a29d97f56ab4f3c9c37f33a73d6f53baf494916aa",
+      "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/slideshow/smartart-simple.pptx",
+      "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+      "license": "Apache-2.0",
+      "licensePath": "apache-poi/LICENSE",
+      "noticePath": "apache-poi/NOTICE",
+      "modified": false,
+      "producerDeclared": "Microsoft Macintosh PowerPoint",
+      "producerVerification": "Declared document metadata only; no authoring application was executed.",
+      "reusedFromExistingCorpus": true,
+      "zipInspection": {
+        "method": "Python standard library zipfile + ElementTree, independently of the application codec",
+        "zipCrcPassed": true,
+        "xmlWellFormedParts": 43,
+        "slideCount": 1,
+        "internalRelationshipCount": 41,
+        "missingInternalTargets": [],
+        "externalRelationships": [],
+        "diagramRelationships": [
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId3",
+            "type": "diagramLayout",
+            "target": "ppt/diagrams/layout1.xml"
+          },
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId2",
+            "type": "diagramData",
+            "target": "ppt/diagrams/data1.xml"
+          },
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId6",
+            "type": "diagramDrawing",
+            "target": "ppt/diagrams/drawing1.xml"
+          },
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId5",
+            "type": "diagramColors",
+            "target": "ppt/diagrams/colors1.xml"
+          },
+          {
+            "part": "ppt/slides/slide1.xml",
+            "id": "rId4",
+            "type": "diagramQuickStyle",
+            "target": "ppt/diagrams/quickStyle1.xml"
+          }
+        ],
+        "layouts": [
+          {
+            "part": "ppt/diagrams/layout1.xml",
+            "sha256": "00361f4bd6f55656bbbece58a570c6102085e84f328576942626fd1951610fe0",
+            "uniqueId": "urn:microsoft.com/office/officeart/2005/8/layout/venn1",
+            "layoutName": "venn1",
+            "layoutNamePrefix": "venn1",
+            "categories": [
+              "relationship",
+              "convert"
+            ],
+            "layoutNodeNamePrefix": [
+              "compositeShape",
+              "circ1TxSh",
+              "circ1",
+              "circ1Tx",
+              "circ2",
+              "circ2Tx",
+              "circ3",
+              "circ3Tx"
+            ]
+          }
+        ],
+        "dataModels": [
+          {
+            "part": "ppt/diagrams/data1.xml",
+            "sha256": "5019b766e3e7cc7357e123b9663e6c31b89ea6115d12c802625c1096c95b76ef",
+            "pointCount": 22,
+            "pointTypes": {
+              "doc": 1,
+              "node": 4,
+              "parTrans": 4,
+              "sibTrans": 4,
+              "pres": 9
+            },
+            "connectionCount": 21,
+            "text": [
+              "abc",
+              "def",
+              "ghi"
+            ],
+            "placeholderCount": 2,
+            "declaredLayoutIds": [
+              "urn:microsoft.com/office/officeart/2005/8/layout/venn1"
+            ]
+          }
+        ],
+        "drawings": [
+          {
+            "part": "ppt/diagrams/drawing1.xml",
+            "sha256": "e3cb078c4354da8917850fee01130565fc4247636fe7c597c5811563f9dc3418",
+            "shapeCount": 4,
+            "presetGeometries": {
+              "ellipse": 4
+            },
+            "rotatedShapeTransformCount": 0,
+            "rotatedTextTransformCount": 0
+          }
+        ]
+      },
+      "coverageNote": "Venn layout reused byte-for-byte from the existing corpus; data text abc/def/ghi and gradient, transparency and image fill. This is not an additional unique source beyond the old corpus."
+    }
+  ]
+}

@@ -1,0 +1,536 @@
+{
+  "schemaVersion": 1,
+  "description": "Original OOXML stress cases plus separately licensed pinned upstream SmartArt. Source validity and preservation are separate from visual fidelity/playback claims.",
+  "items": [
+    {
+      "id": "typography-rich",
+      "path": "fixtures/generated/typography-rich.pptx",
+      "bytes": 33717,
+      "sha256": "3f1b8c8598a5073111a0e9d06264b3269ad79eaff95d4a00c6029f8de27a34cf",
+      "provenance": {
+        "kind": "generated",
+        "license": "MIT",
+        "generator": "generate.py",
+        "producerDeclared": "Original python-pptx + explicit OOXML fixture; not Office/WPS/LibreOffice-authored",
+        "reproducibleTimestamp": "2025-02-12T12:00:00Z"
+      },
+      "expected": {
+        "slides": 1,
+        "textIncludes": [
+          "typography-rich"
+        ],
+        "unsupportedFeatures": [
+          "mixed-runs",
+          "superscript",
+          "character-spacing",
+          "paragraph-spacing",
+          "bullets-tabs"
+        ],
+        "protectedShapes": [
+          "RICH_RUNS",
+          "BULLETS"
+        ]
+      },
+      "screenshots": [
+        0
+      ],
+      "editPageIndex": 0,
+      "editObjectName": "SAFE_EDIT",
+      "preserveParts": [
+        "ppt/media/*",
+        "ppt/charts/*",
+        "ppt/embeddings/*",
+        "ppt/slideMasters/*",
+        "ppt/slideLayouts/*",
+        "ppt/theme/*",
+        "ppt/diagrams/*"
+      ],
+      "formatObjectName": "RICH_RUNS",
+      "formatSlideIndex": 0
+    },
+    {
+      "id": "text-layout-vertical",
+      "path": "fixtures/generated/text-layout-vertical.pptx",
+      "bytes": 33457,
+      "sha256": "3c03ecb055aefbbf11b5814ad4e6bb622aa5ca00616c6c23159f2dae1462b831",
+      "provenance": {
+        "kind": "generated",
+        "license": "MIT",
+        "generator": "generate.py",
+        "producerDeclared": "Original python-pptx + explicit OOXML fixture; not Office/WPS/LibreOffice-authored",
+        "reproducibleTimestamp": "2025-02-12T12:00:00Z"
+      },
+      "expected": {
+        "slides": 1,
+        "textIncludes": [
+          "text-layout-vertical"
+        ],
+        "unsupportedFeatures": [
+          "anchor-insets",
+          "no-wrap",
+          "body-rotation",
+          "east-asian-vertical"
+        ],
+        "protectedShapes": [
+          "TOP_ZERO",
+          "CENTER_ASYM",
+          "BOTTOM_NOWRAP",
+          "ROTATED_POS",
+          "ROTATED_NEG",
+          "EAST_ASIAN_VERTICAL"
+        ]
+      },
+      "screenshots": [
+        0
+      ],
+      "editPageIndex": 0,
+      "editObjectName": "SAFE_EDIT",
+      "preserveParts": [
+        "ppt/media/*",
+        "ppt/charts/*",
+        "ppt/embeddings/*",
+        "ppt/slideMasters/*",
+        "ppt/slideLayouts/*",
+        "ppt/theme/*",
+        "ppt/diagrams/*"
+      ]
+    },
+    {
+      "id": "nested-groups-images",
+      "path": "fixtures/generated/nested-groups-images.pptx",
+      "bytes": 34758,
+      "sha256": "bb6820325e97cb3a848c355ecc36493c1835bf313d8ae12e9a99e47fcce36e6d",
+      "provenance": {
+        "kind": "generated",
+        "license": "MIT",
+        "generator": "generate.py",
+        "producerDeclared": "Original python-pptx + explicit OOXML fixture; not Office/WPS/LibreOffice-authored",
+        "reproducibleTimestamp": "2025-02-12T12:00:00Z"
+      },
+      "expected": {
+        "slides": 1,
+        "textIncludes": [
+          "nested-groups-images"
+        ],
+        "unsupportedFeatures": [
+          "nested-groups",
+          "group-rotation",
+          "picture-crop",
+          "picture-flip",
+          "alpha"
+        ],
+        "protectedShapes": [
+          "OUTER_GROUP",
+          "ALPHA_CROP_IMAGE",
+          "CONNECTED_GROUP"
+        ]
+      },
+      "screenshots": [
+        0
+      ],
+      "editPageIndex": 0,
+      "editObjectName": "SAFE_EDIT",
+      "preserveParts": [
+        "ppt/media/*",
+        "ppt/charts/*",
+        "ppt/embeddings/*",
+        "ppt/slideMasters/*",
+        "ppt/slideLayouts/*",
+        "ppt/theme/*",
+        "ppt/diagrams/*"
+      ],
+      "duplicateObjectName": "CONNECTED_GROUP"
+    },
+    {
+      "id": "merged-styled-tables",
+      "path": "fixtures/generated/merged-styled-tables.pptx",
+      "bytes": 33706,
+      "sha256": "4fe9d3b3235d7060cc1dd11ec252dd92573585161394f8886195c4d5974f2b75",
+      "provenance": {
+        "kind": "generated",
+        "license": "MIT",
+        "generator": "generate.py",
+        "producerDeclared": "Original python-pptx + explicit OOXML fixture; not Office/WPS/LibreOffice-authored",
+        "reproducibleTimestamp": "2025-02-12T12:00:00Z"
+      },
+      "expected": {
+        "slides": 1,
+        "textIncludes": [
+          "merged-styled-tables"
+        ],
+        "unsupportedFeatures": [
+          "merged-cells",
+          "nonuniform-rows",
+          "cell-margins",
+          "vertical-cell-text",
+          "cell-borders"
+        ],
+        "protectedShapes": [
+          "MERGED_TABLE"
+        ]
+      },
+      "screenshots": [
+        0
+      ],
+      "editPageIndex": 0,
+      "editObjectName": "SAFE_EDIT",
+      "preserveParts": [
+        "ppt/media/*",
+        "ppt/charts/*",
+        "ppt/embeddings/*",
+        "ppt/slideMasters/*",
+        "ppt/slideLayouts/*",
+        "ppt/theme/*",
+        "ppt/diagrams/*"
+      ]
+    },
+    {
+      "id": "combo-and-doughnut-charts",
+      "path": "fixtures/generated/combo-and-doughnut-charts.pptx",
+      "bytes": 45667,
+      "sha256": "cbc9d85d39d2576f762f7c4da4692dafeb15345c96157a5855dc01a8f3cecac3",
+      "provenance": {
+        "kind": "generated",
+        "license": "MIT",
+        "generator": "generate.py",
+        "producerDeclared": "Original python-pptx + explicit OOXML fixture; not Office/WPS/LibreOffice-authored",
+        "reproducibleTimestamp": "2025-02-12T12:00:00Z"
+      },
+      "expected": {
+        "slides": 1,
+        "textIncludes": [
+          "combo-and-doughnut-charts"
+        ],
+        "unsupportedFeatures": [
+          "combination-chart",
+          "doughnut-chart",
+          "editable-xlsx-workbooks",
+          "cached-series"
+        ],
+        "protectedShapes": [
+          "COMBO_CHART",
+          "DOUGHNUT_CHART"
+        ]
+      },
+      "screenshots": [
+        0
+      ],
+      "editPageIndex": 0,
+      "editObjectName": "SAFE_EDIT",
+      "preserveParts": [
+        "ppt/media/*",
+        "ppt/charts/*",
+        "ppt/embeddings/*",
+        "ppt/slideMasters/*",
+        "ppt/slideLayouts/*",
+        "ppt/theme/*",
+        "ppt/diagrams/*"
+      ]
+    },
+    {
+      "id": "motion-triggers-connectors",
+      "path": "fixtures/generated/motion-triggers-connectors.pptx",
+      "bytes": 36079,
+      "sha256": "99c1d2e0b8dc9991c6da11da1f46d2bb29fd66ca42008f1d0798b621afa3e0a1",
+      "provenance": {
+        "kind": "generated",
+        "license": "MIT",
+        "generator": "generate.py",
+        "producerDeclared": "Original python-pptx + explicit OOXML fixture; not Office/WPS/LibreOffice-authored",
+        "reproducibleTimestamp": "2025-02-12T12:00:00Z"
+      },
+      "expected": {
+        "slides": 2,
+        "textIncludes": [
+          "motion-triggers-connectors"
+        ],
+        "unsupportedFeatures": [
+          "motion-path",
+          "onClick-trigger",
+          "rotation-animation",
+          "build-list",
+          "bound-connector",
+          "internal-slide-link"
+        ],
+        "protectedShapes": [
+          "ANIMATED_TARGET",
+          "TRIGGER_BUTTON",
+          "CONNECTOR_DEST",
+          "BOUND_CONNECTOR",
+          "INTERNAL_SLIDE_LINK"
+        ]
+      },
+      "screenshots": [
+        0
+      ],
+      "editPageIndex": 0,
+      "editObjectName": "SAFE_EDIT",
+      "preserveParts": [
+        "ppt/media/*",
+        "ppt/charts/*",
+        "ppt/embeddings/*",
+        "ppt/slideMasters/*",
+        "ppt/slideLayouts/*",
+        "ppt/theme/*",
+        "ppt/diagrams/*"
+      ],
+      "animationTarget": {
+        "slideIndex": 0,
+        "shapeName": "ANIMATED_TARGET"
+      },
+      "animationTrigger": {
+        "slideIndex": 0,
+        "shapeName": "TRIGGER_BUTTON"
+      }
+    },
+    {
+      "id": "slide-links-inheritance",
+      "path": "fixtures/generated/slide-links-inheritance.pptx",
+      "bytes": 37986,
+      "sha256": "224ca6c6867a7c8f7328f0ff407606b05905695127cac857921ed42892a0bce2",
+      "provenance": {
+        "kind": "generated",
+        "license": "MIT",
+        "generator": "generate.py",
+        "producerDeclared": "Original python-pptx + explicit OOXML fixture; not Office/WPS/LibreOffice-authored",
+        "reproducibleTimestamp": "2025-02-12T12:00:00Z"
+      },
+      "expected": {
+        "slides": 3,
+        "textIncludes": [
+          "slide-links-inheritance"
+        ],
+        "unsupportedFeatures": [
+          "internal-slide-links",
+          "external-link-disabled",
+          "custom-show-repeated-slide",
+          "hidden-slide",
+          "master-inheritance"
+        ],
+        "protectedShapes": [
+          "PAGE_MARKER",
+          "LINK_TO_FIRST",
+          "LINK_TO_LAST",
+          "EXTERNAL_LINK"
+        ]
+      },
+      "screenshots": [
+        0
+      ],
+      "editPageIndex": 0,
+      "editObjectName": "SAFE_EDIT",
+      "preserveParts": [
+        "ppt/media/*",
+        "ppt/charts/*",
+        "ppt/embeddings/*",
+        "ppt/slideMasters/*",
+        "ppt/slideLayouts/*",
+        "ppt/theme/*",
+        "ppt/diagrams/*"
+      ]
+    },
+    {
+      "id": "placeholder-inheritance",
+      "path": "fixtures/generated/placeholder-inheritance.pptx",
+      "bytes": 33175,
+      "sha256": "d046fbce07fe6a1b539c615ea2ef81779303c2147cb532290f94d6a534b63188",
+      "provenance": {
+        "kind": "generated",
+        "license": "MIT",
+        "generator": "generate.py",
+        "producerDeclared": "Original python-pptx + explicit OOXML fixture; not Office/WPS/LibreOffice-authored",
+        "reproducibleTimestamp": "2025-02-12T12:00:00Z"
+      },
+      "expected": {
+        "slides": 1,
+        "textIncludes": [
+          "placeholder-inheritance"
+        ],
+        "unsupportedFeatures": [
+          "partial-transform-inheritance",
+          "bodyPr-per-attribute-inheritance",
+          "own-rotation-layout-offset"
+        ],
+        "protectedShapes": [
+          "INHERITED_TITLE"
+        ]
+      },
+      "screenshots": [
+        0
+      ],
+      "editPageIndex": 0,
+      "editObjectName": "SAFE_EDIT",
+      "preserveParts": [
+        "ppt/media/*",
+        "ppt/charts/*",
+        "ppt/embeddings/*",
+        "ppt/slideMasters/*",
+        "ppt/slideLayouts/*",
+        "ppt/theme/*",
+        "ppt/diagrams/*"
+      ]
+    },
+    {
+      "id": "poi-smartart-default-list",
+      "path": "fixtures/upstream/apache-poi/SmartArt.pptx",
+      "bytes": 41382,
+      "sha256": "b97e4c6d2ee1dd4094f50f9043820610268dd452d7717c537f5456636adcc353",
+      "provenance": {
+        "kind": "upstream",
+        "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/slideshow/SmartArt.pptx",
+        "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+        "license": "Apache-2.0",
+        "producerDeclared": "Microsoft Office PowerPoint",
+        "modified": false,
+        "licensePath": "fixtures/upstream/apache-poi/LICENSE",
+        "noticePath": "fixtures/upstream/apache-poi/NOTICE"
+      },
+      "expected": {
+        "slides": 1,
+        "textIncludes": [],
+        "unsupportedFeatures": [
+          "smartart",
+          "default"
+        ],
+        "protectedShapes": []
+      },
+      "screenshots": [
+        0
+      ],
+      "editPageIndex": 0,
+      "preserveParts": [
+        "ppt/diagrams/*",
+        "ppt/media/*",
+        "ppt/theme/*",
+        "ppt/slideMasters/*",
+        "ppt/slideLayouts/*"
+      ]
+    },
+    {
+      "id": "poi-smartart-alternating-hexagons",
+      "path": "fixtures/upstream/apache-poi/smartart-rotated-text.pptx",
+      "bytes": 43459,
+      "sha256": "a357985aec81b0bfa8a71138bbe94c9b3f6e00dee110c0da34302e22253de260",
+      "provenance": {
+        "kind": "upstream",
+        "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/slideshow/smartart-rotated-text.pptx",
+        "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+        "license": "Apache-2.0",
+        "producerDeclared": "Microsoft Macintosh PowerPoint",
+        "modified": false,
+        "licensePath": "fixtures/upstream/apache-poi/LICENSE",
+        "noticePath": "fixtures/upstream/apache-poi/NOTICE"
+      },
+      "expected": {
+        "slides": 1,
+        "textIncludes": [],
+        "unsupportedFeatures": [
+          "smartart",
+          "AlternatingHexagons"
+        ],
+        "protectedShapes": []
+      },
+      "screenshots": [
+        0
+      ],
+      "editPageIndex": 0,
+      "preserveParts": [
+        "ppt/diagrams/*",
+        "ppt/media/*",
+        "ppt/theme/*",
+        "ppt/slideMasters/*",
+        "ppt/slideLayouts/*"
+      ]
+    },
+    {
+      "id": "poi-smartart-venn",
+      "path": "fixtures/upstream/apache-poi/smartart-simple.pptx",
+      "bytes": 71102,
+      "sha256": "238ff6433dac00b2722edb9a29d97f56ab4f3c9c37f33a73d6f53baf494916aa",
+      "provenance": {
+        "kind": "upstream",
+        "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/slideshow/smartart-simple.pptx",
+        "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+        "license": "Apache-2.0",
+        "producerDeclared": "Microsoft Macintosh PowerPoint",
+        "modified": false,
+        "licensePath": "fixtures/upstream/apache-poi/LICENSE",
+        "noticePath": "fixtures/upstream/apache-poi/NOTICE"
+      },
+      "expected": {
+        "slides": 1,
+        "textIncludes": [],
+        "unsupportedFeatures": [
+          "smartart",
+          "venn1"
+        ],
+        "protectedShapes": []
+      },
+      "screenshots": [
+        0
+      ],
+      "editPageIndex": 0,
+      "preserveParts": [
+        "ppt/diagrams/*",
+        "ppt/media/*",
+        "ppt/theme/*",
+        "ppt/slideMasters/*",
+        "ppt/slideLayouts/*"
+      ]
+    },
+    {
+      "id": "affine-group-mc-custom",
+      "path": "fixtures/generated/affine-group-mc-custom.pptx",
+      "bytes": 33966,
+      "sha256": "b6f19bd0ef4a394c371ce209cc7c23917bbbec9b326080e250feeba0e691fd1e",
+      "provenance": {
+        "kind": "generated",
+        "license": "MIT",
+        "generator": "generate.py",
+        "producerDeclared": "Original python-pptx + explicit OOXML fixture; not Office/WPS/LibreOffice-authored",
+        "reproducibleTimestamp": "2025-02-12T12:00:00Z"
+      },
+      "expected": {
+        "slides": 1,
+        "textIncludes": [
+          "affine-group-mc-custom"
+        ],
+        "unsupportedFeatures": [
+          "nonuniform-group-scale",
+          "rotated-child",
+          "move-preserves-child-xfrm",
+          "mc-choice-fallback-shared-id",
+          "ancestor-only-requires-prefix",
+          "custom-bezier-geometry"
+        ],
+        "protectedShapes": [
+          "AFFINE_GROUP",
+          "CUSTOM_BEZIER_ROOT",
+          "MC_CHOICE"
+        ]
+      },
+      "screenshots": [
+        0
+      ],
+      "editPageIndex": 0,
+      "editObjectName": "SAFE_EDIT",
+      "preserveParts": [
+        "ppt/media/*",
+        "ppt/charts/*",
+        "ppt/embeddings/*",
+        "ppt/slideMasters/*",
+        "ppt/slideLayouts/*",
+        "ppt/theme/*",
+        "ppt/diagrams/*"
+      ],
+      "moveObjectName": "AFFINE_GROUP",
+      "copySelectionNames": [
+        "FREE_A",
+        "FREE_B",
+        "FREE_CONNECTOR"
+      ],
+      "codecNestedFormatObjectName": "AFFINE_CHILD",
+      "codecNestedFormatSlideIndex": 0
+    }
+  ]
+}

@@ -377,15 +377,15 @@ jobs:
 
           安装包：Windows x64、Apple Silicon Mac、Intel Mac。安装后，Word / Excel / PPT 文档编辑和 PDF 工具使用随包本地引擎，不需要用户安装 Python 或 Microsoft Office。
 
-          本次更新统一工作台、Word / Excel / PPT / PDF 中文工具栏、属性面板及弹窗的扁平样式，采用纯色、细边框与小圆角，并优化窄窗口布局。新激活的文档标签会自动保持可见，帮助、PDF 合并及未保存确认弹窗支持键盘焦点循环与关闭后的焦点还原。Office 引擎自绘的高级菜单仍保留内核外观。
+          本次更新将 PPT 切换为独立编辑内核，提供中文页面与对象编辑、可编辑表格和基本图表、备注、页面转场、本地媒体与 PDF 导出；打开演示文稿无需启动文字/表格的文档引擎。演示文稿支持 PPTX，旧 PPT 和 ODP 需先转换格式。
 
-          本版新增 Word / Excel 中文工作台。Word 支持真实文字与段落格式、语义标题、页边距、页眉页脚、表格单元格编辑、查找替换，以及批注、脚注、目录与修订入口。Excel 支持工作表编排、单元格与公式、格式、排序筛选、冻结、数据验证和条件格式、命名区域、可编辑图表与数据透视表。保存前会检查工作台未提交的草稿，避免把尚未应用的修改当成已经保存。
+          修复复杂 PPTX 保存时未修改格式的丢失、分组连接线引用、母版位置继承、非等比组变换、透明描边线宽和文字裁切等问题。会破坏动画引用或复杂分组的对象操作会明确阻止，保留原内容；文稿内对象剪贴板不会跨文稿误用资源引用。
 
-          PDF 新增文档书签导航、页码和半透明文字水印，修改进入现有撤销/重做与保存流程。PPT 继续提供页面与对象编辑、可编辑表格/图表、六种页面转场和本地音视频。
+          复杂 PPTX 专项使用 12 份固定样例，完成 36 次保存重开和 65 份实际导出，900 项文件结构、引用与内容保留断言通过。438 项 Node 测试、28 项 PDF Python 测试和 24 项基础浏览器回归通过。测试范围与实际截图见 [复杂 PPTX 专项](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/docs/presentation-complex-compatibility.md)。
 
-          各项能力以实际文档回归范围为准，并未在 Microsoft 365 原软件中完成全部双向互验。完整 Word 内容控件/邮件合并、全套 Excel 函数、Power Query/Power Pivot、VBA/Office 加载项、微软云协作与 Copilot 等尚未全面对齐；逐对象演示动画、SmartArt、Morph 和双屏演讲者视图也未完整实现，不宣称完全替代 Microsoft 365。功能范围见 [Word / Excel 对照](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/docs/word-excel-365-parity.md) 与 [PDF 能力说明](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/docs/pdf-capabilities.md)。
+          文件内容保留不等于完整显示：SmartArt 和部分复杂图表仍采用保护占位，复杂逐对象动画尚不能完整播放；混合文字样式、竖排、合并表格和特殊排版仍有简化。未完成任意复杂文档的无损兼容，不宣称全部功能与最新版办公软件一致。更多范围见 [独立 PPT 说明](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/docs/standalone-presentation.md)、[文字与表格功能范围](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/docs/word-excel-365-parity.md) 与 [PDF 能力说明](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/docs/pdf-capabilities.md)。
 
-          三种安装包均通过实际应用内自检：跨源隔离与 SharedArrayBuffer、Writer 文档编辑和 DOCX/PDF 往返、Calc 公式计算和 XLSX/PDF 往返、Impress 两页中英文演示文稿原文修改后 PPTX/ODP 保存重开及 PDF 导出（独立读取确认两页）、PDF 原文删除替换后重新读取。本版额外验证 Word 标题和字符样式、表格二次修改、页边距/页眉页脚，以及 Excel 排序/冻结、公式修改后重算、图表数据来源和透视表字段配置，均经过两次 DOCX/XLSX 保存重开，并由独立 PDF 后端读取导出内容。既有 PPT 页名/备注/隐藏页、可编辑表格/图表、二次保存后的转场/音频、真实 PDF 放映画布与音频元数据检查全部保留。媒体播放仍取决于系统支持的编码。
+          发布前的三平台应用自检覆盖实际文档编辑与保存重开、公式计算、独立 PPT 页名/备注/隐藏页和表格/图表、二次保存后的转场/音频、PDF 导出读取及放映画布。底层保留引擎的格式往返检查也继续执行，但不代表独立 PPT 界面开放 ODP 编辑。复杂专项的全部样例主要在浏览器中验证，不等于全部复杂画面已经在每种原生 WebView 上验证。媒体播放取决于系统支持的编码。
           Windows x64 在 Windows Server 2022 上验证，Apple Silicon 包在 macOS 15 ARM 上验证。Intel x64 包在 Intel 构建机原生编译并检查 PDF、架构与签名，随后将原封 DMG 转移到 Apple Silicon macOS 15，通过 Rosetta 运行真实 x64 App 与 PDF 进程完成相同自检；校验安装包摘要、App 全部文件、链接与签名一致，无重建或重签。
           Intel 包尚未在真实 Intel GPU 上实测；GitHub 的 Intel 虚拟机未提供可用的原生 WebGL 图形环境。本验证不代表已测试所有系统版本、显卡或复杂 Office 文档。
 
@@ -415,7 +415,7 @@ jobs:
           NODE
           else
             mapfile -t assets < <(node -e 'for (const file of require("./release-assets.json")) console.log(`artifacts/${file}`)')
-            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --title "Open Office ${version} · Windows / macOS" --notes-file release-notes.md "${assets[@]}"
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --title "Open Office ${version} · 独立 PPT 内核 · Windows / macOS" --notes-file release-notes.md "${assets[@]}"
           fi
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,targetCommitish,assets > release-ready.json
           node --input-type=module <<'NODE'

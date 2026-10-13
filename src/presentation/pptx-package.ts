@@ -202,6 +202,36 @@ async function xml(archive: Archive, name: string, options: PptxPackageOptions) 
   return readXmlString(source, options)
 }
 function putXml(archive: Archive, name: string, document: Document, options: PptxPackageOptions) { put(archive, name, textEncoder.encode(parser(options).serialize(document))) }
+
+/** Read a bounded, CRC-checked package for the independent presentation editor.
+ * Every XML member is checked, including extensions that the editor preserves.
+ * Returned buffers are detached copies; callers never receive archive internals. */
+export async function readPptxParts(input: Uint8Array | ArrayBuffer, options: PptxPackageOptions = {}): Promise<Map<string, Uint8Array>> {
+  const archive = openArchive(input), parts = new Map<string, Uint8Array>()
+  for (const name of archive.keys()) {
+    const isXml = /(?:\.xml|\.rels)$/i.test(name)
+    const bytes = await get(archive, name, options, isXml ? PPTX_LIMITS.xmlBytes : PPTX_LIMITS.mediaBytes)
+    if (isXml) await xml(archive, name, options)
+    parts.set(name, bytes.slice())
+  }
+  return parts
+}
+
+/** Write copies of validated package members without mutating the source map. */
+export function writePptxParts(parts: Map<string, Uint8Array>): Uint8Array {
+  const archive: Archive = new Map()
+  for (const [name, bytes] of parts) {
+    requireValue(bytes instanceof Uint8Array && bytes.byteLength <= PPTX_LIMITS.mediaBytes, 'PART_LIMIT', `PPTX 文件过大：${name}`)
+    if (/(?:\.xml|\.rels)$/i.test(name)) {
+      requireValue(bytes.byteLength <= PPTX_LIMITS.xmlBytes, 'PART_LIMIT', `PPTX XML 文件过大：${name}`)
+      const source = bytes[0] === 255 && bytes[1] === 254 ? new TextDecoder('utf-16le', { fatal: true }).decode(bytes)
+        : bytes[0] === 254 && bytes[1] === 255 ? new TextDecoder('utf-16be', { fatal: true }).decode(bytes) : textDecoder.decode(bytes)
+      readXmlString(source, {})
+    }
+    put(archive, name, bytes)
+  }
+  return saveArchive(archive)
+}
 function children(node: Element | Document, local?: string) { return Array.from(node.children).filter(child => !local || child.localName === local) }
 function descendants(node: Element | Document, local: string) { return Array.from(node.getElementsByTagNameNS('*', local)) }
 function child(node: Element | Document, local: string) { return children(node, local)[0] }

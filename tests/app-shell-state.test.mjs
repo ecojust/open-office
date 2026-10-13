@@ -14,7 +14,7 @@ import { reviewOfficeImport } from '../src/office/import-review.ts'
 const app = (await readFile(new URL('../src/App.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
 const utilities = await readFile(new URL('../src/shared/document.ts', import.meta.url), 'utf8')
 const dialogFocus = await readFile(new URL('../src/shared/dialog-focus.ts', import.meta.url), 'utf8')
-const names = 'tabs,activeKey,active,home,tabBar,helpDialog,closeDialog,officeDocument,pdfDocument,officeEditor,pdfEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationWorkbench,presentationEffects,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,browserFile,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest'
+const names = 'tabs,activeKey,active,home,tabBar,helpDialog,closeDialog,officeDocument,pdfDocument,presentationDocument,officeEditor,pdfEditor,presentationEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,browserFile,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest'
 
 function compile(source, require, extra = {}) {
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
@@ -71,12 +71,17 @@ function shell({nativeEnabled = true, smoke = false} = {}) {
     throw Error(`Unexpected setup import ${name}`)
   }, browser).state)
   const handle = {
-    exportFile: async () => ({ base64: 'TkVX', extension: 'docx', dirty: false }),
+    exportFile: async () => ({ base64: 'TkVX', extension: helpers.defaultSaveExtension(state.active.value?.document.extension || 'docx'), dirty: false }),
     discardChanges: async options => { calls.push(['discard', options]) },
     markSaved: async () => { calls.push(['marked']) },
   }
   state.officeEditor.value = handle
   state.pdfEditor.value = handle
+  const presentationHandle = Object.assign(Object.create(handle), {
+    assertNoPendingEdits() {}, discardDrafts() {}, stopPresentation() { calls.push(['stop-presentation']) },
+    getPresentationState: async () => ({ documentId: state.activeKey.value, revision: 1 }),
+  })
+  state.presentationEditor.value = presentationHandle
   function tab(id, { ready = true, dirty = false, fileId = id, kind = 'word' } = {}) {
     const extension = {word:'docx',sheet:'xlsx',presentation:'pptx',pdf:'pdf'}[kind]
     state.tabs.value.push({ key: id, ready, dirty, fileId, document: { id, kind, extension,
@@ -86,13 +91,14 @@ function shell({nativeEnabled = true, smoke = false} = {}) {
   function active(tab) {
     state.activeKey.value = tab.key
     if (tab.document.kind === 'pdf') state.pdfDocument.value = tab.document
+    else if (tab.document.kind === 'presentation') state.presentationDocument.value = tab.document
     else state.officeDocument.value = tab.document
   }
   async function idle() {
     for (let n = 0; n < 50 && state.busy.value; n++) { await Promise.resolve(); await vue.nextTick() }
     assert.equal(state.busy.value, '', 'The shell task should finish')
   }
-  return { state, native, calls, reviews, handle, tab, active, idle, browser, observers,
+  return { state, native, calls, reviews, handle, presentationHandle, tab, active, idle, browser, observers,
     async mount() { for (const callback of mounted) await callback() },
     unmount() { for (const callback of beforeUnmount) callback(); scope.stop() },
   }
@@ -285,7 +291,7 @@ test('cancelled save and external conflict preserve dirty state and original ide
 })
 
 test('legacy imports save only as modern copies without an original-file overwrite token', async () => {
-  for(const [extension,modern,kind] of [['doc','docx','word'],['rtf','docx','word'],['xls','xlsx','sheet'],['ppt','pptx','presentation']]) {
+  for(const [extension,modern,kind] of [['doc','docx','word'],['rtf','docx','word'],['xls','xlsx','sheet']]) {
     const h=shell(),a=h.tab('original',{dirty:true,kind});h.active(a)
     a.document.extension=extension;a.document.name=`Original.${extension}`
     let requested
@@ -551,8 +557,8 @@ test('native helper export uses the same guarded transaction and never swallows 
   assert.equal(h.state.activeKey.value,'A')
 })
 
-test('presentation PDF and ODP exports stay copies and never replace the editable PPTX tab', async () => {
-  for(const format of ['pdf','odp']){
+test('presentation PDF export stays a copy and never replaces the editable PPTX tab', async () => {
+  for(const format of ['pdf']){
   const h=shell(), a=h.tab('deck',{kind:'presentation',dirty:true});h.active(a)
   h.handle.exportFile=async({format}={})=>({base64:'UFBUWA==',extension:format||'pptx',dirty:true})
   await h.state.saveActive(true,format)
@@ -562,6 +568,86 @@ test('presentation PDF and ODP exports stay copies and never replace the editabl
   assert.equal(a.fileId,'deck');assert.equal(a.dirty,true)
   assert.ok(!h.calls.some(call=>call[0]==='marked'))
   }
+})
+
+test('unsupported PPT and ODP imports are rejected before replacing any loaded document', async () => {
+  for (const extension of ['ppt', 'odp']) {
+    const h=shell(),a=h.tab('existing',{dirty:true});h.active(a)
+    const original=h.state.officeDocument.value;let exports=0
+    h.handle.exportFile=async()=>{exports++;return {base64:'NEW',extension:'docx'}}
+    await assert.rejects(h.state.addDocument({id:'legacy',kind:'presentation',extension,name:`Legacy.${extension}`,base64:'SOURCE',sha256:'source-hash',sizeBytes:6},'legacy'),/PPTX/)
+    assert.equal(exports,0);assert.equal(h.state.tabs.value.length,1)
+    assert.equal(h.state.activeKey.value,a.key);assert.equal(a.dirty,true)
+    assert.equal(h.state.officeDocument.value,original);assert.equal(h.state.presentationDocument.value,undefined)
+  }
+})
+
+test('presentation rejects unsupported ODP export before invoking an editor or file dialog', async () => {
+  const h=shell(),a=h.tab('deck',{kind:'presentation',dirty:true});h.active(a)
+  let exports=0;h.presentationHandle.exportFile=async()=>{exports++;return {base64:'UNSUPPORTED',extension:'odp'}}
+  await assert.rejects(h.state.saveActive(true,'odp'),/PPTX|支持/)
+  assert.equal(exports,0);assert.equal(a.document.extension,'pptx');assert.equal(a.dirty,true)
+  assert.ok(!h.calls.some(call=>call[0]==='save'))
+})
+
+test('adding a presentation routes only to its independent editor and never mounts an Office model', async () => {
+  const h=shell();let officeExports=0,presentationExports=0
+  h.handle.exportFile=async()=>{officeExports++;throw Error('Wrong Office route')}
+  h.presentationHandle.exportFile=async()=>{presentationExports++;return {base64:'UFBUWA==',extension:'pptx'}}
+  await h.state.addDocument({id:'new',kind:'presentation',extension:'pptx',name:'Independent.pptx',base64:'',sha256:'',sizeBytes:0})
+  const a=h.state.tabs.value[0];h.state.readyFor(a.key)
+  assert.equal(h.state.officeDocument.value,undefined);assert.equal(h.state.presentationDocument.value.id,a.key)
+  assert.equal(await h.state.saveActive(),true)
+  assert.equal(officeExports,0);assert.equal(presentationExports,1)
+  assert.equal(h.state.officeDocument.value,undefined)
+})
+
+test('presentation and Office/PDF switches preserve separate model identities and route each export', async () => {
+  const h=shell(),deck=h.tab('deck',{kind:'presentation'}),office=h.tab('office'),pdf=h.tab('pdf',{kind:'pdf'})
+  h.active(office);await vue.nextTick();const officeDocument=h.state.officeDocument.value
+  const exports=[]
+  h.handle.exportFile=async()=>{exports.push(h.state.active.value.document.kind);return {base64:'T0ZGSUNF',extension:h.state.active.value.document.extension}}
+  h.presentationHandle.exportFile=async()=>{exports.push('independent-presentation');return {base64:'UFBUWA==',extension:'pptx',dirty:true}}
+  await h.state.activate(deck);h.state.readyFor(deck.key)
+  assert.equal(h.state.officeDocument.value,officeDocument)
+  assert.equal(h.state.presentationDocument.value.id,deck.key)
+  await h.state.activate(pdf);h.state.readyFor(pdf.key)
+  assert.equal(deck.document.base64,'UFBUWA==');assert.equal(deck.dirty,true)
+  const presentationDocument=h.state.presentationDocument.value
+  await h.state.activate(office)
+  assert.equal(office.ready,true);assert.equal(h.state.presentationDocument.value,presentationDocument)
+  await h.state.activate(deck)
+  assert.equal(deck.ready,true);assert.equal(h.state.presentationDocument.value.id,deck.key)
+  assert.equal(h.state.presentationDocument.value.base64,'UFBUWA==')
+  assert.deepEqual(exports,['word','independent-presentation','pdf','word'])
+})
+
+test('closing the final presentation releases its model while retaining the active Office/PDF editor', async () => {
+  for (const kind of ['word','pdf']) {
+    const h=shell(),deck=h.tab('deck',{kind:'presentation'}),other=h.tab('other',{kind});h.active(deck)
+    await h.state.activate(other);h.state.readyFor(other.key)
+    const field=kind==='pdf'?'pdfDocument':'officeDocument', retained=h.state[field].value
+    const discards=h.calls.filter(call=>call[0]==='discard').length
+    h.state.closeTab(deck);await h.idle()
+    assert.equal(h.state.presentationDocument.value,undefined)
+    assert.equal(h.state[field].value,retained);assert.equal(h.state.activeKey.value,other.key)
+    assert.equal(other.ready,true);assert.equal(h.calls.filter(call=>call[0]==='discard').length,discards)
+  }
+})
+
+for(const failure of ['draft','cancelled','conflict','save-error']) test(`failed presentation close retains its independent model and content after ${failure}`,async()=>{
+  const h=shell(),a=h.tab('deck',{kind:'presentation',dirty:true});h.tab('pdf',{kind:'pdf'});h.active(a)
+  const original=h.state.presentationDocument.value
+  if(failure==='draft')h.presentationHandle.assertNoPendingEdits=()=>{throw Error('Pending presentation draft')}
+  else h.native.saveDocument=async()=>{
+    if(failure==='save-error')throw Error('Write failed')
+    return {status:failure,message:'External change'}
+  }
+  h.state.closeTarget.value=a;await h.state.resolveClose('save')
+  assert.equal(h.state.presentationDocument.value,original);assert.equal(h.state.officeDocument.value,undefined)
+  assert.equal(h.state.activeKey.value,a.key);assert.equal(a.dirty,true)
+  assert.equal(h.state.tabs.value.length,2);assert.equal(h.state.closeTarget.value.key,a.key)
+  assert.ok(!h.calls.some(call=>call[0]==='discard'||call[0]==='marked'))
 })
 
 test('presentation save and switch retain its PPTX snapshot and presentation identity', async () => {
@@ -574,9 +660,10 @@ test('presentation save and switch retain its PPTX snapshot and presentation ide
   h.handle.exportFile=async()=>({base64:'UERGX0VYSVNUSU5H',extension:'pdf'})
   h.state.readyFor('other')
   await h.state.activate(a)
-  assert.equal(h.state.officeDocument.value.id,'deck')
-  assert.equal(h.state.officeDocument.value.base64,'UFBUWA==')
-  assert.equal(h.state.officeDocument.value.kind,'presentation')
+  assert.equal(h.state.presentationDocument.value.id,'deck')
+  assert.equal(h.state.presentationDocument.value.base64,'UFBUWA==')
+  assert.equal(h.state.presentationDocument.value.kind,'presentation')
+  assert.equal(h.state.officeDocument.value,undefined)
 })
 
 test('native window close exits presentation preview before showing unsaved confirmation', async()=>{
@@ -586,18 +673,18 @@ test('native window close exits presentation preview before showing unsaved conf
   await h.state.closeWindow()
   assert.equal(h.state.slidePreview.value,undefined)
   assert.equal(h.state.closeTarget.value,'window')
+  assert.ok(h.calls.some(call=>call[0]==='stop-presentation'),'Independent player must close before the window confirmation')
   assert.equal(a.dirty,true)
   assert.ok(!h.calls.some(call=>call[0]==='close'))
 })
 
 
 test('pending presentation text or transition drafts prevent saving and tab switching', async () => {
-  for (const panel of ['workbench', 'effects']) {
+  for (const panel of ['text', 'transition']) {
     const h = shell(), a = h.tab('A', { kind: 'presentation' }), b = h.tab('B'); h.active(a)
     let exports = 0
     h.handle.exportFile = async () => { exports++; return {base64:'NEW',extension:'pptx'} }
-    if (panel === 'workbench') h.state.presentationWorkbench.value = {assertNoPendingEdits(){throw Error('Unapplied notes')},discardDrafts(){}}
-    else h.state.presentationEffects.value = {hasPendingEdits(){return true},discardDrafts(){}}
+    h.presentationHandle.assertNoPendingEdits = () => { throw Error(`Unapplied ${panel}`) }
     await assert.rejects(h.state.saveActive(), /Unapplied|尚未应用/)
     await assert.rejects(h.state.activate(b), /Unapplied|尚未应用/)
     assert.equal(h.state.activeKey.value, 'A')
@@ -608,12 +695,14 @@ test('pending presentation text or transition drafts prevent saving and tab swit
 
 test('confirmed discard clears presentation drafts before replacing the loaded tab', async () => {
   const h = shell(), a = h.tab('A', { kind: 'presentation', dirty: true }); h.active(a)
-  let dropped = 0
-  h.state.presentationWorkbench.value = {assertNoPendingEdits(){throw Error('Unapplied notes')},discardDrafts(){dropped++}}
-  h.state.presentationEffects.value = {hasPendingEdits(){return true},discardDrafts(){dropped++}}
+  let dropped = 0, textDraft = true, transitionDraft = true
+  h.presentationHandle.assertNoPendingEdits = () => { throw Error('Unapplied notes and transition') }
+  h.presentationHandle.discardDrafts = () => { dropped++; textDraft = false; transitionDraft = false }
   h.state.closeTarget.value = a
   await h.state.resolveClose('discard')
-  assert.equal(dropped, 2)
+  assert.equal(dropped, 1)
+  assert.equal(textDraft, false); assert.equal(transitionDraft, false)
+  assert.equal(h.state.presentationDocument.value,undefined)
   assert.equal(h.state.tabs.value.length, 0)
   assert.ok(h.calls.some(call=>call[0]==='discard' && call[1].force === true))
 })
@@ -631,7 +720,7 @@ test('native duplicate-slide request uses the metadata-aware editor and respects
   assert.equal(actions[0].type,'duplicate-page')
   assert.equal(actions[0].pageIndex,0)
   assert.equal(h.state.presentationState.value.pageCount,2)
-  h.state.presentationEffects.value = {hasPendingEdits(){return true}}
+  h.presentationHandle.assertNoPendingEdits = () => { throw Error('切换设置尚未应用') }
   h.state.officeRequest({type:'presentation-duplicate',pageIndex:0})
   await h.idle()
   assert.match(h.state.error.value,/尚未应用/)
@@ -655,15 +744,18 @@ for (const [kind,panel] of [['word','wordWorkbench'],['sheet','sheetWorkbench']]
 }
 
 for(const [kind,getter,field] of [['word','getWriterState','writerState'],['sheet','getCalcState','calcState'],['presentation','getPresentationState','presentationState']]) {
- test(`${kind} toolbar refreshes when returning from PDF to a retained Office model`,async()=>{
+ test(`${kind} toolbar refreshes when returning from PDF to its retained editor`,async()=>{
    const h=shell(),office=h.tab('office',{kind}),pdf=h.tab('pdf',{kind:'pdf'});h.active(pdf)
-   h.state.officeDocument.value=office.document
+   const documentField=kind==='presentation'?'presentationDocument':'officeDocument'
+   h.state[documentField].value=office.document
    const reopened=[]
-   h.handle[getter]=async()=>{reopened.push(office.key);return {documentId:office.key,revision:3,dirty:false}}
+   const handle=kind==='presentation'?h.presentationHandle:h.handle
+   handle[getter]=async()=>{reopened.push(office.key);return {documentId:office.key,revision:3,dirty:false}}
    await h.state.activate(office)
    assert.deepEqual(reopened,['office'])
    assert.equal(h.state[field].value.documentId,'office')
-   assert.equal(h.state.officeDocument.value.id,'office')
+   assert.equal(h.state[documentField].value.id,'office')
+   if(kind==='presentation')assert.equal(h.state.officeDocument.value,undefined)
  })
 }
 

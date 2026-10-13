@@ -41,7 +41,10 @@ npm run test:browser
 npm run test:browser:word
 npm run test:browser:sheet
 npm run test:browser:office-ui
+npm run test:browser:ppt-independent
 ```
+
+`test:browser:ppt-independent` 使用完整 Vue 应用验证新的独立演示工作区，检查真实 PPTX/PDF 下载、重新打开与界面操作，并确认没有加载旧办公引擎。`ppt-workbench`、`impress` 等旧测试保留为历史引擎的回归入口，不作为当前 PPT 路由的验收证据。
 
 桌面发布工作流仅由 `workflow_dispatch` 触发。选择 `platform=all` 与 `publish=true`，三种安装包通过构建及应用内自检后，才发布测试版；源码推送本身不会自动发布。
 
@@ -55,6 +58,7 @@ npm run test:browser:office-ui
 ```text
 src/                    Vue 外壳、原生文件桥、PDF 工作室
 src/office/             办公内核消息桥与类型
+src/presentation/core/  独立 PPT 文档模型、SVG/PDF 绘制、PPTX 导入导出
 public/office/          独立办公内核宿主与线程适配
 public/office-runtime/  校验后下载的 WASM、数据与字体（不入 Git）
 public/legal/           随应用分发的许可文本

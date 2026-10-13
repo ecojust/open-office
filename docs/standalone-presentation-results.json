@@ -1,0 +1,246 @@
+{
+  "scope": "Independent presentation engine source; Linux Chromium full Vue app, not a desktop installer validation",
+  "build": {
+    "version": "0.4.0",
+    "buildVersion": "2026.1013.1927"
+  },
+  "frontendAndProtocolTests": {
+    "passed": 430,
+    "failed": 0
+  },
+  "pythonPdfTests": {
+    "passed": 28,
+    "failed": 0
+  },
+  "independentPptxChecks": {
+    "passed": 27,
+    "failed": 0,
+    "reader": "python-pptx 1.0.2",
+    "files": 5
+  },
+  "browser": {
+    "ok": true,
+    "checks": [
+      "New presentation opens independently and saves a real one-slide PPTX ZIP",
+      "Text editing, arrow movement, pointer dragging, resizing and undo/redo change the actual slide",
+      "Saved OOXML independently contains edited text, exact geometry, a native table and chart values",
+      "Saved PPTX reopens with editable text, table cells and chart values; a second save retains edits",
+      "Exported PDF independently reopens with three readable pages and searchable Chinese text",
+      "Original rich PPTX imports three slides with real image, table, chart and preserved notes",
+      "Twenty-slide PPTX imports, selects its last slide and preserves both hidden slides in saved OOXML",
+      "Shift+F5, next/hidden-page skipping, Home, End, Escape and F5 use the built-in slideshow",
+      "Editor remains usable without document overflow at 640, 900 and 1360 pixels",
+      "Unsaved tab switching preserves edits; close cancel keeps them, save closes a real file, and discard closes explicitly",
+      "Codec creates a standard OOXML package with master, layout and theme",
+      "Rich sample imports inherited geometry, tables and chart data; unchanged dependencies and original buffers survive two saves",
+      "The 20-page fixture preserves its original centered-title geometry, including source-authored overlap on slide five",
+      "Changing an imported layout preserves inherited master artwork, background, placeholder geometry and theme text style",
+      "Text, table, chart, notes, hidden slides, duplicate and reorder survive independent import/export with unique IDs",
+      "Group move, resize, rotation and absolute child geometry survive real OOXML export/import",
+      "New editable tables declare the standard OOXML table graphicData URI for independent office readers",
+      "Effects and media retain original transition XML, timing metadata and embedded bytes",
+      "Editing notes replaces multiple ordinary text shapes without duplicating their old text",
+      "Unsupported SmartArt is explicitly locked and its original diagram parts remain intact",
+      "DTD in unrecognized extensions, macro packages, signed packages and relationship traversal are rejected",
+      "Independent ZIP inspection confirms edited chart values live in real embedded XLSX workbooks",
+      "Production codec passes direct fixture round trips and independent embedded-workbook readback in the same browser",
+      "Entire PPT session has zero iframes, Office/WASM runtime loads, external requests and page/console errors"
+    ],
+    "operations": [
+      {
+        "name": "home",
+        "milliseconds": 2322
+      },
+      {
+        "name": "new-presentation-ready",
+        "milliseconds": 494
+      },
+      {
+        "name": "text-edit-geometry-history",
+        "milliseconds": 2110
+      },
+      {
+        "name": "editable-table-chart",
+        "milliseconds": 2481
+      },
+      {
+        "name": "save-edited-pptx",
+        "milliseconds": 271
+      },
+      {
+        "name": "import-to-editor-ready",
+        "file": "edited.pptx",
+        "milliseconds": 701
+      },
+      {
+        "name": "save-reopen-editable",
+        "milliseconds": 3424
+      },
+      {
+        "name": "pdf-independent-readback",
+        "milliseconds": 4264
+      },
+      {
+        "name": "import-to-editor-ready",
+        "file": "presentation-rich.pptx",
+        "milliseconds": 4727
+      },
+      {
+        "name": "rich-original-pptx-import",
+        "milliseconds": 6498
+      },
+      {
+        "name": "import-to-editor-ready",
+        "file": "presentation-20-slides.pptx",
+        "milliseconds": 12415
+      },
+      {
+        "name": "twenty-slide-import",
+        "milliseconds": 13618
+      },
+      {
+        "name": "slideshow-hidden-and-shortcuts",
+        "milliseconds": 8411
+      },
+      {
+        "name": "layout-640",
+        "layout": {
+          "viewport": 640,
+          "documentWidth": 640,
+          "toolbarRowsExcludingTitleAndTabs": 2,
+          "stage": {
+            "x": 123,
+            "y": 397.28125,
+            "width": 485,
+            "height": 272.8125,
+            "right": 608,
+            "bottom": 670.09375
+          }
+        }
+      },
+      {
+        "name": "layout-900",
+        "layout": {
+          "viewport": 900,
+          "documentWidth": 900,
+          "toolbarRowsExcludingTitleAndTabs": 2,
+          "stage": {
+            "x": 162,
+            "y": 394.375,
+            "width": 506,
+            "height": 284.625,
+            "right": 668,
+            "bottom": 679
+          }
+        }
+      },
+      {
+        "name": "layout-1360",
+        "layout": {
+          "viewport": 1360,
+          "documentWidth": 1360,
+          "toolbarRowsExcludingTitleAndTabs": 2,
+          "stage": {
+            "x": 210,
+            "y": 289.1875,
+            "width": 880,
+            "height": 495,
+            "right": 1090,
+            "bottom": 784.1875
+          }
+        }
+      },
+      {
+        "name": "responsive-layouts",
+        "milliseconds": 635
+      },
+      {
+        "name": "import-to-editor-ready",
+        "file": "saved-on-close.pptx",
+        "milliseconds": 235
+      },
+      {
+        "name": "dirty-switch-and-close",
+        "milliseconds": 2076
+      },
+      {
+        "name": "codec-independent-contract",
+        "milliseconds": 10047
+      }
+    ],
+    "heap": [
+      {
+        "name": "home",
+        "scope": "Chromium page JS heap, not process/native memory",
+        "usedBytes": 6057824,
+        "totalBytes": 8916992,
+        "nodes": 281,
+        "documents": 6,
+        "performanceMemory": {
+          "usedJSHeapSize": 10347857,
+          "totalJSHeapSize": 13203853,
+          "jsHeapSizeLimit": 4395630592
+        },
+        "iframeCount": 0,
+        "workers": []
+      },
+      {
+        "name": "new-presentation",
+        "scope": "Chromium page JS heap, not process/native memory",
+        "usedBytes": 7809024,
+        "totalBytes": 10285056,
+        "nodes": 753,
+        "documents": 9,
+        "performanceMemory": {
+          "usedJSHeapSize": 12101453,
+          "totalJSHeapSize": 14576413,
+          "jsHeapSizeLimit": 4395630592
+        },
+        "iframeCount": 0,
+        "workers": []
+      },
+      {
+        "name": "twenty-slides",
+        "scope": "Chromium page JS heap, not process/native memory",
+        "usedBytes": 15514868,
+        "totalBytes": 22167552,
+        "nodes": 3765,
+        "documents": 6,
+        "performanceMemory": {
+          "usedJSHeapSize": 39176183,
+          "totalJSHeapSize": 45733511,
+          "jsHeapSizeLimit": 4395630592
+        },
+        "iframeCount": 0,
+        "workers": []
+      },
+      {
+        "name": "final",
+        "scope": "Chromium page JS heap, not process/native memory",
+        "usedBytes": 41895396,
+        "totalBytes": 91152384,
+        "nodes": 209009,
+        "documents": 3752,
+        "performanceMemory": {
+          "usedJSHeapSize": 107869789,
+          "totalJSHeapSize": 157125629,
+          "jsHeapSizeLimit": 4395630592
+        },
+        "iframeCount": 0,
+        "workers": []
+      }
+    ],
+    "pageErrors": [],
+    "consoleErrors": [],
+    "externalRequests": [],
+    "officeRuntimeRequests": []
+  },
+  "measurementNote": "Final browser run overlapped production build and other test suites. These are development-run observations, not native process memory or benchmark guarantees.",
+  "pptxSha256": {
+    "blank.pptx": "40f641d48aee20895c4434d6508de3cf73452bd787d8abd462a7bec452759248",
+    "edited.pptx": "9e5fc717dd4f01730310fe2c2e8baa52b3375397ea93b79fa6c12e01ba7d8a86",
+    "reopened-edited.pptx": "b910d1fdbe1563537b4e80d21129ebda846d0999acaba8d058dc693a55d78fa3",
+    "rich-roundtrip.pptx": "c833cf233d6c4dd513a7bb5eb70ffbd5bb6463c896198b7e7a2ca5efca58415a",
+    "twenty-roundtrip.pptx": "36c4165f07b0ec68bc919173ef1101524be267dd4d5a9cc95be4955c4c6c1bdf"
+  }
+}

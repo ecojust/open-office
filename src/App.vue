@@ -5,8 +5,7 @@ import Icon from './components/Icon.vue'
 import OfficeEditor from './components/OfficeEditor.vue'
 import PdfEditor from './components/PdfEditor.vue'
 import SlidePreview from './components/SlidePreview.vue'
-import PresentationWorkbench from './components/PresentationWorkbench.vue'
-import PresentationEffects from './components/PresentationEffects.vue'
+import StandalonePresentationEditor from './components/StandalonePresentationEditor.vue'
 import WordWorkbench from './components/WordWorkbench.vue'
 import SheetWorkbench from './components/SheetWorkbench.vue'
 import type { PresentationState, PresentationAction } from './presentation/types'
@@ -43,13 +42,21 @@ onMounted(() => {
 })
 onBeforeUnmount(() => tabBarObserver?.disconnect())
 const active = computed(() => tabs.value.find(t => t.key === activeKey.value))
-const officeDocument = shallowRef<OfficeDocument>(), pdfDocument = shallowRef<NativeDocument>()
+const officeDocument = shallowRef<OfficeDocument>(), pdfDocument = shallowRef<NativeDocument>(), presentationDocument = shallowRef<NativeDocument>()
 const officeEditor = ref<EditorHandle & { insertImage?(image: {name:string;base64:string}):Promise<void>; newSlide?():Promise<unknown>; smokeTest?():Promise<unknown>; getPresentationState?():Promise<PresentationState>; presentationObjectData?(query:{type:'table'|'chart';id:string}):Promise<unknown>; presentationAction?(action:PresentationAction):Promise<PresentationState>; presentationEdit?(patch:PresentationPatch):Promise<void>; getWriterState?():Promise<WriterState>; writerAction?(action:WriterAction):Promise<WriterState>; writerCommand?(command:WriterCommand):Promise<WriterState>; writerData?(query:WriterQuery):Promise<unknown>; getCalcState?():Promise<CalcState>; calcAction?(action:CalcAction):Promise<CalcState>; calcData?(query:CalcDataQuery):Promise<unknown> }>()
 type PresentationPatch = Omit<Parameters<typeof patchPptxPackage>[1]['slides'][number], 'slideIndex'>
 const pdfEditor = ref<EditorHandle>()
-const presentationState = shallowRef<PresentationState | null>(null), presentationFeatures = shallowRef<PptxPresentation['slides'][number] | null>(null)
-const presentationWorkbench = ref<{hasPendingEdits():boolean;assertNoPendingEdits():void;discardDrafts():void}>()
-const presentationEffects = ref<{hasPendingEdits():boolean;discardDrafts():void}>()
+type PresentationEditorHandle = EditorHandle & {
+  present(startPage?:number):Promise<void>; stopPresentation():void
+  assertNoPendingEdits():void; discardDrafts():void
+  insertImage(image:{name:string;base64:string;mimeType?:string}):Promise<void>
+  newSlide():Promise<unknown>; getPresentationState():Promise<PresentationState>
+  presentationAction(action:PresentationAction):Promise<PresentationState>
+  presentationObjectData(query:{type:'table'|'chart';id:string}):Promise<unknown>
+  presentationEdit(patch:PresentationPatch):Promise<void>
+}
+const presentationEditor = ref<PresentationEditorHandle>()
+const presentationState = shallowRef<PresentationState | null>(null)
 type WorkbenchDrafts<T> = {hasPendingEdits():boolean;assertNoPendingEdits():void;discardDrafts():void;actionSucceeded?(state:T):void;actionFailed?():void}
 const wordWorkbench = ref<WorkbenchDrafts<WriterState>>(), sheetWorkbench = ref<WorkbenchDrafts<CalcState>>()
 const writerState = shallowRef<WriterState | null>(null), calcState = shallowRef<CalcState | null>(null)
@@ -57,13 +64,12 @@ function assertWorkbenchDrafts() {
   if(active.value?.document.kind==='word')wordWorkbench.value?.assertNoPendingEdits()
   if(active.value?.document.kind==='sheet')sheetWorkbench.value?.assertNoPendingEdits()
   if(active.value?.document.kind!=='presentation')return
-  presentationWorkbench.value?.assertNoPendingEdits()
-  if(presentationEffects.value?.hasPendingEdits())throw Error('切换设置尚未应用，请先应用或还原。')
+  presentationEditor.value?.assertNoPendingEdits()
 }
 function presentationChanged(state:PresentationState) {if(state.documentId===activeKey.value)presentationState.value=state}
 function writerChanged(state:WriterState) {if(state.documentId===activeKey.value)writerState.value=state}
 function calcChanged(state:CalcState) {if(state.documentId===activeKey.value)calcState.value=state}
-watch(activeKey,()=>{presentationState.value=null;presentationFeatures.value=null;writerState.value=null;calcState.value=null})
+watch(activeKey,()=>{presentationState.value=null;writerState.value=null;calcState.value=null})
 const slidePreview = shallowRef<{base64:string;name:string;startPage:number;presentation?:PptxPresentation}>()
 const recents = ref<RecentDocument[]>([]), busy = ref(''), error = ref(''), status = ref('所有文件，仅在你的设备上处理')
 const help = ref(false), search = ref(''), closeTarget = ref<Tab | 'window' | null>(null)
@@ -73,7 +79,8 @@ useDialogFocus(closeDialog)
 const fileInput = ref<HTMLInputElement>(), imageInput = ref<HTMLInputElement>()
 let unlisten: (() => void) | undefined
 let pendingWindowClose = false
-const editor = () => active.value?.document.kind === 'pdf' ? pdfEditor.value : officeEditor.value
+const editor = () => active.value?.document.kind === 'pdf' ? pdfEditor.value : active.value?.document.kind === 'presentation' ? presentationEditor.value : officeEditor.value
+const imageEditor = () => active.value?.document.kind === 'presentation' ? presentationEditor.value : officeEditor.value
 const kindNames: Record<Kind,string> = { word:'文字文档', sheet:'电子表格', presentation:'演示文稿', pdf:'PDF 文档' }
 const icons: Record<Kind,string> = {word:'file',sheet:'sheet',presentation:'presentation',pdf:'pdf'}
 const filteredRecents = computed(() => recents.value.filter(r => r.name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase())))
@@ -161,11 +168,15 @@ async function stash() {
 }
 async function activate(tab:Tab) {
   if(activeKey.value!==tab.key) {
-    const reuseOffice=tab.document.kind!=='pdf'&&officeDocument.value?.id===tab.key
+    const reuseOffice=['word','sheet'].includes(tab.document.kind)&&officeDocument.value?.id===tab.key
+    const reusePresentation=tab.document.kind==='presentation'&&presentationDocument.value?.id===tab.key
     await stash()
     activeKey.value=tab.key
     if(tab.document.kind==='pdf') {tab.ready=false;tab.loadError=undefined;pdfDocument.value=tab.document}
-    else {
+    else if(tab.document.kind==='presentation') {
+      if(!reusePresentation){tab.ready=false;tab.loadError=undefined}
+      presentationDocument.value=tab.document
+    } else {
       if(officeDocument.value?.id!==tab.key) {tab.ready=false;tab.loadError=undefined}
       officeDocument.value=tab.document as OfficeDocument
     }
@@ -176,12 +187,13 @@ async function activate(tab:Tab) {
     if(reuseOffice&&tab.ready) {
       if(tab.document.kind==='word'&&officeEditor.value?.getWriterState)writerChanged(await officeEditor.value.getWriterState())
       else if(tab.document.kind==='sheet'&&officeEditor.value?.getCalcState)calcChanged(await officeEditor.value.getCalcState())
-      else if(tab.document.kind==='presentation'&&officeEditor.value?.getPresentationState)presentationChanged(await officeEditor.value.getPresentationState())
     }
+    if(reusePresentation&&tab.ready&&presentationEditor.value)presentationChanged(await presentationEditor.value.getPresentationState())
   }
   home.value=false
 }
 async function addDocument(doc:NativeDocument, fileId?:string) {
+  if(doc.kind==='presentation'&&doc.extension!=='pptx')throw Error('独立演示编辑器目前支持 PPTX。请先将旧 PPT 或 ODP 转换为 PPTX；原文件未修改。')
   const existing=fileId && tabs.value.find(t=>t.fileId===fileId)
   if(existing) { await activate(existing); return }
   const key=crypto.randomUUID()
@@ -190,6 +202,7 @@ async function addDocument(doc:NativeDocument, fileId?:string) {
   await stash()
   tabs.value.push(tab); activeKey.value=key; home.value=false
   if(doc.kind==='pdf') pdfDocument.value=tab.document
+  else if(doc.kind==='presentation')presentationDocument.value=tab.document
   else officeDocument.value=tab.document as OfficeDocument
 }
 function newDocument(kind:Kind) {
@@ -227,6 +240,7 @@ async function saveActive(saveAs=false, format?:Extension):Promise<boolean> {
   const tab=active.value;if(!tab)return false
   assertWorkbenchDrafts()
   if(format&&isImportOnly(format))throw Error('旧版格式仅支持导入，请选择 DOCX、XLSX 或 PPTX 保存副本。')
+  if(tab.document.kind==='presentation'&&format&&format!=='pptx'&&format!=='pdf')throw Error('独立演示编辑器支持保存 PPTX 和导出 PDF，暂不支持 ODP 转换。')
   const handle=requireEditor(tab)
   const exported=await handle.exportFile({format:format||defaultSaveExtension(tab.document.extension)})
   if(activeKey.value!==tab.key)throw Error('文档已切换，本次保存已取消。')
@@ -256,24 +270,11 @@ async function saveActive(saveAs=false, format?:Extension):Promise<boolean> {
 function save(saveAs=false,format?:Extension) {void task(format?`正在导出 ${format.toUpperCase()}`:'正在保存文档',async()=>{await saveActive(saveAs,format)})}
 function newSlide() {
   void task('正在新建幻灯片',async()=>{
-    const tab=active.value;if(!tab||tab.document.kind!=='presentation')return
-    requireEditor(tab);assertWorkbenchDrafts()
-    if(!officeEditor.value?.newSlide)throw Error('演示文稿编辑器尚未就绪。')
-    await officeEditor.value.newSlide();status.value='已新建幻灯片，沿用当前母版和布局'
+    assertWorkbenchDrafts()
+    if(!presentationEditor.value)throw Error('演示文稿编辑器尚未就绪。')
+    await presentationEditor.value.newSlide()
   })
 }
-async function readPresentationObject(query:{type:'table'|'chart';id:string}) {
-  if(!officeEditor.value?.presentationObjectData)throw Error('演示文稿尚未准备好。')
-  return officeEditor.value.presentationObjectData(query)
-}
-function runPresentationAction(action:PresentationAction) {
-  void task('正在更新幻灯片',async()=>{
-    if(presentationEffects.value?.hasPendingEdits())throw Error('切换设置尚未应用，请先应用或还原。')
-    if(!officeEditor.value?.presentationAction)throw Error('演示工作台尚未准备好。')
-    presentationChanged(await officeEditor.value.presentationAction(action))
-  })
-}
-function refreshPresentation() {void task('正在刷新幻灯片',async()=>{if(officeEditor.value?.getPresentationState)presentationChanged(await officeEditor.value.getPresentationState())})}
 function runWriterAction(action:WriterAction) {
   void task('正在更新文档',async()=>{
     if(active.value?.document.kind!=='word'||!officeEditor.value?.writerAction)throw Error('文字工作台尚未就绪。')
@@ -317,47 +318,34 @@ async function readCalcData(query:CalcDataQuery) {
   if(!officeEditor.value?.calcData)throw Error('工作表尚未准备好。')
   return officeEditor.value.calcData(query)
 }
-function editPresentationFeatures(patch:PresentationPatch) {
-  void task('正在更新放映设置',async()=>{
-    presentationWorkbench.value?.assertNoPendingEdits()
-    if(!officeEditor.value?.presentationEdit)throw Error('演示工作台尚未准备好。')
-    await officeEditor.value.presentationEdit(patch);status.value='已更新放映设置，请保存文稿'
-  })
-}
 function previewSlides(startPage=0) {
-  void task('正在准备放映预览',async()=>{
-    const tab=active.value;if(!tab||tab.document.kind!=='presentation')return
+  void task('正在准备放映',async()=>{
+    if(active.value?.document.kind!=='presentation'||!presentationEditor.value)return
     assertWorkbenchDrafts()
-    const handle=requireEditor(tab)
-    const pptx=await handle.exportFile({format:'pptx'})
-    const {parsePptxPackage}=await import('./presentation/pptx-package')
-    const presentation=await parsePptxPackage(base64ToBytes(pptx.base64))
-    const exported=await handle.exportFile({format:'pdf'})
-    if(activeKey.value!==tab.key)throw Error('文档已切换，已取消旧演示文稿的预览。')
-    if(exported.dirty)tab.dirty=true
-    slidePreview.value={base64:exported.base64,name:tab.document.name,startPage:Number.isSafeInteger(startPage)?Math.max(0,startPage):0,presentation}
+    await presentationEditor.value.present(startPage)
   })
 }
 function closeSlidePreview() {slidePreview.value=undefined}
 function changeTab(tab:Tab) {void task('正在切换文档',()=>activate(tab))}
 async function removeTab(tab:Tab, discardConfirmed=false) {
   if(tab.key===activeKey.value) {
-    if(discardConfirmed) {presentationWorkbench.value?.discardDrafts();presentationEffects.value?.discardDrafts();wordWorkbench.value?.discardDrafts();sheetWorkbench.value?.discardDrafts()}
+    if(discardConfirmed) {presentationEditor.value?.discardDrafts();wordWorkbench.value?.discardDrafts();sheetWorkbench.value?.discardDrafts()}
     if(tab.ready)await editor()?.discardChanges?.({force:discardConfirmed})
     const next=tabs.value.find(t=>t.key!==tab.key)
     // Do not ask stash() to export a tab whose close was already checked/confirmed.
     activeKey.value=''
     if(next) await activate(next)
-    else {home.value=true;officeDocument.value=undefined;pdfDocument.value=undefined}
+    else {home.value=true;officeDocument.value=undefined;pdfDocument.value=undefined;presentationDocument.value=undefined}
   }
   tabs.value=tabs.value.filter(t=>t.key!==tab.key)
   // Keep a hidden Office model only while its tab can still be resumed. Closing
   // that tab must also unload its WASM iframe, even when PDF tabs remain open.
   if(officeDocument.value&&!tabs.value.some(t=>t.key===officeDocument.value?.id)) {
     officeDocument.value=undefined
-    presentationState.value=null;presentationFeatures.value=null;writerState.value=null;calcState.value=null
+    presentationState.value=null;writerState.value=null;calcState.value=null
   }
   if(pdfDocument.value&&!tabs.value.some(t=>t.key===pdfDocument.value?.id))pdfDocument.value=undefined
+  if(presentationDocument.value&&!tabs.value.some(t=>t.key===presentationDocument.value?.id))presentationDocument.value=undefined
 }
 function closeTab(tab:Tab) {
   if(busy.value)return
@@ -374,6 +362,7 @@ function closeTab(tab:Tab) {
 async function closeWindow() {
   if(busy.value) {pendingWindowClose=true;return}
   // The native close confirmation must remain visible above a presentation.
+  presentationEditor.value?.stopPresentation()
   if(slidePreview.value) {closeSlidePreview();await nextTick()}
   await task('正在检查未保存修改',async()=>{
     const tab=active.value
@@ -399,12 +388,12 @@ async function resolveClose(action:'save'|'discard') {
 }
 function editCommand(command:'undo'|'redo'|'print') {void task('正在处理',async()=>{const fn=editor()?.[command];if(fn)await fn();else if(command==='print'&&await saveActive(true,'pdf'))status.value='已导出 PDF；请在系统 PDF 阅读器中打开并打印。'})}
 function insertImage() {
-  if(native.isTauri()) void task('正在插入图片',async()=>{const image=await native.pickImage();if(image)await officeEditor.value?.insertImage?.(image)})
+  if(native.isTauri()) void task('正在插入图片',async()=>{const image=await native.pickImage();if(image)await imageEditor()?.insertImage?.(image)})
   else imageInput.value?.click()
 }
 async function browserImage(event:Event) {
   const input=event.target as HTMLInputElement,file=input.files?.[0];input.value='';if(!file)return
-  await task('正在插入图片',async()=>{if(file.size>10*1024*1024)throw Error('图片不能超过 10 MB');await officeEditor.value?.insertImage?.({name:file.name,base64:bytesToBase64(new Uint8Array(await file.arrayBuffer()))})})
+  await task('正在插入图片',async()=>{if(file.size>10*1024*1024)throw Error('图片不能超过 10 MB');await imageEditor()?.insertImage?.({name:file.name,base64:bytesToBase64(new Uint8Array(await file.arrayBuffer()))})})
 }
 function officeRequest(request:{type:string;notice?:string;pageIndex?:number}) {
   if(request.type==='open')openFile()
@@ -423,8 +412,8 @@ function officeRequest(request:{type:string;notice?:string;pageIndex?:number}) {
   else if(request.type==='presentation-duplicate') {
     void task('正在复制幻灯片',async()=>{
       assertWorkbenchDrafts()
-      if(!officeEditor.value?.presentationAction || !Number.isInteger(request.pageIndex))throw Error('请先选择要复制的幻灯片。')
-      presentationChanged(await officeEditor.value.presentationAction({type:'duplicate-page',pageIndex:request.pageIndex!}))
+      if(!presentationEditor.value?.presentationAction || !Number.isInteger(request.pageIndex))throw Error('请先选择要复制的幻灯片。')
+      presentationChanged(await presentationEditor.value.presentationAction({type:'duplicate-page',pageIndex:request.pageIndex!}))
     })
   }
   else if(request.type==='close' && active.value)closeTab(active.value)
@@ -435,7 +424,7 @@ function officeRequest(request:{type:string;notice?:string;pageIndex?:number}) {
   }
 }
 function keydown(event:KeyboardEvent) {
-  if(slidePreview.value)return
+  if(slidePreview.value||event.defaultPrevented)return
   if(event.key==='F5'&&active.value?.document.kind==='presentation'&&!home.value){event.preventDefault();previewSlides();return}
   if(!(event.ctrlKey||event.metaKey)||event.altKey)return
   if(event.key.toLowerCase()==='o'){event.preventDefault();openFile()}
@@ -524,7 +513,7 @@ onMounted(async()=>{
             await editorTransaction('正在验证演示文稿保存与重新打开',()=>addDocument({id:'',kind:'presentation',extension:'pptx',name:'Native presentation verification.pptx',base64,sha256:'',sizeBytes:Math.floor(base64.length*.75)}))
             await nextTick();const current=active.value;if(!current)throw Error('Native presentation tab missing')
             await awaitReady(current)
-            return nativeTransactionalEditor(officeEditor.value!) as unknown as Awaited<ReturnType<Parameters<typeof verifyNativePresentation>[0]['create']>>
+            return nativeTransactionalEditor(presentationEditor.value!) as unknown as Awaited<ReturnType<Parameters<typeof verifyNativePresentation>[0]['create']>>
           }
           report.presentationWorkbench=await verifyNativePresentation({
             create:()=>loadNativePresentation(),reopen:base64=>loadNativePresentation(base64),
@@ -562,7 +551,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <section v-if="section==='home'" class="create-grid" aria-label="新建文件">
           <button class="create-card word" @click="newDocument('word')"><span class="document-art"><Icon name="file" :size="27"/></span><span class="card-bottom"><span><strong>文字文档</strong><small>文档排版与图文编辑</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">DOCX · ODT</span></button>
           <button class="create-card sheet" @click="newDocument('sheet')"><span class="document-art"><Icon name="sheet" :size="27"/></span><span class="card-bottom"><span><strong>电子表格</strong><small>数据整理与公式计算</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">XLSX · ODS</span></button>
-          <button class="create-card presentation" @click="newDocument('presentation')"><span class="document-art"><Icon name="presentation" :size="27"/></span><span class="card-bottom"><span><strong>演示文稿</strong><small>幻灯片设计与演示</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">PPTX · ODP</span></button>
+          <button class="create-card presentation" @click="newDocument('presentation')"><span class="document-art"><Icon name="presentation" :size="27"/></span><span class="card-bottom"><span><strong>演示文稿</strong><small>幻灯片设计与演示</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">PPTX · 独立编辑器</span></button>
           <button class="create-card pdf" @click="newDocument('pdf')"><span class="document-art"><Icon name="pdf" :size="27"/></span><span class="card-bottom"><span><strong>PDF 工作室</strong><small>文字编辑、批注与页面整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">PDF</span></button>
         </section>
         <section class="recent-section"><div class="section-heading"><h2>最近打开 <span>{{recents.length}}</span></h2><label class="search-box"><Icon name="search" :size="17"/><input v-model="search" placeholder="查找最近的文件" aria-label="查找最近的文件"/></label></div>
@@ -574,17 +563,16 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
     </div>
     <section v-show="!home" class="editor-workspace">
       <div ref="tabBar" class="tab-bar"><button class="home-tab" @click="home=true" aria-label="工作台"><Icon name="home" :size="18"/></button><div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div><button class="new-tab" @click="home=true" aria-label="新建文档"><Icon name="plus" :size="18"/></button></div>
-      <div class="command-bar"><button @click="openFile"><Icon name="folder" :size="17"/>打开</button><span class="separator"/><button :disabled="!active?.ready" @click="save()"><Icon name="save" :size="17"/>保存</button><button :disabled="!active?.ready" @click="save(true)">另存为</button><button v-if="active?.document.kind!=='pdf'" :disabled="!active?.ready" @click="save(true,'pdf')"><Icon name="download" :size="17"/>导出 PDF</button><span class="separator"/><button :disabled="!active?.ready" @click="editCommand('undo')" title="撤销"><Icon name="undo" :size="17"/></button><button :disabled="!active?.ready" @click="editCommand('redo')" title="重做"><Icon name="redo" :size="17"/></button><template v-if="active?.document.kind==='presentation'"><span class="separator"/><button :disabled="!active?.ready" @click="newSlide" data-testid="presentation-new-slide"><Icon name="plus" :size="17"/>新建幻灯片</button><button :disabled="!active?.ready" @click="insertImage"><Icon name="image" :size="17"/>插入图片</button><button :disabled="!active?.ready" @click="previewSlides()" title="内置放映、转场与本地音视频 · F5" data-testid="presentation-preview"><Icon name="presentation" :size="17"/>预览放映</button><button :disabled="!active?.ready" @click="save(true,active.document.extension==='odp'?'pptx':'odp')" data-testid="presentation-export-alternate">导出 {{active.document.extension==='odp'?'PPTX':'ODP'}}</button></template><span class="command-spacer"/><span class="save-state"><i :class="{'dirty-dot':active?.dirty}"/>{{active?.dirty?'尚未保存':'已保存'}}</span></div>
+      <div class="command-bar"><button @click="openFile"><Icon name="folder" :size="17"/>打开</button><span class="separator"/><button :disabled="!active?.ready" @click="save()"><Icon name="save" :size="17"/>保存</button><button :disabled="!active?.ready" @click="save(true)">另存为</button><button v-if="active?.document.kind!=='pdf'" :disabled="!active?.ready" @click="save(true,'pdf')"><Icon name="download" :size="17"/>导出 PDF</button><span class="separator"/><button :disabled="!active?.ready" @click="editCommand('undo')" title="撤销"><Icon name="undo" :size="17"/></button><button :disabled="!active?.ready" @click="editCommand('redo')" title="重做"><Icon name="redo" :size="17"/></button><span class="command-spacer"/><span class="save-state"><i :class="{'dirty-dot':active?.dirty}"/>{{active?.dirty?'尚未保存':'已保存'}}</span></div>
       <div v-if="active?.importWarnings?.length" class="import-review-notice" role="note" data-testid="import-review-notice"><Icon name="info" :size="16"/><div><p v-for="warning in active.importWarnings" :key="warning">{{warning}}</p><strong>保存需另存副本，避免自动覆盖原件。</strong></div></div>
       <div class="editor-content" :inert="!!busy">
-        <WordWorkbench v-if="officeDocument" v-show="active?.document.kind!=='pdf'" ref="wordWorkbench" :active="active?.document.kind==='word'" :state="writerState" :read-data="readWriterData" :refresh-state="readFreshWriterState" :busy="!!busy" :disabled="!active?.ready" @action="runWriterAction" @command="runWriterCommand" @refresh="refreshWriter" @insert-image="insertImage" @draft-change="dirtyFor(activeKey,$event)">
+        <WordWorkbench v-if="officeDocument" v-show="active?.document.kind==='word'||active?.document.kind==='sheet'" ref="wordWorkbench" :active="active?.document.kind==='word'" :state="writerState" :read-data="readWriterData" :refresh-state="readFreshWriterState" :busy="!!busy" :disabled="!active?.ready" @action="runWriterAction" @command="runWriterCommand" @refresh="refreshWriter" @insert-image="insertImage" @draft-change="dirtyFor(activeKey,$event)">
         <SheetWorkbench ref="sheetWorkbench" :active="active?.document.kind==='sheet'" :state="calcState" :read-data="readCalcData" :busy="!!busy" :disabled="!active?.ready" @action="runCalcAction" @refresh="refreshCalc" @insert-image="insertImage" @draft-change="dirtyFor(activeKey,$event)">
-        <PresentationWorkbench ref="presentationWorkbench" :active="active?.document.kind==='presentation'" :state="presentationState" :read-object-data="readPresentationObject" :busy="!!busy" @action="runPresentationAction" @refresh="refreshPresentation" @insert-image="insertImage" @preview="previewSlides" @draft-change="dirtyFor(activeKey,$event)">
-          <OfficeEditor ref="officeEditor" :document="officeDocument" :smoke-mode="smokeMode" @dirty="dirtyFor(officeDocument?.id,$event)" @ready="readyFor(officeDocument?.id)" @error="editorError(officeDocument?.id,$event)" @status="status=$event" @request="officeRequest" @presentation-state="presentationChanged" @presentation-features="presentationFeatures=$event" @word-state="writerChanged" @sheet-state="calcChanged"/>
-          <template #effects><PresentationEffects v-if="presentationState" ref="presentationEffects" :slide="presentationFeatures" :page-id="presentationState.currentPage.id" :enabled="active?.document.extension==='pptx'" :busy="!!busy" @edit="editPresentationFeatures" @draft-change="dirtyFor(activeKey,$event)" @error="error=$event"/></template>
-        </PresentationWorkbench>
+          <OfficeEditor ref="officeEditor" :document="officeDocument" :smoke-mode="smokeMode" @dirty="dirtyFor(officeDocument?.id,$event)" @ready="readyFor(officeDocument?.id)" @error="editorError(officeDocument?.id,$event)" @status="status=$event" @request="officeRequest" @word-state="writerChanged" @sheet-state="calcChanged"/>
+
         </SheetWorkbench>
         </WordWorkbench>
+        <StandalonePresentationEditor v-if="presentationDocument" v-show="active?.document.kind==='presentation'" ref="presentationEditor" :document="presentationDocument" :active="!home&&active?.document.kind==='presentation'" :disabled="!!busy" @dirty="dirtyFor(presentationDocument?.id,$event)" @ready="readyFor(presentationDocument?.id)" @error="editorError(presentationDocument?.id,$event)" @status="status=$event"/>
         <PdfEditor v-if="pdfDocument && active?.document.kind==='pdf'" :key="pdfDocument.id" ref="pdfEditor" :document="pdfDocument" :initial-dirty="active?.dirty" @dirty="dirtyFor(pdfDocument?.id,$event)" @ready="readyFor(pdfDocument?.id)" @error="editorError(pdfDocument?.id,$event)" @status="status=$event"/>
       </div>
       <footer class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · 本机编辑</span></footer>
@@ -593,7 +581,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
     <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{error}}</span><button @click="error=''" aria-label="关闭错误提示"><Icon name="close" :size="16"/></button></div>
     <div v-if="busy" class="busy-overlay" role="status"><span class="busy-pill"><i/>{{busy}}</span></div>
     <div v-if="closeTarget" class="modal-backdrop" @keydown.esc="closeTarget=null"><section ref="closeDialog" class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="close-heading"><span class="modal-icon"><Icon name="save" :size="27"/></span><h2 id="close-heading">保存你的修改？</h2><p>{{closeTarget==='window'?'有文档尚未保存。保存后再退出，可以保留所有修改。':`“${closeTarget.document.name}”有尚未保存的修改。`}}</p><div class="modal-actions"><button @click="closeTarget=null">取消</button><button @click="resolveClose('discard')">不保存</button><button class="primary" @click="resolveClose('save')">{{closeTarget==='window'?'全部保存并退出':'保存并关闭'}}</button></div></section></div>
-    <div v-if="help" class="modal-backdrop" @click.self="help=false" @keydown.esc.stop.prevent="help=false"><section ref="helpDialog" class="modal help-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>提供中文文字排版、表格与公式、数据分析、幻灯片编排及 PDF 导出。文档使用本地引擎处理，高级内置菜单目前为英文。导入 DOC、RTF、XLS、PPT 后保存为现代格式副本，保留旧格式原件。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持原有文字替换、文字和图片、批注、手写签名、页面整理，以及页码、透明水印和书签导航。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件时会另存副本。演示文稿提供中文编排、对象与图表编辑、备注、转场和本地媒体放映。SmartArt、逐对象动画和 Morph 尚未完整实现。Microsoft 365 的本地文档能力尚未完全对齐：复杂排版、最新函数、宏与插件仍有差异。请检查导出结果；宏不自动执行。</p><p class="help-note"><strong>永久本地范围：</strong>不提供账户、云盘、云协作或云 AI，也不将这些服务列入后续功能计划。安装包内的编辑引擎在本机处理文档。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 0.4.0 · 构建 {{buildVersion}} · 使用 LibreOffice / ZetaOffice、PDF.js 与 PyMuPDF。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
+    <div v-if="help" class="modal-backdrop" @click.self="help=false" @keydown.esc.stop.prevent="help=false"><section ref="helpDialog" class="modal help-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>提供中文文字排版、表格与公式、数据分析、幻灯片编排及 PDF 导出。文字与表格使用本地文档引擎，高级菜单目前为英文。演示文稿采用独立编辑器，支持 PPTX，旧 PPT 与 ODP 请先转换格式。导入 DOC、RTF、XLS 后另存现代格式副本，保留原件。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持原有文字替换、文字和图片、批注、手写签名、页面整理，以及页码、透明水印和书签导航。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件时会另存副本。演示文稿提供中文编排、对象与图表编辑、备注、转场和本地媒体放映。SmartArt、逐对象动画和 Morph 尚未完整实现。Microsoft 365 的本地文档能力尚未完全对齐：复杂排版、最新函数、宏与插件仍有差异。请检查导出结果；宏不自动执行。</p><p class="help-note"><strong>永久本地范围：</strong>不提供账户、云盘、云协作或云 AI，也不将这些服务列入后续功能计划。安装包内的编辑引擎在本机处理文档。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 0.4.0 · 构建 {{buildVersion}} · 使用 LibreOffice / ZetaOffice、PDF.js 与 PyMuPDF。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
   </div>
 </template>
 
