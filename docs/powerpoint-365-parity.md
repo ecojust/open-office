@@ -29,8 +29,9 @@
 ### 当前构建的动态放映与媒体核验
 
 - 0.2.0 的实际安装包验证记录为 [Actions 38325471381](https://github.com/ecojust/open-office/actions/runs/38325471381)。Windows、Apple Silicon 和原封 Intel DMG 的 Rosetta 验证通过；这些既有检查的范围仍是基本编辑、保存重开与 PDF 导出，不包括动画放映验收。
-- 原生 `XPresentation.start()` 曾在真实 Chromium 中出现 `memory access out of bounds`；当前产品仍禁用完整放映。最新一轮全屏、窗口化和 `ParentWindow` 探测发现测试服务的 CSS MIME 有遗漏，画布停留在默认尺寸，因此这轮结果只作初步记录，**不据此判定所有窗口化方案不可行**。正在使用正确画布复核。尚未定位原生崩溃根因，不能将其归因于媒体裁剪。
-- `Preview=true` 的单页预览在初步探测中能返回 `running=true`，无动画样例随后自动结束；该探测同样需要正确画布复核。源码将它视为动画预览模式，指定动画节点时还会禁用页面切换；调用能返回既不是完整放映成功，也不证明实际动画播放。[lo-preview]
+- 在 Linux Chromium 中修正探测服务的 CSS MIME 后，确认实际画布与像素缓冲均为 1440×1000、worker WebGL 可用，重新验证三种调用。原生 `XPresentation.start()` 仍出现 `memory access out of bounds`，随后 `isRunning()` 为 false、放映控制器不存在；`startWithArguments(IsFullScreen=false)` 未在 20 秒内返回，后续 UNO 查询也在 5 秒后超时。**这些是该测试环境的结果，不是 Windows／macOS 放映验收，也不证明所有替代窗口化方案不可行。**
+- `Preview=true` 的单页预览在正确画布上能返回 `running=true`，无动画样例在 3 秒后已自动结束。源码将它视为动画预览模式，指定动画节点时还会禁用页面切换；此次未使用真实动画或媒体样例，因此调用能返回既不是完整放映成功，也不证明实际动画播放。[lo-preview]
+- 属性式窗口化和指定 `ParentWindow` 仅在首轮默认尺寸画布上探测，未作相同条件的复核，保留为初步结果。未定位原生崩溃的具体 C++ 根因，不能将其归因于媒体裁剪。此次有限探测没有找到可安全开启完整放映的 JavaScript 配置方案。
 - 从本机随包 `soffice.data` 的 `versionrc` 读取的核心 build ID 为 `efaf0670b4d055f838a2849becb10f08aa06a257`。按 `soffice.data.js.metadata` 中的文件偏移提取 `services/services.rdb`，其中有 `com.sun.star.presentation.SlideShow` 和 VCL／Cairo Canvas 服务，但没有 avmedia 组件或 `com.sun.star.media.Manager`。
 - 同一构建的官方源码在默认 WASM strip 配置中设置 `enable_avmedia=no`；Qt 5.15 官方文档也明确 QtMultimedia 不适用于该 WASM 平台。因此不能通过打开一个菜单或放映开关，获得这份固定内核中缺失的原生音视频后端。[lo-wasm-config][qt5-wasm]
 - 仅重新下载并核对了官方 CDN 的 `soffice.js` 与 `soffice.data.js.metadata`，两者与锁定摘要一致；未重新下载所有大型二进制，也不能据此声称已排查所有商业或私有构建。此次公开版本调查未找到可直接替换且明确修复放映的发行版。
