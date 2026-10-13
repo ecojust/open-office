@@ -7,6 +7,11 @@ on:
         description: Existing desktop build run ID (diagnostics only, no rebuild or release)
         type: string
         required: true
+      job_id:
+        description: Optional failed job ID; expose only known Rust test names, error codes, and fixed failure categories
+        type: string
+        required: false
+        default: ''
 
 permissions:
   actions: read
@@ -24,7 +29,18 @@ jobs:
         env:
           SOURCE_RUN_ID: ${{ inputs.run_id }}
         run: node -e 'if(!/^[0-9]+$/.test(process.env.SOURCE_RUN_ID))throw Error("Invalid run ID")'
+      - uses: actions/checkout@v4
+        if: inputs.job_id != ''
+      - name: Summarize only allowlisted Rust failure identifiers without exposing logs
+        if: inputs.job_id != ''
+        env:
+          SOURCE_RUN_ID: ${{ inputs.run_id }}
+          SOURCE_JOB_ID: ${{ inputs.job_id }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/read-failed-job-log.mjs
       - uses: actions/download-artifact@v4
+        if: inputs.job_id == ''
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.run_id }}
@@ -32,6 +48,7 @@ jobs:
           path: diagnostics
           merge-multiple: true
       - name: Expose existing bounded reports through readable check annotations
+        if: inputs.job_id == ''
         run: |
           node --input-type=module <<'NODE'
           import { appendFileSync, readFileSync, readdirSync, statSync } from 'node:fs';
