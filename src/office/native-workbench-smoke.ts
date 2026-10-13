@@ -1,13 +1,14 @@
 import { base64ToBytes } from '../shared/document'
 export { pdfReadbackText } from './pdf-readback'
 import type { OfficeExportRequest, OfficeExportResult } from './types'
-import type { WriterAction, WriterQuery, WriterState, WriterTableData } from '../word/types'
+import { canIssueWriterCommand, writerCommandTarget, type WriterAction, type WriterCommand, type WriterQuery, type WriterState, type WriterTableData } from '../word/types'
 import type { CalcAction, CalcDataQuery, CalcState, CalcRangeData, CalcChartData, CalcPivotData, CalcRulesData } from '../sheet/types'
 
 interface ExportingEditor { exportFile(options?: OfficeExportRequest): Promise<OfficeExportResult> }
 interface WriterEditor extends ExportingEditor {
   getWriterState(): Promise<WriterState>
   writerAction(action: WriterAction): Promise<WriterState>
+  writerCommand(command: WriterCommand): Promise<WriterState>
   writerData(query: WriterQuery): Promise<unknown>
 }
 interface CalcEditor extends ExportingEditor {
@@ -34,12 +35,40 @@ function outputBytes(output: OfficeExportResult, format: string) {
   return bytes.length
 }
 
+// Each fixed smoke-test step is a new intent, not an old user draft. Writer
+// uses the same single-request current-target commands as the real toolbar;
+// Calc retains its strict snapshot/version contract. Never retry a rejected
+// action or promote a previously rejected expectedRevision.
+function assertFreshTarget(previous: WriterState | CalcState, next: WriterState | CalcState, fields: string[]) {
+  check(previous.documentId === next.documentId, 'new action document changed while reading its target')
+  check(Number.isSafeInteger(next.revision) && next.revision >= previous.revision, 'new action snapshot revision is invalid')
+  for (const field of fields) {
+    const before = (previous as unknown as Record<string, unknown>)[field]
+    const after = (next as unknown as Record<string, unknown>)[field]
+    check(JSON.stringify(before) === JSON.stringify(after), `new action target ${field} changed; action was not submitted`)
+  }
+}
+export async function submitNativeWriterAction(editor: WriterEditor, previous: WriterState, input: WriterAction) {
+  if (canIssueWriterCommand(input, previous)) {
+    return editor.writerCommand({ action: input, target: writerCommandTarget(previous) })
+  }
+  // Table edits retain their dedicated native-cell identity/signature CAS;
+  // unsupported/draft operations are never silently promoted to commands.
+  return editor.writerAction({ ...input, expectedRevision: previous.revision, ...(input.type === 'update-table' ? {} : { expectedSelectionId: previous.selection.id }) })
+}
+
+export async function submitNativeCalcAction(editor: CalcEditor, previous: CalcState, input: CalcAction) {
+  const next = await editor.getCalcState()
+  assertFreshTarget(previous, next, ['sheets', 'activeSheetIndex', 'selection', 'cell', 'format', 'frozen'])
+  return editor.calcAction({ ...input, expectedRevision: next.revision })
+}
+
 // Runs in the installed native WebView, through the real Vue editor and actual
 // UNO objects. The injected lifecycle must reopen exported bytes, not fixtures.
 export async function verifyNativeWord(options: Lifecycle<WriterEditor>) {
   let editor = await options.create(), state = await editor.getWriterState()
   const action = async (input: WriterAction) => {
-    state = await editor.writerAction({ ...input, expectedRevision: state.revision, expectedSelectionId: state.selection.id })
+    state = await submitNativeWriterAction(editor, state, input)
     return state
   }
   const heading = 'Native Word heading 中文', body = 'Native body REPLACED_TOKEN 正文'
@@ -66,7 +95,7 @@ export async function verifyNativeWord(options: Lifecycle<WriterEditor>) {
   check(firstTable && firstTable.rows === 2 && firstTable.columns === 2, 'Writer reopened table dimensions differ')
   const data = await editor.writerData({ type: 'table', name: firstTable.name }) as WriterTableData
   check(JSON.stringify(data.cells) === JSON.stringify([['项目', '值'], ['Native table', '42']]), 'Writer table cells did not reopen')
-  await action({ type: 'update-table', name: firstTable.name, cells: [['项目', '值'], ['Native edited table', '84']] })
+  await action({ type: 'update-table', name: firstTable.name, cells: [['项目', '值'], ['Native edited table', '84']], expectedTableId: data.tableId, expectedCells: data.cells, expectedCellSignatures: data.cellSignatures })
   await action({ type: 'find-replace', search: 'REPLACED_TOKEN', replace: 'SECOND_SAVE_TOKEN', all: true })
   const second = await editor.exportFile({ format: 'docx' }), docxBytes = outputBytes(second, 'docx')
   editor = await options.reopen(second.base64); state = await editor.getWriterState()
@@ -95,7 +124,7 @@ export async function verifyNativeWord(options: Lifecycle<WriterEditor>) {
 
 export async function verifyNativeCalc(options: Lifecycle<CalcEditor>) {
   let editor = await options.create(), state = await editor.getCalcState()
-  const action = async (input: CalcAction) => { state = await editor.calcAction({ ...input, expectedRevision: state.revision }); return state }
+  const action = async (input: CalcAction) => { state = await submitNativeCalcAction(editor, state, input); return state }
   await action({ type: 'rename-sheet', sheetIndex: 0, name: 'Native data 中文' })
   await action({ type: 'add-sheet', name: 'Native summary' })
   await action({ type: 'select-sheet', sheetIndex: 0 })

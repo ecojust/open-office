@@ -85,3 +85,24 @@ export type WriterAction = Guard & (
   | { type: 'update-indexes' }
 )
 export type WriterQuery = { type: 'table'; name: string }
+
+// A fresh toolbar command targets the current logical cursor/page style. User
+// drafts always keep WriterAction's strict expectedRevision contract instead.
+export type WriterImmediateAction = WriterAction extends infer Action ? Action extends { type:
+  'insert-text'|'insert-break'|'insert-table'|'format-text'|'format-paragraph'|'apply-style'|'set-page'|'set-header-footer'|'find-replace'
+} ? Omit<Action, 'expectedRevision'|'expectedSelectionId'> : never : never
+export type WriterCommandTarget = Pick<WriterState, 'documentId'|'revision'|'selection'|'textStyle'|'paragraph'|'page'|'tables'>
+export interface WriterCommand { action: WriterImmediateAction; target: WriterCommandTarget }
+export function writerCommandTarget(state: WriterState): WriterCommandTarget {
+  return { documentId: state.documentId, revision: state.revision, selection: { ...state.selection }, textStyle: { ...state.textStyle },
+    paragraph: { ...state.paragraph }, page: { ...state.page }, tables: state.tables.map(table => ({ ...table })) }
+}
+export function canIssueWriterCommand(action: WriterAction, state: WriterState): action is WriterAction & WriterImmediateAction {
+  if ('expectedRevision' in action || 'expectedSelectionId' in action || state.selection.truncated) return false
+  if (action.type === 'insert-text') return state.selection.collapsed && action.replaceSelection !== true
+  if (action.type === 'insert-break') return state.selection.collapsed
+  if (action.type === 'insert-table') return state.selection.collapsed && state.selection.tableName === null
+  if (action.type === 'set-header-footer') return action.enabled && (action.target === 'header'
+    ? !state.page.headerEnabled && !state.page.headerTruncated : !state.page.footerEnabled && !state.page.footerTruncated)
+  return ['format-text','format-paragraph','apply-style','set-page','find-replace'].includes(action.type)
+}

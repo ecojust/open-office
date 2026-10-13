@@ -11,6 +11,18 @@ const report={scope:'Real Vue controls, local Writer/Calc and independently insp
 const pass=name=>{report.checks.push(name);console.log('PASS',name)}
 async function idle(){await page.waitForFunction(()=>document.querySelector('.error-banner')||document.querySelector('.office-frame:not(.is-loading)')&&!document.querySelector('.office-loading')&&!document.querySelector('.busy-overlay'),null,{timeout:240000});const error=page.locator('.error-banner');if(await error.count())throw Error(await error.innerText())}
 async function action(button){await button.click();await idle()}
+async function applyWordDraft(){
+ const apply=page.getByRole('button',{name:'应用',exact:true}),recheck=page.getByRole('button',{name:'保留输入并重新核对',exact:true})
+ const retained=await page.locator('.ow-word .ow-panel input,.ow-word .ow-panel textarea').evaluateAll(fields=>fields.map(field=>({value:field.value,checked:field.type==='checkbox'?field.checked:undefined})))
+ if(await apply.isEnabled()){
+  try{await action(apply);return}catch(error){if(!String(error).includes('文档已变化'))throw error}
+ }
+ // Follow the visible product recovery, never change a version or replay an RPC.
+ // One new explicit decision only; a second concurrent conflict still fails.
+ await recheck.waitFor();assert.deepEqual(await page.locator('.ow-word .ow-panel input,.ow-word .ow-panel textarea').evaluateAll(fields=>fields.map(field=>({value:field.value,checked:field.type==='checkbox'?field.checked:undefined}))),retained,'Conflict must retain the complete draft')
+ await recheck.click();const review=page.getByTestId('word-draft-review');await review.waitFor();assert.match(await review.innerText(),/当前页面样式：/);assert.match(await review.innerText(),/保留输入：/)
+ await page.getByRole('button',{name:'按当前文档应用',exact:true}).click();await idle();pass('A stale Writer draft was retained, explicitly compared with the current target, and applied only after a second user confirmation')
+}
 async function wordTab(name){await page.locator('.ow-word>.ow-ribbon').getByRole('tab',{name,exact:true}).click()}
 async function sheetTab(name){await page.locator('.ow-sheet>.ow-ribbon').getByRole('tab',{name,exact:true}).click()}
 async function save(extension){const download=page.waitForEvent('download');await page.getByRole('button',{name:'保存',exact:true}).click();const file=path.join(out,'ui-edited.'+extension);await(await download).saveAs(file);await idle();return unzipSync(fs.readFileSync(file))}
@@ -40,13 +52,13 @@ async function screenshot(name){
  await page.locator('.create-card.word').click();await idle();await page.getByLabel('段落样式',{exact:true}).waitFor();await page.evaluate(()=>window.originalOfficeFrame=document.querySelector('.office-frame'))
  await wordTab('插入');await action(page.locator('.ow-word>.ow-ribbon').getByRole('button',{name:'文字',exact:true}))
  await page.getByLabel('文字内容',{exact:true}).fill('工作台真实文档 · 中文核验\n项目进展与行动计划。')
- await action(page.getByRole('button',{name:'应用',exact:true}));await page.getByTestId('word-draft-notice').waitFor({state:'hidden'})
+ await applyWordDraft();await page.getByTestId('word-draft-notice').waitFor({state:'hidden'})
  pass('Chinese text inserted through the Writer workbench and acknowledged')
- await wordTab('布局');await action(page.getByRole('button',{name:'纸张与页边距',exact:true}));const widthInput=page.getByLabel('纸张宽度 · 毫米');await widthInput.fill(Number(await widthInput.inputValue()).toFixed(3));await action(page.getByRole('button',{name:'应用',exact:true}));await page.getByTestId('word-draft-notice').waitFor({state:'hidden'})
+ await wordTab('布局');await action(page.getByRole('button',{name:'纸张与页边距',exact:true}));const widthInput=page.getByLabel('纸张宽度 · 毫米');await widthInput.fill(Number(await widthInput.inputValue()).toFixed(3));await applyWordDraft();await page.getByTestId('word-draft-notice').waitFor({state:'hidden'})
  pass('Normalized page-size input does not leave a false pending draft')
- await wordTab('插入');await action(page.locator('.ow-word>.ow-ribbon').getByRole('button',{name:'页眉',exact:true}));await page.getByLabel('启用页眉').check();await page.getByLabel('页眉文字').fill('OPEN OFFICE · 本地办公');await action(page.getByRole('button',{name:'应用',exact:true}));await page.getByTestId('word-draft-notice').waitFor({state:'hidden'})
+ await wordTab('插入');await action(page.locator('.ow-word>.ow-ribbon').getByRole('button',{name:'页眉',exact:true}));await page.getByLabel('启用页眉').check();await page.getByLabel('页眉文字').fill('OPEN OFFICE · 本地办公');await applyWordDraft();await page.getByTestId('word-draft-notice').waitFor({state:'hidden'})
  await action(page.locator('.ow-word>.ow-ribbon').getByRole('button',{name:'表格',exact:true}));await page.getByLabel('行数',{exact:true}).fill('2');await page.getByLabel('列数',{exact:true}).fill('2');await action(page.getByRole('button',{name:'插入表格',exact:true}));await page.getByTestId('word-draft-notice').waitFor({state:'hidden'})
- await wordTab('审阅');await action(page.getByRole('button',{name:'表格数据',exact:true}));const options=await page.getByLabel('选择表格').locator('option').evaluateAll(items=>items.map(i=>i.value).filter(Boolean));assert.ok(options.length);await page.getByLabel('选择表格').selectOption(options[0]);await page.getByLabel('第 1 行第 1 列',{exact:true}).waitFor();await page.getByLabel('第 1 行第 1 列',{exact:true}).fill('中文表格回读');await action(page.getByRole('button',{name:'应用',exact:true}));await page.getByTestId('word-draft-notice').waitFor({state:'hidden'})
+ await wordTab('审阅');await action(page.getByRole('button',{name:'表格数据',exact:true}));const options=await page.getByLabel('选择表格').locator('option').evaluateAll(items=>items.map(i=>i.value).filter(Boolean));assert.ok(options.length);await page.getByLabel('选择表格').selectOption(options[0]);await page.getByLabel('第 1 行第 1 列',{exact:true}).waitFor();await page.getByLabel('第 1 行第 1 列',{exact:true}).fill('中文表格回读');await applyWordDraft();await page.getByTestId('word-draft-notice').waitFor({state:'hidden'})
  const docx=await save('docx'),wordXml=strFromU8(docx['word/document.xml']),headers=Object.entries(docx).filter(([name])=>/^word\/header\d+\.xml$/.test(name)).map(([,v])=>strFromU8(v)).join('\n')
  assert.ok(wordXml.includes('工作台真实文档'));assert.ok(wordXml.includes('中文表格回读'));assert.ok(headers.includes('本地办公'));pass('Real DOCX contains Chinese text, a native editable table and header')
  await screenshot('writer')

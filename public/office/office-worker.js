@@ -163,7 +163,10 @@ Module.zetajs.then(zetajs => {
       document.listener = zetajs.unoObject([css.util.XModifyListener], {
         modified() {
           if (current !== document || document.suppressed) return;
-          document.dirty = true; document.revision++; reportDirty(document);
+          // DocChanged is also emitted after clearing Writer's modified flag.
+          // Keep every notification in the revision sequence, but derive dirty
+          // from the model so a late clean notification cannot invent edits.
+          document.dirty = document.model.isModified(); document.revision++; reportDirty(document);
         },
         disposing() {},
       });
@@ -198,7 +201,10 @@ Module.zetajs.then(zetajs => {
         args.push(prop('FilterData', new zetajs.Any(zetajs.type.sequence(zetajs.type.struct(css.beans.PropertyValue)), [prop('ExportHiddenSlides', true)])));
       }
       current.model.storeToURL(`file://${path}`, args);
-      current.model.setModified(current.dirty);
+      // Writer broadcasts DocChanged even for true -> true. A native export
+      // normally leaves this flag intact; avoid creating another modification
+      // notification when there is no flag to restore.
+      if (current.model.isModified() !== dirty) current.model.setModified(dirty);
     } finally { current.suppressed = false; }
     return { path, extension: format, name: current.name.replace(/\.[^.]+$/, '') + '.' + format, revision, dirty };
   }
@@ -498,7 +504,7 @@ Module.zetajs.then(zetajs => {
     if (message.action === 'open') return open(message.data);
     if (!current || message.documentId !== current.id) throw Error('当前文档已经切换，旧操作已取消。');
     if (message.action === 'smoke-test') return smokeTest();
-    if (/^(word|sheet)-(state|action|data)$/.test(message.action)) {
+    if (/^(word|sheet)-(state|action|data|command)$/.test(message.action)) {
       const [kind, operation] = message.action.split('-');
       if (current.kind !== kind) throw Error('此操作与当前文档类型不匹配。');
       const tools = kind === 'word' ? writerTools : calcTools;
@@ -508,6 +514,14 @@ Module.zetajs.then(zetajs => {
         // The data and its revision belong to this one worker request. A
         // debounced toolbar refresh may still show an older document version.
         return { ...data, documentId: current.id, revision: current.revision };
+      }
+      if (operation === 'command') {
+        const input = message.data, target = input?.target;
+        if (kind !== 'word' || typeof tools.command !== 'function' || !target || target.documentId !== current.id
+          || !Number.isSafeInteger(target.revision) || target.revision < 0 || target.revision > current.revision) throw Error('即时命令的文档目标或版本无效。');
+        // The tool validates its bounded current target and applies the command
+        // synchronously in this same request. Draft actions below stay strict.
+        tools.command(input);
       }
       if (operation === 'action') {
         const action = message.data;

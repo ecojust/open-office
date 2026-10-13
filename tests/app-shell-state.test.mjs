@@ -11,7 +11,7 @@ import * as vue from 'vue'
 // LibreOffice/PDF engine or native WebView compatibility tests.
 const app = (await readFile(new URL('../src/App.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
 const utilities = await readFile(new URL('../src/shared/document.ts', import.meta.url), 'utf8')
-const names = 'tabs,activeKey,active,officeDocument,pdfDocument,officeEditor,pdfEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationWorkbench,presentationEffects,presentationState,slidePreview,busy,error,closeTarget,readyFor,editorError,stash,activate,addDocument,saveActive,closeTab,closeWindow,resolveClose,task,officeRequest'
+const names = 'tabs,activeKey,active,officeDocument,pdfDocument,officeEditor,pdfEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationWorkbench,presentationEffects,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest'
 
 function compile(source, require, extra = {}) {
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
@@ -74,6 +74,46 @@ test('native smoke URL reports failure even if Tauri injection is absent', async
   await h.mount()
   assert.match(h.state.error.value,/no Tauri IPC/)
   assert.ok(h.calls.some(call=>call[0]==='smoke-failure'&&call[1]==='app-startup'))
+})
+
+test('draft review reads a real fresh Writer state without discarding pending inputs', async () => {
+  const h=shell(),a=h.tab('A');h.active(a);await vue.nextTick()
+  let reads=0
+  const fresh={documentId:'A',revision:7}
+  h.handle.getWriterState=async()=>{reads++;return fresh}
+  h.state.wordWorkbench.value={assertNoPendingEdits(){throw Error('Draft must remain available')},discardDrafts(){assert.fail('Do not discard drafts')}}
+  assert.equal(await h.state.readFreshWriterState(),fresh)
+  assert.equal(h.state.writerState.value,fresh);assert.equal(reads,1)
+  h.handle.getWriterState=async()=>{throw Error('Engine state unavailable')}
+  await assert.rejects(h.state.readFreshWriterState(),/Engine state unavailable/)
+})
+
+test('late draft review cannot use a different document or editor result', async () => {
+  for(const changed of ['tab','editor','result']) {
+    const h=shell(),a=h.tab('A'),b=h.tab('B');h.active(a);await vue.nextTick()
+    let finish
+    h.handle.getWriterState=()=>new Promise(resolve=>{finish=resolve})
+    const reading=h.state.readFreshWriterState()
+    if(changed==='tab'){h.active(b);await vue.nextTick()}
+    if(changed==='editor')h.state.officeEditor.value={...h.handle}
+    finish({documentId:changed==='result'?'B':'A',revision:7})
+    await assert.rejects(reading,/文档已切换/)
+    assert.equal(h.state.writerState.value,null)
+  }
+})
+
+test('immediate Writer commands cannot consume drafts or retry a rejected target', async () => {
+  const h=shell(),a=h.tab('A');h.active(a);await vue.nextTick()
+  const command={action:{type:'format-text',bold:true},target:{documentId:'A',revision:4}},calls=[]
+  h.handle.writerCommand=async input=>{calls.push(input);throw Error('Command target changed')}
+  h.state.wordWorkbench.value={assertNoPendingEdits(){throw Error('Pending draft')}}
+  h.state.runWriterCommand(command);await h.idle()
+  assert.equal(calls.length,0);assert.match(h.state.error.value,/Pending draft/)
+  h.state.wordWorkbench.value={assertNoPendingEdits(){}}
+  h.state.runWriterCommand(command);await h.idle()
+  assert.equal(calls.length,1);assert.equal(calls[0],command)
+  assert.match(h.state.error.value,/Command target changed/)
+  assert.equal(command.target.revision,4,'A rejected target is not rebound to a later version')
 })
 
 test('native smoke startup IPC rejection reaches the HTTP failure fallback', async () => {
@@ -171,6 +211,39 @@ test('window close during a task is deferred once, without recursive checks', as
   await h.state.closeWindow(); assert.equal(h.calls.length, 0)
   release(); await task; await h.idle()
   assert.equal(h.calls.filter(call => call[0] === 'close').length, 1)
+})
+
+test('editor transaction blocks overlapping work and propagates errors while releasing the input barrier', async () => {
+  const h=shell();let finish,worked=false
+  const gate=new Promise(resolve=>{finish=resolve})
+  const work=h.state.editorTransaction('saving',async()=>{worked=true;await gate;throw Error('Revision changed')})
+  assert.equal(worked,false,'Work must wait for Vue to render the inert region')
+  for(let n=0;n<10&&!worked;n++)await Promise.resolve()
+  assert.equal(h.state.busy.value,'saving');assert.equal(worked,true)
+  await assert.rejects(h.state.editorTransaction('another',async()=>assert.fail('Overlapping work must be blocked')),/另一项/)
+  finish();await assert.rejects(work,/Revision changed/)
+  assert.equal(h.state.busy.value,'')
+})
+
+test('native helper export uses the same guarded transaction and never swallows a failed discard', async()=>{
+  const h=shell()
+  let called=false
+  h.handle.writerAction=function(input){called=true;assert.equal(this,h.handle);assert.equal(h.state.busy.value,'');return input}
+  h.handle.exportFile=async()=>{assert.equal(h.state.busy.value.length>0,true);return {base64:'snapshot',revision:7}}
+  const nativeEditor=h.state.nativeTransactionalEditor(h.handle)
+  const intent={type:'apply-style',expectedRevision:3}
+  assert.equal(nativeEditor.writerAction(intent),intent)
+  assert.equal(called,true,'Captured edit intents must forward synchronously without a new render/focus await')
+  assert.equal((await nativeEditor.exportFile()).revision,7)
+  assert.equal(h.state.busy.value,'')
+  const a=h.tab('A'),b=h.tab('B');h.active(a)
+  h.handle.discardChanges=async()=>{assert.equal(h.state.busy.value.length>0,true);throw Error('Revision changed')}
+  await assert.rejects(h.state.editorTransaction('switching',()=>h.state.activate(b)),/Revision changed/)
+  assert.equal(h.state.activeKey.value,'A');assert.equal(a.document.base64,'T0xE')
+  assert.equal(h.state.busy.value,'')
+  await h.state.task('switching',()=>h.state.activate(b))
+  assert.match(h.state.error.value,/Revision changed/)
+  assert.equal(h.state.activeKey.value,'A')
 })
 
 test('presentation PDF and ODP exports stay copies and never replace the editable PPTX tab', async () => {
@@ -288,3 +361,13 @@ for(const [kind,getter,field] of [['word','getWriterState','writerState'],['shee
    assert.equal(h.state.officeDocument.value.id,'office')
  })
 }
+
+test('native clean notifications never clear a tab with unsaved user content', () => {
+  const h = shell(), tab = h.tab('A', { dirty: true })
+  h.state.tabs.value = [tab]; h.state.activeKey.value = 'A'
+  h.state.dirtyFor('A', false)
+  assert.equal(tab.dirty, true)
+  tab.dirty = false
+  h.state.dirtyFor('A', true)
+  assert.equal(tab.dirty, true)
+})

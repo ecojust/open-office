@@ -9,8 +9,17 @@ let port, activeDocumentId = '', activeDocumentKind = '', disposed = false, file
 const pending = new Map();
 const allowed = new Set(['open','export','undo','redo','search','mark-saved','discard','focus','insert-image',
   'new-slide','preview-presentation','presentation-state','presentation-action','presentation-object-data',
-  'word-state','word-action','word-data','sheet-state','sheet-action','sheet-data']);
+  'word-state','word-action','word-command','word-data','sheet-state','sheet-action','sheet-data']);
 const smokeMode = new URLSearchParams(location.search).get('smoke') === '1';
+const smokeKinds = new Set(['word','sheet','presentation']);
+const smokeActionTypes = new Set(['insert-text','insert-break','insert-table','set-page','set-header-footer','find-replace','apply-style','format-text','update-table','rename-sheet','add-sheet','select-sheet','select-range','set-matrix','set-cell','patch-cells','format','sort','freeze','insert-chart','insert-pivot','filter','clear-filter']);
+function smokeOperation(action, data = {}, kind = activeDocumentKind) {
+  const detail = { action, ...(smokeKinds.has(kind) ? { kind } : {}) };
+  if (smokeActionTypes.has(data.type)) detail.type = data.type;
+  if (action === 'word-command' && smokeActionTypes.has(data.action?.type)) detail.type = data.action.type;
+  for (const name of ['revision','expectedRevision']) if (Number.isSafeInteger(data[name]) && data[name] >= 0 && data[name] <= 1000000000) detail[name] = data[name];
+  return detail;
+}
 if (smokeMode) allowed.add('smoke-test');
 const send = (message) => { if (!disposed) parent.postMessage({ channel: CHANNEL, session, ...message }, location.origin); };
 const progress = (text, percent) => send({ event: 'progress', data: { text, percent } });
@@ -167,7 +176,7 @@ window.addEventListener('message', (event) => {
       const path = `/tmp/open-office-image-${++fileCounter}.${extension}`;
       FS.writeFile(path, bytes); data = { path };
     }
-    smokeDiagnostic('request', { action: message.action, hasDocument: !!activeDocumentId });
+    if (smokeMode) smokeDiagnostic('request', { ...smokeOperation(message.action, data, message.action === 'open' ? data.kind : activeDocumentKind), hasDocument: !!activeDocumentId });
     pending.set(message.requestId, { ...message, data });
     port.postMessage({ requestId: message.requestId, action: message.action, documentId: message.documentId, data });
   } catch (error) { reply(message, false, undefined, errorText(error)); }
@@ -177,13 +186,14 @@ function workerMessage(event) {
   if (!message || disposed) return;
   if (message.event === 'engine-ready') { smokeDiagnostic('engine-ready'); progress('办公引擎已就绪', 100); send(message); return; }
   if (message.event) {
+    if (smokeMode && message.event === 'dirty' && message.documentId === activeDocumentId) smokeDiagnostic('dirty', { ...smokeOperation('dirty', message.data), dirty: message.data?.dirty === true });
     if (!message.documentId || message.documentId === activeDocumentId) send(message);
     return;
   }
   const request = pending.get(message.requestId);
   if (!request) return;
   pending.delete(message.requestId);
-  smokeDiagnostic('reply', { action: request.action, ok: message.ok, error: message.error });
+  if (smokeMode) smokeDiagnostic('reply', { ...smokeOperation(request.action, { ...request.data, ...message.data }, request.action === 'open' ? request.data.kind : activeDocumentKind), ok: message.ok, error: message.error });
   try {
     if (request.action === 'insert-image') { try { FS.unlink(request.data.path); } catch {} }
     if (!message.ok) {

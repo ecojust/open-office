@@ -1,23 +1,30 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import Icon from './Icon.vue'
-import type { WriterState, WriterAction, WriterQuery, WriterTableData, WriterTextStyle, WriterParagraph } from '../word/types'
+import type { WriterState, WriterAction, WriterCommand, WriterQuery, WriterTableData, WriterTextStyle, WriterParagraph } from '../word/types'
+import { canIssueWriterCommand, writerCommandTarget } from '../word/types'
+import { createWriterDraftReview, writerDraftReviewMatches } from '../word/draft-review'
+import type { WriterDraftOrigin, WriterDraftReview } from '../word/draft-review'
 import '../office/workbench.css'
-const props = withDefaults(defineProps<{ state?: WriterState | null; active?: boolean; busy?: boolean; disabled?: boolean; readData?: (query: WriterQuery) => Promise<unknown> }>(), { active: true, busy: false, disabled: false })
-const emit = defineEmits<{ action: [action: WriterAction]; refresh: []; 'insert-image': []; 'draft-change': [pending: boolean] }>()
+const props = withDefaults(defineProps<{ state?: WriterState | null; active?: boolean; busy?: boolean; disabled?: boolean; readData?: (query: WriterQuery) => Promise<unknown>; refreshState?: () => Promise<WriterState> }>(), { active: true, busy: false, disabled: false })
+const emit = defineEmits<{ action: [action: WriterAction]; command: [command: WriterCommand]; refresh: []; 'insert-image': []; 'draft-change': [pending: boolean] }>()
 const tabs = ['开始','插入','布局','审阅'] as const
 const tab = ref<(typeof tabs)[number]>('开始'), panel = ref(''), problem = ref(''), confirmingRemoval=ref(false)
-const draft = reactive<Record<string,string>>({}), baseline = ref(''), origin = ref<{ id: string; revision: number; selection: string }>()
+const draft = reactive<Record<string,string>>({}), baseline = ref(''), origin = ref<WriterDraftOrigin>()
+const draftReview=ref<WriterDraftReview>(), reviewLoading=ref(false)
+let reviewToken=0
 const pending = computed(() => !!panel.value && JSON.stringify(draft) !== baseline.value)
-const ready = computed(() => props.active && !!props.state && !props.disabled && !props.busy)
+const ready = computed(() => props.active && !!props.state && !props.disabled && !props.busy && !reviewLoading.value)
 const locked = computed(() => !ready.value || pending.value)
 const stale = computed(() => pending.value && !!origin.value && (origin.value.id !== props.state?.documentId || (panel.value!=='table' && origin.value.revision !== props.state.revision) || (['text','paragraph','comment','footnote','insertTable','toc'].includes(panel.value) && origin.value.selection !== props.state.selection.id)))
 const titles: Record<string,string> = { text:'文字输入', paragraph:'段落设置', page:'纸张与页边距', header:'页眉', footer:'页脚', insertTable:'插入表格', table:'表格数据', outline:'文档大纲', find:'查找与替换', review:'批注与修订', comment:'添加批注', footnote:'插入脚注', toc:'文档目录' }
+const canReview=computed(()=>stale.value&&['page','header','footer'].includes(panel.value)&&!!props.refreshState)
 const tableVersion=ref<{documentId:string;revision:number}>()
 const table = ref<WriterTableData>(), tableLoading = ref(false), tableName = ref('')
 const search = reactive({ text:'', replace:'', matchCase:false, wholeWords:false })
 let token = 0, disposed = false, applying: { id: string; revision: number } | undefined
 function resetValues(state:WriterState|null|undefined=props.state) {
+  reviewToken++;draftReview.value=undefined;reviewLoading.value=false
   const s=state, values:Record<string,string>={}
   if(panel.value==='text') values.text=s?.selection.text || ''
   else if(panel.value==='paragraph') for(const key of ['leftIndent','rightIndent','firstLineIndent','spaceAbove','spaceBelow','lineSpacingPercent'] as const) values[key]=String(s?.paragraph[key] ?? 0)
@@ -33,7 +40,8 @@ function resetValues(state:WriterState|null|undefined=props.state) {
 }
 function edit(key:string,value:string) {
   if(!ready.value) return
-  if(!origin.value && props.state) origin.value={id:props.state.documentId,revision:panel.value==='table'?tableVersion.value?.revision??props.state.revision:props.state.revision,selection:props.state.selection.id}
+  if(!origin.value && props.state) origin.value={id:props.state.documentId,revision:panel.value==='table'?tableVersion.value?.revision??props.state.revision:props.state.revision,selection:props.state.selection.id,styleName:props.state.page.styleName}
+  draftReview.value=undefined;reviewToken++
   draft[key]=value; problem.value='';confirmingRemoval.value=false
 }
 function styleLabel(name:string,label:string){
@@ -52,6 +60,7 @@ function send(action:WriterAction,fromDraft=false) {
   if(fromDraft && stale.value) {problem.value='文档或选区已改变。请还原输入，再重新编辑。';return}
   problem.value=''
   if(fromDraft) applying={id:props.state.documentId,revision:props.state.revision}
+  if(!fromDraft&&canIssueWriterCommand(action,props.state)){emit('command',{action,target:writerCommandTarget(props.state)});return}
   emit('action',{...action,expectedRevision:fromDraft?origin.value?.revision??props.state.revision:props.state.revision,...(action.type==='update-table'?{}:{expectedSelectionId:props.state.selection.id})})
 }
 function format(update:Partial<WriterTextStyle>) {send({type:'format-text',...update})}
@@ -95,6 +104,30 @@ function actionSucceeded(state:WriterState) {
 }
 function actionFailed(){applying=undefined;confirmingRemoval.value=false}
 
+async function reviewDraft(){
+  if(!ready.value||!canReview.value||!origin.value||!props.refreshState)return
+  const request=++reviewToken,oldOrigin={...origin.value},inputJson=JSON.stringify(draft),targetPanel=panel.value as WriterDraftReview['panel']
+  reviewLoading.value=true;draftReview.value=undefined;problem.value=''
+  try {
+    const state=await props.refreshState();await nextTick()
+    if(disposed||request!==reviewToken)return
+    if(inputJson!==JSON.stringify(draft)||targetPanel!==panel.value)throw Error('输入已改变，请重新核对。')
+    const review=createWriterDraftReview(targetPanel,state,draft,oldOrigin)
+    if(!writerDraftReviewMatches(review,props.state,draft))throw Error('核对期间文档或目标又有变化，请重新核对；输入已保留。')
+    draftReview.value=review
+  }catch(error){if(request===reviewToken)problem.value=error instanceof Error?error.message:String(error)}
+  finally{if(request===reviewToken)reviewLoading.value=false}
+}
+function confirmDraftReview(){
+  const review=draftReview.value
+  if(!ready.value||!review)return
+  if(!writerDraftReviewMatches(review,props.state,draft)){draftReview.value=undefined;problem.value='核对后文档又有变化，请重新核对；输入已保留。';return}
+  // This click is a new, explicit user intent; no failed action is retried.
+  origin.value={id:review.documentId,revision:review.revision,selection:review.selectionId,styleName:review.styleName}
+  draftReview.value=undefined;problem.value='';apply()
+}
+function cancelDraftReview(){reviewToken++;draftReview.value=undefined;reviewLoading.value=false}
+
 function assertNoPendingEdits(){if(pending.value)throw Error('文字工作台有尚未应用的输入，请先点击“应用”或“还原”。')}
 async function readTable(name:string) {
   if(!props.readData||!props.state||pending.value||!name)return
@@ -114,12 +147,14 @@ const tableCells=computed<string[][]>(()=>{try{return JSON.parse(draft.cells||'[
 function editCell(row:number,column:number,event:Event){const cells=tableCells.value.map(row=>[...row]);cells[row][column]=(event.target as HTMLInputElement).value;edit('cells',JSON.stringify(cells))}
 function find(replace=false,all=false){if(!search.text.trim())return;send({type:'find-replace',search:search.text,...(replace?{replace:search.replace,all}:{}),matchCase:search.matchCase,wholeWords:search.wholeWords})}
 watch(()=>props.state,(state,previous)=>{
+  if(reviewLoading.value&&origin.value&&(!state||state.documentId!==origin.value.id||state.selection.id!==origin.value.selection||state.page.styleName!==origin.value.styleName)){cancelDraftReview();problem.value='核对期间文档、光标或页面样式已变化。输入已保留。'}
+  if(draftReview.value&&!writerDraftReviewMatches(draftReview.value,state,draft)){draftReview.value=undefined;problem.value='核对后文档或目标已变化。输入仍保留，请重新核对。'}
   if(previous?.documentId&&state?.documentId!==previous.documentId){token++;applying=undefined;panel.value='';table.value=undefined;tableVersion.value=undefined;tableName.value='';resetValues();return}
   if(!pending.value&&!applying){if(tableVersion.value&&state?.documentId!==tableVersion.value.documentId){table.value=undefined;tableVersion.value=undefined}resetValues()}
 },{deep:true,immediate:true})
 watch(()=>props.active,active=>{if(!active&&!pending.value){panel.value='';token++;resetValues()}})
 watch(pending,value=>emit('draft-change',value),{immediate:true})
-onBeforeUnmount(()=>{disposed=true;token++})
+onBeforeUnmount(()=>{disposed=true;token++;reviewToken++})
 defineExpose({hasPendingEdits:()=>pending.value,assertNoPendingEdits,discardDrafts,actionSucceeded,actionFailed})
 </script>
 <template>
@@ -141,11 +176,17 @@ defineExpose({hasPendingEdits:()=>pending.value,assertNoPendingEdits,discardDraf
    <template v-else><button class="ow-command" :disabled="!ready" @click="openPanel('find')"><Icon name="search" :size="16"/>查找与替换</button><button class="ow-command" :disabled="!ready" @click="openPanel('table')">表格数据</button><span class="ow-divider"/><button class="ow-command" :disabled="!ready" @click="openPanel('comment')">添加批注</button><button class="ow-command" :disabled="!ready" @click="openPanel('review')">批注与修订</button><button class="ow-command" :disabled="!ready" @click="openPanel('footnote')">脚注 / 尾注</button></template>
   </div>
  </header>
- <div v-if="active&&pending" class="ow-notice" data-testid="word-draft-notice">{{stale?'选区或文档已改变，请还原输入后重试。':'还有未应用的输入；保存或切换文档前，请先应用或还原。'}}<button :disabled="busy" @click="discardDrafts">还原</button></div>
+ <div v-if="active&&pending" class="ow-notice" data-testid="word-draft-notice">{{stale?'文档已变化，输入已保留。请重新核对支持的页面设置，或还原后重新编辑。':'还有未应用的输入；保存或切换文档前，请先应用或还原。'}}<button v-if="canReview" :disabled="!ready" @click="reviewDraft">保留输入并重新核对</button><button :disabled="busy||reviewLoading" @click="discardDrafts">还原</button></div>
  <div v-if="active&&problem" class="ow-notice ow-error" role="alert">{{problem}}</div>
  <div class="ow-body"><div class="ow-canvas"><slot/></div>
   <aside v-if="active&&panel" class="ow-panel" :aria-label="titles[panel]">
    <div class="ow-panel-heading"><h3>{{titles[panel]}}</h3><button class="ow-command ow-square" aria-label="关闭文字面板" :disabled="pending" @click="panel=''">×</button></div>
+   <p v-if="reviewLoading" role="status">正在读取当前文档，保留你的输入…</p>
+   <section v-if="draftReview" class="ow-draft-review" data-testid="word-draft-review" aria-label="重新核对保留输入">
+    <strong>请确认新的应用目标</strong><p>当前页面样式：{{draftReview.styleName}} · 版本 {{draftReview.revision}}。确认会按下列保留输入设置此页面样式，不会自动重试上一次操作。</p>
+    <dl><template v-for="row in draftReview.rows" :key="row.label"><dt>{{row.label}}</dt><dd><span>当前：{{row.current||'（空）'}}</span><span>保留输入：{{row.proposed||'（空）'}}</span></dd></template></dl>
+    <div class="ow-actions"><button class="ow-primary" :disabled="!ready" @click="confirmDraftReview">按当前文档应用</button><button :disabled="busy" @click="cancelDraftReview">取消核对</button></div>
+   </section>
    <template v-if="panel==='text'"><p>{{state?.selection.collapsed?'在画布内放置光标，再输入要插入的文字。':'应用会替换画布中当前选中的文字。'}}</p><label class="ow-field">文字内容<textarea aria-label="文字内容" :value="draft.text" :disabled="!ready||state?.selection.truncated" rows="9" @input="input('text',$event)"/><small>单次最多 20,000 字；长文可直接在画布内编辑。</small></label><p v-if="state?.selection.truncated">选区过大，请在画布内缩小选区后编辑。</p></template>
    <template v-else-if="panel==='paragraph'"><div class="ow-field-row"><label v-for="item in [{key:'leftIndent',label:'左缩进'},{key:'rightIndent',label:'右缩进'},{key:'firstLineIndent',label:'首行缩进'},{key:'spaceAbove',label:'段前间距'},{key:'spaceBelow',label:'段后间距'}]" :key="item.key" class="ow-field">{{item.label}} · 毫米<input type="number" step="0.5" :value="draft[item.key]" :disabled="!ready" @input="input(item.key,$event)"/></label><label class="ow-field">行距 · %<input type="number" min="80" max="300" :value="draft.lineSpacingPercent" :disabled="!ready" @input="input('lineSpacingPercent',$event)"/></label></div></template>
    <template v-else-if="panel==='page'"><p>设置作用于当前页面样式。</p><div class="ow-field-row"><label v-for="item in [{key:'width',label:'纸张宽度'},{key:'height',label:'纸张高度'},{key:'marginTop',label:'上边距'},{key:'marginBottom',label:'下边距'},{key:'marginLeft',label:'左边距'},{key:'marginRight',label:'右边距'}]" :key="item.key" class="ow-field">{{item.label}} · 毫米<input type="number" step="1" min="0" :value="draft[item.key]" :disabled="!ready" @input="input(item.key,$event)"/></label></div></template>

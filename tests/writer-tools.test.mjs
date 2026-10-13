@@ -18,7 +18,7 @@ function fixture() {
     setPropertyValue(name, value) { writes.push([label, name, value]); this.values[name] = value instanceof Any ? value.value : value },
   })
   let selectionText=''
-  const owner = { createTextCursorByRange: () => ({ gotoRange() {}, getString:()=>selectionText }), compareRegionStarts: () => 0, compareRegionEnds: () => 0 }
+  const owner = { createEnumeration:()=>enumeration([]), createTextCursorByRange: () => ({ gotoRange() {}, getString:()=>selectionText }), compareRegionStarts: () => 0, compareRegionEnds: () => 0 }
   const view = Object.assign(props({ PageStyleName: 'Standard', ParaAdjust: 0, CharHeight: 12, CharHeightAsian: 12, CharHeightComplex: 12,
     CharWeight: 100, CharWeightAsian: 100, CharWeightComplex: 100, CharColor: 0, CharBackColor: -1, CharBackTransparent: true }, 'view'), {
     getText: () => owner, getStart: () => view, getEnd: () => view, getString: () => '', isCollapsed: () => true,
@@ -27,9 +27,11 @@ function fixture() {
     TopMargin: 2000, BottomMargin: 2000, HeaderIsOn: false, FooterIsOn: false }, 'page')
   const tableCells = [[{ getString:()=>'', setString(value) { writes.push(['cell',0,0,value]) } },{getString:()=>'',setString(value){writes.push(['cell',0,1,value])}}]]
   const table = { getRows:()=>({getCount:()=>1}),getColumns:()=>({getCount:()=>2}),getCellByName:name=>tableCells[0][name.charCodeAt(0)-65] }
-  const model = { supportsService:()=>true,getCurrentController:()=>({getViewCursor:()=>view}),
-    getStyleFamilies:()=>({getByName:()=>({hasByName:name=>name==='Standard',getByName:()=>page})}),
-    getTextTables:()=>({hasByName:name=>name==='Table1',getByName:()=>table}),
+  const controller = { getViewCursor:()=>view, getSelection:()=>({getCount:()=>1,getByIndex:()=>view}) };
+  const model = { supportsService:()=>true,getText:()=>owner,getCurrentController:()=>controller,
+    getStyleFamilies:()=>({getByName:()=>({getElementNames:()=>[],hasByName:name=>name==='Standard',getByName:()=>page})}),
+    getTextFields:()=>({createEnumeration:()=>enumeration([])}),getRedlines:()=>({createEnumeration:()=>enumeration([])}),getFootnotes:()=>({getCount:()=>0}),getDocumentIndexes:()=>({getCount:()=>0}),
+    getTextTables:()=>({getElementNames:()=>['Table1'],hasByName:name=>name==='Table1',getByName:()=>table}),
   }
   let modelReads=0, revision=0, dispatchHandler=null
   const context = vm.createContext({ WebAssembly, Error })
@@ -37,7 +39,7 @@ function fixture() {
   const api=context.createWriterTools({ getModel:()=>{modelReads++;return model}, getRevision:()=>revision, css:{beans:{PropertyValue:Struct},awt:{FontSlant:{ITALIC:2,NONE:0}},style:{LineSpacing:Struct,LineSpacingMode:{PROP:0}}},
     zetajs:{Any,type:{float:'float',short:'short'},sameUnoObject:(a,b)=>a===b,catchUnoException:error=>{errors.push(error);return {Message:'optional'}}},
     dispatch:(command,args)=>{writes.push(['dispatch',command,args]);dispatchHandler?.(command,args)} })
-  return {api,writes,reads,view,page,model,errors,tableCells,set selectionText(value){selectionText=value},set revision(value){revision=value},set dispatchHandler(fn){dispatchHandler=fn},get modelReads(){return modelReads}}
+  return {api,writes,reads,view,page,model,controller,errors,tableCells,set selectionText(value){selectionText=value},set revision(value){revision=value},set dispatchHandler(fn){dispatchHandler=fn},get modelReads(){return modelReads}}
 }
 function rejectsBeforeModel(data) {
   const h=fixture()
@@ -242,4 +244,61 @@ test('stale table recovery never joins or creates paragraphs or line separators'
     h.tableCells[0][0].value='old'+separator+'paragraph'
     assert.equal(h.api.data({type:'table',name:'Table1'}).cellSignatures[0][0],'')
   }
+})
+
+function commandTarget(h) {
+  const state=h.api.state()
+  return {documentId:'A',revision:0,...Object.fromEntries(['selection','textStyle','paragraph','page','tables'].map(key=>[key,state[key]]))}
+}
+test('immediate command validates the current target and performs genuine property writes in one call',()=>{
+  const h=fixture(), target=commandTarget(h)
+  h.revision=7 // Delayed native notifications do not by themselves change this target.
+  h.api.command({action:{type:'format-text',bold:true},target})
+  assert.equal(h.view.values.CharWeight,150)
+  assert.equal(h.view.values.CharWeightAsian,150)
+})
+test('commands reject old draft guards, unsupported writes and malformed targets before touching UNO',()=>{
+  for(const action of [{type:'format-text',bold:true,expectedRevision:0},{type:'format-text',bold:true,expectedSelectionId:'x'},
+    {type:'update-table',name:'Table1',cells:[['x','y']]},{type:'delete-comment',index:0}]) {
+    const h=fixture();assert.throws(()=>h.api.command({action,target:{}}));assert.equal(h.modelReads,0);assert.deepEqual(h.writes,[])
+  }
+  const h=fixture();assert.throws(()=>h.api.command({action:{type:'format-text',bold:true},target:{documentId:'A'}}));assert.equal(h.modelReads,0)
+})
+test('changed relevant command selection, formatting or page properties reject before writing',()=>{
+  for(const [action,change] of [
+    [{type:'format-text',bold:true},h=>{h.selectionText='new text'}],
+    [{type:'format-text',bold:false},h=>{h.view.values.CharWeight=150}],
+    [{type:'set-page',marginLeft:22},h=>{h.page.values.Width=22000}],
+  ]) {
+    const h=fixture(),target=commandTarget(h);change(h)
+    assert.throws(()=>h.api.command({action,target}),/目标已改变/)
+    assert.deepEqual(h.writes,[])
+  }
+})
+test('unrelated font changes and fresh UNO wrappers do not retarget a current command',()=>{
+  const h=fixture(),target=commandTarget(h)
+  h.view.values.CharHeight=20
+  h.api.command({action:{type:'format-text',bold:true},target})
+  assert.equal(h.view.values.CharWeight,150)
+  const pageTarget=commandTarget(h)
+  h.model.getStyleFamilies=()=>({getByName:()=>({getElementNames:()=>[],hasByName:()=>true,getByName:()=>({...h.page})})})
+  h.api.command({action:{type:'set-page',marginLeft:22},target:pageTarget})
+  assert.equal(h.page.values.LeftMargin,2200)
+})
+test('image/multiple selections and selected-text replacement cannot use immediate insertion',()=>{
+  for(const selected of [()=>({getText:()=>({})}),()=>({getCount:()=>2,getByIndex:()=>null})]) {
+    const h=fixture(),target=commandTarget(h);h.controller.getSelection=selected
+    assert.throws(()=>h.api.command({action:{type:'insert-text',text:'x'},target}),/对象|多选/);assert.deepEqual(h.writes,[])
+  }
+  const h=fixture(),target=commandTarget(h)
+  assert.throws(()=>h.api.command({action:{type:'insert-text',text:'x',replaceSelection:true},target}),/版本保护/);assert.deepEqual(h.writes,[])
+})
+test('new header command requires an authoritative disabled section and never uses optional fallback as proof',()=>{
+  const h=fixture();delete h.page.values.HeaderIsOn;const target=commandTarget(h)
+  assert.equal(target.page.headerEnabled,false,'Display metadata uses fallback, which is not write authority')
+  assert.throws(()=>h.api.command({action:{type:'set-header-footer',target:'header',enabled:true,text:'new'},target}),/preflight/)
+  assert.deepEqual(h.writes,[])
+  const existing=fixture();existing.page.values.HeaderIsOn=true;existing.page.values.HeaderText={getString:()=>''}
+  assert.throws(()=>existing.api.command({action:{type:'set-header-footer',target:'header',enabled:true,text:'new'},target:commandTarget(existing)}),/版本保护/)
+  assert.deepEqual(existing.writes,[])
 })

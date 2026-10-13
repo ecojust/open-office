@@ -49,7 +49,7 @@ async function editor(t, kind = 'presentation') {
       const queue = queued.get(action)
       if (queue?.length) return Promise.resolve(queue.shift())
       if (action === 'presentation-state') return Promise.resolve(pageState(id))
-      if (/^(word|sheet)-(state|action)$/.test(action)) return Promise.resolve({documentId:id,revision:7,dirty:false})
+      if (/^(word|sheet)-(state|action|command)$/.test(action)) return Promise.resolve({documentId:id,revision:7,dirty:false})
       if (action === 'export') return Promise.resolve(exportResult())
       if (action === 'mark-saved') return Promise.resolve({ dirty: false })
       return Promise.resolve({ id: data?.id })
@@ -369,3 +369,15 @@ for (const [kind, method] of [['word','writerData'], ['sheet','calcData']]) {
     await failed
   })
 }
+
+test('Writer command uses one RPC and rejects a response after the document changes', async t => {
+  const h=await editor(t,'word'), pending=deferred(), command={action:{type:'format-text',bold:true},target:{documentId:'A',revision:7}}
+  h.enqueue('word-command',pending.promise)
+  const failed=assert.rejects(h.exposed.writerCommand(command),/文档已切换/)
+  await until(()=>h.count('word-command')===1)
+  await h.switchTo('B')
+  const events=h.events.length
+  pending.resolve({documentId:'A',revision:8,dirty:true})
+  await failed
+  assert.equal(h.count('word-command'),1);assert.equal(h.events.length,events)
+})

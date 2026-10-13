@@ -9,7 +9,7 @@ import vm from 'node:vm'
 const source = await readFile(new URL('../public/office/office-worker.js', import.meta.url), 'utf8')
 async function engine(initial = { kind: 'word', extension: 'docx' }) {
   const messages = [], models = [], imports = [], stores = [], dispatches = []
-  const controls = { failNextLoad: false, rejectNextService: false, ignoreMove: false, refusePageSwitch: false, configureNextModel: null, modifyDuringDataRead: false, acceptTableSnapshot: false }
+  const controls = { failNextLoad: false, rejectNextService: false, ignoreMove: false, refusePageSwitch: false, configureNextModel: null, modifyDuringDataRead: false, acceptTableSnapshot: false, acceptCommand: false }
   const nativeExceptions = new Map(), exceptionCalls = []
   const nativeException = message => {
     // A token, not an Error: real UNO exceptions cross the boundary as tagged
@@ -135,6 +135,7 @@ async function engine(initial = { kind: 'word', extension: 'docx' }) {
     state() { toolCalls.push([kind, 'state']); return { marker: kind, documentId: 'untrusted', revision: -1, dirty: false } },
     action(data) { toolCalls.push([kind, 'action', data]); if (data.type !== 'edit') throw Error('Unknown tool action'); getModel().edit() },
     data(query) { toolCalls.push([kind, 'data', query]); if (controls.modifyDuringDataRead) { controls.modifyDuringDataRead = false; getModel().edit() } return { marker: kind, value: 42, documentId: 'untrusted', revision: -1 } },
+    command(data) { toolCalls.push([kind, 'command', data]); if (!controls.acceptCommand) throw Error('Current command target changed'); getModel().edit() },
     applyTableSnapshot(data) {
       toolCalls.push([kind, 'table-snapshot', data]);
       // The real Writer helper validates native identity, cells and style
@@ -376,6 +377,53 @@ test('export preserves authoritative modified state before queued UI notificatio
   assert.equal(exported.data.dirty, true)
   assert.equal(model.isModified(), true, 'Export must not mark the editor saved')
   assert.equal(stores[0].args.find(item => item.Name === 'FilterName').Value, 'Office Open XML Text')
+})
+
+test('export never sets the same modified flag but restores a genuinely changed native flag',async()=>{
+  for(const initial of [false,true]) {
+    const {request,model,stores}=await engine()
+    if(initial)model.edit()
+    const writes=[]
+    model.setModified=function(value){writes.push(value);this.modified=value;this.listener?.modified()}
+    model.storeToURL=function(path,args){stores.push({path,args})}
+    const first=request('export',{format:'docx'})
+    assert.equal(first.ok,true);assert.deepEqual(writes,[])
+    assert.equal(first.data.dirty,initial);assert.equal(model.isModified(),initial)
+    model.storeToURL=function(path,args){stores.push({path,args});this.modified=!initial}
+    const second=request('export',{format:'docx'})
+    assert.equal(second.ok,true);assert.deepEqual(writes,[initial])
+    assert.equal(second.data.revision,first.data.revision,'Restoring the export flag must remain suppressed')
+    assert.equal(model.isModified(),initial)
+    model.edit()
+    assert.equal(request('discard',{revision:second.data.revision}).ok,false,'Real later edits must still reject discard')
+  }
+})
+
+test('late clean native notifications advance revision without inventing unsaved edits after discard', async () => {
+  const { request, model, messages } = await engine()
+  model.edit()
+  const exported = request('export', { format: 'docx' }).data
+  assert.equal(request('discard', { revision: exported.revision }).ok, true)
+  model.listener.modified() // Real Writer emits this later with isModified() false.
+  const state = request('word-state').data
+  assert.equal(state.dirty, false)
+  assert.equal(state.revision, exported.revision + 1, 'Even clean native notifications must remain in the revision sequence')
+  assert.equal(messages.filter(message => message.event === 'dirty').at(-1).data.dirty, false)
+  assert.equal(request('word-action', { type: 'edit', expectedRevision: exported.revision }).ok, false, 'A stale edit still cannot bypass revision protection')
+  assert.equal(request('discard', { revision: exported.revision }).ok, false, 'A stale export still cannot clear a newer revision')
+  assert.equal(request('open', { id: 'B', name: 'B.docx', kind: 'word', extension: 'docx', isNew: true }).ok, true, 'The already discarded, native-clean model may be replaced')
+})
+
+test('a genuine native edit after discard remains dirty and blocks replacement', async () => {
+  const { request, model } = await engine()
+  model.edit()
+  const exported = request('export', { format: 'docx' }).data
+  assert.equal(request('discard', { revision: exported.revision }).ok, true)
+  model.edit()
+  assert.equal(request('word-state').data.dirty, true)
+  assert.equal(request('open', { id: 'B', name: 'B.docx', kind: 'word', extension: 'docx', isNew: true }).ok, false)
+  assert.equal(model.closed, false)
+  assert.equal(request('discard', { revision: exported.revision }).ok, false)
 })
 
 test('edits after export reject stale save/discard acknowledgements', async () => {
@@ -800,4 +848,22 @@ test('optional presentation metadata reads propagate WASM traps instead of repor
     assert.equal(model.mutations.length, mutations)
     assert.equal(model.isModified(), false)
   }
+})
+
+test('Writer immediate commands use one bounded production route while drafts keep strict revisions', async () => {
+  const h=await engine(), command={action:{type:'format-text',bold:true},target:{documentId:'A',revision:0}}
+  h.model.edit()
+  assert.equal(h.request('word-action',{type:'edit',expectedRevision:0}).ok,false)
+  assert.equal(h.request('word-command',command).ok,false,'Tool target rejection must reach the caller')
+  assert.equal(h.model.isModified(),true)
+  h.controls.acceptCommand=true
+  const result=h.request('word-command',command)
+  assert.equal(result.ok,true);assert.equal(result.data.documentId,'A');assert.equal(result.data.revision,2)
+  assert.equal(h.toolCalls.filter(call=>call[1]==='command').length,2,'No retry or extra read/write RPC')
+  const before=h.toolCalls.length
+  for(const target of [{documentId:'B',revision:0},{documentId:'A',revision:999},{documentId:'A',revision:-1},{documentId:'A',revision:'0'},null]) assert.equal(h.request('word-command',{action:command.action,target}).ok,false)
+  assert.equal(h.toolCalls.length,before)
+  assert.equal(h.request('word-command',command,'B').ok,false)
+  const sheet=await engine({kind:'sheet',extension:'xlsx'});sheet.controls.acceptCommand=true
+  assert.equal(sheet.request('sheet-command',command).ok,false)
 })

@@ -10,7 +10,7 @@ import PresentationEffects from './components/PresentationEffects.vue'
 import WordWorkbench from './components/WordWorkbench.vue'
 import SheetWorkbench from './components/SheetWorkbench.vue'
 import type { PresentationState, PresentationAction } from './presentation/types'
-import type { WriterState, WriterAction, WriterQuery } from './word/types'
+import type { WriterState, WriterAction, WriterCommand, WriterQuery } from './word/types'
 import type { CalcState, CalcAction, CalcDataQuery } from './sheet/types'
 import type { PptxPresentation, patchPptxPackage } from './presentation/pptx-package'
 import * as native from './native'
@@ -27,7 +27,7 @@ smokeStage('app-setup', 'Vue setup reached')
 const tabs = ref<Tab[]>([]), activeKey = ref(''), home = ref(true), section = ref('home')
 const active = computed(() => tabs.value.find(t => t.key === activeKey.value))
 const officeDocument = shallowRef<OfficeDocument>(), pdfDocument = shallowRef<NativeDocument>()
-const officeEditor = ref<EditorHandle & { insertImage?(image: {name:string;base64:string}):Promise<void>; newSlide?():Promise<unknown>; smokeTest?():Promise<unknown>; getPresentationState?():Promise<PresentationState>; presentationObjectData?(query:{type:'table'|'chart';id:string}):Promise<unknown>; presentationAction?(action:PresentationAction):Promise<PresentationState>; presentationEdit?(patch:PresentationPatch):Promise<void>; getWriterState?():Promise<WriterState>; writerAction?(action:WriterAction):Promise<WriterState>; writerData?(query:WriterQuery):Promise<unknown>; getCalcState?():Promise<CalcState>; calcAction?(action:CalcAction):Promise<CalcState>; calcData?(query:CalcDataQuery):Promise<unknown> }>()
+const officeEditor = ref<EditorHandle & { insertImage?(image: {name:string;base64:string}):Promise<void>; newSlide?():Promise<unknown>; smokeTest?():Promise<unknown>; getPresentationState?():Promise<PresentationState>; presentationObjectData?(query:{type:'table'|'chart';id:string}):Promise<unknown>; presentationAction?(action:PresentationAction):Promise<PresentationState>; presentationEdit?(patch:PresentationPatch):Promise<void>; getWriterState?():Promise<WriterState>; writerAction?(action:WriterAction):Promise<WriterState>; writerCommand?(command:WriterCommand):Promise<WriterState>; writerData?(query:WriterQuery):Promise<unknown>; getCalcState?():Promise<CalcState>; calcAction?(action:CalcAction):Promise<CalcState>; calcData?(query:CalcDataQuery):Promise<unknown> }>()
 type PresentationPatch = Omit<Parameters<typeof patchPptxPackage>[1]['slides'][number], 'slideIndex'>
 const pdfEditor = ref<EditorHandle>()
 const presentationState = shallowRef<PresentationState | null>(null), presentationFeatures = shallowRef<PptxPresentation['slides'][number] | null>(null)
@@ -58,16 +58,35 @@ const kindNames: Record<Kind,string> = { word:'文字文档', sheet:'电子表�
 const icons: Record<Kind,string> = {word:'file',sheet:'sheet',presentation:'presentation',pdf:'pdf'}
 const filteredRecents = computed(() => recents.value.filter(r => r.name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase())))
 const message = (e:unknown) => e instanceof Error ? e.message : String(e)
-async function task(label:string, work:()=>Promise<void>) {
-  if (busy.value) return
+async function editorTransaction<T>(label:string, work:()=>Promise<T>):Promise<T> {
+  if (busy.value) throw Error('正在处理另一项文档操作，请等待完成。')
   error.value=''; busy.value=label
-  // A visual overlay alone leaves the iframe's keyboard focus active during exports.
-  const focused=document.activeElement
-  if(focused instanceof HTMLElement) focused.blur()
-  try { await nextTick(); await work() } catch(e) { error.value=message(e) } finally {
+  try {
+    // Native verification uses this same input barrier as user actions.
+    // Do not suppress dirty events or replace a failed revision with a newer one.
+    const focused=document.activeElement
+    if(focused instanceof HTMLElement) focused.blur()
+    await nextTick()
+    return await work()
+  } finally {
     busy.value=''
     if(pendingWindowClose) {pendingWindowClose=false;void closeWindow()}
   }
+}
+async function task(label:string, work:()=>Promise<void>) {
+  if (busy.value) return
+  try { await editorTransaction(label,work) } catch(e) { error.value=message(e) }
+}
+function nativeTransactionalEditor<T extends object>(handle:T):T {
+  return new Proxy(handle,{get(target,key,receiver){
+    const value=Reflect.get(target,key,receiver)
+    if(typeof value!=='function')return value
+    // Programmatic edits already carry their captured revision. Do not insert
+    // another focus/render await between constructing that intent and sending it.
+    // File snapshots use the same barrier as the user-facing Save command.
+    if(key!=='exportFile')return value.bind(target)
+    return (...args:unknown[])=>editorTransaction('正在验证本机文档操作',()=>value.apply(target,args))
+  }})
 }
 function dirtyFor(id:string|undefined, value:boolean) {
   const tab=tabs.value.find(t=>t.key===id)
@@ -231,6 +250,13 @@ function runWriterAction(action:WriterAction) {
     } catch(error) {wordWorkbench.value?.actionFailed?.();throw error}
   })
 }
+function runWriterCommand(command:WriterCommand) {
+  void task('正在更新文档',async()=>{
+    assertWorkbenchDrafts()
+    if(active.value?.document.kind!=='word'||!officeEditor.value?.writerCommand)throw Error('文字工作台尚未就绪。')
+    writerChanged(await officeEditor.value.writerCommand(command))
+  })
+}
 function runCalcAction(action:CalcAction) {
   void task('正在更新工作表',async()=>{
     if(active.value?.document.kind!=='sheet'||!officeEditor.value?.calcAction)throw Error('表格工作台尚未就绪。')
@@ -242,6 +268,14 @@ function runCalcAction(action:CalcAction) {
 }
 function refreshWriter() {void task('正在刷新文档属性',async()=>{if(officeEditor.value?.getWriterState)writerChanged(await officeEditor.value.getWriterState())})}
 function refreshCalc() {void task('正在刷新工作表属性',async()=>{if(officeEditor.value?.getCalcState)calcChanged(await officeEditor.value.getCalcState())})}
+async function readFreshWriterState():Promise<WriterState> {
+  const tab=active.value, handle=officeEditor.value
+  if(!tab?.ready||tab.document.kind!=='word'||!handle?.getWriterState)throw Error('文字文档尚未准备好，输入已保留。')
+  const state=await handle.getWriterState()
+  if(activeKey.value!==tab.key||officeEditor.value!==handle||state.documentId!==tab.key)throw Error('文档已切换，本次核对已取消，输入已保留。')
+  writerChanged(state)
+  return state
+}
 async function readWriterData(query:WriterQuery) {
   if(!officeEditor.value?.writerData)throw Error('文字文档尚未准备好。')
   return officeEditor.value.writerData(query)
@@ -384,7 +418,7 @@ onMounted(async()=>{
         try {
           if(!crossOriginIsolated)throw Error('Native WebView is not cross-origin isolated')
           smokeStage('office-start','creating Writer document')
-          await addDocument({id:'',kind:'word',extension:'docx',name:'Smoke.docx',base64:'',sha256:'',sizeBytes:0})
+          await editorTransaction('正在准备本机文档验证',()=>addDocument({id:'',kind:'word',extension:'docx',name:'Smoke.docx',base64:'',sha256:'',sizeBytes:0}))
           await nextTick()
           const deadline=Date.now()+240000
           while(!active.value?.ready&&Date.now()<deadline) {
@@ -394,7 +428,7 @@ onMounted(async()=>{
           if(!active.value?.ready)throw Error('Office engine readiness timed out after 240s')
           if(!officeEditor.value?.smokeTest)throw Error('Office smoke test unavailable')
           smokeStage('office-roundtrip','starting actual Writer, Calc and Impress edits')
-          const office=await officeEditor.value.smokeTest() as {impress?:{pdfBase64?:string;pdfPageCount?:number}}
+          const office=await editorTransaction('正在验证本机办公内核',()=>officeEditor.value!.smokeTest!()) as {impress?:{pdfBase64?:string;pdfPageCount?:number}}
           const presentationPdf=office.impress?.pdfBase64
           if(office.impress)delete office.impress.pdfBase64
           report.office=office
@@ -420,10 +454,10 @@ onMounted(async()=>{
           const {verifyNativeWord,verifyNativeCalc,pdfReadbackText}=await import('./office/native-workbench-smoke')
           const loadNativeWorkbench=async(kind:'word'|'sheet',base64='')=>{
             const extension=kind==='word'?'docx':'xlsx'
-            await addDocument({id:'',kind,extension,name:`Native ${kind} verification.${extension}`,base64,sha256:'',sizeBytes:Math.floor(base64.length*.75)})
+            await editorTransaction('正在验证文档保存与重新打开',()=>addDocument({id:'',kind,extension,name:`Native ${kind} verification.${extension}`,base64,sha256:'',sizeBytes:Math.floor(base64.length*.75)}))
             await nextTick();const current=active.value;if(!current)throw Error('Native document tab missing')
             await awaitReady(current)
-            return officeEditor.value!
+            return nativeTransactionalEditor(officeEditor.value!)
           }
           const inspectWorkbenchPdf=async(base64:string)=>{
             const first=await requestPdf('inspect',base64,{pageIndices:[0]})
@@ -447,10 +481,10 @@ onMounted(async()=>{
           smokeStage('presentation-workbench','starting native editor, PPTX features and player')
           const {verifyNativePresentation}=await import('./presentation/native-smoke')
           const loadNativePresentation=async(base64='')=>{
-            await addDocument({id:'',kind:'presentation',extension:'pptx',name:'Native presentation verification.pptx',base64,sha256:'',sizeBytes:Math.floor(base64.length*.75)})
+            await editorTransaction('正在验证演示文稿保存与重新打开',()=>addDocument({id:'',kind:'presentation',extension:'pptx',name:'Native presentation verification.pptx',base64,sha256:'',sizeBytes:Math.floor(base64.length*.75)}))
             await nextTick();const current=active.value;if(!current)throw Error('Native presentation tab missing')
             await awaitReady(current)
-            return officeEditor.value as unknown as Awaited<ReturnType<Parameters<typeof verifyNativePresentation>[0]['create']>>
+            return nativeTransactionalEditor(officeEditor.value!) as unknown as Awaited<ReturnType<Parameters<typeof verifyNativePresentation>[0]['create']>>
           }
           report.presentationWorkbench=await verifyNativePresentation({
             create:()=>loadNativePresentation(),reopen:base64=>loadNativePresentation(base64),
@@ -502,7 +536,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       <div class="tab-bar"><button class="home-tab" @click="home=true" aria-label="工作台"><Icon name="home" :size="18"/></button><div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div><button class="new-tab" @click="home=true" aria-label="新建文档"><Icon name="plus" :size="18"/></button></div>
       <div class="command-bar"><button @click="openFile"><Icon name="folder" :size="17"/>打开</button><span class="separator"/><button :disabled="!active?.ready" @click="save()"><Icon name="save" :size="17"/>保存</button><button :disabled="!active?.ready" @click="save(true)">另存为</button><button v-if="active?.document.kind!=='pdf'" :disabled="!active?.ready" @click="save(true,'pdf')"><Icon name="download" :size="17"/>导出 PDF</button><span class="separator"/><button :disabled="!active?.ready" @click="editCommand('undo')" title="撤销"><Icon name="undo" :size="17"/></button><button :disabled="!active?.ready" @click="editCommand('redo')" title="重做"><Icon name="redo" :size="17"/></button><template v-if="active?.document.kind==='presentation'"><span class="separator"/><button :disabled="!active?.ready" @click="newSlide" data-testid="presentation-new-slide"><Icon name="plus" :size="17"/>新建幻灯片</button><button :disabled="!active?.ready" @click="insertImage"><Icon name="image" :size="17"/>插入图片</button><button :disabled="!active?.ready" @click="previewSlides()" title="内置放映、转场与本地音视频 · F5" data-testid="presentation-preview"><Icon name="presentation" :size="17"/>预览放映</button><button :disabled="!active?.ready" @click="save(true,active.document.extension==='odp'?'pptx':'odp')" data-testid="presentation-export-alternate">导出 {{active.document.extension==='odp'?'PPTX':'ODP'}}</button></template><span class="command-spacer"/><span class="save-state"><i :class="{'dirty-dot':active?.dirty}"/>{{active?.dirty?'尚未保存':'已保存'}}</span></div>
       <div class="editor-content" :inert="!!busy">
-        <WordWorkbench v-if="officeDocument" v-show="active?.document.kind!=='pdf'" ref="wordWorkbench" :active="active?.document.kind==='word'" :state="writerState" :read-data="readWriterData" :busy="!!busy" :disabled="!active?.ready" @action="runWriterAction" @refresh="refreshWriter" @insert-image="insertImage" @draft-change="dirtyFor(activeKey,$event)">
+        <WordWorkbench v-if="officeDocument" v-show="active?.document.kind!=='pdf'" ref="wordWorkbench" :active="active?.document.kind==='word'" :state="writerState" :read-data="readWriterData" :refresh-state="readFreshWriterState" :busy="!!busy" :disabled="!active?.ready" @action="runWriterAction" @command="runWriterCommand" @refresh="refreshWriter" @insert-image="insertImage" @draft-change="dirtyFor(activeKey,$event)">
         <SheetWorkbench ref="sheetWorkbench" :active="active?.document.kind==='sheet'" :state="calcState" :read-data="readCalcData" :busy="!!busy" :disabled="!active?.ready" @action="runCalcAction" @refresh="refreshCalc" @insert-image="insertImage" @draft-change="dirtyFor(activeKey,$event)">
         <PresentationWorkbench ref="presentationWorkbench" :active="active?.document.kind==='presentation'" :state="presentationState" :read-object-data="readPresentationObject" :busy="!!busy" @action="runPresentationAction" @refresh="refreshPresentation" @insert-image="insertImage" @preview="previewSlides" @draft-change="dirtyFor(activeKey,$event)">
           <OfficeEditor ref="officeEditor" :document="officeDocument" :smoke-mode="smokeMode" @dirty="dirtyFor(officeDocument?.id,$event)" @ready="readyFor(officeDocument?.id)" @error="editorError(officeDocument?.id,$event)" @status="status=$event" @request="officeRequest" @presentation-state="presentationChanged" @presentation-features="presentationFeatures=$event" @word-state="writerChanged" @sheet-state="calcChanged"/>

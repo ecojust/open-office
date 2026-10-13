@@ -22,21 +22,26 @@ import {createApp,h,ref,shallowRef,nextTick} from 'vue';
 import OfficeEditor from '/src/components/OfficeEditor.vue';
 import {verifyNativeWord,verifyNativeCalc,pdfReadbackText} from '/src/office/native-workbench-smoke.ts';
 import {requestPdf} from '/src/pdf/protocol.ts';
-const model=shallowRef(null),editor=ref(null),status=ref('Ready');let readyWaiter,serial=0;
+const model=shallowRef(null),editor=ref(null),status=ref('Ready'),locked=ref(false);let readyWaiter,serial=0;
 async function phase(label){status.value=label;await window.qaPhase(label)}
+async function transaction(work){
+ if(locked.value)throw Error('Overlapping document transaction');locked.value=true;
+ try{const focused=document.activeElement;if(focused instanceof HTMLElement)focused.blur();await nextTick();return await work()}
+ finally{locked.value=false}
+}
 function onReady(){if(readyWaiter?.id===model.value?.id){const task=readyWaiter;readyWaiter=null;clearTimeout(task.timer);task.resolve()}}
 function onError(message){if(readyWaiter){const task=readyWaiter;readyWaiter=null;clearTimeout(task.timer);task.reject(Error(message))}void window.qaFailure(message)}
-function wrapped(){return new Proxy(editor.value,{get(target,name){const value=target[name];if(typeof value!=='function')return value;return async(...args)=>{const detail=/Action$|Data$/.test(name)?':'+args[0]?.type:name==='exportFile'?':'+args[0]?.format:'';await phase(String(name)+detail);const result=await value.apply(target,args);await phase(String(name)+detail+':complete');return result}}})}
-async function load(kind,base64=''){
+function wrapped(){return new Proxy(editor.value,{get(target,name){const value=target[name];if(typeof value!=='function')return value;return async(...args)=>{const detail=/Action$|Data$/.test(name)?':'+args[0]?.type:name==='exportFile'?':'+args[0]?.format:'';void phase(String(name)+detail);const result=await (name==='exportFile'?transaction(()=>value.apply(target,args)):value.apply(target,args));void phase(String(name)+detail+':complete');return result}}})}
+async function load(kind,base64=''){let ready;await transaction(async()=>{
  if(editor.value&&model.value){await editor.value.exportFile();await editor.value.discardChanges()}
  const id='office-contract-'+(++serial),extension=kind==='word'?'docx':'xlsx';
  await phase(kind+(base64?':reopen':':create'));
- const ready=new Promise((resolve,reject)=>{const timer=setTimeout(()=>{readyWaiter=null;reject(Error('Editor startup exceeded 240 seconds'))},240000);readyWaiter={id,resolve,reject,timer}});
+ ready=new Promise((resolve,reject)=>{const timer=setTimeout(()=>{readyWaiter=null;reject(Error('Editor startup exceeded 240 seconds'))},240000);readyWaiter={id,resolve,reject,timer}});
  model.value={id,kind,extension,name:'Native '+kind+'.'+extension,base64,sha256:'',sizeBytes:Math.floor(base64.length*.75)};
- await nextTick();await ready;return wrapped()
+ });await nextTick();await ready;return wrapped()
 }
 async function inspectPdf(base64){const first=await requestPdf('inspect',base64,{pageIndices:[0]});const pageCount=first.metadata?.pageCount||0;if(!pageCount||pageCount>20)throw Error('Unexpected PDF size');let text=pdfReadbackText(first.textBlocks||[]);for(let pageIndex=1;pageIndex<pageCount;pageIndex++){const page=await requestPdf('inspect',base64,{pageIndices:[pageIndex]});text+='\\n'+pdfReadbackText(page.textBlocks||[])}await window.qaPdfReadback({base64,pageCount,text});return {pageCount,text}}
-createApp({setup:()=>()=>[h('div',{id:'qa-status'},status.value),h('main',{class:'qa-editor'},model.value?h(OfficeEditor,{ref:editor,document:model.value,smokeMode:true,onReady,onError}):null)]}).mount('#app');
+createApp({setup:()=>()=>[h('div',{id:'qa-status'},status.value),h('main',{class:'qa-editor',inert:locked.value},model.value?h(OfficeEditor,{ref:editor,document:model.value,smokeMode:true,onReady,onError}):null)]}).mount('#app');
 window.qa={async run(){const word=await verifyNativeWord({create:()=>load('word'),reopen:base64=>load('word',base64),inspectPdf});await window.qaCapture('word-verified');await phase('word:passed');const sheet=await verifyNativeCalc({create:()=>load('sheet'),reopen:base64=>load('sheet',base64),inspectPdf});await window.qaCapture('sheet-verified');await phase('sheet:passed');return {word,sheet}}};
 `);
 

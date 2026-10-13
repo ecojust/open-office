@@ -323,8 +323,8 @@
       metadata = { styles, ...scanOutline(e), tables, review: reviewInfo(e) }; metadataRevision = revision;
       return metadata;
     }
-    function state() {
-      const e = env(), view = e.view, spacing = read(view, 'ParaLineSpacing');
+    function commandState(e = env()) {
+      const view = e.view, spacing = read(view, 'ParaLineSpacing');
       return { selection: selection(e), textStyle: { fontName: String(read(view, 'CharFontNameAsian', read(view, 'CharFontName', ''))).slice(0, 120),
         fontSize: Number(read(view, 'CharHeight', 12)), bold: Number(read(view, 'CharWeight', 100)) >= 150,
         italic: enumValue(read(view, 'CharPosture')) === enumValue(css.awt.FontSlant.ITALIC), underline: Number(read(view, 'CharUnderline', 0)) !== 0,
@@ -334,8 +334,9 @@
           rightIndent: Number(read(view, 'ParaRightMargin', 0)) / 100, firstLineIndent: Number(read(view, 'ParaFirstLineIndent', 0)) / 100,
           spaceAbove: Number(read(view, 'ParaTopMargin', 0)) / 100, spaceBelow: Number(read(view, 'ParaBottomMargin', 0)) / 100,
           lineSpacingPercent: enumValue(spacing?.Mode) === enumValue(css.style.LineSpacingMode.PROP) ? Number(spacing.Height) : 100 },
-        ...documentMetadata(e), page: pageInfo(e), message };
+        page: pageInfo(e) };
     }
+    function state() { const e = env(); return { ...commandState(e), ...documentMetadata(e), message }; }
     function cursor(env, replace = true) {
       const range = env.text.createTextCursorByRange(env.view.getStart()); range.gotoRange(env.view.getEnd(), replace); return range;
     }
@@ -499,6 +500,66 @@
       }
       return { message };
     }
+    // New immediate commands are validated and executed in one worker turn.
+    // This is not a replay of an old draft or a general rich-document CAS.
+    function command(input) {
+      record(input, ['action', 'target']);
+      const proposed = input.action, target = input.target;
+      const allowed = ['insert-text','insert-break','insert-table','format-text','format-paragraph','apply-style','set-page','set-header-footer','find-replace'];
+      if (!proposed || !allowed.includes(proposed.type) || 'expectedRevision' in proposed || 'expectedSelectionId' in proposed) throw Error('此操作不能作为即时命令执行。');
+      validateAction(proposed);
+      record(target, ['documentId','revision','selection','textStyle','paragraph','page','tables']);
+      for (const field of ['documentId','revision','selection','textStyle','paragraph','page','tables']) if (!Object.prototype.hasOwnProperty.call(target, field)) throw Error('即时命令目标不完整。');
+      text(target.documentId, 200, '文档编号', false); number(target.revision, 0, Number.MAX_SAFE_INTEGER, '文档版本', true);
+      if (JSON.stringify(target).length > 128 * 1024) throw Error('即时命令目标过大，请在画布中操作。');
+      const model = getModel(), live = commandState();
+      if (!same(model, getModel())) throw Error('即时命令的文档已切换。');
+      function equal(a, b, depth = 0) {
+        if (depth > 8) return false;
+        if (a === b) return true;
+        if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) return false;
+        const keys = Object.keys(a), other = Object.keys(b);
+        return keys.length === other.length && keys.every(key => Object.prototype.hasOwnProperty.call(b, key) && equal(a[key], b[key], depth + 1));
+      }
+      const selectionCommand = ['insert-text','insert-break','insert-table','format-text','format-paragraph','apply-style'].includes(proposed.type);
+      const requireEqual = (before, after) => { if (!equal(before, after)) throw Error('即时命令目标已改变，请在当前目标重新操作。'); };
+      if (selectionCommand) requireEqual(target.selection, live.selection);
+      if (proposed.type === 'format-text') for (const key of TEXT_STYLE) if (proposed[key] !== undefined) requireEqual(target.textStyle?.[key], live.textStyle[key]);
+      if (proposed.type === 'format-paragraph') for (const key of PARAGRAPH) if (proposed[key] !== undefined) requireEqual(target.paragraph?.[key], live.paragraph[key]);
+      if (proposed.type === 'apply-style') requireEqual(target.paragraph?.styleName, live.paragraph.styleName);
+      if (proposed.type === 'set-page') for (const key of ['styleName', ...PAGE]) requireEqual(target.page?.[key], live.page[key]);
+      if (proposed.type === 'set-header-footer') {
+        requireEqual(target.page?.styleName, live.page.styleName);
+        const enabled = proposed.target === 'header' ? 'headerEnabled' : 'footerEnabled', truncated = proposed.target === 'header' ? 'headerTruncated' : 'footerTruncated';
+        if (target.page?.[enabled] !== false || target.page?.[truncated] !== false) throw Error('已有页眉页脚需要使用有版本保护的编辑操作。');
+      }
+      // Find/replace is an explicit new query on the current document, not a
+      // replay of results captured from a prior document revision. No caller-
+      // supplied paths, regex programs or dispatch commands are accepted.
+      if (live.selection.truncated) throw Error('选区过大，请在画布中缩小选区后操作。');
+      const e = env(), actualText = previousSelection.range.getString(), actualCollapsed = e.view.isCollapsed();
+      const active = e.controller.getSelection();
+      if (!active || typeof active.getCount !== 'function' || typeof active.getByIndex !== 'function' || active.getCount() !== 1) throw Error('请在画布中选择一个文字位置，对象或多选不能使用即时文字命令。');
+      const range = active.getByIndex(0);
+      if (!range || typeof range.getText !== 'function' || !same(range.getText(), e.text)
+        || e.text.compareRegionStarts(range, e.view) !== 0 || e.text.compareRegionEnds(range, e.view) !== 0) throw Error('当前选中的是对象或另一处文字，请重新定位。');
+      if (actualText !== live.selection.text || actualCollapsed !== live.selection.collapsed) throw Error('无法确认当前文字选区。');
+      if (['insert-text','insert-break','insert-table'].includes(proposed.type) && !actualCollapsed) throw Error('即时插入要求折叠光标，请先在画布中定位。');
+      if (proposed.type === 'insert-text' && proposed.replaceSelection === true) throw Error('替换选区必须使用有版本保护的编辑操作。');
+      if (proposed.type === 'insert-table' && (live.selection.tableName !== null || !same(e.text, e.model.getText()))) throw Error('请先把光标移到表格外。');
+      if (proposed.type === 'set-page' || proposed.type === 'set-header-footer') {
+        const actualName = e.view.getPropertyValue('PageStyleName'), style = e.model.getStyleFamilies().getByName('PageStyles').getByName(actualName);
+        if (actualName !== live.page.styleName) throw Error('当前页面样式已改变。');
+        if (proposed.type === 'set-header-footer') {
+          const prefix = proposed.target === 'header' ? 'Header' : 'Footer';
+          // Do not treat an optional/fallback display value as proof that an
+          // existing native content section is disabled.
+          const enabled = style.getPropertyValue(`${prefix}IsOn`);
+          if (enabled !== false || proposed.enabled !== true || (proposed.target === 'header' ? live.page.headerTruncated : live.page.footerTruncated)) throw Error('已有页眉页脚需要使用有版本保护的编辑操作。');
+        }
+      }
+      return action({ ...proposed, expectedSelectionId: live.selection.id });
+    }
     function data(query) {
       record(query, ['type', 'name']); choice(query.type, ['table'], '数据查询'); text(query.name, 200, '表格名称', false);
       const table = tableByName(env(), query.name), { rows, columns } = dimensions(table), grid = cellGrid(table, rows, columns);
@@ -517,6 +578,6 @@
       while (cellBaselines.size > 512) cellBaselines.delete(cellBaselines.keys().next().value);
       return { name: query.name, tableId, rows, columns, cells, cellSignatures };
     }
-    return Object.freeze({ state, action, applyTableSnapshot: input => applyTableSnapshot(input, true), data, validateAction, allowedTypes: new Set(ACTIONS) });
+    return Object.freeze({ state, action, command, applyTableSnapshot: input => applyTableSnapshot(input, true), data, validateAction, allowedTypes: new Set(ACTIONS) });
   };
 })(globalThis);

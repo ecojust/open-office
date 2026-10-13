@@ -1,7 +1,21 @@
-const PHASES = new Set(['office-start','office-roundtrip','pdf-roundtrip','word-workbench','sheet-workbench','presentation-workbench','ipc-smoke-report','office-host:request','office-host:reply']);
-const ACTIONS = new Set(['open','export','discard','mark-saved','smoke-test','word-state','word-action','word-data','sheet-state','sheet-action','sheet-data','presentation-state','presentation-action','presentation-object-data','preview-presentation']);
+const PHASES = new Set(['office-start','office-roundtrip','pdf-roundtrip','word-workbench','sheet-workbench','presentation-workbench','ipc-smoke-report','office-host:request','office-host:reply','office-host:dirty']);
+const ACTIONS = new Set(['open','export','discard','mark-saved','smoke-test','word-state','word-action','word-command','word-data','sheet-state','sheet-action','sheet-data','presentation-state','presentation-action','presentation-object-data','preview-presentation','dirty']);
+const KINDS = new Set(['word','sheet','presentation']);
+const TYPES = new Set(['insert-text','insert-break','insert-table','set-page','set-header-footer','find-replace','apply-style','format-text','update-table','rename-sheet','add-sheet','select-sheet','select-range','set-matrix','set-cell','patch-cells','format','sort','freeze','insert-chart','insert-pivot','filter','clear-filter']);
 const PLATFORM = new Set(['windows-x64','macos-arm64','macos-x64']);
 const CONFLICT = '文档在导出后又有修改，已保留内容。请重新保存或明确放弃修改。';
+const FAILURES = new Map([
+  [CONFLICT, 'export-revision-conflict'],
+  ['文档已变化，请刷新工作台后再操作。', 'stale-workbench-revision'],
+  ['当前文档有未保存修改。请先保存，或明确放弃修改后再切换。', 'unsaved-document-open'],
+  ['请先保存或放弃当前文档修改，再打开其他文档。', 'unsaved-editor-open'],
+  ['操作等待超时，文档仍保留在编辑器中。', 'engine-request-timeout'],
+  ['即时命令目标已改变，请在当前目标重新操作。', 'immediate-command-target-changed'],
+  ['请在画布中选择一个文字位置，对象或多选不能使用即时文字命令。', 'immediate-command-nontext-selection'],
+  ['当前选中的是对象或另一处文字，请重新定位。', 'immediate-command-range-mismatch'],
+  ['无法确认当前文字选区。', 'immediate-command-unverified-selection'],
+  ['已有页眉页脚需要使用有版本保护的编辑操作。', 'immediate-command-existing-header-footer'],
+]);
 const finite = value => Number.isSafeInteger(value) && value >= 0 && value <= 86400000 ? value : null;
 
 // Only fixed identifiers, booleans and bounded numbers leave this function.
@@ -18,7 +32,11 @@ export function nativeReportSummary(report) {
       if (!detail || !ACTIONS.has(detail.action)) continue;
       item.action = detail.action;
       if (typeof detail.ok === 'boolean') item.ok = detail.ok;
-      if (detail.error === CONFLICT) item.failure = 'export-revision-conflict';
+      if (typeof detail.dirty === 'boolean') item.dirty = detail.dirty;
+      if (KINDS.has(detail.kind)) item.kind = detail.kind;
+      if (TYPES.has(detail.type)) item.type = detail.type;
+      for (const name of ['revision','expectedRevision']) if (Number.isSafeInteger(detail[name]) && detail[name] >= 0 && detail[name] <= 1000000000) item[name] = detail[name];
+      if (FAILURES.has(detail.error)) item.failure = FAILURES.get(detail.error);
     } else item.complete = event.detail === 'complete';
     events.push(item);
   }
@@ -31,6 +49,6 @@ export function nativeReportSummary(report) {
     runId: typeof report.runId === 'string' && /^\d{1,20}$/.test(report.runId) ? report.runId : null,
     ok: report.ok === true, durationMs: finite(report.durationMs),
     process: { exitCode: Number.isInteger(report.process?.exitCode) && Math.abs(report.process.exitCode) <= 255 ? report.process.exitCode : null, timedOut: report.process?.timedOut === true },
-    failure: frontend.error === CONFLICT ? 'export-revision-conflict' : frontend.error ? 'other' : null,
+    failure: FAILURES.get(frontend.error) || (frontend.error ? 'other' : null),
     groups, events: events.slice(-80), rawDetailsOmitted: true };
 }

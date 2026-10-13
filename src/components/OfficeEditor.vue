@@ -4,7 +4,7 @@ import { OfficeBridge } from '../office/bridge'
 import { PresentationSession } from '../presentation/session'
 import { base64ToBytes, bytesToBase64 } from '../shared/document'
 import type { PresentationState, PresentationAction } from '../presentation/types'
-import type { WriterState, WriterAction, WriterQuery } from '../word/types'
+import type { WriterState, WriterAction, WriterCommand, WriterQuery } from '../word/types'
 import type { CalcState, CalcAction, CalcDataQuery } from '../sheet/types'
 import type { patchPptxPackage } from '../presentation/pptx-package'
 import type { OfficeDocument, OfficeEvent, OfficeExportRequest, OfficeExportResult, OfficeNativeRequest } from '../office/types'
@@ -150,7 +150,7 @@ const search = (query = '') => command('search', { query })
 const insertImage = (image: { name: string; base64: string }) => command('insert-image', image)
 const presentationObjectData = (query:{type:'table'|'chart';id:string}) => command('presentation-object-data', query)
 const newSlide = () => presentationAction({ type: 'add-page' })
-async function toolRequest<T>(kind: 'word' | 'sheet', operation: 'state' | 'action' | 'data', data: unknown = {}): Promise<T> {
+async function toolRequest<T>(kind: 'word' | 'sheet', operation: 'state' | 'action' | 'data' | 'command', data: unknown = {}): Promise<T> {
   if (!bridge || !loaded || loaded.kind !== kind || loaded.id !== props.document.id) throw Error('请先打开对应的文档。')
   if (operation !== 'state' && (loading.value || problem.value)) throw Error('请等待文档成功打开后再操作。')
   const id = loaded.id, client = bridge, token = generation
@@ -173,6 +173,13 @@ async function writerAction(action: WriterAction) {
   await opening
   if (props.document.id !== id || generation !== token) throw Error('文档已切换，旧的编辑操作已取消。')
   const state = await toolRequest<WriterState>('word', 'action', action)
+  emit('word-state', state); return state
+}
+async function writerCommand(input: WriterCommand) {
+  const id = props.document.id, token = generation
+  await opening
+  if (props.document.id !== id || generation !== token) throw Error('文档已切换，旧的即时命令已取消。')
+  const state = await toolRequest<WriterState>('word', 'command', input)
   emit('word-state', state); return state
 }
 async function calcAction(action: CalcAction) {
@@ -231,7 +238,7 @@ function retry(force = false) {
 onMounted(() => { startBridge(); queueLoad(props.document) })
 watch(() => props.document.id, () => queueLoad(props.document))
 onBeforeUnmount(() => { disposed = true; generation++; clearTimeout(refreshTimer); bridge?.dispose(); if (frame.value) frame.value.src = 'about:blank' })
-defineExpose({ exportFile, markSaved, discardChanges, loadDocument, undo, redo, search, insertImage, newSlide, presentationObjectData, getPresentationState, presentationAction, presentationEdit, getWriterState, writerAction, writerData, getCalcState, calcAction, calcData, smokeTest, retry, focus: () => command('focus') })
+defineExpose({ exportFile, markSaved, discardChanges, loadDocument, undo, redo, search, insertImage, newSlide, presentationObjectData, getPresentationState, presentationAction, presentationEdit, getWriterState, writerAction, writerCommand, writerData, getCalcState, calcAction, calcData, smokeTest, retry, focus: () => command('focus') })
 </script>
 
 <template>
