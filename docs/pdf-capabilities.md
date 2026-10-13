@@ -2,7 +2,7 @@
 
 本页描述本仓库的 PDF 编辑器，不能据此宣称与 Microsoft 365 或 Adobe Acrobat 全功能一致。PDF 是固定版式文件格式，Microsoft 365 中最相关的参照是 Word 的 PDF 导入转换，以及各 Office 应用的 PDF 导出。
 
-本页包含开发中 0.4.0 的新增能力，版本仍在验证，尚未发布。下列能力按具体文件操作验收；浏览器、PDF 后端和桌面安装包是不同的验证层级。
+本页描述[已公开发布的 0.4.0 测试版](https://github.com/ecojust/open-office/releases/tag/desktop-v0.4.0-38348938454)（prerelease）。下列能力按具体文件操作验收；浏览器、PDF 后端和桌面安装包是不同的验证层级。
 
 ## 与 Word PDF 编辑的区别
 
@@ -44,9 +44,9 @@ Microsoft 官方说明：Word 打开 PDF 时会生成副本，将内容转换成
 
 `tests/browser/pdf-ui.cjs` 通过真实 Vue 按钮调用本地 PyMuPDF，验证书签跳转、页码和撤销/重做、水印保存与独立回读，再执行既有 PDF 编辑、保存、密码和小窗口回归。报告默认写入 `test-results/pdf-ui/`，复跑会覆盖该路径，引用时须核对运行版本与实际状态；浏览器验证不代替每个平台安装包中的原生对话框验证。
 
-开发提交 `293e484` 的 Windows 完整原生检查包括 PDF 中英文原文替换和独立重新读取，并读取 Writer／Calc／Impress 导出的 PDF。该检查不等同于在 Windows 上完整执行上述每一项 PDF UI 用例，也不能外推到后续提交或尚未完成验收的 macOS 包。
+发布提交 `4788fec61d97d45bd8627e7fd7e3a4fa3bbcbe21` 的[构建 38348938454](https://github.com/ecojust/open-office/actions/runs/38348938454) 全部通过：Windows 与 Apple Silicon 最终应用、同一原封 Intel DMG 的 Rosetta 运行均完成真实 GUI 验收，包括 PDF 中英文原文替换、独立重新读取，以及 Writer／Calc／Impress 导出 PDF 的检查。原生门槛不等同于在每个平台完整执行上述所有 PDF UI 用例；Rosetta 通过也不是物理 Intel GPU 实测。
 
-当前候选的无探针 Word／Calc helper 已通过独立 PDF 回读；本轮完整测试中的 28 项真实 Python PDF 测试也已通过。这不替代当前候选的完整 UI 复测和三平台安装包验收。
+同一发布提交的无探针 Word／Calc helper、独立 PDF 回读和最终完整中文 UI 均通过；UI 为 10 项检查，页面错误与 HTTP 失败为 0。完整测试通过 242 项 Node 回归和 28 项真实 Python PDF 测试。以上记录仅覆盖列明的样例，不能称为 Microsoft 365 或 Acrobat 全功能兼容。
 
 ## 官方资料
 

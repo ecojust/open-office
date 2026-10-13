@@ -4,7 +4,7 @@
 
 文字、表格和演示提供中文工作台，编辑实际文档对象并保存到 DOCX、XLSX、PPTX；不需要外部 Office 软件。与 Microsoft 365 的逐项差距见 [Word／Excel 功能对照](docs/word-excel-365-parity.md)及 [PowerPoint 功能对照](docs/powerpoint-365-parity.md)。本项目采用独立内置路线，尚未完成全部功能对齐。
 
-**版本状态：**本页描述开发中的 0.4.0，尚未发布；新增功能正在完成各平台安装包验证。已有版本请以 Releases 的版本说明为准。指定样例通过，不表示任意文档、全部 Office 功能或后续代码版本已通过兼容验证。
+**版本状态：**[0.4.0 测试版已公开发布](https://github.com/ecojust/open-office/releases/tag/desktop-v0.4.0-38348938454)（prerelease），提供 Windows x64、macOS Apple Silicon 和 Intel 安装包。指定样例通过，不表示任意文档、全部 Office 功能或后续代码版本已通过兼容验证。
 
 ## 当前实现范围
 
@@ -49,7 +49,7 @@ PDF 的页码和水印可以应用到全部页面或指定页面，修改后可�
 
 ## 获取安装包
 
-在 [GitHub Releases](https://github.com/ecojust/open-office/releases) 下载对应平台：
+在 [0.4.0 测试版发布页](https://github.com/ecojust/open-office/releases/tag/desktop-v0.4.0-38348938454) 下载对应平台：
 
 - Windows x64 安装程序。
 - macOS Apple Silicon（M 系列）DMG。
@@ -92,9 +92,9 @@ npm run desktop:build
 
 通过 GitHub Actions 的 Desktop release 工作流可在 Windows x64、Apple Silicon 和 Intel 三种原生构建机上生成对应安装包。发布前必须实际启动应用，确认隔离环境与 SharedArrayBuffer 可用，再执行 Writer 原文修改后保存重开、Calc 公式往返、Impress 两页幻灯片修改后分别保存重开 PPTX/ODP，以及 PDF 中文原文替换后的重开检查。Impress 还须实际导出 PDF，由独立 PDF 内核回读确认两页；不能只凭文件存在或导出成功标志判定通过。任何一种安装包未通过时不发布。文档往返、PDF 导出与静态预览检查不等于原生动画放映或所有 PowerPoint 特性的兼容验证。
 
-0.4.0 还增加 Word 格式、语义标题、表格和页眉页脚的两次 DOCX 往返，以及 Calc 数据类型、公式重算、排序／冻结、图表来源、透视配置和筛选的两次 XLSX 往返；两者导出的 PDF 由独立内核读回。开发提交 `293e484` 的 Windows 安装包已通过当次完整原生检查；此结果仅属于该提交和 Windows 环境。后续修改及 macOS 包仍须完成对应验收，不能据此宣布 0.4.0 已发布。
+0.4.0 测试版对应提交 `4788fec61d97d45bd8627e7fd7e3a4fa3bbcbe21`，[构建与发布记录 38348938454](https://github.com/ecojust/open-office/actions/runs/38348938454) 全部通过。Word 格式、语义标题、表格和页眉页脚完成两次 DOCX 往返；Calc 数据类型、公式重算、排序／冻结、图表来源、透视配置和筛选完成两次 XLSX 往返；两者导出的 PDF 由独立内核读回。Windows 与 Apple Silicon 最终安装应用的真实 GUI 检查，以及原封 Intel DMG 的 Rosetta GUI 检查均通过。
 
-当前候选已通过无探针的 Word／Calc 同 helper 验证、独立 PDF 回读和发布报告校验。完整 UI 的 10 项通过记录属于上一版代码，本次命令接线仍待完整 UI 复测及三平台原生验收。
+同一发布提交还通过无探针的 Word／Calc 同 helper 验证、独立 PDF 回读和发布报告校验；最终完整中文 UI 的 10 项检查通过，页面错误与 HTTP 失败均为 0。完整测试通过 242 项 Node 回归和 28 项真实 Python PDF 测试。这些结果验证指定样例，不等于 Microsoft 365 双向互验或完整功能对齐。
 
 Windows 与 Apple Silicon 包在对应架构上运行上述检查。Intel 包保留原生构建、PDF 引擎测试、x86_64 架构与严格签名检查；由于 GitHub Intel 虚拟机的原生 WebGL 图形环境不可用，完整界面检查使用同一次构建的原封 Intel DMG，在 Apple Silicon macOS 15 上通过 Rosetta 运行真实 x64 App 与 PDF 进程。搬运前后校验 DMG 摘要、App 全部文件、符号链接和签名，不重建、不换成 ARM 包。报告分别记录目标架构、宿主架构与执行模式。**这不等同于已在真实 Intel GPU 上实测**，也不保证所有显卡、系统版本或复杂文档均兼容。
 

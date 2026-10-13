@@ -6,7 +6,7 @@
 
 目标分别为 **Microsoft 365 Word / Excel for Windows 桌面版**、**Microsoft 365 Word / Excel for Mac 桌面版**。Office 2024 永久版、网页版、移动版不是同一个功能集合。不能仅写“最新版”作为验收版本：实际互验须登记应用完整版本/构建、更新频道、操作系统、CPU、语言/区域、字体与许可。版本来源为微软的 [Windows 更新历史][windows-history]、[Mac 更新历史][mac-history]；本轮没有安装或运行微软 Office，也没有完成微软端的双向互验。
 
-此前已发布基线为 **Open Office 0.3.0**，提交 `a7553c8d1f79f6140a67e87ee6191aafd4b8e6bd`，[三平台构建记录][baseline-run]。本文的当前实现范围按**开发中的 0.4.0** 更新；0.4.0 尚未发布。引擎是随包 ZetaOffice / LibreOffice 24.2.8.0 WASM；原生桥负责本地文件和 PDF 进程。已有 LibreOffice 菜单、UNO 方法、能看到导入结果，均不等于对应 Microsoft 功能已兼容。
+本文按**已公开发布的 [Open Office 0.4.0 测试版][release-040]**（prerelease）说明当前实现范围。安装包对应提交 `4788fec61d97d45bd8627e7fd7e3a4fa3bbcbe21`，[构建与发布记录 38348938454][release-run] 全部通过；后续纯文档更新不改变这些安装包的源码提交。引擎是随包 ZetaOffice / LibreOffice 24.2.8.0 WASM；原生桥负责本地文件和 PDF 进程。已有 LibreOffice 菜单、UNO 方法、能看到导入结果，均不等于对应 Microsoft 功能已兼容。
 
 | 状态 | 本文的准确含义 |
 | --- | --- |
@@ -17,9 +17,9 @@
 
 下表及后面的功能矩阵区分 0.4.0 已实现、部分支持和未完成的范围。实现新按钮、通过类型检查或通过报告合同单测，都不能直接升级为真实文档通过。所有“有限已验”项目的 **Microsoft 原版打开→编辑→保存→本应用再次打开** 仍待验证；“严格对齐 Microsoft 365”仍是目标，不能写成已完成。
 
-### 0.4.0 开发中的新增证据
+### 0.4.0 测试版的验证证据
 
-以下记录开发阶段已完成的指定样例，报告路径会在复跑时更新；它们不是对任意后续提交的自动认证。最终发布以对应提交重新执行的结果为准。
+以下区分功能专项、最终完整 UI 和安装包验收。它们验证列明的样例，不是对任意文档或后续提交的自动认证。默认本地报告路径会在复跑时覆盖，固定发布证据以本页列明的提交与构建记录为准。
 
 `tests/browser/writer-workbench.cjs` 完整回归已在真实 Chromium + 随包 WASM 中通过：中英文原文编辑、字符和段落样式、Heading 1、查找替换、表格单元格、页边距/页眉页脚/页码、批注、脚注、目录、修订设置及记录。测试执行 110 次连续状态读取，确认 revision/dirty 不变，并验证 DOCX 与 ODT 保存重开后的标题、格式和表格仍可读；证据为 `test-results/writer-workbench/report.json`。这些是对应样例的浏览器/内核结果，不是微软 Word 双向互验，也不替代新版三平台安装包验证。
 
@@ -33,25 +33,25 @@ Writer 增量专项及最新完整回归还验证批注导航/删除，以及接
 
 该次真实结果覆盖 Word 的语义标题、字符样式、表格第二次修改、页边距和页眉页脚，两次 DOCX 重开及独立读回 1 页 PDF；Calc 覆盖两次 XLSX 重开、文字 `00123` / `=SUM(9,9)` 类型保持、公式重算、排序/冻结、唯一柱形图的真实来源、透视字段源索引与 SUM、筛选首存保留及二存清除，并独立读回 3 页 PDF。PDF 按原始页/块/行合并字体片段再比对文字，保留旧文字标记的拒绝检查。**这是与原生发布共用 helper 的浏览器证据，不能单独代表安装包或微软 Office 互验结果。**
 
-此前开发提交 `293e484` 的 Windows 安装包通过完整原生检查，包含当时的 Word／Calc 工作台和已有 PPT／PDF 检查。它只证明该提交在 Windows WebView2 中的指定样例；后续修改不继承此验证结果，当前候选的三平台安装包仍待验证。最终发布需记录届时实际通过的提交和构建，不以历史成功记录代替。
+[发布构建 38348938454][release-run] 已完成 Windows x64 与 Apple Silicon 最终安装应用的真实 GUI 验收，包含 Word／Calc 工作台及已有 PPT／PDF 门槛。Intel 包在原生 x64 构建机通过构建、签名与文件清单检查，再将同一原封 DMG 送至 Apple Silicon macOS 15，经 Rosetta 运行真实 x64 App 和 PDF 进程并通过完整 GUI 门槛；发布任务随后成功。三个安装包均对应 `4788fec61d97d45bd8627e7fd7e3a4fa3bbcbe21`，但这不等同于物理 Intel GPU 验证。
 
 图表及透视字段的内部名称不是跨格式稳定标识：真实 XLSX 往返中，嵌入图表名称可变为 `Object 1`，透视数据字段的显示标题也可带汇总前缀。验收因此要求唯一真实图表及准确的来源范围、类型、行列表头；透视字段按实际源列索引、独立读回的源表头、方向与汇总函数共同确认，同时保留真实显示名，不以名称相同或对象存在作为通过依据。
 
 滚动视口冻结的实际专项已通过，证据为 `test-results/calc-freeze/report.json`：先从 Writer 切到 Calc，将视口及选区滚到 `Z100`，再分别冻结首行、首列、2 列/3 行及取消冻结。真实状态与独立 XLSX `xSplit/ySplit` 分别为 `0/1`、`1/0`、`2/3`、无冻结；标题区域显示正确，主体视口与 `Z100` 选区保持，同值操作不增加 revision。此专项补足首屏冻结样例覆盖不到的滚动边界，不替代完整中文 App 链路。
 
-上一版代码的完整中文 App UI 曾通过 10 项检查，`errors=[]`、`httpFailures=[]`，默认报告路径为 `test-results/word-sheet-ui/report.json`。该次覆盖 Writer 中文正文、同值页面提交、页眉和表格编辑及 DOCX XML 读回；Calc 覆盖带类型单格修改保持 SUM 并重算为 43、选区 `A5:B5` 冻结首行后仍保持且 XLSX `ySplit=1`、图表和透视表保存，以及 Calc→PDF→Calc→PPT 切换时保留同一个 iframe。当前目标命令的新接线仍须重新完成整条 UI 回归，不能将上一版记录视为本次通过。
+发布提交 `4788fec61d97d45bd8627e7fd7e3a4fa3bbcbe21` 的最终完整中文 App UI 已通过 10 项检查，`ok=true`、`errors=[]`、`httpFailures=[]`，报告默认写入 `test-results/word-sheet-ui/report.json`。实际覆盖 Writer 中文正文、同值页面提交、页眉和表格编辑及 DOCX XML 读回；Calc 覆盖带类型单格修改保持 SUM 并重算为 43、选区 `A5:B5` 冻结首行后仍保持且 XLSX `ySplit=1`、图表和透视表保存，以及 Calc→PDF→Calc→PPT 切换时保留同一个 iframe。
 
-显式草稿复核与恢复流程另有 10 项 Node 回归及真实 Vue、受控状态的负例通过。**此前完整 WASM UI 运行没有自然触发晚到版本冲突，因此不能将它写成真实内核已走过该恢复分支的证据。**当前无探针 helper 已通过，完整 UI 与最终各平台安装包仍须独立完成验收。
+显式草稿复核与恢复流程另有 10 项 Node 回归及真实 Vue、受控状态的负例通过。这些负例与完整 UI 是不同的覆盖范围，不能据此宣称完整 WASM UI 已自然触发晚到版本冲突并走过恢复分支。无探针 helper、完整 UI 和各平台安装包的通过记录也不扩大这一分支的验证范围。
 
-| 0.4.0 新增入口/合同 | 实现范围 | 已有样例证据与候选版本边界 |
+| 0.4.0 新增入口/合同 | 实现范围 | 指定样例证据与兼容边界 |
 | --- | --- | --- |
 | Word 字符与段落 | 字体/字号/粗斜体/下划线/颜色/高亮，段落对齐/缩进/间距/行距，语义样式与标题导航 | 最新完整真实 Writer 样例、只读状态压力及 DOCX/ODT 往返通过；并非任意复杂文档格式已等价 |
 | Word 页面 | 页面尺寸/方向/边距，页眉页脚与页码字段，分页/分段/换行 | 首轮实际样例通过；并非任意多节、奇偶页或复杂浮动版式已等价 |
 | Word 表格与查替 | 新建矩形表格、原单元格读写；普通大小写/整词搜索、单次/全部替换 | 首轮真实引擎与改单格保留其他格样式专项通过；合并单元格、嵌套表格与 Word 通配符不由此覆盖 |
 | Word 参考资料 | 脚注/尾注、目录生成/更新、标题导航 | 首轮脚注/目录样例通过；题注/交叉引用/书目不包含在该证明中 |
 | Word 审阅 | 批注创建/导航/删除，修订开关与显示、接受/拒绝当前选择或全部更改 | 首轮与新增专项实际通过，包括部分选区接受后的 DOCX 修订标记检查；尚不代表现代线程批注/共同创作 |
-| Word 草稿保护 | 编辑草稿绑定文档、revision 与 selection；截断内容提示，阻止未应用草稿被保存/切页掩盖 | 显式复核/恢复有 Node 与受控 Vue 负例；上一版完整 UI 通过但未自然触发晚到恢复分支，当前接线完整 UI 待复测 |
-| Calc 工作表与数据 | 新建/复制/命名/重排/隐藏/删除；选区、矩阵写入、带类型单元格 patch、行列操作与大小 | 真实样例、XLSX/ODS 往返及当前无探针 helper 通过；上一版中文 App UI 有通过记录，当前候选完整 UI 与各平台安装包仍须验收 |
+| Word 草稿保护 | 编辑草稿绑定文档、revision 与 selection；截断内容提示，阻止未应用草稿被保存/切页掩盖 | 最终完整 UI 通过；显式复核/恢复另有 Node 与受控 Vue 负例，不冒充完整 WASM UI 已自然触发晚到恢复分支 |
+| Calc 工作表与数据 | 新建/复制/命名/重排/隐藏/删除；选区、矩阵写入、带类型单元格 patch、行列操作与大小 | 真实样例、XLSX/ODS 往返、无探针 helper、最终中文 App UI 与所列平台原生门槛通过；未覆盖组合仍单独验收 |
 | Calc 类型保护 | `number` / `text` / `formula` / `empty` 明确写入，只改编辑过的单元格，保留原公式、前导零与公式外观的普通文字 | 公式外观文字及制表/换行的 XLSX/ODS 样例通过；同发布 helper 的 `00123` 与 `=SUM(9,9)` 两次 XLSX 保存重开均为 text |
 | Calc 样式、排序与冻结 | 字体/颜色/对齐/折行/数字格式、合并、行高列宽；按指定列排序并保留表头、冻结行列 | 完整 XLSX/ODS 样例通过；另通过 Writer 切换后滚至 Z100 的首行/首列/双轴/取消冻结专项，实际状态与 XLSX XML 一致 |
 | Calc 持久筛选 | 使用实际 DatabaseRange 保存筛选条件，读回规则，清理筛选时清除规则；不是仅临时隐藏行 | 实际 XLSX autoFilter 与同 helper 的首存条件重开、二存清除后不复活均通过 |
@@ -59,9 +59,9 @@ Writer 增量专项及最新完整回归还验证批注导航/删除，以及接
 | Calc 图表与透视表 | 四种基本图表、真实单元格来源；透视行字段/数据字段及 sum/count/average，删除/刷新入口 | 柱形图来源/类型/表头与 SUM 透视配置、实际聚合及 XLSX/ODS 往返通过；字段显示名修复经同 helper 实际两次 XLSX 重开验证，其余图表类型/汇总组合不由此全覆盖 |
 | PDF 配套改进 | 书签导航、页码、半透明文字水印、现有撤销重做与保存流程 | 独立记录于 [PDF 能力说明](pdf-capabilities.md)，不能算 Word/Excel 分页或对象兼容性证明 |
 
-完整验证使用 `test:browser:sheet`、`test:browser:word`、`test:browser:office-ui`、`test:browser:office-native-contract`。其中前两者验证真实 UNO/文件往返，UI runner 验证中文工作台与永久编辑器实例，最后一个直接运行发布所用的相同 helper。当前无探针 helper 已通过，完整 UI 及最终三平台安装包仍须完成当前候选验收。默认报告路径会被复跑覆盖，须结合对应提交、运行时间和最终状态引用，不能仅按目录名称认定通过。`test:browser:workbench-drafts` 是有意义的轻量草稿/过期状态合同回归，**不加载 WASM，因此不作为文档功能通过证据**。
+完整验证使用 `test:browser:sheet`、`test:browser:word`、`test:browser:office-ui`、`test:browser:office-native-contract`。其中前两者验证真实 UNO/文件往返，UI runner 验证中文工作台与永久编辑器实例，最后一个直接运行发布所用的相同 helper。0.4.0 发布提交的无探针 helper、完整 UI 和三平台安装包门槛均已通过，Intel 的运行环境按上文明确为 Rosetta。默认报告路径会被复跑覆盖，须结合对应提交、运行时间和最终状态引用，不能仅按目录名称认定通过。`test:browser:workbench-drafts` 是有意义的轻量草稿/过期状态合同回归，**不加载 WASM，因此不作为文档功能通过证据**。
 
-本轮完整测试通过 242 项 Node 回归和 28 项真实 Python PDF 测试；开发阶段另有 Rust 检查与正式前端构建的通过记录。这些检查不替代最终安装应用的实际操作；最终测试数量及结果以对应发布提交的报告为准。中文 App 跨类型 UI、滚动冻结专项与同发布 helper 的浏览器证据见上文；0.4.0 尚未发布，各平台原生包分别记录验收结果。
+0.4.0 发布提交的完整测试通过 242 项 Node 回归和 28 项真实 Python PDF 测试，发布构建中的 Rust 检查、前端构建及各平台原生门槛也已通过。中文 App 跨类型 UI、滚动冻结专项与同发布 helper 的浏览器证据见上文。该版本已作为公开测试版发布；这些结果不替代 Microsoft 原版互验，也不保证任意复杂文档无损兼容。
 
 ## Word：本地核心编辑与版式
 
@@ -138,7 +138,7 @@ Writer 增量专项及最新完整回归还验证批注导航/删除，以及接
 | Office Add-ins | 微软的 JavaScript 扩展平台覆盖多个 Office 客户端，但 API requirement sets 与宿主支持不同。[平台说明][office-addins] | 未接入 Office.js 宿主；普通网页 iframe 或自定义插件接口不能算 Microsoft 加载项兼容 |
 | Office Scripts | 有 Windows、Mac、Web 的平台/版本、许可和联网要求，脚本与 Power Automate/云存储联动；不是 VBA 的离线替代。[平台限制][office-scripts-limits] | 未接入；本产品内部 JS 自动化不宣称与 Office Scripts 等价 |
 
-Windows 与 macOS 的字体度量、系统打印、输入法、快捷键、文件授权及 WebView 行为也必须分别测试。已发布基线的 Intel 安装包采用 Apple Silicon Rosetta 验证，0.4.0 仍需独立完成同一路径验收；**Rosetta 通过不是 Intel 实机 GPU/字体/打印全部通过**。
+Windows 与 macOS 的字体度量、系统打印、输入法、快捷键、文件授权及 WebView 行为也必须分别测试。0.4.0 的原封 Intel 安装包已在 Apple Silicon 上经 Rosetta 完成实际 x64 GUI 验收；**Rosetta 通过不是 Intel 实机 GPU/字体/打印全部通过**。
 
 ## 云服务与账号功能
 
@@ -164,7 +164,7 @@ Windows 与 macOS 的字体度量、系统打印、输入法、快捷键、文�
 5. **门槛负例**：测试缺失工作台报告、错文本/错单元格、样式退化、图表被图像代替、第二次保存丢失、旧报告伪 `ok:true` 均拒绝发布。原生报告仅包含生成的固定样例和必要结构化结果，不包含用户文档。
 6. **原版互验另建记录**：在真实 Microsoft 365 Windows 与 Mac 环境，用固定样例做双向保存、对象编辑、公式重算、分页与打印比较。记录实际支持及差异，不在没有安装 Office 的环境里宣称完成。
 
-0.4.0 元数据与回归入口已准备；软件版本号本身不增加兼容性证明。新增对象 API、真实回归、三平台最终应用与 Microsoft 原版互验分别记账，按实际结果逐项更新。
+0.4.0 测试版已发布；软件版本号本身不增加兼容性证明。新增对象 API、真实回归、三平台最终应用与 Microsoft 原版互验分别记账，按实际结果逐项更新。
 
 ## 官方来源
 
@@ -172,7 +172,8 @@ Windows 与 macOS 的字体度量、系统打印、输入法、快捷键、文�
 
 [windows-history]: https://learn.microsoft.com/en-us/officeupdates/update-history-microsoft365-apps-by-date
 [mac-history]: https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac
-[baseline-run]: https://github.com/ecojust/open-office/actions/runs/38333312954
+[release-040]: https://github.com/ecojust/open-office/releases/tag/desktop-v0.4.0-38348938454
+[release-run]: https://github.com/ecojust/open-office/actions/runs/38348938454
 [word-home]: https://support.microsoft.com/en-us/word/
 [word-section]: https://support.microsoft.com/en-us/word/insert-a-section-break
 [word-accessibility]: https://support.microsoft.com/en-us/accessibility/word/accessibility-tools-for-word
