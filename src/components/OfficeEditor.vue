@@ -4,12 +4,14 @@ import { OfficeBridge } from '../office/bridge'
 import { PresentationSession } from '../presentation/session'
 import { base64ToBytes, bytesToBase64 } from '../shared/document'
 import type { PresentationState, PresentationAction } from '../presentation/types'
+import type { WriterState, WriterAction, WriterQuery } from '../word/types'
+import type { CalcState, CalcAction, CalcDataQuery } from '../sheet/types'
 import type { patchPptxPackage } from '../presentation/pptx-package'
 import type { OfficeDocument, OfficeEvent, OfficeExportRequest, OfficeExportResult, OfficeNativeRequest } from '../office/types'
 
 const props = defineProps<{ document: OfficeDocument; smokeMode?: boolean }>()
 const emit = defineEmits<{
-  dirty: [value: boolean]; ready: []; error: [message: string]; status: [message: string]; request: [request: OfficeNativeRequest]; 'presentation-state': [state: PresentationState]; 'presentation-features': [slide: ReturnType<PresentationSession['slide']>]
+  dirty: [value: boolean]; ready: []; error: [message: string]; status: [message: string]; request: [request: OfficeNativeRequest]; 'presentation-state': [state: PresentationState]; 'presentation-features': [slide: ReturnType<PresentationSession['slide']>]; 'word-state': [state: WriterState]; 'sheet-state': [state: CalcState]
 }>()
 const frame = ref<HTMLIFrameElement>()
 const loading = ref(true), problem = ref(''), status = ref('正在准备完整办公编辑器'), progress = ref(0)
@@ -19,10 +21,25 @@ let loaded: OfficeDocument | null = null, savedExport: { id: string; revision: n
 let opening: Promise<void> = Promise.resolve()
 let presentation = new PresentationSession(), presentationState: PresentationState | null = null
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
+let refreshRunning = false, refreshQueued = false
 function emitFeatures() { emit('presentation-features', presentationState ? presentation.slide(presentationState.currentPage.id) : null) }
-function schedulePresentationRefresh() {
+function scheduleWorkbenchRefresh() {
   clearTimeout(refreshTimer)
-  if (loaded?.kind === 'presentation') refreshTimer = setTimeout(() => { void getPresentationState().catch(error => emit('status', error instanceof Error ? error.message : String(error))) }, 400)
+  if (loaded && !disposed) refreshTimer = setTimeout(() => { void refreshWorkbench() }, 400)
+}
+async function refreshWorkbench() {
+  if (!loaded || disposed) return
+  if (refreshRunning) { refreshQueued = true; return }
+  refreshRunning = true
+  const id = loaded.id, token = generation
+  try {
+    await (loaded.kind === 'presentation' ? getPresentationState() : loaded.kind === 'word' ? getWriterState() : getCalcState())
+  } catch (error) {
+    if (!disposed && generation === token && loaded?.id === id) emit('status', error instanceof Error ? error.message : String(error))
+  } finally {
+    refreshRunning = false
+    if (refreshQueued) { refreshQueued = false; scheduleWorkbenchRefresh() }
+  }
 }
 function reportError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
@@ -34,8 +51,8 @@ function eventReceived(event: OfficeEvent) {
     status.value = event.data.text; progress.value = Math.max(progress.value, event.data.percent || 0)
     emit('status', status.value)
   } else if (event.event === 'dirty') {
-    dirty.value = !!event.data.dirty || presentation.dirty; emit('dirty', dirty.value); schedulePresentationRefresh()
-  } else if (event.event === 'presentation-changed') schedulePresentationRefresh()
+    dirty.value = !!event.data.dirty || presentation.dirty; emit('dirty', dirty.value); scheduleWorkbenchRefresh()
+  } else if (event.event === 'presentation-changed' || event.event === 'workbench-changed') scheduleWorkbenchRefresh()
   else if (event.event === 'native-request') emit('request', event.data)
   else if (event.event === 'error') reportError(event.error)
 }
@@ -63,6 +80,9 @@ async function loadDocument(document: OfficeDocument, options: { discard?: boole
       if (disposed || token !== generation || bridge !== client) return
       await presentation.open(document.extension === 'pptx' && document.base64 ? base64ToBytes(document.base64) : null, state)
       presentationState = state; emit('presentation-state', state); emitFeatures()
+    } else {
+      await (document.kind === 'word' ? getWriterState() : getCalcState())
+      if (disposed || token !== generation || bridge !== client) return
     }
     dirty.value = false; loading.value = false; progress.value = 100
     status.value = '完整编辑器已就绪 · 文件仅在本机处理'
@@ -94,61 +114,108 @@ async function exportFile(options: OfficeExportRequest = {}): Promise<OfficeExpo
 }
 async function markSaved() {
   if (!bridge || !loaded || !savedExport || savedExport.id !== loaded.id || loaded.id !== props.document.id) return
-  const id = loaded.id, client = bridge
-  const result = await client.request<{ dirty: boolean }>('mark-saved', { revision: savedExport.revision }, id)
-  if (bridge !== client || loaded?.id !== id || props.document.id !== id) return
-  presentation.markSaved(savedExport.featureRevision)
-  dirty.value = result.dirty || presentation.dirty; emit('dirty', dirty.value)
+  const id = loaded.id, client = bridge, token = generation, source = presentation, exported = savedExport
+  const result = await client.request<{ dirty: boolean }>('mark-saved', { revision: exported.revision }, id)
+  if (disposed || generation !== token || bridge !== client || loaded?.id !== id || props.document.id !== id || presentation !== source) return
+  source.markSaved(exported.featureRevision)
+  dirty.value = result.dirty || source.dirty; emit('dirty', dirty.value)
 }
 async function discardChanges(options: { force?: boolean } = {}) {
   if (!bridge || !loaded) return
   if (loaded.id !== props.document.id) throw Error('当前标签未成功打开，不能放弃其他文档的修改。')
-  const id = loaded.id, client = bridge
-  if (!options.force && (!savedExport || savedExport.id !== id)) throw Error('请先导出当前内容，再切换文档；放弃修改需要明确确认。')
-  if (!options.force && savedExport?.featureRevision !== presentation.revision) throw Error('演示效果已改变，请重新导出后再切换。')
-  await client.request('discard', { revision: savedExport?.revision, force: options.force === true }, id)
-  if (bridge !== client || loaded?.id !== id || props.document.id !== id) return
-  presentation.discard(); dirty.value = false; emit('dirty', false)
+  const id = loaded.id, client = bridge, token = generation, source = presentation, exported = savedExport, featureRevision = source.revision
+  if (!options.force && (!exported || exported.id !== id)) throw Error('请先导出当前内容，再切换文档；放弃修改需要明确确认。')
+  if (!options.force && exported?.featureRevision !== featureRevision) throw Error('演示效果已改变，请重新导出后再切换。')
+  await client.request('discard', { revision: exported?.revision, force: options.force === true }, id)
+  if (disposed || generation !== token || bridge !== client || loaded?.id !== id || props.document.id !== id || presentation !== source) throw Error('文档已切换，旧的放弃操作已取消。')
+  if (source.revision !== featureRevision) throw Error('演示效果已改变，已保留新修改。请重新导出后再切换。')
+  source.discard(); dirty.value = false; emit('dirty', false)
 }
 async function command(action: string, data = {}) {
+  const id = props.document.id, token = generation
   await opening
+  if (disposed || generation !== token || props.document.id !== id) throw Error('文档已切换，旧的编辑操作已取消。')
   if (!bridge || !loaded || loading.value) return
-  if (loaded.id !== props.document.id || problem.value) throw Error('当前标签未成功打开，已阻止操作其他文档。')
-  try { return await bridge.request(action, data, loaded.id) }
-  catch (error) { emit('error', error instanceof Error ? error.message : String(error)); throw error }
+  if (loaded.id !== id || problem.value) throw Error('当前标签未成功打开，已阻止操作其他文档。')
+  const client = bridge
+  const current = () => !disposed && generation === token && bridge === client && loaded?.id === id && props.document.id === id
+  try {
+    const result = await client.request(action, data, id)
+    if (!current()) throw Error('文档已切换，旧的编辑响应已丢弃。')
+    return result
+  } catch (error) { if (current()) emit('error', error instanceof Error ? error.message : String(error)); throw error }
 }
 const undo = () => command('undo'), redo = () => command('redo')
 const search = (query = '') => command('search', { query })
 const insertImage = (image: { name: string; base64: string }) => command('insert-image', image)
 const presentationObjectData = (query:{type:'table'|'chart';id:string}) => command('presentation-object-data', query)
 const newSlide = () => presentationAction({ type: 'add-page' })
+async function toolRequest<T>(kind: 'word' | 'sheet', operation: 'state' | 'action' | 'data', data: unknown = {}): Promise<T> {
+  if (!bridge || !loaded || loaded.kind !== kind || loaded.id !== props.document.id) throw Error('请先打开对应的文档。')
+  if (operation !== 'state' && (loading.value || problem.value)) throw Error('请等待文档成功打开后再操作。')
+  const id = loaded.id, client = bridge, token = generation
+  const result = await client.request<T>(`${kind}-${operation}`, data, id)
+  if (disposed || generation !== token || bridge !== client || loaded?.id !== id || props.document.id !== id) throw Error('文档已切换，旧的工作台响应已丢弃。')
+  const state = result as {documentId?:string;revision?:number;dirty?:boolean} | null
+  if (!state || state.documentId !== id || !Number.isSafeInteger(state.revision) || (state.revision as number) < 0 || (operation !== 'data' && typeof state.dirty !== 'boolean')) throw Error('工作台返回的文档版本无效，已忽略响应。')
+  return result
+}
+async function getWriterState() {
+  const state = await toolRequest<WriterState>('word', 'state')
+  emit('word-state', state); return state
+}
+async function getCalcState() {
+  const state = await toolRequest<CalcState>('sheet', 'state')
+  emit('sheet-state', state); return state
+}
+async function writerAction(action: WriterAction) {
+  const id = props.document.id, token = generation
+  await opening
+  if (props.document.id !== id || generation !== token) throw Error('文档已切换，旧的编辑操作已取消。')
+  const state = await toolRequest<WriterState>('word', 'action', action)
+  emit('word-state', state); return state
+}
+async function calcAction(action: CalcAction) {
+  const id = props.document.id, token = generation
+  await opening
+  if (props.document.id !== id || generation !== token) throw Error('文档已切换，旧的编辑操作已取消。')
+  const state = await toolRequest<CalcState>('sheet', 'action', action)
+  emit('sheet-state', state); return state
+}
+const writerData = (query: WriterQuery) => toolRequest<unknown>('word', 'data', query)
+const calcData = (query: CalcDataQuery) => toolRequest<unknown>('sheet', 'data', query)
 async function getPresentationState(): Promise<PresentationState> {
   if (!bridge || !loaded || loaded.kind !== 'presentation') throw Error('请先打开演示文稿。')
-  const id = loaded.id, client = bridge
+  const id = loaded.id, client = bridge, token = generation
   const state = await client.request<PresentationState>('presentation-state', {}, id)
-  if (disposed || loaded?.id !== id || bridge !== client || props.document.id !== id) throw Error('文档已切换，旧的幻灯片状态已丢弃。')
+  if (disposed || generation !== token || loaded?.id !== id || bridge !== client || props.document.id !== id) throw Error('文档已切换，旧的幻灯片状态已丢弃。')
   presentationState = state; emit('presentation-state', state); emitFeatures()
   return state
 }
 async function presentationAction(action: PresentationAction) {
+  const id = props.document.id, token = generation, source = presentation
   const before = await getPresentationState()
+  if (disposed || generation !== token || props.document.id !== id || presentation !== source) throw Error('文档已切换，旧的幻灯片操作已取消。')
   const origin = before.pages.find(page => page.index === ('pageIndex' in action ? action.pageIndex : before.currentPageIndex))
   const result = await command('presentation-action', action) as PresentationState | undefined
   if (!result) throw Error('演示文稿未准备好。')
+  if (disposed || generation !== token || props.document.id !== id || presentation !== source) throw Error('文档已切换，旧的幻灯片响应已丢弃。')
   if (action.type === 'duplicate-page' && origin) {
     const added = result.pages.find(page => !before.pages.some(old => old.id === page.id))
-    if (added) presentation.duplicate(origin.id, added.id)
+    if (added) source.duplicate(origin.id, added.id)
   }
   presentationState = result; emit('presentation-state', result); emitFeatures()
   return result
 }
 async function presentationEdit(patch: Omit<Parameters<typeof patchPptxPackage>[1]['slides'][number], 'slideIndex'>) {
+  const id = props.document.id, token = generation
   if (loaded?.extension !== 'pptx') throw Error('请先导出并打开 PPTX 文件，再编辑转场和媒体。')
   const before = await getPresentationState(), source = presentation
   const exported = await exportFile({format: 'pptx'})
   const state = await getPresentationState()
-  if (presentation !== source || state.documentId !== before.documentId || state.currentPage.id !== before.currentPage.id || state.revision !== exported.revision) throw Error('更新效果期间幻灯片发生变化，请在目标页面重试。')
+  if (generation !== token || presentation !== source || state.documentId !== before.documentId || state.currentPage.id !== before.currentPage.id || state.revision !== exported.revision) throw Error('更新效果期间幻灯片发生变化，请在目标页面重试。')
   await source.edit(base64ToBytes(exported.base64), state, state.currentPage.id, patch)
+  if (disposed || generation !== token || loaded?.id !== id || props.document.id !== id || presentation !== source) throw Error('文档已切换，旧的演示效果响应已丢弃。')
   dirty.value = true; savedExport = null; emit('dirty', true); emitFeatures()
 }
 async function smokeTest() {
@@ -164,7 +231,7 @@ function retry(force = false) {
 onMounted(() => { startBridge(); queueLoad(props.document) })
 watch(() => props.document.id, () => queueLoad(props.document))
 onBeforeUnmount(() => { disposed = true; generation++; clearTimeout(refreshTimer); bridge?.dispose(); if (frame.value) frame.value.src = 'about:blank' })
-defineExpose({ exportFile, markSaved, discardChanges, loadDocument, undo, redo, search, insertImage, newSlide, presentationObjectData, getPresentationState, presentationAction, presentationEdit, smokeTest, retry, focus: () => command('focus') })
+defineExpose({ exportFile, markSaved, discardChanges, loadDocument, undo, redo, search, insertImage, newSlide, presentationObjectData, getPresentationState, presentationAction, presentationEdit, getWriterState, writerAction, writerData, getCalcState, calcAction, calcData, smokeTest, retry, focus: () => command('focus') })
 </script>
 
 <template>

@@ -25,6 +25,45 @@ function requireCheck(value, message) {
   assert.ok(value, message);
 }
 
+export function validateOfficeWorkbenches(report) {
+  const word = report.wordWorkbench;
+  requireCheck(word?.schemaVersion === 1 && word.ok === true && word.reopenCount === 2, 'Word workbench did not complete both real DOCX reopenings');
+  requireCheck(word.heading === 'Native Word heading 中文' && word.body === 'Native body SECOND_SAVE_TOKEN 正文', 'Word workbench original text or second edit did not persist');
+  requireCheck(word.textStyle?.bold === true && word.textStyle.fontSize === 18 && word.textStyle.color === '#203A5D' && word.textStyle.outlineLevel === 1, 'Word workbench lost its semantic heading or text formatting');
+  requireCheck(word.table?.rows === 2 && word.table.columns === 2
+    && JSON.stringify(word.table.cells) === JSON.stringify([['项目', '值'], ['Native edited table', '84']]), 'Word workbench table is missing or its second edit was lost');
+  for (const [name, value] of Object.entries({ left: 20, right: 20, top: 18, bottom: 18 })) {
+    requireCheck(typeof word.margins?.[name] === 'number' && Number.isFinite(word.margins[name]) && Math.abs(word.margins[name] - value) < .05, 'Word workbench page margins did not survive saving');
+  }
+  requireCheck(typeof word.headerText === 'string' && word.headerText.includes('Native header 页眉')
+    && typeof word.footerText === 'string' && word.footerText.includes('Native footer 页脚'), 'Word workbench headers/footers did not reopen');
+  for (const key of ['docxBytes', 'pdfBytes']) requireCheck(Number.isSafeInteger(word[key]) && word[key] > 100, 'Word workbench exported no real document');
+  requireCheck(word.pdfTextVerified === true && Number.isSafeInteger(word.pdfPageCount) && word.pdfPageCount >= 1, 'Word workbench independent PDF readback failed');
+
+  const sheet = report.sheetWorkbench;
+  requireCheck(sheet?.schemaVersion === 1 && sheet.ok === true && sheet.reopenCount === 2, 'Calc workbench did not complete both real XLSX reopenings');
+  requireCheck(JSON.stringify(sheet.sheetNames) === JSON.stringify(['Native data 中文', 'Native summary']), 'Calc workbench sheet names or order did not persist');
+  requireCheck(JSON.stringify(sheet.sortedMatrix) === JSON.stringify([['地区', '销量', '成本'], ['南', 24, 8], ['北', 18, 6], ['北', 12, 5]]), 'Calc workbench sorted data differs from the original worksheet');
+  requireCheck(sheet.formula === '=SUM(G1:G2)' && JSON.stringify(sheet.values) === '[41,2,43]', 'Calc workbench second edit did not recalculate and persist');
+  requireCheck(JSON.stringify(sheet.typedCells?.values) === JSON.stringify(['00123', '=SUM(9,9)']) && JSON.stringify(sheet.typedCells?.types) === '["text","text"]', 'Calc workbench typed text became a number or formula');
+  requireCheck(sheet.savedFilter?.enabled === true && sheet.savedFilter.header === true && Array.isArray(sheet.savedFilter.fields) && sheet.savedFilter.fields.length === 1
+    && sheet.savedFilter.fields[0]?.column === 0 && sheet.savedFilter.fields[0]?.operator === 'equal' && sheet.savedFilter.fields[0]?.value === '北', 'Calc workbench saved filter criteria did not reopen');
+  requireCheck(sheet.clearedFilter === null || (sheet.clearedFilter?.enabled === false && Array.isArray(sheet.clearedFilter.fields) && sheet.clearedFilter.fields.length === 0), 'Calc workbench cleared filter returned after saving');
+  requireCheck(sheet.headerFormat?.bold === true && sheet.headerFormat.textColor === '#203A5D', 'Calc workbench header formatting did not reopen');
+  requireCheck(sheet.frozen?.rows === 1 && sheet.frozen.columns === 1, 'Calc workbench frozen panes did not reopen');
+  const rangeMatches = (range, endColumn) => range && range.sheetIndex === 0 && range.startColumn === 0 && range.startRow === 0 && range.endColumn === endColumn && range.endRow === 3;
+  requireCheck(sheet.chartCount === 1 && typeof sheet.chart?.name === 'string' && sheet.chart.name.trim() && sheet.chart.chartType === 'column' && sheet.chart.headerRow === true && sheet.chart.headerColumn === true
+    && Array.isArray(sheet.chart.ranges) && sheet.chart.ranges.some(range => rangeMatches(range, 1)), 'Calc workbench editable chart/source did not reopen');
+  requireCheck(sheet.pivot?.name === 'NativeSalesPivot' && rangeMatches(sheet.pivot.source, 2) && sheet.pivot.output?.sheetIndex === 1
+    && Array.isArray(sheet.pivot.fields) && sheet.pivot.fields.some(field => field.index === 0 && typeof field.name === 'string' && field.name.trim() && field.orientation === 'row')
+    && sheet.pivot.fields.some(field => field.index === 1 && typeof field.name === 'string' && field.name.trim() && field.orientation === 'data' && field.operation === 'sum'), 'Calc workbench pivot source or field semantics did not reopen');
+  for (const key of ['xlsxBytes', 'pdfBytes']) requireCheck(Number.isSafeInteger(sheet[key]) && sheet[key] > 100, 'Calc workbench exported no real workbook');
+  requireCheck(sheet.pdfTextVerified === true && Number.isSafeInteger(sheet.pdfPageCount) && sheet.pdfPageCount >= 1, 'Calc workbench independent PDF readback failed');
+  return { wordWorkbenchSecondSave: true, wordEditableTable: true, wordTextAndPageFormatting: true,
+    wordIndependentPdfReadback: true, calcWorkbenchSecondSave: true, calcEditableChart: true, calcPivotSemantics: true,
+    calcSortAndFreeze: true, calcTypedTextPreserved: true, calcFilterPersistence: true, calcIndependentPdfReadback: true };
+}
+
 export function selectExecution(platformId, target, hostPlatform, hostArch, allowRosetta) {
   const configuration = PLATFORMS[platformId];
   requireCheck(configuration, 'OPEN_OFFICE_PLATFORM_ID must be windows-x64, macos-x64, or macos-arm64');
@@ -157,8 +196,10 @@ export function validateFrontendReport(report) {
   requireCheck(workbench.editableTable === true && workbench.editableChart === true, 'Presentation workbench lost editable embedded objects');
   requireCheck(workbench.transition === 'fade' && workbench.mediaBytes === 3244 && typeof workbench.mediaDuration === 'number' && Math.abs(workbench.mediaDuration - .2) < .05, 'Presentation workbench transition or native media metadata failed');
   requireCheck(JSON.stringify(workbench.pdfCanvasPages) === '[0,1]', 'Presentation workbench actual canvas navigation failed');
+  const officeWorkbenchChecks = validateOfficeWorkbenches(report);
 
   return {
+    ...officeWorkbenchChecks,
     presentationWorkbenchRoundTrip: true, presentationMediaMetadata: true, presentationCanvasNavigation: true,
     crossOriginIsolated: true, sharedArrayBuffer: true, writerOriginalTextRoundTrip: true,
     writerPdfExport: true, calcFormulaRoundTrip: true, calcPdfExport: true,

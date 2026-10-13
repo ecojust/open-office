@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | ZetaOffice / LibreOffice WASM | 24.2.8.0；核心构建 `efaf0670b4d055f838a2849becb10f08aa06a257` | LibreOffice 的 MPL-2.0、LGPL-3.0 及各文件许可；完整上游法律文档保留在 `LIBREOFFICE-THIRD-PARTY-LICENSES.html`。WASM 与 Qt 静态组合还包含下述 GPL 代码。 |
 | Qt 5 / QtBase WASM 分支 | `5.15.2+wasm` | **WASM 平台插件采用 GPL 第 3 版**，并保留 Qt 原文规定的后续版本选项；不能仅以 Qt 其他部分的 LGPL 掩盖该要求。插件原文见 `QT-WASM-LICENSE-HEADER.txt`，全文见 `GPL-3.0.txt`。其余组件仍按各文件许可。 |
-| zeta.js | v1.2.0，提交 `57360bcb0e7726ffa0e66567c8041261b959f8dd` | MIT，Copyright © 2024 allotropia software GmbH and contributors。本地存在一处 `getSingleton` 返回值转换修复，差异保存在 `zetajs-local-change.patch`。 |
+| zeta.js | v1.2.0，提交 `57360bcb0e7726ffa0e66567c8041261b959f8dd` | MIT，Copyright © 2024 allotropia software GmbH and contributors。本地修复 `getSingleton` 返回值转换，并补充 UNO `TYPEDEF` 别名递归解析（含异常路径的类型描述句柄释放）；完整差异保存在 `zetajs-local-change.patch`，上游版权与许可保持不变。 |
 | Emscripten | allotropia `fixed-3.1.65`，提交 `949ee1d40467b80e90a9fdc67155d443426fef2d` | MIT / University of Illinois NCSA 双许可及内含库各自许可；见 `EMSCRIPTEN-LICENSE.txt`。 |
 | PyMuPDF | 1.28.2 | 采用免费开源的 GNU AGPL 第 3 版授权。Artifex 的商业授权是另一条独立授权途径，本项目不使用该途径。完整原文来自此版本官方 sdist 的 `COPYING`，见 `AGPL-3.0.txt`。 |
 | MuPDF | 1.28.2，与 PyMuPDF 实测版本一致 | GNU AGPL 第 3 版；其第三方源代码、字体和编解码库另保留各自许可，见 `mupdf/`。PyMuPDF 的源码压缩包**不包含** MuPDF 全部 C/C++ 源码，因此源码下载脚本单独包含 MuPDF 完整源码包。 |

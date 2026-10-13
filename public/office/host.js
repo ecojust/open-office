@@ -8,7 +8,8 @@ const adapterBase = new URL('./', location.href).href;
 let port, activeDocumentId = '', activeDocumentKind = '', disposed = false, fileCounter = 0;
 const pending = new Map();
 const allowed = new Set(['open','export','undo','redo','search','mark-saved','discard','focus','insert-image',
-  'new-slide','preview-presentation','presentation-state','presentation-action','presentation-object-data']);
+  'new-slide','preview-presentation','presentation-state','presentation-action','presentation-object-data',
+  'word-state','word-action','word-data','sheet-state','sheet-action','sheet-data']);
 const smokeMode = new URLSearchParams(location.search).get('smoke') === '1';
 if (smokeMode) allowed.add('smoke-test');
 const send = (message) => { if (!disposed) parent.postMessage({ channel: CHANNEL, session, ...message }, location.origin); };
@@ -241,7 +242,7 @@ async function start() {
   smokeDiagnostic('font-ready', { bytes: font.byteLength });
   window.Module = {
     canvas,
-    uno_scripts: [new URL('zeta.js', adapterBase).href, new URL('presentation-objects.js', adapterBase).href, new URL('office-worker.js', adapterBase).href],
+    uno_scripts: ['zeta.js', 'presentation-objects.js', 'writer-tools.js', 'calc-tools.js', 'office-worker.js'].map(name => new URL(name, adapterBase).href),
     locateFile: path => new URL(path, runtimeBase).href,
     mainScriptUrlOrBlob: new Blob([`importScripts(${JSON.stringify(new URL('soffice.js', runtimeBase).href)});`], { type: 'application/javascript' }),
     preRun: [() => {

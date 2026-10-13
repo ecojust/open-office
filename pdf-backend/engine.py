@@ -28,6 +28,7 @@ MAX_TEXT_BLOCKS = 6_000
 OPERATIONS = {
     'inspect', 'new', 'replace_text', 'add_text', 'add_image', 'highlight',
     'ink', 'rotate', 'delete', 'reorder', 'extract', 'merge',
+    'page_numbers', 'watermark',
 }
 
 
@@ -175,9 +176,14 @@ def metadata(doc, context):
         box = bounds(page)
         pages.append({'index': index, 'width': box.width, 'height': box.height,
                       'rotation': page.rotation, 'mediaBox': list(page.mediabox), 'cropBox': list(page.cropbox)})
+    # Read only local page destinations. URI / remote-file actions are never executed.
+    outline = []
+    for level, title, destination, action in doc.get_toc(simple=False)[:2000]:
+        outline.append({'level': min(max(int(level), 1), 20), 'title': str(title)[:500],
+                        'pageIndex': destination - 1 if action.get('kind') == pymupdf.LINK_GOTO and 1 <= destination <= doc.page_count else None})
     return {'pageCount': doc.page_count, 'encrypted': context['encrypted'], 'needsPassword': False,
             'signed': signed, 'signatureFields': fields, 'authenticatedAs': context['authenticatedAs'],
-            'permissions': context['permissions'], 'pages': pages}
+            'permissions': context['permissions'], 'pages': pages, 'outline': outline}
 
 
 def text_blocks(doc, options, permitted=True):
@@ -344,6 +350,65 @@ def output_document(doc, context, options, warnings):
             'textBlocks': text_blocks(doc, {}, context['permissions']['copy']), 'warnings': warnings}
 
 
+def stamp_pages(doc, options, operation):
+    selected = indices(options.get('pageIndices', list(range(doc.page_count))), doc.page_count)
+    watermark = operation == 'watermark'
+    size = number(options.get('fontSize', 44 if watermark else 10), '字号', 8, 144 if watermark else 32)
+    rgb = color(options.get('color'), (0.35, 0.39, 0.46))
+    opacity = number(options.get('opacity', 0.16 if watermark else 1), '不透明度', 0.05, 0.8 if watermark else 1)
+    text = options.get('text', '草稿') if watermark else ''
+    if watermark and (not isinstance(text, str) or not text.strip() or len(text) > 120
+                      or any(ord(char) < 32 for char in text)):
+        fail('INVALID_OPTIONS', '水印需要 1 至 120 个字符的单行文字。')
+    style = options.get('format', 'number-total')
+    if not watermark and style not in ('number', 'number-total', 'chinese'):
+        fail('INVALID_OPTIONS', '未知的页码格式。')
+    position = options.get('position', 'bottom-center')
+    if not watermark and position not in ('bottom-left', 'bottom-center', 'bottom-right', 'top-left', 'top-center', 'top-right'):
+        fail('INVALID_OPTIONS', '请选择页码在页眉或页脚的位置。')
+    # Work in displayed page coordinates, then map the overlay back through /Rotate.
+    # This preserves original content, CropBox, page rotation, links and annotations.
+    font = pymupdf.Font('cjk')
+    overlay = pymupdf.open()
+    try:
+        for index in selected:
+            page = doc[index]
+            width, height = page.rect.width, page.rect.height
+            stamp = overlay.new_page(width=width, height=height)
+            stamp.insert_font(fontname='StampCJK', fontbuffer=font.buffer)
+            if watermark:
+                value = text.strip()
+                region = pymupdf.Rect(18, max(0, height / 2 - size * 0.7), width - 18, min(height, height / 2 + size * 1.8))
+                align = 1
+            else:
+                value = str(index + 1) if style == 'number' else (f'第 {index + 1} 页 / 共 {doc.page_count} 页' if style == 'chinese' else f'{index + 1} / {doc.page_count}')
+                top = 16 if position.startswith('top') else height - 16 - size * 1.6
+                region = pymupdf.Rect(18, top, width - 18, top + size * 1.6)
+                align = {'left': 0, 'center': 1, 'right': 2}[position.split('-')[1]]
+            if region.is_empty or region.y0 < 0 or region.y1 > height:
+                fail('TEXT_OVERFLOW', '页面过小，无法放置所选字号的页码或水印。请减小字号。')
+            # Keep stamps to a single line; overflow rejects the entire transaction.
+            if font.text_length(value, fontsize=size) > region.width:
+                fail('TEXT_OVERFLOW', '页码或水印过长，无法完整放入页面。请缩短文字或减小字号。')
+            if stamp.insert_textbox(region, value, fontname='StampCJK', fontsize=size, align=align,
+                                    color=rgb, fill_opacity=opacity) < -0.01:
+                fail('TEXT_OVERFLOW', '所选字号无法完整放入页面。请减小字号。')
+        # MuPDF's graft map records source xref bounds on first import: finish
+        # constructing the overlay document before importing any of its pages.
+        for overlay_index, index in enumerate(selected):
+            page = doc[index]
+            rotation = page.rotation
+            # show_pdf_page's coordinate transform on a rotated CropBox includes
+            # different offsets. Insert in its unrotated space, then restore /Rotate.
+            try:
+                page.set_rotation(0)
+                page.show_pdf_page(bounds(page), overlay, overlay_index, rotate=rotation, overlay=True)
+            finally:
+                page.set_rotation(rotation)
+    finally:
+        overlay.close()
+
+
 def new_context():
     return {'encrypted': False, 'authenticatedAs': 'none',
             'permissions': {k: True for k in ('edit', 'modify', 'annotate', 'assemble', 'copy', 'print')}}
@@ -399,7 +464,9 @@ def process(request):
                 return {**response, 'ok': True, 'metadata': metadata(doc, context),
                         'textBlocks': text_blocks(doc, options, context['permissions']['copy'])}
             warnings = authorize(doc, context, operation, options)
-            if operation in ('replace_text', 'add_text', 'add_image', 'highlight', 'ink'):
+            if operation in ('page_numbers', 'watermark'):
+                stamp_pages(doc, options, operation)
+            elif operation in ('replace_text', 'add_text', 'add_image', 'highlight', 'ink'):
                 page = doc[page_index(options, doc.page_count)]
                 if operation in ('replace_text', 'add_text'):
                     write_text(page, options, operation == 'replace_text')

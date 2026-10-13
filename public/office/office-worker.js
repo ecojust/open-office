@@ -17,6 +17,10 @@ Module.zetajs.then(zetajs => {
   let current = null, outputCounter = 0;
   const presentationObjects = typeof createPresentationObjects === 'function'
     ? createPresentationObjects({ zetajs, css, getModel: () => current?.model }) : null;
+  const toolContext = { zetajs, css, getModel: () => current?.model, getRevision: () => current?.revision ?? 0,
+    dispatch: (command, args = []) => helper.executeDispatch(current.frame, command, '', 0, args) };
+  const writerTools = typeof createWriterTools === 'function' ? createWriterTools(toolContext) : null;
+  const calcTools = typeof createCalcTools === 'function' ? createCalcTools(toolContext) : null;
   const presentationLayouts = new Set([0, 1, 3, 12, 14, 15, 16, 18, 19, 20, 32, 34]);
 
   function describe(error) {
@@ -104,22 +108,21 @@ Module.zetajs.then(zetajs => {
     document.interceptor = interceptor; document.frame = frame; document.delegates = delegates;
   }
   function reportDirty(document) { send({ event: 'dirty', documentId: document.id, data: { dirty: document.dirty, revision: document.revision } }); }
-  function reportPresentationChanged(document) {
-    if (current === document && document.kind === 'presentation') send({ event: 'presentation-changed', documentId: document.id });
+  function reportWorkbenchChanged(document) {
+    if (current === document) send({ event: document.kind === 'presentation' ? 'presentation-changed' : 'workbench-changed', documentId: document.id });
   }
-  function listenPresentation(document) {
-    if (document.kind !== 'presentation') return;
+  function listenWorkbench(document) {
     const controller = document.model.getCurrentController();
     document.controller = controller;
     try {
       document.selectionListener = zetajs.unoObject([css.view.XSelectionChangeListener], {
-        selectionChanged() { reportPresentationChanged(document); }, disposing() {},
+        selectionChanged() { reportWorkbenchChanged(document); }, disposing() {},
       });
       controller.addSelectionChangeListener(document.selectionListener);
     } catch (error) { recoverOptional(error); document.selectionListener = null; }
-    try {
+    if (document.kind === 'presentation') try {
       document.pageListener = zetajs.unoObject([css.beans.XPropertyChangeListener], {
-        propertyChange() { reportPresentationChanged(document); }, disposing() {},
+        propertyChange() { reportWorkbenchChanged(document); }, disposing() {},
       });
       controller.addPropertyChangeListener('CurrentPage', document.pageListener);
     } catch (error) { recoverOptional(error); document.pageListener = null; }
@@ -166,7 +169,7 @@ Module.zetajs.then(zetajs => {
       });
       model.addModifyListener(document.listener);
       installInterception(document);
-      listenPresentation(document);
+      listenWorkbench(document);
       const previous = current;
       closeDocument(previous);
       current = document;
@@ -403,7 +406,7 @@ Module.zetajs.then(zetajs => {
       }
       default: throw Error('不支持的演示文稿操作。');
     }
-    reportPresentationChanged(current);
+    reportWorkbenchChanged(current);
     return presentationState();
   }
   function smokeTest() {
@@ -495,6 +498,31 @@ Module.zetajs.then(zetajs => {
     if (message.action === 'open') return open(message.data);
     if (!current || message.documentId !== current.id) throw Error('当前文档已经切换，旧操作已取消。');
     if (message.action === 'smoke-test') return smokeTest();
+    if (/^(word|sheet)-(state|action|data)$/.test(message.action)) {
+      const [kind, operation] = message.action.split('-');
+      if (current.kind !== kind) throw Error('此操作与当前文档类型不匹配。');
+      const tools = kind === 'word' ? writerTools : calcTools;
+      if (!tools) throw Error('中文文档工具未载入，请重新启动编辑器。');
+      if (operation === 'data') {
+        const data = tools.data(message.data);
+        // The data and its revision belong to this one worker request. A
+        // debounced toolbar refresh may still show an older document version.
+        return { ...data, documentId: current.id, revision: current.revision };
+      }
+      if (operation === 'action') {
+        const action = message.data;
+        if (!action || typeof action !== 'object' || Array.isArray(action) || typeof action.type !== 'string') throw Error('编辑请求无效。');
+        if ('expectedRevision' in action && (!Number.isSafeInteger(action.expectedRevision) || action.expectedRevision < 0)) throw Error('文档版本无效，请重新读取后再操作。');
+        if ('expectedRevision' in action && action.expectedRevision !== current.revision) {
+          // A named table read can outlive a delayed native Modify event. Only
+          // Writer's dedicated compare-and-swap preflight may apply that edit;
+          // a caller-supplied expectedCells key alone never bypasses the guard.
+          if (action.expectedRevision > current.revision || kind !== 'word' || action.type !== 'update-table' || typeof tools.applyTableSnapshot !== 'function') throw Error('文档已变化，请刷新工作台后再操作。');
+          tools.applyTableSnapshot(action);
+        } else tools.action(action);
+      }
+      return { ...tools.state(), documentId: current.id, revision: current.revision, dirty: current.model.isModified() };
+    }
     if (message.action === 'presentation-state') return presentationState();
     if (message.action === 'presentation-action') return presentationAction(message.data);
     if (message.action === 'presentation-object-data') {

@@ -77,6 +77,14 @@ const allowSignedCopy = ref(false)
 const signedSource = ref(false)
 const copyRequired = ref(false)
 const showPages = ref(true)
+const sidebarTab = ref<'pages' | 'outline'>('pages')
+const outline = ref<{ level: number; title: string; pageIndex: number | null }[]>([])
+const stampMode = ref<'page_numbers' | 'watermark' | null>(null)
+const stampDialog = ref<HTMLFormElement | null>(null)
+const stampScope = ref<'all' | 'selected'>('all')
+const stampText = ref('草稿'), stampSize = ref(44), stampOpacity = ref(16), stampColor = ref('#647080')
+const stampFormat = ref('number-total'), stampPosition = ref('bottom-center'), stampChanged = ref(false)
+let stampReturnFocus: HTMLElement | null = null
 const showSearch = ref(false)
 const searchQuery = ref('')
 const searchedQuery = ref('')
@@ -141,6 +149,7 @@ const canRedo = computed(() => !!redoStack.value.length && !isBusy.value)
 const currentTextBlocks = computed(() => textBlocks.value.filter(block => block.pageIndex === pageIndex.value && block.text.trim()))
 const propertyPanelVisible = computed(() => !!selectedText.value || tool.value !== 'select')
 const hasPendingEdits = computed(() => {
+  if (stampChanged.value) return true
   if (selectedText.value) {
     const block = selectedText.value
     return editText.value !== block.text || Math.abs(fontSize.value - block.fontSize) > 0.05 || color.value !== textColorHex(block)
@@ -222,6 +231,8 @@ async function installDocument(base64: string, response: PdfResponse, epoch: num
   documentRevision++
   currentBytes.value = base64
   metadata.value = response.metadata ?? { pageCount: nextPdf.numPages, pages: [] }
+  outline.value = response.metadata?.outline ?? []
+  if (!response.metadata?.outline) void readPreviewOutline(nextPdf, epoch)
   textBlocks.value = response.textBlocks ?? []
   inspectedPages.clear()
   for (const block of textBlocks.value) inspectedPages.add(block.pageIndex)
@@ -240,6 +251,59 @@ async function installDocument(base64: string, response: PdfResponse, epoch: num
   await renderCurrentPage()
   queueVisibleThumbnails()
   void inspectCurrentPage()
+}
+
+async function readPreviewOutline(source: pdfjs.PDFDocumentProxy, epoch: number) {
+  try {
+    const result: typeof outline.value = []
+    const walk = async (items: Awaited<ReturnType<pdfjs.PDFDocumentProxy['getOutline']>>, level: number) => {
+      for (const item of items || []) {
+        if (result.length >= 2000 || level > 20 || !alive(epoch) || source !== pdf) return
+        let destination: number | null = null
+        try {
+          const target = typeof item.dest === 'string' ? await source.getDestination(item.dest) : item.dest
+          if (Array.isArray(target) && target[0] != null) destination = typeof target[0] === 'number' ? target[0] : await source.getPageIndex(target[0])
+        } catch { /* Unsupported external destinations remain visible but cannot be followed. */ }
+        result.push({ level, title: String(item.title).slice(0, 500), pageIndex: destination !== null && destination >= 0 && destination < source.numPages ? destination : null })
+        await walk(item.items, level + 1)
+      }
+    }
+    await walk(await source.getOutline(), 1)
+    if (alive(epoch) && source === pdf) outline.value = result
+  } catch { if (alive(epoch) && source === pdf) outline.value = [] }
+}
+
+async function openStamp(mode: 'page_numbers' | 'watermark') {
+  if (!canModify.value || isBusy.value) return
+  if (hasPendingEdits.value) { setStatus('请先应用或清除当前编辑，再添加页码或水印。'); return }
+  clearEditorSelection(); stampReturnFocus = globalThis.document.activeElement as HTMLElement | null
+  stampMode.value = mode; stampScope.value = 'all'; stampChanged.value = false
+  stampSize.value = mode === 'watermark' ? 44 : 10
+  await nextTick(); stampDialog.value?.focus()
+}
+function closeStamp() {
+  if (isBusy.value) return
+  stampMode.value = null; stampChanged.value = false; stampReturnFocus?.focus(); stampReturnFocus = null
+  announceDirty()
+}
+function stampKeyboard(event: KeyboardEvent) {
+  if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeStamp() }
+  if (event.key === 'Tab') {
+    const fields = [...(stampDialog.value?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled)') || [])]
+    const first = fields[0], last = fields.at(-1)
+    if (event.shiftKey && (globalThis.document.activeElement === first || globalThis.document.activeElement === stampDialog.value)) { event.preventDefault(); last?.focus() }
+    else if (!event.shiftKey && globalThis.document.activeElement === last) { event.preventDefault(); first?.focus() }
+  }
+}
+async function applyStamp() {
+  const mode = stampMode.value, epoch = documentEpoch
+  if (!mode || !canModify.value || isBusy.value) return
+  const pageIndices = stampScope.value === 'selected' ? [...selectedPages.value] : Array.from({ length: pageCount.value }, (_, index) => index)
+  try {
+    await queueOperation(mode, { pageIndices, fontSize: stampSize.value, color: colorToRgb(stampColor.value),
+      ...(mode === 'watermark' ? { text: stampText.value, opacity: stampOpacity.value / 100 } : { format: stampFormat.value, position: stampPosition.value }) }, '正在更新页面内容…')
+    if (alive(epoch)) { closeStamp(); setStatus(`已为 ${pageIndices.length} 页添加${mode === 'watermark' ? '水印' : '页码'}，可以撤销。请保存文件。`) }
+  } catch { /* Keep the settings visible; queueOperation already reported the precise error. */ }
 }
 
 async function openCurrentDocument(reset = true) {
@@ -265,6 +329,7 @@ async function openCurrentDocument(reset = true) {
     lastExportedBytes = ''
     currentBytes.value = ''
     metadata.value = null
+    outline.value = []; stampMode.value = null; stampChanged.value = false
     password.value = ''
     passwordInput.value = ''
     pageIndex.value = 0
@@ -762,6 +827,7 @@ async function discardChanges() {
   // The shell already stashed the PDF or confirmed closing. There is no internal
   // document-close prompt to bypass; release only the not-yet-applied preview.
   clearEditorSelection()
+  stampMode.value = null; stampChanged.value = false
 }
 defineExpose({ exportFile, undo, redo, markSaved, discardChanges })
 
@@ -772,7 +838,7 @@ watch(() => [props.document.id, props.document.base64] as const, ([id, base64]) 
   void openCurrentDocument()
 }, { immediate: true })
 watch(pageIndex, () => { clearEditorSelection(); stage.value?.scrollTo({ top: 0, left: 0 }); void renderCurrentPage(); void inspectCurrentPage() })
-watch(showPages, () => { void nextTick().then(queueVisibleThumbnails) })
+watch([showPages, sidebarTab], () => { void nextTick().then(queueVisibleThumbnails) })
 watch(propertyPanelVisible, () => { if (fitWidth.value) void nextTick().then(renderCurrentPage) })
 watch(hasPendingEdits, value => { if (value) emit('dirty', true) })
 
@@ -814,6 +880,10 @@ onBeforeUnmount(() => {
         <button class="pdf-icon-button" title="撤销（最多保留 8 次 / 48 MiB）" aria-label="撤销 PDF 编辑" data-testid="pdf-undo" :disabled="!canUndo" @click="undo"><svg><use href="#pdf-icon-undo" /></svg></button>
         <button class="pdf-icon-button" title="重做" aria-label="重做 PDF 编辑" data-testid="pdf-redo" :disabled="!canRedo" @click="redo"><svg><use href="#pdf-icon-redo" /></svg></button>
       </div>
+      <div class="pdf-toolbar-group">
+        <button class="pdf-tool-button" :disabled="!canModify || isBusy" data-testid="pdf-page-numbers" @click="openStamp('page_numbers')"><span aria-hidden="true">#</span>页码</button>
+        <button class="pdf-tool-button" :disabled="!canModify || isBusy" data-testid="pdf-watermark" @click="openStamp('watermark')"><span aria-hidden="true">◈</span>水印</button>
+      </div>
       <div class="pdf-toolbar-group pdf-zoom-controls">
         <button class="pdf-icon-button" aria-label="缩小 PDF" :disabled="!pageCount || isBusy" @click="changeZoom(-0.15)">−</button>
         <span class="pdf-zoom-value" aria-live="off">{{ Math.round(zoom * 100) }}%</span>
@@ -834,6 +904,8 @@ onBeforeUnmount(() => {
 
     <div class="pdf-workspace">
       <aside v-show="showPages && pageCount" class="pdf-pages-panel" aria-label="PDF 页面管理">
+        <div class="pdf-sidebar-tabs" aria-label="PDF 侧栏"><button :class="{active:sidebarTab==='pages'}" :aria-pressed="sidebarTab==='pages'" @click="sidebarTab='pages'">页面</button><button :class="{active:sidebarTab==='outline'}" :aria-pressed="sidebarTab==='outline'" data-testid="pdf-outline-tab" @click="sidebarTab='outline'">目录 <small>{{ outline.length }}</small></button></div>
+        <div v-show="sidebarTab==='pages'" class="pdf-page-manager">
         <div class="pdf-panel-heading"><strong>页面</strong><span>{{ selectedPages.length }} 页已选</span></div>
         <div class="pdf-page-actions">
           <button class="pdf-icon-button" title="顺时针旋转选中页" aria-label="旋转选中页" data-testid="pdf-rotate" :disabled="!canAssemble || isBusy" @click="rotateSelected"><svg><use href="#pdf-icon-rotate" /></svg></button>
@@ -850,6 +922,11 @@ onBeforeUnmount(() => {
             <button class="pdf-thumbnail-button" :data-testid="`pdf-page-${index + 1}`" :aria-label="`转到第 ${index + 1} 页`" :aria-current="pageIndex === index ? 'page' : undefined" :disabled="isBusy" @click="selectPage(index, $event)"><canvas :ref="element => registerThumbnail(element, index)" aria-hidden="true" /><span>{{ index + 1 }}</span></button>
           </div>
         </div>
+        </div>
+        <nav v-show="sidebarTab==='outline'" class="pdf-outline-list" aria-label="PDF 书签目录">
+          <p v-if="!outline.length" class="pdf-outline-empty">此 PDF 没有目录书签。页面中的普通标题不会自动成为书签。</p>
+          <button v-for="(item,index) in outline" :key="index" :style="{paddingLeft:`${12 + (item.level-1)*12}px`}" :disabled="isBusy || item.pageIndex === null" :aria-current="item.pageIndex===pageIndex ? 'page' : undefined" :title="item.pageIndex === null ? '外部或无页码的目标，不能在此跳转' : `转到第 ${item.pageIndex+1} 页`" data-testid="pdf-outline-item" @click="item.pageIndex !== null && selectPage(item.pageIndex)"><span>{{ item.title || '未命名书签' }}</span><small>{{ item.pageIndex === null ? '—' : item.pageIndex+1 }}</small></button>
+        </nav>
       </aside>
 
       <main ref="stage" class="pdf-stage" :class="{ 'pdf-stage-drawing': tool !== 'select' }" aria-label="PDF 页面">
@@ -894,6 +971,19 @@ onBeforeUnmount(() => {
         <button class="pdf-secondary-button" :disabled="isBusy" data-testid="pdf-clear-placement" @click="clearEditorSelection()">清除当前选择 / 预览</button>
         <p class="pdf-property-footnote">应用后可撤销。保存前请核对换行、字形与页面布局。</p>
       </aside>
+      <div v-if="stampMode" class="pdf-dialog-backdrop">
+        <form ref="stampDialog" class="pdf-merge-dialog pdf-stamp-dialog" role="dialog" aria-modal="true" aria-labelledby="pdf-stamp-title" tabindex="-1" data-testid="pdf-stamp-dialog" @submit.prevent="applyStamp" @keydown="stampKeyboard" @input="stampChanged=true" @change="stampChanged=true">
+          <div class="pdf-panel-heading"><strong id="pdf-stamp-title">{{ stampMode==='watermark' ? '添加文字水印' : '添加页码' }}</strong><button type="button" class="pdf-icon-button" aria-label="取消页码或水印" :disabled="isBusy" @click="closeStamp"><svg><use href="#pdf-icon-close" /></svg></button></div>
+          <p>{{ stampMode==='watermark' ? '在页面中央叠加半透明文字，保留原文内容。水印不能阻止复制，也不能代替敏感信息的删除。' : '按文档中的实际页序编号，在页眉或页脚添加页码。已有页码不会自动移除，请避免重复添加。' }}</p>
+          <label class="pdf-field">应用范围<span class="pdf-select-wrap"><select v-model="stampScope" aria-label="页码或水印范围" :disabled="isBusy" data-testid="pdf-stamp-scope"><option value="all">全部 {{ pageCount }} 页</option><option value="selected">所选 {{ selectedPages.length }} 页</option></select></span></label>
+          <label v-if="stampMode==='watermark'" class="pdf-field">水印文字<input v-model="stampText" maxlength="120" required :disabled="isBusy" data-testid="pdf-watermark-text" /></label>
+          <div v-else class="pdf-property-row"><label class="pdf-field">页码格式<span class="pdf-select-wrap"><select v-model="stampFormat" aria-label="页码格式" :disabled="isBusy" data-testid="pdf-number-format"><option value="number-total">1 / 10</option><option value="number">1</option><option value="chinese">第 1 页 / 共 10 页</option></select></span></label><label class="pdf-field">放置位置<span class="pdf-select-wrap"><select v-model="stampPosition" aria-label="页码位置" :disabled="isBusy"><option value="bottom-center">页脚居中</option><option value="bottom-left">页脚左侧</option><option value="bottom-right">页脚右侧</option><option value="top-center">页眉居中</option><option value="top-left">页眉左侧</option><option value="top-right">页眉右侧</option></select></span></label></div>
+          <div class="pdf-property-row"><label class="pdf-field">字号 / 磅<input v-model.number="stampSize" type="number" min="8" :max="stampMode==='watermark' ? 144 : 32" required :disabled="isBusy" data-testid="pdf-stamp-size" /></label><label class="pdf-field">文字颜色<input v-model="stampColor" type="color" :disabled="isBusy" /></label></div>
+          <label v-if="stampMode==='watermark'" class="pdf-field">不透明度 {{ stampOpacity }}%<input v-model.number="stampOpacity" type="range" min="5" max="80" :disabled="isBusy" aria-label="水印不透明度" /></label>
+          <p class="pdf-stamp-note">应用后可撤销；保存后成为 PDF 页面内容。长文字放不下时会保留原文件并提示调整。</p>
+          <div class="pdf-dialog-actions"><button type="button" class="pdf-secondary-button" :disabled="isBusy" @click="closeStamp">取消</button><button class="pdf-primary-button" :disabled="isBusy || !canModify || (stampMode==='watermark' && !stampText.trim())" data-testid="pdf-apply-stamp">{{ isBusy ? '正在应用…' : '应用到页面' }}</button></div>
+        </form>
+      </div>
       <div v-if="mergeCandidate" class="pdf-dialog-backdrop" @keydown.esc="!isBusy && (mergeCandidate = null)">
         <form class="pdf-merge-dialog" role="dialog" aria-modal="true" aria-labelledby="pdf-merge-title" data-testid="pdf-merge-dialog" @submit.prevent="confirmMerge">
           <div class="pdf-panel-heading"><strong id="pdf-merge-title">追加 PDF 页面</strong><button type="button" class="pdf-icon-button" aria-label="取消合并" :disabled="isBusy" @click="mergeCandidate = null"><svg><use href="#pdf-icon-close" /></svg></button></div>

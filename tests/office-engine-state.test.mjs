@@ -9,7 +9,7 @@ import vm from 'node:vm'
 const source = await readFile(new URL('../public/office/office-worker.js', import.meta.url), 'utf8')
 async function engine(initial = { kind: 'word', extension: 'docx' }) {
   const messages = [], models = [], imports = [], stores = [], dispatches = []
-  const controls = { failNextLoad: false, rejectNextService: false, ignoreMove: false, refusePageSwitch: false, configureNextModel: null }
+  const controls = { failNextLoad: false, rejectNextService: false, ignoreMove: false, refusePageSwitch: false, configureNextModel: null, modifyDuringDataRead: false, acceptTableSnapshot: false }
   const nativeExceptions = new Map(), exceptionCalls = []
   const nativeException = message => {
     // A token, not an Error: real UNO exceptions cross the boundary as tagged
@@ -130,7 +130,21 @@ async function engine(initial = { kind: 'word', extension: 'docx' }) {
       return { Message: native.message }
     },
   }
-  vm.runInNewContext(source, { Module: { zetajs: Promise.resolve(zeta) }, console, WebAssembly })
+  const toolCalls = []
+  const toolFactory = kind => ({ getModel }) => ({
+    state() { toolCalls.push([kind, 'state']); return { marker: kind, documentId: 'untrusted', revision: -1, dirty: false } },
+    action(data) { toolCalls.push([kind, 'action', data]); if (data.type !== 'edit') throw Error('Unknown tool action'); getModel().edit() },
+    data(query) { toolCalls.push([kind, 'data', query]); if (controls.modifyDuringDataRead) { controls.modifyDuringDataRead = false; getModel().edit() } return { marker: kind, value: 42, documentId: 'untrusted', revision: -1 } },
+    applyTableSnapshot(data) {
+      toolCalls.push([kind, 'table-snapshot', data]);
+      // The real Writer helper validates native identity, cells and style
+      // fingerprints. Here rejection is controlled to test the worker route.
+      if (!controls.acceptTableSnapshot) throw Error('Table snapshot validation failed');
+      getModel().edit();
+    },
+  })
+  vm.runInNewContext(source, { Module: { zetajs: Promise.resolve(zeta) }, console, WebAssembly,
+    createWriterTools: toolFactory('word'), createCalcTools: toolFactory('sheet') })
   await Promise.resolve()
   let seq = 0
   const request = (action, data = {}, documentId = 'A') => {
@@ -142,8 +156,80 @@ async function engine(initial = { kind: 'word', extension: 'docx' }) {
   }
   assert.equal(request('open', { id: 'A', name: `A.${initial.extension}`, ...initial, isNew: true }).ok, true)
   return { request, imports, stores, model: models[0], models, controls, messages, frame, dispatches,
-    nativeException, nativeExceptions, exceptionCalls }
+    nativeException, nativeExceptions, exceptionCalls, toolCalls }
 }
+
+for (const [kind, extension] of [['word', 'docx'], ['sheet', 'xlsx']]) {
+  test(`${kind} workbench routes only matching current-document requests and owns revision metadata`, async () => {
+    const {request, model, toolCalls, messages} = await engine({kind, extension})
+    const initial = request(`${kind}-state`)
+    assert.equal(initial.ok, true)
+    assert.equal(initial.data.documentId, 'A')
+    assert.equal(initial.data.revision, 0)
+    assert.equal(initial.data.dirty, false)
+    assert.equal(initial.data.marker, kind)
+    const before = toolCalls.length
+    assert.equal(request(`${kind}-state`, {}, 'stale-document').ok, false)
+    assert.equal(request(`${kind === 'word' ? 'sheet' : 'word'}-state`).ok, false)
+    for (const action of [null, [], {type:'edit',expectedRevision:-1}, {type:'edit',expectedRevision:'0'}, {type:'edit',expectedRevision:1}]) {
+      assert.equal(request(`${kind}-action`, action).ok, false)
+    }
+    assert.equal(toolCalls.length, before, 'Rejected requests must not reach a mutating helper')
+    assert.equal(model.isModified(), false)
+    const edited = request(`${kind}-action`, {type:'edit',expectedRevision:0})
+    assert.equal(edited.ok, true)
+    assert.equal(edited.data.revision, 1)
+    assert.equal(edited.data.dirty, true)
+    const data = request(`${kind}-data`, {type:'read'}).data
+    assert.equal(data.value, 42)
+    assert.equal(data.documentId, 'A')
+    assert.equal(data.revision, 1)
+    assert.equal(request(`${kind}-action`, {type:'unknown'}).ok, false)
+    model.getCurrentController().selectionListener.selectionChanged()
+    assert.ok(messages.some(message=>message.event==='workbench-changed' && message.documentId==='A'))
+  })
+  test(`${kind} data carries its own completed read revision without requiring a toolbar refresh`, async () => {
+    const {request, controls} = await engine({kind, extension})
+    assert.equal(request(`${kind}-state`).data.revision, 0)
+    controls.modifyDuringDataRead = true
+    const data = request(`${kind}-data`, {type:'read'}).data
+    assert.equal(data.value, 42)
+    assert.equal(data.documentId, 'A')
+    assert.equal(data.revision, 1)
+  })
+}
+
+test('only stale Writer table edits can reach the dedicated snapshot validator', async () => {
+  const {request, model, controls, toolCalls} = await engine()
+  model.edit()
+  controls.acceptTableSnapshot = true
+  const action = {type:'update-table',expectedRevision:0,expectedTableId:'read-token',expectedCells:[['old']],expectedCellSignatures:[['native-token']],cells:[['new']]}
+  const updated = request('word-action',action)
+  assert.equal(updated.ok,true)
+  assert.equal(updated.data.revision,2)
+  assert.equal(toolCalls.filter(call=>call[1]==='table-snapshot').length,1)
+  assert.equal(toolCalls.filter(call=>call[1]==='action').length,0,'A stale table edit cannot fall through to the ordinary action path')
+  const count=toolCalls.length
+  for(const invalid of [{...action,type:'edit'}, {...action,expectedRevision:3}, {...action,expectedRevision:-1}, {...action,expectedRevision:0.5}]) {
+    assert.equal(request('word-action',invalid).ok,false)
+  }
+  assert.equal(toolCalls.length,count)
+  const sheet=await engine({kind:'sheet',extension:'xlsx'})
+  sheet.model.edit();sheet.controls.acceptTableSnapshot=true
+  assert.equal(sheet.request('sheet-action',action).ok,false)
+  assert.equal(sheet.toolCalls.length,0,'Calc never uses the Writer table exception')
+})
+
+test('a rejected table snapshot never falls back to applying unvalidated cells', async () => {
+  const {request, model, toolCalls}=await engine()
+  model.edit()
+  const result=request('word-action',{type:'update-table',expectedRevision:0,expectedCells:[['forged']]})
+  assert.equal(result.ok,false)
+  assert.match(result.error,/snapshot validation failed/)
+  assert.equal(request('word-state').data.revision,1)
+  assert.equal(toolCalls.filter(call=>call[1]==='action').length,0)
+  assert.equal(toolCalls.filter(call=>call[1]==='table-snapshot').length,1)
+})
 
 test('office imports disable macros and external updates independently of profile', async () => {
   const { imports } = await engine()

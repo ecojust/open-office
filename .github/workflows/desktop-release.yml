@@ -377,9 +377,13 @@ jobs:
 
           安装包：Windows x64、Apple Silicon Mac、Intel Mac。安装后，Word / Excel / PPT 文档编辑和 PDF 工具使用随包本地引擎，不需要用户安装 Python 或 Microsoft Office。
 
-          新增中文 PPT 工作台：页面管理、文本与形状属性、表格单元格、图表数据、备注；内置放映支持淡化、推进、擦除、覆盖、揭开、拆分和本地音视频。逐对象动画、SmartArt、Morph、双屏演讲者视图和微软云功能尚未完整实现，不宣称已全面替代 Microsoft 365。
+          本版新增 Word / Excel 中文工作台。Word 支持真实文字与段落格式、语义标题、页边距、页眉页脚、表格单元格编辑、查找替换，以及批注、脚注、目录与修订入口。Excel 支持工作表编排、单元格与公式、格式、排序筛选、冻结、数据验证和条件格式、命名区域、可编辑图表与数据透视表。保存前会检查工作台未提交的草稿，避免把尚未应用的修改当成已经保存。
 
-          三种安装包均通过实际应用内自检：跨源隔离与 SharedArrayBuffer、Writer 文档编辑和 DOCX/PDF 往返、Calc 公式计算和 XLSX/PDF 往返、Impress 两页中英文演示文稿原文修改后 PPTX/ODP 保存重开及 PDF 导出（独立读取确认两页）、PDF 原文删除替换后重新读取。新版额外验证真实表格与图表编辑、页名/备注/隐藏页保存重开、PPTX 内嵌转场和音频在二次保存后保留、原生 WebView 中的两页 PDF 放映画布和本地音频元数据加载。媒体播放还取决于系统支持的编码。
+          PDF 新增文档书签导航、页码和半透明文字水印，修改进入现有撤销/重做与保存流程。PPT 继续提供页面与对象编辑、可编辑表格/图表、六种页面转场和本地音视频。
+
+          各项能力以实际文档回归范围为准，并未在 Microsoft 365 原软件中完成全部双向互验。完整 Word 内容控件/邮件合并、全套 Excel 函数、Power Query/Power Pivot、VBA/Office 加载项、微软云协作与 Copilot 等尚未全面对齐；逐对象演示动画、SmartArt、Morph 和双屏演讲者视图也未完整实现，不宣称完全替代 Microsoft 365。功能范围见 [Word / Excel 对照](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/docs/word-excel-365-parity.md) 与 [PDF 能力说明](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_SHA}/docs/pdf-capabilities.md)。
+
+          三种安装包均通过实际应用内自检：跨源隔离与 SharedArrayBuffer、Writer 文档编辑和 DOCX/PDF 往返、Calc 公式计算和 XLSX/PDF 往返、Impress 两页中英文演示文稿原文修改后 PPTX/ODP 保存重开及 PDF 导出（独立读取确认两页）、PDF 原文删除替换后重新读取。本版额外验证 Word 标题和字符样式、表格二次修改、页边距/页眉页脚，以及 Excel 排序/冻结、公式修改后重算、图表数据来源和透视表字段配置，均经过两次 DOCX/XLSX 保存重开，并由独立 PDF 后端读取导出内容。既有 PPT 页名/备注/隐藏页、可编辑表格/图表、二次保存后的转场/音频、真实 PDF 放映画布与音频元数据检查全部保留。媒体播放仍取决于系统支持的编码。
           Windows x64 在 Windows Server 2022 上验证，Apple Silicon 包在 macOS 15 ARM 上验证。Intel x64 包在 Intel 构建机原生编译并检查 PDF、架构与签名，随后将原封 DMG 转移到 Apple Silicon macOS 15，通过 Rosetta 运行真实 x64 App 与 PDF 进程完成相同自检；校验安装包摘要、App 全部文件、链接与签名一致，无重建或重签。
           Intel 包尚未在真实 Intel GPU 上实测；GitHub 的 Intel 虚拟机未提供可用的原生 WebGL 图形环境。本验证不代表已测试所有系统版本、显卡或复杂 Office 文档。
 

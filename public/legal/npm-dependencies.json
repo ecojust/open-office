@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lockfileSha256": "274b92d604979777bb5d23c722eed45a3410e0df67fcfe5f96dee5b4ac0a9fe7",
+  "lockfileSha256": "32c8199eac4da8ac3b367d2a1754a1ff24ba0aad1c67d2afa0f917c6036bb3c4",
   "packages": [
     {
       "name": "@babel/helper-string-parser",

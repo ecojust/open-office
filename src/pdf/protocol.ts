@@ -27,6 +27,7 @@ export interface PdfMetadata {
   needsPassword?: boolean
   signed?: boolean
   hasSignatures?: boolean
+  outline?: { level: number; title: string; pageIndex: number | null }[]
   permissions?: Record<string, boolean> | number
   [key: string]: unknown
 }

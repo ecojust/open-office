@@ -8,7 +8,9 @@ export function pdfDevPlugin(): Plugin {
   return { name:'local-pdf-development', apply:'serve', configureServer(server) {
     server.middlewares.use('/__pdf-dev', (request,response) => {
       const host=request.headers.host || ''
-      if(request.method!=='POST' || !/^127\.0\.0\.1:5198$/.test(host) || request.headers.origin!==`http://${host}` || !request.headers['content-type']?.startsWith('application/json')) {
+      const listening=server.httpServer?.address()
+      const localHost=listening && typeof listening==='object' && listening.address==='127.0.0.1' ? `127.0.0.1:${listening.port}` : null
+      if(request.method!=='POST' || !localHost || host!==localHost || request.headers.origin!==`http://${localHost}` || !request.headers['content-type']?.startsWith('application/json')) {
         response.writeHead(403);response.end('Local development requests only');return
       }
       const pieces:Buffer[]=[];let size=0, finished=false

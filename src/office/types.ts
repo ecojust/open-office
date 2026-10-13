@@ -15,7 +15,7 @@ export type OfficeNativeRequest = { type: 'save' | 'save-as' | 'open' | 'new' | 
 export interface OfficeEvent {
   channel: 'open-office-engine'
   session: string
-  event?: 'engine-ready' | 'progress' | 'dirty' | 'error' | 'native-request' | 'presentation-changed'
+  event?: 'engine-ready' | 'progress' | 'dirty' | 'error' | 'native-request' | 'presentation-changed' | 'workbench-changed'
   requestId?: string
   documentId?: string
   ok?: boolean

@@ -80,6 +80,15 @@ Module.zetajs = new Promise(function (resolve, reject) {
         return Module.uno_Type.Type();
       case Module.uno.com.sun.star.uno.TypeClass.ANY:
         return Module.uno_Type.Any();
+      case Module.uno.com.sun.star.uno.TypeClass.TYPEDEF:
+        {
+          const itd = Module.uno.com.sun.star.reflection.XIndirectTypeDescription.query(td);
+          try {
+            return translateTypeDescriptionAndDelete(itd.getReferencedType());
+          } finally {
+            itd.delete();
+          }
+        }
       case Module.uno.com.sun.star.uno.TypeClass.SEQUENCE:
         {
           const itd = Module.uno.com.sun.star.reflection.XIndirectTypeDescription.query(td);

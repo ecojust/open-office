@@ -11,7 +11,7 @@ import * as vue from 'vue'
 // LibreOffice/PDF engine or native WebView compatibility tests.
 const app = (await readFile(new URL('../src/App.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
 const utilities = await readFile(new URL('../src/shared/document.ts', import.meta.url), 'utf8')
-const names = 'tabs,activeKey,active,officeDocument,pdfDocument,officeEditor,pdfEditor,presentationWorkbench,presentationEffects,presentationState,slidePreview,busy,error,closeTarget,readyFor,editorError,stash,activate,addDocument,saveActive,closeTab,closeWindow,resolveClose,task,officeRequest'
+const names = 'tabs,activeKey,active,officeDocument,pdfDocument,officeEditor,pdfEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationWorkbench,presentationEffects,presentationState,slidePreview,busy,error,closeTarget,readyFor,editorError,stash,activate,addDocument,saveActive,closeTab,closeWindow,resolveClose,task,officeRequest'
 
 function compile(source, require, extra = {}) {
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
@@ -259,3 +259,32 @@ test('native duplicate-slide request uses the metadata-aware editor and respects
   assert.match(h.state.error.value,/尚未应用/)
   assert.equal(actions.length,1,'Unapplied effect drafts must not be detached from their page')
 })
+
+for (const [kind,panel] of [['word','wordWorkbench'],['sheet','sheetWorkbench']]) {
+  test(`${kind} pending inputs prevent export and tab switching until applied or explicitly discarded`, async () => {
+    const h=shell(), a=h.tab('A',{kind,dirty:true}), b=h.tab('B');h.active(a)
+    let exports=0,discarded=0
+    h.handle.exportFile=async()=>{exports++;return {base64:'NEW',extension:kind==='word'?'docx':'xlsx'}}
+    h.state[panel].value={assertNoPendingEdits(){throw Error('Unapplied workspace input')},discardDrafts(){discarded++}}
+    await assert.rejects(h.state.saveActive(),/Unapplied/)
+    await assert.rejects(h.state.activate(b),/Unapplied/)
+    assert.equal(exports,0);assert.equal(h.state.activeKey.value,'A')
+    h.state.closeTarget.value=a
+    await h.state.resolveClose('discard')
+    assert.equal(discarded,1)
+    assert.ok(!h.state.tabs.value.some(tab=>tab.key==='A'))
+  })
+}
+
+for(const [kind,getter,field] of [['word','getWriterState','writerState'],['sheet','getCalcState','calcState'],['presentation','getPresentationState','presentationState']]) {
+ test(`${kind} toolbar refreshes when returning from PDF to a retained Office model`,async()=>{
+   const h=shell(),office=h.tab('office',{kind}),pdf=h.tab('pdf',{kind:'pdf'});h.active(pdf)
+   h.state.officeDocument.value=office.document
+   const reopened=[]
+   h.handle[getter]=async()=>{reopened.push(office.key);return {documentId:office.key,revision:3,dirty:false}}
+   await h.state.activate(office)
+   assert.deepEqual(reopened,['office'])
+   assert.equal(h.state[field].value.documentId,'office')
+   assert.equal(h.state.officeDocument.value.id,'office')
+ })
+}

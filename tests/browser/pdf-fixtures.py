@@ -11,6 +11,7 @@ for index in range(3):
     page.insert_text((50, 65), f'ORIGINAL PAGE {index + 1}', fontsize=18, color=(0.1, 0.2, 0.4))
     page.insert_text((50, 120), 'KEEP THIS NEIGHBOR', fontsize=12)
     page.insert_text((50, 220), f'Searchable reference unique-{index + 1}', fontsize=12)
+doc.set_toc([[1, '总览', 1], [2, '检索章节', 3]])
 doc.save(out/'fixture.pdf')
 doc.save(out/'protected.pdf', encryption=pymupdf.PDF_ENCRYPT_AES_256, owner_pw='owner123', user_pw='test123', permissions=pymupdf.PDF_PERM_PRINT | pymupdf.PDF_PERM_COPY)
 image = doc[0].get_pixmap(matrix=pymupdf.Matrix(.5, .5))

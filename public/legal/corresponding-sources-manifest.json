@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-12",
+  "recordedAt": "2026-10-13",
   "runtimeBuildId": "efaf0670b4d055f838a2849becb10f08aa06a257",
   "runtimeManifestSha256": "d102bbe5549b0f51bf967d903c1f14cd269781372ffe3ee1a7d0c99e0bb4ba3a",
   "runtimeAssetSha256": {
@@ -10,7 +10,7 @@
     "soffice.data.js.metadata": "5d9d909d0b9b38443c0f19704032d0fc12d654f6c9c24c2c3b237739c4848ae3",
     "NotoSansCJKsc-Regular.otf": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b"
   },
-  "zetaJsShippedSha256": "ee633709bfa1de3221e8f68beb395f68fd5ff00cab9e33ba22e97e8271b348b4",
+  "zetaJsShippedSha256": "7bdfa389a1d220c279f60602b2e0724b2280fa91d68d5237d1bce3bf0dedbf32",
   "zetaJsUpstreamSha256": "b70ee7022908822c512535bbf43c4e44c297acc364e7542abba0d3071f5f9bfd",
   "archives": [
     {
@@ -72,7 +72,7 @@
       "repository": "https://github.com/allotropia/zetajs",
       "sourceRef": "v1.2.0",
       "commit": "57360bcb0e7726ffa0e66567c8041261b959f8dd",
-      "provenance": "Annotated v1.2.0 tag resolved to its commit. The locally shipped zeta.js includes the recorded one-line patch.",
+      "provenance": "Annotated v1.2.0 tag resolved to its commit. The locally shipped zeta.js includes the recorded local patch.",
       "file": "zetajs-57360bcb0e7726ffa0e66567c8041261b959f8dd.tar.gz",
       "url": "https://codeload.github.com/allotropia/zetajs/tar.gz/57360bcb0e7726ffa0e66567c8041261b959f8dd",
       "bytes": 820266,
