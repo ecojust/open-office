@@ -775,41 +775,86 @@ mod tests {
             flag.store(true, Ordering::Release);
         });
         let server = AssetServer::start_with_smoke(root.path(), Some(smoke)).unwrap();
-        let post = |path: &str, origin: &str, body: &str| {
+        let post = |stage: &str, path: &str, origin: &str, body: &str| {
             let address = server.info.origin.strip_prefix("http://").unwrap();
-            let mut stream = TcpStream::connect(address).unwrap();
+            let mut stream = TcpStream::connect(address)
+                .unwrap_or_else(|_| panic!("{stage}: test connection failed"));
             stream
-                .set_read_timeout(Some(Duration::from_secs(2)))
-                .unwrap();
-            write!(stream,"POST {path} HTTP/1.1\r\nHost: {address}\r\nOrigin: {origin}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",body.len()).unwrap();
+                .set_read_timeout(Some(Duration::from_secs(10)))
+                .unwrap_or_else(|_| panic!("{stage}: test read deadline setup failed"));
+            stream
+                .set_write_timeout(Some(Duration::from_secs(10)))
+                .unwrap_or_else(|_| panic!("{stage}: test write deadline setup failed"));
+            // Send one prepared request, rather than write_fmt's separate tiny
+            // socket writes. The bounded deadline also allows a busy CI runner
+            // to durably write smoke diagnostics before responding.
+            let request = format!("POST {path} HTTP/1.1\r\nHost: {address}\r\nOrigin: {origin}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}", body.len());
+            stream
+                .write_all(request.as_bytes())
+                .unwrap_or_else(|_| panic!("{stage}: complete test request write failed"));
             let mut response = String::new();
-            stream.read_to_string(&mut response).unwrap();
+            // Read through EOF: serve() sets the failure stop flag before its
+            // owning thread drops this connection, so the final flag assertion
+            // cannot race the response headers arriving at the client.
+            stream.read_to_string(&mut response).unwrap_or_else(|_| {
+                panic!("{stage}: test response did not complete within deadline")
+            });
             response
         };
         let route = format!("{}__native-smoke/failure", server.info.base_path);
-        assert!(post(&route, "http://localhost:1", r#"{"ok":false}"#).starts_with("HTTP/1.1 403"));
-        assert!(post(
-            "/wrong/__native-smoke/failure",
-            &server.info.origin,
-            r#"{"ok":false}"#
-        )
-        .starts_with("HTTP/1.1 405"));
-        assert!(post(&route, &server.info.origin, r#"{"ok":true}"#).starts_with("HTTP/1.1 400"));
+        assert!(
+            post(
+                "origin-rejected",
+                &route,
+                "http://localhost:1",
+                r#"{"ok":false}"#
+            )
+            .starts_with("HTTP/1.1 403"),
+            "origin-rejected: expected forbidden"
+        );
+        assert!(
+            post(
+                "namespace-rejected",
+                "/wrong/__native-smoke/failure",
+                &server.info.origin,
+                r#"{"ok":false}"#
+            )
+            .starts_with("HTTP/1.1 405"),
+            "namespace-rejected: expected read-only rejection"
+        );
+        assert!(
+            post(
+                "success-report-rejected",
+                &route,
+                &server.info.origin,
+                r#"{"ok":true}"#
+            )
+            .starts_with("HTTP/1.1 400"),
+            "success-report-rejected: expected invalid report"
+        );
         assert!(!output.exists());
         assert!(!stopped.load(Ordering::Acquire));
         let progress = format!("{}__native-smoke/progress", server.info.base_path);
-        assert!(post(
-            &progress,
-            &server.info.origin,
-            r#"{"phase":"main-entry","detail":"module loaded"}"#
-        )
-        .starts_with("HTTP/1.1 200"));
-        assert!(post(
-            &route,
-            &server.info.origin,
-            r#"{"ok":false,"error":"IPC unavailable"}"#
-        )
-        .starts_with("HTTP/1.1 200"));
+        assert!(
+            post(
+                "progress-accepted",
+                &progress,
+                &server.info.origin,
+                r#"{"phase":"main-entry","detail":"module loaded"}"#
+            )
+            .starts_with("HTTP/1.1 200"),
+            "progress-accepted: expected success"
+        );
+        assert!(
+            post(
+                "failure-report-accepted",
+                &route,
+                &server.info.origin,
+                r#"{"ok":false,"error":"IPC unavailable"}"#
+            )
+            .starts_with("HTTP/1.1 200"),
+            "failure-report-accepted: expected success"
+        );
         assert!(output.is_file());
         assert!(stopped.load(Ordering::Acquire));
     }
