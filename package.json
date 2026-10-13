@@ -30,13 +30,16 @@
     "test:browser:ppt-workbench-ui": "node tests/browser/presentation-workbench-ui.cjs",
     "test:browser:ppt-player": "node tests/browser/presentation-player.cjs",
     "test:browser:ppt-package": "node tests/browser/pptx-package.cjs",
+    "test:browser:ppt-chart-data": "node tests/browser/pptx-chart-data.cjs",
+    "test:browser:ppt-chart-native": "node tests/browser/pptx-chart-native.cjs",
     "test:browser:ppt-native-contract": "node tests/browser/presentation-native-contract.cjs",
     "test:browser:word": "node tests/browser/writer-workbench.cjs",
     "test:browser:sheet": "node tests/browser/calc-workbench.cjs",
     "test:browser:office-native-contract": "node tests/browser/office-workbench-native-contract.cjs",
     "test:browser:workbench-drafts": "node tests/browser/workbench-drafts.cjs",
     "test:browser:office-ui": "node tests/browser/word-sheet-ui.cjs",
-    "test:browser:office-drafts": "node tests/browser/workbench-drafts.cjs"
+    "test:browser:office-drafts": "node tests/browser/workbench-drafts.cjs",
+    "test:compatibility": "node tests/compatibility/run.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.3",

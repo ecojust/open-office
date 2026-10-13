@@ -1,0 +1,701 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "tika-wps-attachments",
+  "scope": "Read-only bounded ZIP/CFB package-stream parsing; no object activation, external access or Office execution",
+  "source": {
+    "path": "tests/compatibility/fixtures/upstream/apache-tika/testWPSAttachment.docx",
+    "sha256": "f9373ab9c763603ce72e4a5490c727be745bf48a98d703bab1c9f98ff9cc8a36",
+    "objects": [
+      {
+        "object": 1,
+        "name": "oleObject1.bin",
+        "bytes": 2560,
+        "sha256": "d78dcdd4a2c030db707b1d744968c7ad18f2da1aacee558daa53d3dbea807e08"
+      },
+      {
+        "object": 2,
+        "name": "oleObject2.bin",
+        "bytes": 26112,
+        "sha256": "e547b3c99e8536b375daa386e914df2daca2ebf155704680ad57e72493c9dc13"
+      },
+      {
+        "object": 3,
+        "name": "oleObject3.bin",
+        "bytes": 3072,
+        "sha256": "cc9afe78bb5c4bba0aa8e3be93cbfe86b69d67fd5348f1bc26c34f5bb1b4b75e"
+      },
+      {
+        "object": 4,
+        "name": "oleObject4.bin",
+        "bytes": 9728,
+        "sha256": "de094ae6510a43b64a99e2683ce36465d8e89f37ff9bc3d4321c18e3ea840de0"
+      },
+      {
+        "object": 5,
+        "name": "oleObject5.bin",
+        "bytes": 13824,
+        "sha256": "bdafb9a91499ed4763ec011193d0815b76b308bc6288054daef13e1a1b57c5c8"
+      },
+      {
+        "object": 6,
+        "name": "oleObject6.bin",
+        "bytes": 18944,
+        "sha256": "b7edad8dc33392136a45f9deef9d8f171bd07fa1f60c11d3a0eae50a6904daaf"
+      },
+      {
+        "object": 7,
+        "name": "oleObject7.bin",
+        "bytes": 12800,
+        "sha256": "db1b4f37fa1308c7aad21cc1ac8de539bdb4bdac2b1a60a92c28a2883910758e"
+      },
+      {
+        "object": 8,
+        "name": "oleObject8.bin",
+        "bytes": 87040,
+        "sha256": "08f2ae577231149fe6b957cadf4b042af2a1b5fc03caffdb9253e8155a7acb4e"
+      },
+      {
+        "object": 9,
+        "name": "oleObject9.bin",
+        "bytes": 35840,
+        "sha256": "617f9dcccc4d6aafcf088a4d9bef96cf67144ef61798c4914a9b3d2fae22435f"
+      }
+    ],
+    "packages": {
+      "5": {
+        "packageSha256": "80839465ad0e03a864cc47b651fd8ec3f5c8e124af75b957da6b3b080d5430b7",
+        "semantics": {
+          "format": "docx",
+          "text": [
+            "docx_content"
+          ],
+          "features": {
+            "paragraphs": 1,
+            "tables": 0,
+            "comments": 0,
+            "footnotes": 0,
+            "endnotes": 0,
+            "trackedChanges": 0,
+            "imageReferences": 0,
+            "imageParts": 0,
+            "chartParts": 0,
+            "pivotTableParts": 0,
+            "embeddedObjects": 0,
+            "images": 0,
+            "charts": 0,
+            "hyperlinks": 0
+          },
+          "paragraphs": [
+            "docx_content"
+          ],
+          "tables": [],
+          "sections": [
+            {
+              "pageSize": {
+                "w": "11906",
+                "h": "16838"
+              },
+              "pageMargins": {
+                "top": "1440",
+                "right": "1800",
+                "bottom": "1440",
+                "left": "1800",
+                "header": "851",
+                "footer": "992",
+                "gutter": "0"
+              },
+              "headers": [],
+              "footers": []
+            }
+          ]
+        }
+      },
+      "7": {
+        "packageSha256": "62a5784d3bf0d60bc89c2162d25c9574b3b9ebc6ef3092e930db280017489930",
+        "semantics": {
+          "format": "xlsx",
+          "text": [
+            "xlsx_content"
+          ],
+          "features": {
+            "sheets": 3,
+            "cells": 1,
+            "formulas": 0,
+            "mergedRanges": 0,
+            "imageParts": 0,
+            "chartParts": 0,
+            "pivotTableParts": 0,
+            "embeddedObjects": 0,
+            "images": 0,
+            "charts": 0,
+            "tables": 0,
+            "hyperlinks": 0
+          },
+          "sheets": [
+            {
+              "name": "Sheet1",
+              "state": "visible",
+              "cells": [
+                {
+                  "address": "A1",
+                  "type": "text",
+                  "value": "xlsx_content",
+                  "formula": null
+                }
+              ],
+              "mergedRanges": []
+            },
+            {
+              "name": "Sheet2",
+              "state": "visible",
+              "cells": [],
+              "mergedRanges": []
+            },
+            {
+              "name": "Sheet3",
+              "state": "visible",
+              "cells": [],
+              "mergedRanges": []
+            }
+          ]
+        }
+      }
+    }
+  },
+  "cycles": [
+    {
+      "cycle": 1,
+      "output": "test-results/compatibility/local-only-final/tika-wps-attachments/docx-cycle-1.docx",
+      "sha256": "88801b1c5ad0042b13d493131d112099aa9399a6fc42c03bdfc5c8c7c0e596dd",
+      "objectCount": 9,
+      "objects": [
+        {
+          "object": 1,
+          "name": "oleObject1.bin",
+          "bytes": 2560,
+          "sha256": "d78dcdd4a2c030db707b1d744968c7ad18f2da1aacee558daa53d3dbea807e08"
+        },
+        {
+          "object": 2,
+          "name": "oleObject2.bin",
+          "bytes": 26112,
+          "sha256": "e547b3c99e8536b375daa386e914df2daca2ebf155704680ad57e72493c9dc13"
+        },
+        {
+          "object": 3,
+          "name": "oleObject3.bin",
+          "bytes": 3072,
+          "sha256": "cc9afe78bb5c4bba0aa8e3be93cbfe86b69d67fd5348f1bc26c34f5bb1b4b75e"
+        },
+        {
+          "object": 4,
+          "name": "oleObject4.doc",
+          "bytes": 9728,
+          "sha256": "de094ae6510a43b64a99e2683ce36465d8e89f37ff9bc3d4321c18e3ea840de0"
+        },
+        {
+          "object": 5,
+          "name": "oleObject5.docx",
+          "bytes": 4879,
+          "sha256": "ddf3407e38458fcc9b09472aed8d4677347b820c610df300d93b51dc78749360"
+        },
+        {
+          "object": 6,
+          "name": "oleObject6.xls",
+          "bytes": 18944,
+          "sha256": "b7edad8dc33392136a45f9deef9d8f171bd07fa1f60c11d3a0eae50a6904daaf"
+        },
+        {
+          "object": 7,
+          "name": "oleObject7.xlsx",
+          "bytes": 5058,
+          "sha256": "2c82f536f6d3ca4d62e5072ba7b11b3ec5ae9f0cfdbe1d3f3a930c534d31bee0"
+        },
+        {
+          "object": 8,
+          "name": "oleObject8.ppt",
+          "bytes": 87040,
+          "sha256": "08f2ae577231149fe6b957cadf4b042af2a1b5fc03caffdb9253e8155a7acb4e"
+        },
+        {
+          "object": 9,
+          "name": "oleObject9.pptx",
+          "bytes": 35840,
+          "sha256": "617f9dcccc4d6aafcf088a4d9bef96cf67144ef61798c4914a9b3d2fae22435f"
+        }
+      ],
+      "byteIdenticalToSource": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        8,
+        9
+      ],
+      "changedFromSource": [
+        5,
+        7
+      ],
+      "packages": {
+        "5": {
+          "packageSha256": "ddf3407e38458fcc9b09472aed8d4677347b820c610df300d93b51dc78749360",
+          "semantics": {
+            "format": "docx",
+            "text": [],
+            "features": {
+              "paragraphs": 1,
+              "tables": 0,
+              "comments": 0,
+              "footnotes": 0,
+              "endnotes": 0,
+              "trackedChanges": 0,
+              "imageReferences": 0,
+              "imageParts": 0,
+              "chartParts": 0,
+              "pivotTableParts": 0,
+              "embeddedObjects": 0,
+              "images": 0,
+              "charts": 0,
+              "hyperlinks": 0
+            },
+            "paragraphs": [
+              ""
+            ],
+            "tables": [],
+            "sections": [
+              {
+                "pageSize": {
+                  "w": "12240",
+                  "h": "15840"
+                },
+                "pageMargins": {
+                  "left": "1134",
+                  "right": "1134",
+                  "gutter": "0",
+                  "header": "0",
+                  "top": "1134",
+                  "footer": "0",
+                  "bottom": "1134"
+                },
+                "headers": [],
+                "footers": []
+              }
+            ]
+          }
+        },
+        "7": {
+          "packageSha256": "2c82f536f6d3ca4d62e5072ba7b11b3ec5ae9f0cfdbe1d3f3a930c534d31bee0",
+          "semantics": {
+            "format": "xlsx",
+            "text": [],
+            "features": {
+              "sheets": 1,
+              "cells": 0,
+              "formulas": 0,
+              "mergedRanges": 0,
+              "imageParts": 0,
+              "chartParts": 0,
+              "pivotTableParts": 0,
+              "embeddedObjects": 0,
+              "images": 0,
+              "charts": 0,
+              "tables": 0,
+              "hyperlinks": 0
+            },
+            "sheets": [
+              {
+                "name": "Sheet1",
+                "state": "visible",
+                "cells": [],
+                "mergedRanges": []
+              }
+            ]
+          }
+        }
+      },
+      "lossDetected": true,
+      "differences": {
+        "missingWordText": [
+          "docx_content"
+        ],
+        "missingSheets": [
+          "Sheet2",
+          "Sheet3"
+        ],
+        "changedOrMissingCells": [
+          {
+            "sheet": "Sheet1",
+            "address": "A1",
+            "before": {
+              "address": "A1",
+              "type": "text",
+              "value": "xlsx_content",
+              "formula": null
+            },
+            "after": null
+          }
+        ],
+        "wordPageSetupChanged": true
+      }
+    },
+    {
+      "cycle": 2,
+      "output": "test-results/compatibility/local-only-final/tika-wps-attachments/docx-cycle-2.docx",
+      "sha256": "608fad66564c6fdfefcb00511a7583acffb7436de615a41637f3ba044a381845",
+      "objectCount": 9,
+      "objects": [
+        {
+          "object": 1,
+          "name": "oleObject1.bin",
+          "bytes": 2560,
+          "sha256": "d78dcdd4a2c030db707b1d744968c7ad18f2da1aacee558daa53d3dbea807e08"
+        },
+        {
+          "object": 2,
+          "name": "oleObject2.bin",
+          "bytes": 26112,
+          "sha256": "e547b3c99e8536b375daa386e914df2daca2ebf155704680ad57e72493c9dc13"
+        },
+        {
+          "object": 3,
+          "name": "oleObject3.bin",
+          "bytes": 3072,
+          "sha256": "cc9afe78bb5c4bba0aa8e3be93cbfe86b69d67fd5348f1bc26c34f5bb1b4b75e"
+        },
+        {
+          "object": 4,
+          "name": "oleObject4.doc",
+          "bytes": 9728,
+          "sha256": "de094ae6510a43b64a99e2683ce36465d8e89f37ff9bc3d4321c18e3ea840de0"
+        },
+        {
+          "object": 5,
+          "name": "oleObject5.docx",
+          "bytes": 5272,
+          "sha256": "4b1e47f682d9afd80050573afdd9678d36f75ec25a736649ae9b154bd3cdf728"
+        },
+        {
+          "object": 6,
+          "name": "oleObject6.xls",
+          "bytes": 18944,
+          "sha256": "b7edad8dc33392136a45f9deef9d8f171bd07fa1f60c11d3a0eae50a6904daaf"
+        },
+        {
+          "object": 7,
+          "name": "oleObject7.xlsx",
+          "bytes": 5374,
+          "sha256": "9c83ec33a1aa1e35141e3dbd74b6052a309a35bf6b11fb09e8c132af01f20425"
+        },
+        {
+          "object": 8,
+          "name": "oleObject8.ppt",
+          "bytes": 87040,
+          "sha256": "08f2ae577231149fe6b957cadf4b042af2a1b5fc03caffdb9253e8155a7acb4e"
+        },
+        {
+          "object": 9,
+          "name": "oleObject9.pptx",
+          "bytes": 35840,
+          "sha256": "617f9dcccc4d6aafcf088a4d9bef96cf67144ef61798c4914a9b3d2fae22435f"
+        }
+      ],
+      "byteIdenticalToSource": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        8,
+        9
+      ],
+      "changedFromSource": [
+        5,
+        7
+      ],
+      "packages": {
+        "5": {
+          "packageSha256": "4b1e47f682d9afd80050573afdd9678d36f75ec25a736649ae9b154bd3cdf728",
+          "semantics": {
+            "format": "docx",
+            "text": [],
+            "features": {
+              "paragraphs": 1,
+              "tables": 0,
+              "comments": 0,
+              "footnotes": 0,
+              "endnotes": 0,
+              "trackedChanges": 0,
+              "imageReferences": 0,
+              "imageParts": 0,
+              "chartParts": 0,
+              "pivotTableParts": 0,
+              "embeddedObjects": 0,
+              "images": 0,
+              "charts": 0,
+              "hyperlinks": 0
+            },
+            "paragraphs": [
+              ""
+            ],
+            "tables": [],
+            "sections": [
+              {
+                "pageSize": {
+                  "w": "12240",
+                  "h": "15840"
+                },
+                "pageMargins": {
+                  "left": "1134",
+                  "right": "1134",
+                  "gutter": "0",
+                  "header": "0",
+                  "top": "1134",
+                  "footer": "0",
+                  "bottom": "1134"
+                },
+                "headers": [],
+                "footers": []
+              }
+            ]
+          }
+        },
+        "7": {
+          "packageSha256": "9c83ec33a1aa1e35141e3dbd74b6052a309a35bf6b11fb09e8c132af01f20425",
+          "semantics": {
+            "format": "xlsx",
+            "text": [],
+            "features": {
+              "sheets": 1,
+              "cells": 0,
+              "formulas": 0,
+              "mergedRanges": 0,
+              "imageParts": 0,
+              "chartParts": 0,
+              "pivotTableParts": 0,
+              "embeddedObjects": 0,
+              "images": 0,
+              "charts": 0,
+              "tables": 0,
+              "hyperlinks": 0
+            },
+            "sheets": [
+              {
+                "name": "Sheet1",
+                "state": "visible",
+                "cells": [],
+                "mergedRanges": []
+              }
+            ]
+          }
+        }
+      },
+      "lossDetected": true,
+      "differences": {
+        "missingWordText": [
+          "docx_content"
+        ],
+        "missingSheets": [
+          "Sheet2",
+          "Sheet3"
+        ],
+        "changedOrMissingCells": [
+          {
+            "sheet": "Sheet1",
+            "address": "A1",
+            "before": {
+              "address": "A1",
+              "type": "text",
+              "value": "xlsx_content",
+              "formula": null
+            },
+            "after": null
+          }
+        ],
+        "wordPageSetupChanged": true
+      }
+    },
+    {
+      "cycle": 3,
+      "output": "test-results/compatibility/local-only-final/tika-wps-attachments/docx-cycle-3.docx",
+      "sha256": "38a56d7cc789505f4a541ed162c9484a50e6f5abd8d241232c511529461a363b",
+      "objectCount": 9,
+      "objects": [
+        {
+          "object": 1,
+          "name": "oleObject1.bin",
+          "bytes": 2560,
+          "sha256": "d78dcdd4a2c030db707b1d744968c7ad18f2da1aacee558daa53d3dbea807e08"
+        },
+        {
+          "object": 2,
+          "name": "oleObject2.bin",
+          "bytes": 26112,
+          "sha256": "e547b3c99e8536b375daa386e914df2daca2ebf155704680ad57e72493c9dc13"
+        },
+        {
+          "object": 3,
+          "name": "oleObject3.bin",
+          "bytes": 3072,
+          "sha256": "cc9afe78bb5c4bba0aa8e3be93cbfe86b69d67fd5348f1bc26c34f5bb1b4b75e"
+        },
+        {
+          "object": 4,
+          "name": "oleObject4.doc",
+          "bytes": 9728,
+          "sha256": "de094ae6510a43b64a99e2683ce36465d8e89f37ff9bc3d4321c18e3ea840de0"
+        },
+        {
+          "object": 5,
+          "name": "oleObject5.docx",
+          "bytes": 5272,
+          "sha256": "e2acb55034481dda331a2a45220629e77e758cbf6b5e7a81a695830f214774d1"
+        },
+        {
+          "object": 6,
+          "name": "oleObject6.xls",
+          "bytes": 18944,
+          "sha256": "b7edad8dc33392136a45f9deef9d8f171bd07fa1f60c11d3a0eae50a6904daaf"
+        },
+        {
+          "object": 7,
+          "name": "oleObject7.xlsx",
+          "bytes": 5374,
+          "sha256": "391cde131b7e156f0337d7463da85425e3eb818cbdda35b648668094bcd0a3ea"
+        },
+        {
+          "object": 8,
+          "name": "oleObject8.ppt",
+          "bytes": 87040,
+          "sha256": "08f2ae577231149fe6b957cadf4b042af2a1b5fc03caffdb9253e8155a7acb4e"
+        },
+        {
+          "object": 9,
+          "name": "oleObject9.pptx",
+          "bytes": 35840,
+          "sha256": "617f9dcccc4d6aafcf088a4d9bef96cf67144ef61798c4914a9b3d2fae22435f"
+        }
+      ],
+      "byteIdenticalToSource": [
+        1,
+        2,
+        3,
+        4,
+        6,
+        8,
+        9
+      ],
+      "changedFromSource": [
+        5,
+        7
+      ],
+      "packages": {
+        "5": {
+          "packageSha256": "e2acb55034481dda331a2a45220629e77e758cbf6b5e7a81a695830f214774d1",
+          "semantics": {
+            "format": "docx",
+            "text": [],
+            "features": {
+              "paragraphs": 1,
+              "tables": 0,
+              "comments": 0,
+              "footnotes": 0,
+              "endnotes": 0,
+              "trackedChanges": 0,
+              "imageReferences": 0,
+              "imageParts": 0,
+              "chartParts": 0,
+              "pivotTableParts": 0,
+              "embeddedObjects": 0,
+              "images": 0,
+              "charts": 0,
+              "hyperlinks": 0
+            },
+            "paragraphs": [
+              ""
+            ],
+            "tables": [],
+            "sections": [
+              {
+                "pageSize": {
+                  "w": "12240",
+                  "h": "15840"
+                },
+                "pageMargins": {
+                  "left": "1134",
+                  "right": "1134",
+                  "gutter": "0",
+                  "header": "0",
+                  "top": "1134",
+                  "footer": "0",
+                  "bottom": "1134"
+                },
+                "headers": [],
+                "footers": []
+              }
+            ]
+          }
+        },
+        "7": {
+          "packageSha256": "391cde131b7e156f0337d7463da85425e3eb818cbdda35b648668094bcd0a3ea",
+          "semantics": {
+            "format": "xlsx",
+            "text": [],
+            "features": {
+              "sheets": 1,
+              "cells": 0,
+              "formulas": 0,
+              "mergedRanges": 0,
+              "imageParts": 0,
+              "chartParts": 0,
+              "pivotTableParts": 0,
+              "embeddedObjects": 0,
+              "images": 0,
+              "charts": 0,
+              "tables": 0,
+              "hyperlinks": 0
+            },
+            "sheets": [
+              {
+                "name": "Sheet1",
+                "state": "visible",
+                "cells": [],
+                "mergedRanges": []
+              }
+            ]
+          }
+        }
+      },
+      "lossDetected": true,
+      "differences": {
+        "missingWordText": [
+          "docx_content"
+        ],
+        "missingSheets": [
+          "Sheet2",
+          "Sheet3"
+        ],
+        "changedOrMissingCells": [
+          {
+            "sheet": "Sheet1",
+            "address": "A1",
+            "before": {
+              "address": "A1",
+              "type": "text",
+              "value": "xlsx_content",
+              "formula": null
+            },
+            "after": null
+          }
+        ],
+        "wordPageSetupChanged": true
+      }
+    }
+  ],
+  "lossDetected": true,
+  "limits": {
+    "renderedPageCount": "Not measured; XML page setup is not a rendered page count",
+    "unchangedHashes": "Prove binary preservation only, not execution safety or Office interoperability",
+    "coverage": "Two simple embedded packages; no formulas or tables in these packages"
+  }
+}

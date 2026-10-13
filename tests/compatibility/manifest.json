@@ -1,0 +1,1022 @@
+{
+  "schemaVersion": 1,
+  "description": "Original generated and separately attributed upstream office compatibility fixtures; no claim of Microsoft/WPS interoperability certification.",
+  "fixtureRoot": "tests/compatibility",
+  "fixtures": [
+    {
+      "id": "writer-rich",
+      "path": "fixtures/generated/writer-rich.docx",
+      "kind": "word",
+      "format": "docx",
+      "bytes": 41212,
+      "sha256": "ab9f2dffd9c8444a0f19406005b7fecb9bd352ea53ad358e737ece361ed66acb",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "python-docx 1.2.0; original Pillow diagram",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "bilingual",
+        "heading-styles",
+        "numbered-list",
+        "merged-table",
+        "header-footer",
+        "page-number-field",
+        "image",
+        "external-hyperlink-no-fetch",
+        "page-break"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "COMPAT-WORD-RICH",
+          "江南项目",
+          "MERGED-PROJECT-HEADER",
+          "APPENDIX-PERSISTENT"
+        ],
+        "minimumFeatures": {
+          "tables": 1,
+          "images": 1,
+          "hyperlinks": 1
+        }
+      }
+    },
+    {
+      "id": "calc-rich",
+      "path": "fixtures/generated/calc-rich.xlsx",
+      "kind": "sheet",
+      "format": "xlsx",
+      "bytes": 13665,
+      "sha256": "a6ebd1f157f45a8936b38881b7a560d7a6cd66a485181132b9d6eeea9342d942",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "XlsxWriter 3.2.9; original Pillow diagram",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "bilingual",
+        "three-sheets",
+        "hidden-sheet",
+        "formula-cache",
+        "cross-sheet-formula",
+        "merged-cells",
+        "number-format",
+        "data-validation",
+        "conditional-format",
+        "chart",
+        "named-range",
+        "comment",
+        "image",
+        "hyperlink",
+        "freeze-panes",
+        "autofilter",
+        "literal-formula-text"
+      ],
+      "assertions": {
+        "sheetNames": [
+          "Summary",
+          "Data",
+          "Archive"
+        ],
+        "sheetCells": [
+          {
+            "sheet": "Summary",
+            "address": "A1",
+            "type": "text",
+            "value": "COMPAT-CALC-RICH"
+          },
+          {
+            "sheet": "Summary",
+            "address": "B3",
+            "type": "formula",
+            "formula": "SUM(Data!D2:D5)",
+            "value": 228
+          },
+          {
+            "sheet": "Data",
+            "address": "D2",
+            "type": "formula",
+            "formula": "B2*C2",
+            "value": 80
+          },
+          {
+            "sheet": "Data",
+            "address": "F2",
+            "type": "text",
+            "value": "00123"
+          },
+          {
+            "sheet": "Data",
+            "address": "F3",
+            "type": "text",
+            "value": "=SUM(9,9)"
+          }
+        ],
+        "minimumFeatures": {
+          "charts": 1,
+          "images": 1,
+          "hyperlinks": 1
+        }
+      }
+    },
+    {
+      "id": "presentation-rich",
+      "path": "fixtures/generated/presentation-rich.pptx",
+      "kind": "presentation",
+      "format": "pptx",
+      "bytes": 46346,
+      "sha256": "db886bbf77e47a73eba60e143a92f5df6d5ed8b7b39d374ab9796abe0258a7da",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "python-pptx 1.0.2; original Pillow diagram",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "bilingual",
+        "three-layouts",
+        "editable-table",
+        "editable-chart",
+        "image",
+        "hyperlink",
+        "shape",
+        "speaker-notes"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "COMPAT-PRESENTATION-RICH",
+          "Editable data",
+          "PROCESS-THREE-STEPS"
+        ],
+        "slideCount": 3,
+        "minimumFeatures": {
+          "tables": 1,
+          "charts": 1,
+          "images": 1,
+          "hyperlinks": 1
+        }
+      }
+    },
+    {
+      "id": "writer-long-report",
+      "path": "fixtures/generated/writer-long-report.docx",
+      "kind": "word",
+      "format": "docx",
+      "bytes": 52653,
+      "sha256": "98a2267ea8559ad70c41575a0ab9fcfe976259952a3e5d97e96cde816ee2013b",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "python-docx 1.2.0; 20 compact explicit sections, rendered page count must be measured",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "20-explicit-page-sections",
+        "mixed-portrait-landscape",
+        "20-tables",
+        "section-specific-headers",
+        "repeated-image",
+        "bilingual"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "LONG-PAGE-01",
+          "LONG-PAGE-10",
+          "LONG-PAGE-20",
+          "S20-R5-C4"
+        ],
+        "minimumFeatures": {
+          "tables": 20,
+          "images": 1
+        }
+      }
+    },
+    {
+      "id": "writer-review-footnotes",
+      "path": "fixtures/generated/writer-review-footnotes.docx",
+      "kind": "word",
+      "format": "docx",
+      "bytes": 40860,
+      "sha256": "f49228398ed7506384c17be51d48871e096911d8991f46d6da12cecc8112f3ad",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "python-docx 1.2.0; explicit original OOXML review and footnote parts",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "bilingual",
+        "comment",
+        "tracked-insertion",
+        "tracked-deletion",
+        "footnote",
+        "nested-table",
+        "merged-table",
+        "image"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "COMPAT-REVIEW-DOCX",
+          "COMMENT-ANCHOR",
+          "OUTER-CELL-PERSISTENT"
+        ],
+        "minimumFeatures": {
+          "tables": 2,
+          "images": 1,
+          "comments": 1,
+          "footnotes": 1,
+          "trackedChanges": 2
+        }
+      }
+    },
+    {
+      "id": "calc-2000-rows",
+      "path": "fixtures/generated/calc-2000-rows.xlsx",
+      "kind": "sheet",
+      "format": "xlsx",
+      "bytes": 96221,
+      "sha256": "da2a15e8c076fe864a60a6c45ce28594181ca418898a837e4d3601646e686159",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "XlsxWriter 3.2.9; deterministic 2000-row ledger",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "2000-data-rows",
+        "4000-row-formulas",
+        "four-sheets",
+        "cross-sheet-formulas",
+        "table",
+        "line-chart",
+        "hidden-sheet",
+        "named-range",
+        "validation",
+        "conditional-format",
+        "repeat-print-header"
+      ],
+      "assertions": {
+        "sheetNames": [
+          "Dashboard",
+          "Transactions",
+          "TaxRates",
+          "HiddenCalc"
+        ],
+        "sheetCells": [
+          {
+            "sheet": "Dashboard",
+            "address": "A1",
+            "type": "text",
+            "value": "COMPAT-LARGE-CALC"
+          },
+          {
+            "sheet": "Dashboard",
+            "address": "B3",
+            "type": "formula",
+            "value": 179812
+          },
+          {
+            "sheet": "Dashboard",
+            "address": "B4",
+            "type": "formula",
+            "value": 2000
+          },
+          {
+            "sheet": "Transactions",
+            "address": "A2001",
+            "type": "text",
+            "value": "TXN-02000"
+          }
+        ],
+        "minimumFeatures": {
+          "charts": 1
+        }
+      }
+    },
+    {
+      "id": "calc-dates-validation",
+      "path": "fixtures/generated/calc-dates-validation.xlsx",
+      "kind": "sheet",
+      "format": "xlsx",
+      "bytes": 7984,
+      "sha256": "d6478cd0a392c2769f5a5a599484ff3abf38bb4db55b36c00f28fb379f6e7e53",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "XlsxWriter 3.2.9; 1904 date epoch and validation edge cases",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "1904-date-system",
+        "leap-day",
+        "date-number-format",
+        "boolean",
+        "formula",
+        "literal-leading-zero",
+        "literal-equals-text",
+        "named-validation-list",
+        "icon-conditional-format",
+        "hidden-row-column",
+        "very-hidden-sheet",
+        "comment"
+      ],
+      "assertions": {
+        "sheetNames": [
+          "Calendar",
+          "Lists"
+        ],
+        "sheetCells": [
+          {
+            "sheet": "Calendar",
+            "address": "A1",
+            "type": "text",
+            "value": "COMPAT-DATE-SYSTEM"
+          },
+          {
+            "sheet": "Calendar",
+            "address": "A5",
+            "type": "text",
+            "value": "0000123"
+          },
+          {
+            "sheet": "Calendar",
+            "address": "A6",
+            "type": "text",
+            "value": "=1+1"
+          },
+          {
+            "sheet": "Calendar",
+            "address": "B6",
+            "type": "formula",
+            "value": 42
+          }
+        ]
+      }
+    },
+    {
+      "id": "presentation-20-slides",
+      "path": "fixtures/generated/presentation-20-slides.pptx",
+      "kind": "presentation",
+      "format": "pptx",
+      "bytes": 108621,
+      "sha256": "d465e9b0035591b6dca92a16f707a91c282f7bda71a3b8ca3ed93d7d3ed91f78",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "python-pptx 1.0.2; original 20-slide briefing",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "20-slides",
+        "four-layouts",
+        "5-editable-tables",
+        "5-editable-charts",
+        "10-images",
+        "20-speaker-notes",
+        "2-hidden-slides",
+        "bilingual"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "DECK-PAGE-01",
+          "DECK-PAGE-10",
+          "DECK-PAGE-20"
+        ],
+        "slideCount": 20,
+        "minimumFeatures": {
+          "tables": 5,
+          "charts": 5,
+          "images": 1
+        }
+      }
+    },
+    {
+      "id": "presentation-effects-media",
+      "path": "fixtures/generated/presentation-effects-media.pptx",
+      "kind": "presentation",
+      "format": "pptx",
+      "bytes": 39061,
+      "sha256": "4e2400482aef07ad252d888e36fb0e8c7237fbaafe4fa303d68c25ba70603537",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "python-pptx 1.0.2; explicit original OOXML timing and 1-second synthesized WAV",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "editable-shape",
+        "fade-entrance-animation",
+        "slide-transition",
+        "timed-advance",
+        "embedded-original-wav-transition-sound",
+        "speaker-notes",
+        "image"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "COMPAT-EFFECTS-MEDIA",
+          "ANIMATED-EDITABLE-SHAPE",
+          "SECOND-TIMED-SLIDE"
+        ],
+        "slideCount": 2,
+        "minimumFeatures": {
+          "images": 1
+        }
+      }
+    },
+    {
+      "id": "writer-unicode-tables",
+      "path": "fixtures/generated/writer-unicode-tables.rtf",
+      "kind": "word",
+      "format": "rtf",
+      "bytes": 6232,
+      "sha256": "6979977225d8fa1aa28e99c585cceea4f6f2fb2e1a7d2d0d5f0e606fc48e5bbe",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "Original standards-based RTF generator with Pillow PNG",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "rtf-unicode",
+        "table",
+        "header-footer",
+        "image",
+        "text-format",
+        "explicit-page-break"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "COMPAT-RICH-RTF",
+          "RTF-TABLE-SENTINEL",
+          "SECOND-RTF-PAGE"
+        ],
+        "minimumFeatures": {
+          "images": 1
+        }
+      }
+    },
+    {
+      "id": "writer-original-odf",
+      "path": "fixtures/generated/writer-original-odf.odt",
+      "kind": "word",
+      "format": "odt",
+      "bytes": 5025,
+      "sha256": "06194ca3a0e05d128c0c2ed304a2d9cd549cb02c66698b470a91f794d6b844ba",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "Original ODF 1.2 XML/ZIP generator; not LibreOffice-authored",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "original-odf",
+        "bilingual",
+        "table",
+        "image",
+        "hyperlink",
+        "header-footer",
+        "footnote",
+        "explicit-page-break"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "COMPAT-ORIGINAL-ODT",
+          "ODT-TABLE-SENTINEL",
+          "ODT-SECOND-PAGE"
+        ],
+        "minimumFeatures": {
+          "tables": 1,
+          "images": 1,
+          "footnotes": 1,
+          "hyperlinks": 1
+        }
+      }
+    },
+    {
+      "id": "calc-original-odf",
+      "path": "fixtures/generated/calc-original-odf.ods",
+      "kind": "sheet",
+      "format": "ods",
+      "bytes": 2240,
+      "sha256": "f2ecb70c3d4c3a1a8e21509765d3972c6978a59fb41f4e7b01f9fe7e9003d4e7",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "Original ODF 1.2 XML/ZIP generator; not LibreOffice-authored",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "original-odf",
+        "two-sheets",
+        "cross-sheet-formula",
+        "numeric-cached-result",
+        "named-range",
+        "bilingual",
+        "literal-leading-zero"
+      ],
+      "assertions": {
+        "sheetNames": [
+          "Budget",
+          "Calculations"
+        ],
+        "sheetCells": [
+          {
+            "sheet": "Budget",
+            "address": "A1",
+            "type": "text",
+            "value": "COMPAT-ORIGINAL-ODS"
+          },
+          {
+            "sheet": "Calculations",
+            "address": "B1",
+            "type": "formula",
+            "value": 2150
+          },
+          {
+            "sheet": "Calculations",
+            "address": "B2",
+            "type": "text",
+            "value": "000987"
+          }
+        ]
+      }
+    },
+    {
+      "id": "presentation-original-odf",
+      "path": "fixtures/generated/presentation-original-odf.odp",
+      "kind": "presentation",
+      "format": "odp",
+      "bytes": 5022,
+      "sha256": "0cad3365fce34c9cc4a856793e3550fdd022b2b4da6ad1d428c9b28ba78e8a97",
+      "provenance": {
+        "type": "generated",
+        "sourceUrl": null,
+        "sourceCommit": null,
+        "license": "MIT",
+        "author": "Open Office project contributors",
+        "generator": "Original ODF 1.2 XML/ZIP generator; not LibreOffice-authored",
+        "generatorPath": "generate-fixtures.py",
+        "producerDeclared": "Generated test fixture; not a Microsoft Office, WPS or LibreOffice-authored original",
+        "reproducibleTimestamp": "2025-01-15T12:00:00Z"
+      },
+      "features": [
+        "original-odf",
+        "three-slides",
+        "table",
+        "image",
+        "editable-shape",
+        "notes",
+        "hyperlink"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "COMPAT-ORIGINAL-ODP",
+          "ODP-DATA-SLIDE",
+          "ODP-FINAL-SLIDE"
+        ],
+        "slideCount": 3,
+        "minimumFeatures": {
+          "tables": 1,
+          "images": 1,
+          "hyperlinks": 1
+        }
+      }
+    },
+    {
+      "id": "poi-word-page-headers",
+      "path": "fixtures/upstream/apache-poi/PageSpecificHeadFoot.doc",
+      "kind": "word",
+      "format": "doc",
+      "bytes": 31232,
+      "sha256": "081c946c701a3061c32c41bef5235f518465a6a62b1250f6834b01ac6bbebbfe",
+      "provenance": {
+        "type": "upstream-fixture",
+        "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/document/PageSpecificHeadFoot.doc",
+        "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+        "license": "Apache-2.0",
+        "licensePath": "fixtures/upstream/apache-poi/LICENSE",
+        "noticePath": "fixtures/upstream/apache-poi/NOTICE",
+        "licenseScope": "Apache POI source repository test-data, with complete upstream legal/LICENSE and NOTICE retained; no separate file-specific license was listed.",
+        "producerDeclared": "Microsoft Office Word",
+        "producerVerification": "Declared document metadata only, not an independently observed authoring session.",
+        "modified": false
+      },
+      "features": [
+        "legacy-binary-doc",
+        "odd-even-page-headers",
+        "multi-column-header-footer"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "This is a sample word document.",
+          "HEADING TEXT",
+          "This is page two."
+        ]
+      }
+    },
+    {
+      "id": "poi-excel-drawing-comments",
+      "path": "fixtures/upstream/apache-poi/DrawingAndComments.xls",
+      "kind": "sheet",
+      "format": "xls",
+      "bytes": 43520,
+      "sha256": "7090a0e8dcde4096621292e2a4c6a068695629491a668441269c252fcd5995d1",
+      "provenance": {
+        "type": "upstream-fixture",
+        "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/spreadsheet/DrawingAndComments.xls",
+        "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+        "license": "Apache-2.0",
+        "licensePath": "fixtures/upstream/apache-poi/LICENSE",
+        "noticePath": "fixtures/upstream/apache-poi/NOTICE",
+        "licenseScope": "Apache POI source repository test-data, with complete upstream legal/LICENSE and NOTICE retained; no separate file-specific license was listed.",
+        "producerDeclared": "Microsoft Excel",
+        "producerVerification": "Declared document metadata only, not an independently observed authoring session.",
+        "modified": false
+      },
+      "features": [
+        "legacy-binary-xls",
+        "drawing",
+        "comments",
+        "three-sheets"
+      ],
+      "assertions": {
+        "sheetNames": [
+          "Sheet1",
+          "Sheet2",
+          "Sheet3"
+        ],
+        "sheetCells": [
+          {
+            "sheet": "Sheet1",
+            "address": "A1",
+            "type": "text",
+            "value": "fsdf"
+          }
+        ]
+      }
+    },
+    {
+      "id": "poi-powerpoint-table",
+      "path": "fixtures/upstream/apache-poi/table_test.ppt",
+      "kind": "presentation",
+      "format": "ppt",
+      "bytes": 122368,
+      "sha256": "4e5c3e64cb0de2b98e7f5d8f8259b4689cc52a3793bd4e0f011493284ee39d77",
+      "provenance": {
+        "type": "upstream-fixture",
+        "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/slideshow/table_test.ppt",
+        "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+        "license": "Apache-2.0",
+        "licensePath": "fixtures/upstream/apache-poi/LICENSE",
+        "noticePath": "fixtures/upstream/apache-poi/NOTICE",
+        "licenseScope": "Apache POI source repository test-data, with complete upstream legal/LICENSE and NOTICE retained; no separate file-specific license was listed.",
+        "producerDeclared": "Microsoft Office PowerPoint",
+        "producerVerification": "Declared document metadata only, not an independently observed authoring session.",
+        "modified": false
+      },
+      "features": [
+        "legacy-binary-ppt",
+        "table-shapes"
+      ],
+      "assertions": {
+        "slideCount": 1
+      }
+    },
+    {
+      "id": "poi-word-footnotes",
+      "path": "fixtures/upstream/apache-poi/footnotes.docx",
+      "kind": "word",
+      "format": "docx",
+      "bytes": 12823,
+      "sha256": "9070094b27ff5201477f4de4b2c027730c66cb889106a1609c5adeed207a59c1",
+      "provenance": {
+        "type": "upstream-fixture",
+        "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/document/footnotes.docx",
+        "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+        "license": "Apache-2.0",
+        "licensePath": "fixtures/upstream/apache-poi/LICENSE",
+        "noticePath": "fixtures/upstream/apache-poi/NOTICE",
+        "licenseScope": "Apache POI source repository test-data, with complete upstream legal/LICENSE and NOTICE retained; no separate file-specific license was listed.",
+        "producerDeclared": "Microsoft Office Word",
+        "producerVerification": "Declared document metadata only, not an independently observed authoring session.",
+        "modified": false
+      },
+      "features": [
+        "word-declared-docx",
+        "footnote",
+        "endnote-parts"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "Eto ochen prostoy text so snoskoy"
+        ],
+        "minimumFeatures": {
+          "footnotes": 1
+        }
+      }
+    },
+    {
+      "id": "poi-powerpoint-smartart",
+      "path": "fixtures/upstream/apache-poi/smartart-simple.pptx",
+      "kind": "presentation",
+      "format": "pptx",
+      "bytes": 71102,
+      "sha256": "238ff6433dac00b2722edb9a29d97f56ab4f3c9c37f33a73d6f53baf494916aa",
+      "provenance": {
+        "type": "upstream-fixture",
+        "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/slideshow/smartart-simple.pptx",
+        "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+        "license": "Apache-2.0",
+        "licensePath": "fixtures/upstream/apache-poi/LICENSE",
+        "noticePath": "fixtures/upstream/apache-poi/NOTICE",
+        "licenseScope": "Apache POI source repository test-data, with complete upstream legal/LICENSE and NOTICE retained; no separate file-specific license was listed.",
+        "producerDeclared": "Microsoft Macintosh PowerPoint",
+        "producerVerification": "Declared document metadata only, not an independently observed authoring session.",
+        "modified": false
+      },
+      "features": [
+        "macintosh-powerpoint-declared",
+        "smartart",
+        "theme",
+        "gradient",
+        "transparency",
+        "image-fill"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "This file contains a SmartArt diagram"
+        ],
+        "slideCount": 1,
+        "minimumFeatures": {
+          "images": 1
+        }
+      }
+    },
+    {
+      "id": "poi-excel-pivots",
+      "path": "fixtures/upstream/apache-poi/ExcelPivotTableSample.xlsx",
+      "kind": "sheet",
+      "format": "xlsx",
+      "bytes": 19460,
+      "sha256": "f0ef1d61c9f3d8b27b18a876b8e24676314c6450ed64a725a7bfaa603fdd67e3",
+      "provenance": {
+        "type": "upstream-fixture",
+        "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/spreadsheet/ExcelPivotTableSample.xlsx",
+        "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+        "license": "Apache-2.0",
+        "licensePath": "fixtures/upstream/apache-poi/LICENSE",
+        "noticePath": "fixtures/upstream/apache-poi/NOTICE",
+        "licenseScope": "Apache POI source repository test-data, with complete upstream legal/LICENSE and NOTICE retained; no separate file-specific license was listed.",
+        "producerDeclared": "Microsoft Excel",
+        "producerVerification": "Declared document metadata only, not an independently observed authoring session.",
+        "modified": false
+      },
+      "features": [
+        "excel-declared-xlsx",
+        "two-pivot-tables",
+        "pivot-cache",
+        "three-sheets",
+        "table",
+        "date-format"
+      ],
+      "assertions": {
+        "sheetNames": [
+          "Tabelle1",
+          "Tabelle2",
+          "Tabelle3"
+        ],
+        "sheetCells": [
+          {
+            "sheet": "Tabelle1",
+            "address": "A1",
+            "type": "text",
+            "value": "Field1"
+          },
+          {
+            "sheet": "Tabelle3",
+            "address": "B4",
+            "type": "number",
+            "value": 11
+          }
+        ]
+      }
+    },
+    {
+      "id": "poi-libreoffice-ods",
+      "path": "fixtures/upstream/apache-poi/SampleSS.ods",
+      "kind": "sheet",
+      "format": "ods",
+      "bytes": 20391,
+      "sha256": "a551ef35d3faddae4bf135960bde419f4a0140f9398c2218614b089ae8a4b46f",
+      "provenance": {
+        "type": "upstream-fixture",
+        "sourceUrl": "https://raw.githubusercontent.com/apache/poi/f3688f45b0de8934fb32736ba14efc5bbca4a580/test-data/spreadsheet/SampleSS.ods",
+        "sourceCommit": "f3688f45b0de8934fb32736ba14efc5bbca4a580",
+        "license": "Apache-2.0",
+        "licensePath": "fixtures/upstream/apache-poi/LICENSE",
+        "noticePath": "fixtures/upstream/apache-poi/NOTICE",
+        "licenseScope": "Apache POI source repository test-data, with complete upstream legal/LICENSE and NOTICE retained; no separate file-specific license was listed.",
+        "producerDeclared": "LibreOffice/4.2.8.2$Linux_X86_64 LibreOffice_project/420m0$Build-2",
+        "producerVerification": "Declared document metadata only, not an independently observed authoring session.",
+        "modified": false
+      },
+      "features": [
+        "libreoffice-declared-ods",
+        "multiple-sheets",
+        "fonts",
+        "cell-colors",
+        "formula"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "Test spreadsheet",
+          "Start of 2nd sheet"
+        ]
+      }
+    },
+    {
+      "id": "onlyoffice-mobile-word",
+      "path": "fixtures/upstream/onlyoffice-document-templates/sample.docx",
+      "kind": "word",
+      "format": "docx",
+      "bytes": 159782,
+      "sha256": "f1515f28731b2bae713dcdacfd3d7c6274eb1e92db27b64b2e9d5e70aaf9916c",
+      "provenance": {
+        "type": "upstream-fixture",
+        "sourceUrl": "https://raw.githubusercontent.com/ONLYOFFICE/document-templates/0a52fb76fa53fddf7d70da28878537cde3d29421/sample-mobile/sample.docx",
+        "sourceCommit": "0a52fb76fa53fddf7d70da28878537cde3d29421",
+        "license": "Apache-2.0",
+        "licensePath": "fixtures/upstream/onlyoffice-document-templates/LICENSE",
+        "upstreamReadmePath": "fixtures/upstream/onlyoffice-document-templates/UPSTREAM-README.md",
+        "licenseScope": "Official ONLYOFFICE document-templates repository; complete upstream Apache-2.0 LICENSE retained. No separate NOTICE was listed at the repository root.",
+        "producerDeclared": "ONLYOFFICE/9.4.0.129",
+        "producerVerification": "Declared docProps/app.xml Application only, not an independently observed authoring session. Official repository describes sample templates for ONLYOFFICE Documents for Android.",
+        "modified": false
+      },
+      "features": [
+        "onlyoffice-declared-docx",
+        "four-tables",
+        "seven-images",
+        "editable-chart",
+        "comment",
+        "section-styles",
+        "layout"
+      ],
+      "assertions": {
+        "textIncludes": [
+          "What the editor can do",
+          "And a table you can edit inline"
+        ],
+        "minimumFeatures": {
+          "tables": 4,
+          "images": 7,
+          "charts": 1,
+          "comments": 1
+        }
+      }
+    },
+    {
+      "id": "onlyoffice-mobile-sheet",
+      "path": "fixtures/upstream/onlyoffice-document-templates/sample.xlsx",
+      "kind": "sheet",
+      "format": "xlsx",
+      "bytes": 47155,
+      "sha256": "50858be515ff6bfc19031adff5889934bd624ba6baac4c1a2afb0f940b4977f5",
+      "provenance": {
+        "type": "upstream-fixture",
+        "sourceUrl": "https://raw.githubusercontent.com/ONLYOFFICE/document-templates/0a52fb76fa53fddf7d70da28878537cde3d29421/sample-mobile/sample.xlsx",
+        "sourceCommit": "0a52fb76fa53fddf7d70da28878537cde3d29421",
+        "license": "Apache-2.0",
+        "licensePath": "fixtures/upstream/onlyoffice-document-templates/LICENSE",
+        "upstreamReadmePath": "fixtures/upstream/onlyoffice-document-templates/UPSTREAM-README.md",
+        "licenseScope": "Official ONLYOFFICE document-templates repository; complete upstream Apache-2.0 LICENSE retained. No separate NOTICE was listed at the repository root.",
+        "producerDeclared": "ONLYOFFICE/9.4.0.129",
+        "producerVerification": "Declared docProps/app.xml Application only, not an independently observed authoring session. Official repository describes sample templates for ONLYOFFICE Documents for Android.",
+        "modified": false
+      },
+      "features": [
+        "onlyoffice-declared-xlsx",
+        "28-formulas",
+        "43-merged-ranges",
+        "three-charts",
+        "four-images",
+        "table",
+        "conditional-format"
+      ],
+      "assertions": {
+        "sheetNames": [
+          "Template"
+        ],
+        "sheetCells": [
+          {
+            "sheet": "Template",
+            "address": "B2",
+            "type": "text",
+            "value": "Spreadsheet Template"
+          }
+        ],
+        "minimumFeatures": {
+          "charts": 3,
+          "images": 4,
+          "tables": 1
+        }
+      }
+    },
+    {
+      "id": "tika-wps-attachments",
+      "path": "fixtures/upstream/apache-tika/testWPSAttachment.docx",
+      "kind": "word",
+      "format": "docx",
+      "bytes": 130189,
+      "sha256": "f9373ab9c763603ce72e4a5490c727be745bf48a98d703bab1c9f98ff9cc8a36",
+      "provenance": {
+        "type": "upstream-fixture",
+        "sourceUrl": "https://raw.githubusercontent.com/apache/tika/7cb848a1ac9c3374ebaa909225ba2185a54ae074/tika-parsers/tika-parsers-standard/tika-parsers-standard-modules/tika-parser-microsoft-module/src/test/resources/test-documents/testWPSAttachment.docx",
+        "sourceCommit": "7cb848a1ac9c3374ebaa909225ba2185a54ae074",
+        "license": "Apache-2.0",
+        "licensePath": "fixtures/upstream/apache-tika/LICENSE.txt",
+        "noticePath": "fixtures/upstream/apache-tika/NOTICE.txt",
+        "licenseScope": "Apache Tika source repository test-documents, complete upstream LICENSE.txt and NOTICE.txt retained.",
+        "producerDeclared": "WPS Office_11.1.0.10700_F1E327BC-269C-435d-A152-05C5408002CA",
+        "producerVerification": "Declared docProps/app.xml Application only, not an independently observed authoring session. This is an attachment-container regression fixture, not evidence of rich WPS body-text coverage.",
+        "modified": false
+      },
+      "features": [
+        "wps-declared-docx",
+        "attachment-container",
+        "nine-embedded-ole-objects",
+        "nine-preview-images",
+        "no-body-text",
+        "attachments-not-executed"
+      ],
+      "assertions": {
+        "minimumFeatures": {
+          "embeddedObjects": 9,
+          "images": 9
+        }
+      }
+    }
+  ]
+}

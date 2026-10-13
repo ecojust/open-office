@@ -1,10 +1,12 @@
+import type { Extension } from '../shared/document'
+
 export type OfficeKind = 'word' | 'sheet' | 'presentation'
 export type OfficeFormat = 'docx' | 'odt' | 'xlsx' | 'ods' | 'pptx' | 'odp' | 'pdf'
 export interface OfficeDocument {
   id: string
   name: string
   kind: OfficeKind
-  extension: string
+  extension: Extension
   base64: string
   sha256: string
   sizeBytes: number

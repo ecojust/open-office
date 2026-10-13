@@ -1,0 +1,2429 @@
+{
+  "schemaVersion": 1,
+  "scope": "Pinned source fixtures in the bundled editor. This index is not a claim of Microsoft/WPS/ONLYOFFICE interoperability or full feature parity. Review, observed losses and protected unsupported conversions remain explicit.",
+  "runs": [
+    {
+      "report": "test-results/compatibility/local-only-full/rechecked-report.json",
+      "reportSha256": "1fe0891c08ef66e0cd6865cbb810ec574a7553e4d41dfdd5107a83fa151aa978",
+      "startedAt": "2026-10-13T05:36:15.280Z",
+      "finishedAt": "2026-10-13T05:54:06.498Z",
+      "semanticRecheck": {
+        "at": "2026-10-13T06:02:40.762Z",
+        "originalReport": "report.json",
+        "reason": "Independent parser/comparator correction; original Office bytes and original browser report retained",
+        "newBrowserRun": false
+      },
+      "supplementalAttachmentAudit": null,
+      "implementationSha256": null,
+      "implementationUnchanged": null,
+      "environment": null,
+      "summary": {
+        "fixtures": 22,
+        "passed": 0,
+        "needsReview": 15,
+        "failed": 7,
+        "attemptedCycles": 130,
+        "savedCycles": 129,
+        "reopenedCycles": 129,
+        "completeCycles": 104,
+        "reopenedBranches": 43,
+        "externalRequests": 0,
+        "pageErrors": 0
+      },
+      "externalRequests": [],
+      "pageErrors": [],
+      "cases": [
+        {
+          "id": "writer-rich",
+          "sourceFormat": "docx",
+          "sourceSha256": "ab9f2dffd9c8444a0f19406005b7fecb9bd352ea53ad358e737ece361ed66acb",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "docx",
+              "status": "pass",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": []
+            },
+            {
+              "format": "odt",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "TABLE_REPRESENTATION",
+                "TEXT_OBJECT_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "calc-rich",
+          "sourceFormat": "xlsx",
+          "sourceSha256": "a6ebd1f157f45a8936b38881b7a560d7a6cd66a485181132b9d6eeea9342d942",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "xlsx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 4,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CHART_LITERAL_REPRESENTATION",
+                "CONDITIONAL_STYLE_UNINSPECTED"
+              ]
+            },
+            {
+              "format": "ods",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 4,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED",
+                "SHEET_VISIBILITY_UNINSPECTED",
+                "FORMULA_REPRESENTATION",
+                "DEFINED_NAME_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "presentation-rich",
+          "sourceFormat": "pptx",
+          "sourceSha256": "db886bbf77e47a73eba60e143a92f5df6d5ed8b7b39d374ab9796abe0258a7da",
+          "sourceInspection": "parsed",
+          "status": "fail",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "pptx",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [
+                "EMBEDDED_OBJECT_COUNT: features.embeddedObjects",
+                "FORMULA_EXPRESSION: presentation.slides[1].charts[0].series[0].title.formula",
+                "FORMULA_EXPRESSION: presentation.slides[1].charts[0].series[0].categories.formula",
+                "FORMULA_EXPRESSION: presentation.slides[1].charts[0].series[0].values.formula",
+                "FORMULA_EXPRESSION: presentation.slides[1].charts[0].series[1].title.formula",
+                "FORMULA_EXPRESSION: presentation.slides[1].charts[0].series[1].categories.formula",
+                "FORMULA_EXPRESSION: presentation.slides[1].charts[0].series[1].values.formula",
+                "CHART_EDITABLE_WORKBOOK: presentation.slides[1].charts[0].externalData"
+              ],
+              "reviewCodes": [
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED",
+                "EMBEDDED_CHART_WORKBOOK_UNINSPECTED"
+              ]
+            },
+            {
+              "format": "odp",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED",
+                "SLIDE_VISIBILITY_AND_OBJECT_REPRESENTATION",
+                "TABLE_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "writer-long-report",
+          "sourceFormat": "docx",
+          "sourceSha256": "98a2267ea8559ad70c41575a0ab9fcfe976259952a3e5d97e96cde816ee2013b",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "docx",
+              "status": "pass",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 20,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": []
+            },
+            {
+              "format": "odt",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 20,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "TABLE_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "writer-review-footnotes",
+          "sourceFormat": "docx",
+          "sourceSha256": "f49228398ed7506384c17be51d48871e096911d8991f46d6da12cecc8112f3ad",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "docx",
+              "status": "pass",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": []
+            },
+            {
+              "format": "odt",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "TABLE_REPRESENTATION",
+                "REVISION_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "calc-2000-rows",
+          "sourceFormat": "xlsx",
+          "sourceSha256": "da2a15e8c076fe864a60a6c45ce28594181ca418898a837e4d3601646e686159",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "xlsx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 45,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CHART_LITERAL_REPRESENTATION",
+                "CONDITIONAL_STYLE_UNINSPECTED"
+              ]
+            },
+            {
+              "format": "ods",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 45,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED",
+                "SHEET_VISIBILITY_UNINSPECTED",
+                "FORMULA_REPRESENTATION",
+                "DEFINED_NAME_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "calc-dates-validation",
+          "sourceFormat": "xlsx",
+          "sourceSha256": "d6478cd0a392c2769f5a5a599484ff3abf38bb4db55b36c00f28fb379f6e7e53",
+          "sourceInspection": "parsed",
+          "status": "fail",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "xlsx",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [
+                "CELL_TYPE: spreadsheet.Calendar!B5.type",
+                "SHEET_VISIBILITY: spreadsheet.Lists.state"
+              ],
+              "reviewCodes": [
+                "FORMULA_REPRESENTATION_ADDED",
+                "CONDITIONAL_STYLE_UNINSPECTED"
+              ]
+            },
+            {
+              "format": "ods",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [
+                "CELL_TYPE: spreadsheet.Calendar!B5.type"
+              ],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "SHEET_VISIBILITY_UNINSPECTED",
+                "DATE_CELL_REPRESENTATION",
+                "FORMULA_REPRESENTATION",
+                "DEFINED_NAME_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "presentation-20-slides",
+          "sourceFormat": "pptx",
+          "sourceSha256": "d465e9b0035591b6dca92a16f707a91c282f7bda71a3b8ca3ed93d7d3ed91f78",
+          "sourceInspection": "parsed",
+          "status": "fail",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "pptx",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 20,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [
+                "EMBEDDED_OBJECT_COUNT: features.embeddedObjects",
+                "FORMULA_EXPRESSION: presentation.slides[1].charts[0].series[0].title.formula",
+                "FORMULA_EXPRESSION: presentation.slides[1].charts[0].series[0].categories.formula",
+                "FORMULA_EXPRESSION: presentation.slides[1].charts[0].series[0].values.formula",
+                "CHART_EDITABLE_WORKBOOK: presentation.slides[1].charts[0].externalData",
+                "FORMULA_EXPRESSION: presentation.slides[5].charts[0].series[0].title.formula",
+                "FORMULA_EXPRESSION: presentation.slides[5].charts[0].series[0].categories.formula",
+                "FORMULA_EXPRESSION: presentation.slides[5].charts[0].series[0].values.formula",
+                "CHART_EDITABLE_WORKBOOK: presentation.slides[5].charts[0].externalData",
+                "FORMULA_EXPRESSION: presentation.slides[9].charts[0].series[0].title.formula",
+                "FORMULA_EXPRESSION: presentation.slides[9].charts[0].series[0].categories.formula",
+                "FORMULA_EXPRESSION: presentation.slides[9].charts[0].series[0].values.formula",
+                "CHART_EDITABLE_WORKBOOK: presentation.slides[9].charts[0].externalData",
+                "FORMULA_EXPRESSION: presentation.slides[13].charts[0].series[0].title.formula",
+                "FORMULA_EXPRESSION: presentation.slides[13].charts[0].series[0].categories.formula",
+                "FORMULA_EXPRESSION: presentation.slides[13].charts[0].series[0].values.formula",
+                "CHART_EDITABLE_WORKBOOK: presentation.slides[13].charts[0].externalData",
+                "FORMULA_EXPRESSION: presentation.slides[17].charts[0].series[0].title.formula",
+                "FORMULA_EXPRESSION: presentation.slides[17].charts[0].series[0].categories.formula",
+                "FORMULA_EXPRESSION: presentation.slides[17].charts[0].series[0].values.formula",
+                "CHART_EDITABLE_WORKBOOK: presentation.slides[17].charts[0].externalData"
+              ],
+              "reviewCodes": [
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED",
+                "EMBEDDED_CHART_WORKBOOK_UNINSPECTED"
+              ]
+            },
+            {
+              "format": "odp",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 20,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED",
+                "TABLE_REPRESENTATION",
+                "SLIDE_VISIBILITY_AND_OBJECT_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "presentation-effects-media",
+          "sourceFormat": "pptx",
+          "sourceSha256": "4e2400482aef07ad252d888e36fb0e8c7237fbaafe4fa303d68c25ba70603537",
+          "sourceInspection": "parsed",
+          "status": "fail",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "pptx",
+              "status": "pass",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": []
+            },
+            {
+              "format": "odp",
+              "status": "fail",
+              "attemptedCycles": 1,
+              "savedCycles": 0,
+              "finalReopened": false,
+              "pdfPages": null,
+              "operationFailures": [
+                "page.evaluate: Error: 此文稿包含或修改过转场、动画或媒体，请先保存为 PPTX。若已移除所有效果，请重新打开保存后的 PPTX，再导出 ODP。"
+              ],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": []
+            }
+          ]
+        },
+        {
+          "id": "writer-unicode-tables",
+          "sourceFormat": "rtf",
+          "sourceSha256": "6979977225d8fa1aa28e99c585cceea4f6f2fb2e1a7d2d0d5f0e606fc48e5bbe",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "docx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "RTF_TABLE_STRUCTURE_PARTIAL",
+                "TEXT_OBJECT_REPRESENTATION",
+                "TEXT_OBJECT_STRUCTURE_PARTIAL",
+                "REVISION_REPRESENTATION"
+              ]
+            },
+            {
+              "format": "odt",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "RTF_TABLE_STRUCTURE_PARTIAL",
+                "TEXT_OBJECT_REPRESENTATION",
+                "TEXT_OBJECT_STRUCTURE_PARTIAL",
+                "REVISION_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "writer-original-odf",
+          "sourceFormat": "odt",
+          "sourceSha256": "06194ca3a0e05d128c0c2ed304a2d9cd549cb02c66698b470a91f794d6b844ba",
+          "sourceInspection": "parsed",
+          "status": "fail",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "docx",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [
+                "TEXT_OBJECT_PRESERVED: word.headers[0]",
+                "TEXT_OBJECT_PRESERVED: word.footers[0]"
+              ],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "TABLE_REPRESENTATION",
+                "TEXT_OBJECT_REPRESENTATION"
+              ]
+            },
+            {
+              "format": "odt",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "TABLE_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "calc-original-odf",
+          "sourceFormat": "ods",
+          "sourceSha256": "f2ecb70c3d4c3a1a8e21509765d3972c6978a59fb41f4e7b01f9fe7e9003d4e7",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "xlsx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "SHEET_VISIBILITY_UNINSPECTED",
+                "FORMULA_REPRESENTATION",
+                "DEFINED_NAME_REPRESENTATION"
+              ]
+            },
+            {
+              "format": "ods",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "SHEET_VISIBILITY_UNINSPECTED",
+                "FORMULA_REPRESENTATION",
+                "DEFINED_NAME_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "presentation-original-odf",
+          "sourceFormat": "odp",
+          "sourceSha256": "0cad3365fce34c9cc4a856793e3550fdd022b2b4da6ad1d428c9b28ba78e8a97",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "pptx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "SLIDE_VISIBILITY_AND_OBJECT_REPRESENTATION",
+                "TABLE_REPRESENTATION"
+              ]
+            },
+            {
+              "format": "odp",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "SLIDE_VISIBILITY_AND_OBJECT_REPRESENTATION",
+                "TABLE_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "poi-word-page-headers",
+          "sourceFormat": "doc",
+          "sourceSha256": "081c946c701a3061c32c41bef5235f518465a6a62b1250f6834b01ac6bbebbfe",
+          "sourceInspection": "unsupported",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "docx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "UNSUPPORTED_INSPECTION"
+              ]
+            },
+            {
+              "format": "odt",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "UNSUPPORTED_INSPECTION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "poi-excel-drawing-comments",
+          "sourceFormat": "xls",
+          "sourceSha256": "7090a0e8dcde4096621292e2a4c6a068695629491a668441269c252fcd5995d1",
+          "sourceInspection": "unsupported",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "xlsx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "UNSUPPORTED_INSPECTION"
+              ]
+            },
+            {
+              "format": "ods",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "UNSUPPORTED_INSPECTION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "poi-powerpoint-table",
+          "sourceFormat": "ppt",
+          "sourceSha256": "4e5c3e64cb0de2b98e7f5d8f8259b4689cc52a3793bd4e0f011493284ee39d77",
+          "sourceInspection": "unsupported",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "pptx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "UNSUPPORTED_INSPECTION"
+              ]
+            },
+            {
+              "format": "odp",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "UNSUPPORTED_INSPECTION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "poi-word-footnotes",
+          "sourceFormat": "docx",
+          "sourceSha256": "9070094b27ff5201477f4de4b2c027730c66cb889106a1609c5adeed207a59c1",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "docx",
+              "status": "pass",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": []
+            },
+            {
+              "format": "odt",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "poi-powerpoint-smartart",
+          "sourceFormat": "pptx",
+          "sourceSha256": "238ff6433dac00b2722edb9a29d97f56ab4f3c9c37f33a73d6f53baf494916aa",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "pptx",
+              "status": "pass",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": []
+            },
+            {
+              "format": "odp",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "SLIDE_VISIBILITY_AND_OBJECT_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "poi-excel-pivots",
+          "sourceFormat": "xlsx",
+          "sourceSha256": "f0ef1d61c9f3d8b27b18a876b8e24676314c6450ed64a725a7bfaa603fdd67e3",
+          "sourceInspection": "parsed",
+          "status": "fail",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "xlsx",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 4,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [
+                "CELL_VALUE: spreadsheet.Tabelle2!B3.value",
+                "CELL_VALUE: spreadsheet.Tabelle2!A4.value",
+                "CELL_VALUE: spreadsheet.Tabelle2!D4.value",
+                "CELL_VALUE: spreadsheet.Tabelle2!A7.value",
+                "CELL_VALUE: spreadsheet.Tabelle3!B1.value",
+                "CELL_VALUE: spreadsheet.Tabelle3!A3.value",
+                "CELL_VALUE: spreadsheet.Tabelle3!A6.value"
+              ],
+              "reviewCodes": []
+            },
+            {
+              "format": "ods",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 4,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [
+                "CELL_VALUE: spreadsheet.Tabelle2!B3.value",
+                "CELL_VALUE: spreadsheet.Tabelle2!A4.value",
+                "CELL_VALUE: spreadsheet.Tabelle2!D4.value",
+                "CELL_VALUE: spreadsheet.Tabelle2!A7.value",
+                "CELL_VALUE: spreadsheet.Tabelle3!B1.value",
+                "CELL_VALUE: spreadsheet.Tabelle3!A3.value",
+                "CELL_VALUE: spreadsheet.Tabelle3!A6.value"
+              ],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "SHEET_VISIBILITY_UNINSPECTED",
+                "DATE_CELL_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "poi-libreoffice-ods",
+          "sourceFormat": "ods",
+          "sourceSha256": "a551ef35d3faddae4bf135960bde419f4a0140f9398c2218614b089ae8a4b46f",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "xlsx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "SHEET_VISIBILITY_UNINSPECTED",
+                "FORMULA_REPRESENTATION"
+              ]
+            },
+            {
+              "format": "ods",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "SHEET_VISIBILITY_UNINSPECTED",
+                "FORMULA_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "onlyoffice-mobile-word",
+          "sourceFormat": "docx",
+          "sourceSha256": "f1515f28731b2bae713dcdacfd3d7c6274eb1e92db27b64b2e9d5e70aaf9916c",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "docx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED",
+                "TABLE_VERTICAL_REPRESENTATION"
+              ]
+            },
+            {
+              "format": "odt",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED",
+                "TABLE_REPRESENTATION",
+                "TEXT_OBJECT_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "onlyoffice-mobile-sheet",
+          "sourceFormat": "xlsx",
+          "sourceSha256": "50858be515ff6bfc19031adff5889934bd624ba6baac4c1a2afb0f940b4977f5",
+          "sourceInspection": "parsed",
+          "status": "fail",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "xlsx",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [
+                "FORMULA_CACHED_VALUE: spreadsheet.Template!I32.value"
+              ],
+              "reviewCodes": [
+                "FORMULA_REPRESENTATION_ADDED",
+                "SHARED_FORMULA_UNEXPANDED",
+                "NUMERIC_SERIALIZATION_REPRESENTATION"
+              ]
+            },
+            {
+              "format": "ods",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [
+                "FORMULA_CACHED_VALUE: spreadsheet.Template!I32.value"
+              ],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED",
+                "SHEET_VISIBILITY_UNINSPECTED",
+                "FORMULA_REPRESENTATION",
+                "FORMULA_REPRESENTATION_ADDED",
+                "SHARED_FORMULA_UNEXPANDED",
+                "NUMERIC_SERIALIZATION_REPRESENTATION",
+                "DEFINED_NAME_REPRESENTATION"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "test-results/compatibility/local-only-wps/rechecked-report.json",
+      "reportSha256": "5cea5a763b941c09f3588e2bba55bd06b2f9f55db95f269623f3144eb7c76b8a",
+      "startedAt": "2026-10-13T05:54:51.361Z",
+      "finishedAt": "2026-10-13T05:56:00.355Z",
+      "semanticRecheck": {
+        "at": "2026-10-13T06:04:29.318Z",
+        "originalReport": "report.json",
+        "reason": "Independent parser/comparator correction; original Office bytes and original browser report retained",
+        "newBrowserRun": false
+      },
+      "supplementalAttachmentAudit": {
+        "path": "tests/compatibility/results/wps-attachment-audit.json",
+        "sha256": "54d21615059749662467878d0ec3c7cca58101d69263686aa24ad8bfa48ab1a8",
+        "lossDetected": true
+      },
+      "implementationSha256": "d5a3a141368f8df69507e4f21227ea68d17ab016afbc9ac11c9929ed33cf640c",
+      "implementationUnchanged": false,
+      "environment": {
+        "node": "v24.19.0",
+        "platform": "linux",
+        "arch": "x64",
+        "headless": true,
+        "chromium": "154.0.8037.57"
+      },
+      "summary": {
+        "fixtures": 1,
+        "passed": 0,
+        "needsReview": 0,
+        "failed": 1,
+        "attemptedCycles": 6,
+        "savedCycles": 6,
+        "reopenedCycles": 6,
+        "completeCycles": 3,
+        "reopenedBranches": 2,
+        "externalRequests": 0,
+        "pageErrors": 0
+      },
+      "externalRequests": [],
+      "pageErrors": [],
+      "cases": [
+        {
+          "id": "tika-wps-attachments",
+          "sourceFormat": "docx",
+          "sourceSha256": "f9373ab9c763603ce72e4a5490c727be745bf48a98d703bab1c9f98ff9cc8a36",
+          "sourceInspection": "parsed",
+          "status": "fail",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "docx",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [
+                "embedded-attachment-content"
+              ],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED"
+              ]
+            },
+            {
+              "format": "odt",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": "test-results/compatibility/local-only-final/rechecked-report.json",
+      "reportSha256": "20c7fe00e058e5790b6f3a12e716627728aa5d336748c3b925e9b1ea301e4f20",
+      "startedAt": "2026-10-13T06:16:37.015Z",
+      "finishedAt": "2026-10-13T06:21:59.320Z",
+      "semanticRecheck": {
+        "at": "2026-10-13T06:22:24.192Z",
+        "originalReport": "report.json",
+        "reason": "Independent parser/comparator correction; original Office bytes and original browser report retained",
+        "newBrowserRun": false
+      },
+      "supplementalAttachmentAudit": {
+        "path": "tests/compatibility/results/wps-attachment-final-audit.json",
+        "sha256": "72258b1110f7d4d5f6b0f1bce8104d1d03a782297481680716a551b59568d446",
+        "lossDetected": true
+      },
+      "implementationSha256": "107b1bff6f024d5f9c41be2b494926cf0c4854da0f25b17b187c7e4c4891b05e",
+      "implementationUnchanged": true,
+      "environment": {
+        "node": "v24.19.0",
+        "platform": "linux",
+        "arch": "x64",
+        "headless": true,
+        "chromium": "154.0.8037.57"
+      },
+      "summary": {
+        "fixtures": 12,
+        "passed": 3,
+        "needsReview": 6,
+        "failed": 3,
+        "attemptedCycles": 36,
+        "savedCycles": 36,
+        "reopenedCycles": 36,
+        "completeCycles": 28,
+        "reopenedBranches": 12,
+        "externalRequests": 0,
+        "pageErrors": 0
+      },
+      "externalRequests": [],
+      "pageErrors": [],
+      "cases": [
+        {
+          "id": "writer-rich",
+          "sourceFormat": "docx",
+          "sourceSha256": "ab9f2dffd9c8444a0f19406005b7fecb9bd352ea53ad358e737ece361ed66acb",
+          "sourceInspection": "parsed",
+          "status": "pass",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "docx",
+              "status": "pass",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": []
+            }
+          ]
+        },
+        {
+          "id": "calc-rich",
+          "sourceFormat": "xlsx",
+          "sourceSha256": "a6ebd1f157f45a8936b38881b7a560d7a6cd66a485181132b9d6eeea9342d942",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "xlsx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 4,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CHART_LITERAL_REPRESENTATION",
+                "CONDITIONAL_STYLE_UNINSPECTED"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "presentation-rich",
+          "sourceFormat": "pptx",
+          "sourceSha256": "db886bbf77e47a73eba60e143a92f5df6d5ed8b7b39d374ab9796abe0258a7da",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "pptx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED",
+                "EMBEDDED_CHART_WORKBOOK_UNINSPECTED"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "calc-dates-validation",
+          "sourceFormat": "xlsx",
+          "sourceSha256": "d6478cd0a392c2769f5a5a599484ff3abf38bb4db55b36c00f28fb379f6e7e53",
+          "sourceInspection": "parsed",
+          "status": "fail",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "xlsx",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [
+                "CELL_TYPE: spreadsheet.Calendar!B5.type",
+                "SHEET_VISIBILITY: spreadsheet.Lists.state"
+              ],
+              "reviewCodes": [
+                "FORMULA_REPRESENTATION_ADDED",
+                "CONDITIONAL_STYLE_UNINSPECTED"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "presentation-20-slides",
+          "sourceFormat": "pptx",
+          "sourceSha256": "d465e9b0035591b6dca92a16f707a91c282f7bda71a3b8ca3ed93d7d3ed91f78",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "pptx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 20,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED",
+                "EMBEDDED_CHART_WORKBOOK_UNINSPECTED"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "presentation-effects-media",
+          "sourceFormat": "pptx",
+          "sourceSha256": "4e2400482aef07ad252d888e36fb0e8c7237fbaafe4fa303d68c25ba70603537",
+          "sourceInspection": "parsed",
+          "status": "pass",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "pptx",
+              "status": "pass",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 2,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": []
+            }
+          ]
+        },
+        {
+          "id": "presentation-original-odf",
+          "sourceFormat": "odp",
+          "sourceSha256": "0cad3365fce34c9cc4a856793e3550fdd022b2b4da6ad1d428c9b28ba78e8a97",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "pptx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "CROSS_FORMAT_REPRESENTATION",
+                "SLIDE_VISIBILITY_AND_OBJECT_REPRESENTATION",
+                "TABLE_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "poi-powerpoint-table",
+          "sourceFormat": "ppt",
+          "sourceSha256": "4e5c3e64cb0de2b98e7f5d8f8259b4689cc52a3793bd4e0f011493284ee39d77",
+          "sourceInspection": "unsupported",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "pptx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "UNSUPPORTED_INSPECTION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "poi-powerpoint-smartart",
+          "sourceFormat": "pptx",
+          "sourceSha256": "238ff6433dac00b2722edb9a29d97f56ab4f3c9c37f33a73d6f53baf494916aa",
+          "sourceInspection": "parsed",
+          "status": "pass",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "pptx",
+              "status": "pass",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": []
+            }
+          ]
+        },
+        {
+          "id": "onlyoffice-mobile-word",
+          "sourceFormat": "docx",
+          "sourceSha256": "f1515f28731b2bae713dcdacfd3d7c6274eb1e92db27b64b2e9d5e70aaf9916c",
+          "sourceInspection": "parsed",
+          "status": "review",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "docx",
+              "status": "review",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED",
+                "TABLE_VERTICAL_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "onlyoffice-mobile-sheet",
+          "sourceFormat": "xlsx",
+          "sourceSha256": "50858be515ff6bfc19031adff5889934bd624ba6baac4c1a2afb0f940b4977f5",
+          "sourceInspection": "parsed",
+          "status": "fail",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "xlsx",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 3,
+              "operationFailures": [],
+              "failedAssertions": [],
+              "preservationFailures": [
+                "FORMULA_CACHED_VALUE: spreadsheet.Template!I32.value"
+              ],
+              "reviewCodes": [
+                "FORMULA_REPRESENTATION_ADDED",
+                "SHARED_FORMULA_UNEXPANDED",
+                "NUMERIC_SERIALIZATION_REPRESENTATION"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "tika-wps-attachments",
+          "sourceFormat": "docx",
+          "sourceSha256": "f9373ab9c763603ce72e4a5490c727be745bf48a98d703bab1c9f98ff9cc8a36",
+          "sourceInspection": "parsed",
+          "status": "fail",
+          "failures": [],
+          "offlineAudit": {
+            "missingDisabled": [],
+            "forbiddenMenuCommands": [],
+            "localSavePresent": true,
+            "updatesDisabled": true,
+            "macrosDisabled": true,
+            "dispatches": [
+              {
+                "command": ".uno:OpenRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SaveAsRemote",
+                "disabled": true
+              },
+              {
+                "command": ".uno:SendMail",
+                "disabled": true
+              },
+              {
+                "command": ".uno:Documentation",
+                "disabled": true
+              },
+              {
+                "command": ".uno:OpenHyperlinkOnCursor",
+                "disabled": true
+              }
+            ]
+          },
+          "branches": [
+            {
+              "format": "docx",
+              "status": "fail",
+              "attemptedCycles": 3,
+              "savedCycles": 3,
+              "finalReopened": true,
+              "pdfPages": 1,
+              "operationFailures": [],
+              "failedAssertions": [
+                "embedded-attachment-content"
+              ],
+              "preservationFailures": [],
+              "reviewCodes": [
+                "EMBEDDED_OBJECT_CONTENT_UNINSPECTED"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

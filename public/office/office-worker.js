@@ -7,12 +7,14 @@ Module.zetajs.then(zetajs => {
   const prop = (Name, Value) => new css.beans.PropertyValue({ Name, Value });
   const short = value => new zetajs.Any(zetajs.type.short, value);
   const send = message => zetajs.mainPort.postMessage(message);
+  const offline = globalThis.OpenOfficeOfflinePolicy;
+  if (!offline) throw Error('缺少本地办公安全策略，请重新加载应用。');
   const filters = { docx: 'Office Open XML Text', odt: 'writer8', xlsx: 'Calc MS Excel 2007 XML', ods: 'calc8',
     pptx: 'Impress MS PowerPoint 2007 XML', odp: 'impress8' };
   const documentTypes = {
-    word: { factory: 'swriter', service: 'com.sun.star.text.TextDocument', formats: ['docx','odt'], pdf: 'writer_pdf_Export' },
-    sheet: { factory: 'scalc', service: 'com.sun.star.sheet.SpreadsheetDocument', formats: ['xlsx','ods'], pdf: 'calc_pdf_Export' },
-    presentation: { factory: 'simpress', service: 'com.sun.star.presentation.PresentationDocument', formats: ['pptx','odp'], pdf: 'impress_pdf_Export' },
+    word: { factory: 'swriter', service: 'com.sun.star.text.TextDocument', imports: ['docx','odt','doc','rtf'], formats: ['docx','odt'], pdf: 'writer_pdf_Export' },
+    sheet: { factory: 'scalc', service: 'com.sun.star.sheet.SpreadsheetDocument', imports: ['xlsx','ods','xls'], formats: ['xlsx','ods'], pdf: 'calc_pdf_Export' },
+    presentation: { factory: 'simpress', service: 'com.sun.star.presentation.PresentationDocument', imports: ['pptx','odp','ppt'], formats: ['pptx','odp'], pdf: 'impress_pdf_Export' },
   };
   let current = null, outputCounter = 0;
   const presentationObjects = typeof createPresentationObjects === 'function'
@@ -62,7 +64,9 @@ Module.zetajs.then(zetajs => {
     let master = null, slave = null;
     const commands = {
       '.uno:Save': 'save', '.uno:SaveAs': 'save-as', '.uno:SaveACopy': 'save-as', '.uno:SaveAll': 'save',
-      '.uno:Open': 'open', '.uno:NewDoc': 'new', '.uno:CloseDoc': 'close', '.uno:CloseWin': 'close',
+      '.uno:Open': 'open', '.uno:OpenFromWriter': 'open', '.uno:OpenFromCalc': 'open',
+      '.uno:OpenFromDraw': 'open', '.uno:OpenFromImpress': 'open', '.uno:OpenLocalURL': 'open',
+      '.uno:NewDoc': 'new', '.uno:CloseDoc': 'close', '.uno:CloseWin': 'close',
       '.uno:ExportTo': 'export-pdf', '.uno:ExportToPDF': 'export-pdf', '.uno:ExportDirectToPDF': 'export-pdf',
       '.uno:Print': 'print', '.uno:PrintDefault': 'print', '.uno:PrintPagePreview': 'print',
       '.uno:InsertGraphic': 'insert-image', '.uno:Quit': 'quit',
@@ -77,11 +81,23 @@ Module.zetajs.then(zetajs => {
     // but route its PrintPagePreview button through the desktop print notice.
     const delegates = new Map();
     function dispatchFor(url) {
-      const type = commands[url.Complete] || (url.Complete.startsWith('private:factory/') ? 'new' : undefined);
+      if (offline.blockedDispatch(url.Complete)) {
+        if (!delegates.has('offline-blocked')) delegates.set('offline-blocked', zetajs.unoObject([css.frame.XDispatch], {
+          dispatch() {},
+          addStatusListener(listener, featureURL) {
+            listener.statusChanged(new css.frame.FeatureStateEvent({ FeatureURL: featureURL, IsEnabled: false, Requery: false }));
+          },
+          removeStatusListener() {},
+        }));
+        return delegates.get('offline-blocked');
+      }
+      const normalized = offline.commandName(url.Complete), complete = normalized ? `.uno:${normalized}` : url.Complete;
+      const type = commands[complete] || (complete.startsWith('private:factory/') ? 'new' : undefined);
       if (!type) return null;
-      const notice = notices[url.Complete], fromCurrent = url.Complete === '.uno:PresentationCurrentSlide', key = `${type}:${notice || ''}:${fromCurrent}`;
+      const notice = notices[complete], fromCurrent = complete === '.uno:PresentationCurrentSlide', key = `${type}:${notice || ''}:${fromCurrent}`;
       if (!delegates.has(key)) delegates.set(key, zetajs.unoObject([css.frame.XDispatch], {
-        dispatch() {
+        dispatch(featureURL, args = []) {
+          if (current !== document || offline.blockedDispatch(featureURL?.Complete || complete, args)) return;
           if (type === 'presentation-preview') requestPresentationPreview(fromCurrent);
           else if (type === 'presentation-duplicate') {
             // The shell duplicates both the real UNO page and its preserved
@@ -96,10 +112,29 @@ Module.zetajs.then(zetajs => {
       }));
       return delegates.get(key);
     }
+    function resolveDispatch(url, frameName, flags) {
+      const own = dispatchFor(url);
+      if (own) return own;
+      const delegate = slave?.queryDispatch(url, frameName, flags);
+      if (!delegate) return null;
+      if (!offline.needsArgumentGuard(url.Complete)) return delegate;
+      // A previously unblocked command can still carry a remote URL argument
+      // only at dispatch time. Guard that path without changing local actions.
+      const key = `guarded:${url.Complete}:${frameName}:${flags}`;
+      if (delegates.has(key)) return delegates.get(key);
+      const guarded = zetajs.unoObject([css.frame.XDispatch], {
+        dispatch(featureURL, args = []) {
+          if (current === document && !offline.blockedDispatch(featureURL?.Complete || url.Complete, args)) delegate.dispatch(featureURL, args);
+        },
+        addStatusListener(listener, featureURL) { delegate.addStatusListener(listener, featureURL); },
+        removeStatusListener(listener, featureURL) { delegate.removeStatusListener(listener, featureURL); },
+      });
+      delegates.set(key, guarded); return guarded;
+    }
     const interceptor = zetajs.unoObject([css.frame.XDispatchProviderInterceptor, css.frame.XInterceptorInfo], {
-      getInterceptedURLs() { return [...Object.keys(commands), 'private:factory/*']; },
-      queryDispatch(url, frameName, flags) { return dispatchFor(url) || slave?.queryDispatch(url, frameName, flags) || null; },
-      queryDispatches(requests) { return requests.map(request => dispatchFor(request.FeatureURL) || slave?.queryDispatch(request.FeatureURL, request.FrameName, request.SearchFlags) || null); },
+      getInterceptedURLs() { return offline.interceptedURLs(Object.keys(commands)); },
+      queryDispatch(url, frameName, flags) { return resolveDispatch(url, frameName, flags); },
+      queryDispatches(requests) { return requests.map(request => resolveDispatch(request.FeatureURL, request.FrameName, request.SearchFlags)); },
       getMasterDispatchProvider() { return master; }, setMasterDispatchProvider(value) { master = value; },
       getSlaveDispatchProvider() { return slave; }, setSlaveDispatchProvider(value) { slave = value; },
     });
@@ -127,8 +162,164 @@ Module.zetajs.then(zetajs => {
       controller.addPropertyChangeListener('CurrentPage', document.pageListener);
     } catch (error) { recoverOptional(error); document.pageListener = null; }
   }
+  const CHART_CLSID = '12DCAE26-281F-416F-A234-C3086127382E';
+  function sameChartObject(left, right) {
+    try { return !!left && !!right && zetajs.sameUnoObject(left, right); }
+    catch (error) { recoverOptional(error); return false; }
+  }
+  // Inspect embedded Model only after positively identifying the chart CLSID.
+  // Model starts an embedded client; ordinary OLE objects must never be opened
+  // as a side effect of collecting evidence for a chart repair.
+  function chartProperty(shape, name) {
+    const info = shape.getPropertySetInfo();
+    return info?.hasPropertyByName(name) ? shape.getPropertyValue(name) : undefined;
+  }
+  function chartShapeName(shape) {
+    const info = shape.getPropertySetInfo?.();
+    const name = info?.hasPropertyByName('Name') ? shape.getPropertyValue('Name')
+      : typeof shape.getName === 'function' ? shape.getName() : undefined;
+    return typeof name === 'string' && name.length > 0 && name.length <= 300 && !/[\x00-\x1f\x7f]/.test(name) ? name : null;
+  }
+  function scanCharts(document) {
+    const result = { complete: true, items: [], names: new Map() };
+    let visited = 0;
+    try {
+      const pages = document.model.getDrawPages(), count = pages.getCount();
+      if (!Number.isInteger(count) || count < 0 || count > 500) { result.complete = false; return result; }
+      for (let index = 0; index < count; index++) {
+        const page = pages.getByIndex(index), names = new Map(); result.names.set(page, names);
+        const walk = (container, depth) => {
+          if (depth > 16) { result.complete = false; return; }
+          const length = container.getCount();
+          if (!Number.isInteger(length) || length < 0 || length > 2000 || visited + length > 20000) { result.complete = false; return; }
+          visited += length;
+          for (let shapeIndex = 0; shapeIndex < length; shapeIndex++) {
+            try {
+              const shape = container.getByIndex(shapeIndex), name = chartShapeName(shape), type = shape.getShapeType();
+              if (name) names.set(name, (names.get(name) || 0) + 1);
+              if (type === 'com.sun.star.drawing.GroupShape') { walk(shape, depth + 1); continue; }
+              if (typeof type !== 'string' || !/OLE2Shape$/.test(type)) continue;
+              const clsid = chartProperty(shape, 'CLSID');
+              if (typeof clsid !== 'string' || clsid.replace(/[{}]/g, '').toUpperCase() !== CHART_CLSID) continue;
+              if (!name) { result.complete = false; continue; }
+              result.items.push({ page, shape, name });
+            } catch (error) { recoverOptional(error); result.complete = false; }
+          }
+        };
+        walk(page, 0);
+      }
+    } catch (error) { recoverOptional(error); result.complete = false; }
+    return result;
+  }
+  function removeChartMonitor(document) {
+    for (const record of document.chartMonitor?.records || []) {
+      if (record.attached) try { record.modifiable.removeModifyListener(record.listener); }
+      catch (error) { recoverOptional(error); }
+      record.attached = false;
+    }
+  }
+  function installChartMonitor(document) {
+    if (document.kind !== 'presentation') return;
+    const monitor = document.chartMonitor = { complete: false, records: [] };
+    try {
+      const scan = scanCharts(document); monitor.complete = scan.complete;
+      for (const item of scan.items) {
+        const record = { ...item, model: null, modifiable: null, listener: null, attached: false,
+          initialNameUnique: scan.names.get(item.page)?.get(item.name) === 1, initiallyClean: false, touched: false, disposed: false };
+        monitor.records.push(record);
+        try {
+          record.model = chartProperty(item.shape, 'Model');
+          if (!record.model || typeof record.model.queryInterface !== 'function') continue;
+          record.modifiable = record.model.queryInterface(zetajs.type.interface(css.util.XModifiable));
+          if (!record.modifiable) continue;
+          record.listener = zetajs.unoObject([css.util.XModifyListener], {
+            // Never reset this on Save/Undo or suppress it during an export.
+            // Identical caches cannot prove that bindings were not edited.
+            modified() { record.touched = true; },
+            disposing() { record.disposed = true; },
+          });
+          record.modifiable.addModifyListener(record.listener); record.attached = true;
+          record.initiallyClean = record.modifiable.isModified() === false && record.initialNameUnique;
+        } catch (error) { recoverOptional(error); }
+      }
+    } catch (error) { removeChartMonitor(document); throw error; }
+  }
+  function chartModificationProof(document) {
+    const monitor = document.chartMonitor, scan = scanCharts(document), proof = [];
+    for (const item of scan.items) {
+      let sourceEligible = false, sourceShapeName;
+      const record = monitor?.records.find(record => sameChartObject(record.page, item.page) && sameChartObject(record.shape, item.shape));
+      if (monitor?.complete && scan.complete && record?.attached && record.initialNameUnique && !record.disposed
+        && scan.names.get(item.page)?.get(item.name) === 1) {
+        try {
+          const model = chartProperty(item.shape, 'Model');
+          if (sameChartObject(record.model, model)) {
+            // Impress can renumber autogenerated names after slide reordering.
+            // Native identities prove the source association even after edits;
+            // only the separate modification evidence authorizes data reuse.
+            sourceShapeName = record.name;
+            sourceEligible = record.initiallyClean && record.modifiable.isModified() === false && !record.touched && !record.disposed;
+          }
+        } catch (error) { recoverOptional(error); }
+      }
+      const pageId = slideIdentity(item.page);
+      if (typeof pageId === 'string' && pageId.length <= 500 && !/[\x00-\x1f\x7f]/.test(pageId)) {
+        proof.push({ pageId, shapeName: item.name, sourceEligible, ...(sourceShapeName ? { sourceShapeName } : {}) });
+      }
+    }
+    return proof;
+  }
+  function beginChartNavigation(document) {
+    const scan = scanCharts(document), monitor = document.chartMonitor, candidates = [];
+    if (!monitor?.complete || !scan.complete) return candidates;
+    for (const record of monitor.records) {
+      if (!record.attached || !record.initiallyClean || record.touched || record.disposed) continue;
+      const item = scan.items.find(item => sameChartObject(item.page, record.page) && sameChartObject(item.shape, record.shape));
+      if (!item || scan.names.get(item.page)?.get(item.name) !== 1) continue;
+      try {
+        if (sameChartObject(record.model, chartProperty(item.shape, 'Model')) && record.modifiable.isModified() === false
+          && !record.touched && !record.disposed) candidates.push({ record, model: record.model });
+      } catch (error) { recoverOptional(error); }
+    }
+    return candidates;
+  }
+  function finishChartNavigation(document, candidates) {
+    if (!candidates?.length) return;
+    const scan = scanCharts(document);
+    if (!scan.complete) return;
+    for (const candidate of candidates) {
+      const record = candidate.record;
+      // Renewal is confined to a verified synchronous page-navigation command.
+      // A prior edit, an unrelated replacement, or a disposal observed before
+      // that command can never regain source-data authorization here.
+      if (record.model !== candidate.model || !record.disposed || record.touched) continue;
+      const item = scan.items.find(item => sameChartObject(item.page, record.page) && sameChartObject(item.shape, record.shape));
+      if (!item || scan.names.get(item.page)?.get(item.name) !== 1) continue;
+      let modifiable, listener, attached = false, disposed = false, accepted = false;
+      try {
+        const model = chartProperty(item.shape, 'Model');
+        if (!model || sameChartObject(record.model, model) || typeof model.queryInterface !== 'function') continue;
+        modifiable = model.queryInterface(zetajs.type.interface(css.util.XModifiable));
+        if (!modifiable || modifiable.isModified() !== false) continue;
+        listener = zetajs.unoObject([css.util.XModifyListener], {
+          modified() { record.touched = true; },
+          disposing() { disposed = true; record.disposed = true; },
+        });
+        modifiable.addModifyListener(listener); attached = true;
+        if (modifiable.isModified() !== false || disposed || record.touched) continue;
+        try { record.modifiable.removeModifyListener(record.listener); } catch (error) { recoverOptional(error); }
+        if (disposed || record.touched) continue;
+        record.model = model; record.modifiable = modifiable; record.listener = listener;
+        record.attached = true; record.disposed = false; accepted = true;
+      } catch (error) { recoverOptional(error); }
+      finally {
+        if (attached && !accepted) try { modifiable.removeModifyListener(listener); } catch (error) { recoverOptional(error); }
+      }
+    }
+  }
   function closeDocument(document) {
     if (!document) return;
+    removeChartMonitor(document);
     try { document.model.removeModifyListener(document.listener); } catch (error) { recoverOptional(error); }
     try { if (document.selectionListener) document.controller.removeSelectionChangeListener(document.selectionListener); } catch (error) { recoverOptional(error); }
     try { if (document.pageListener) document.controller.removePropertyChangeListener('CurrentPage', document.pageListener); } catch (error) { recoverOptional(error); }
@@ -137,7 +328,7 @@ Module.zetajs.then(zetajs => {
   }
   function open(data) {
     const type = documentTypes[data.kind];
-    if (!type || !type.formats.includes(data.extension)) throw Error('不支持的文档类型或格式。');
+    if (!type || !type.imports.includes(data.extension)) throw Error('不支持的文档类型或格式。');
     if (current?.dirty && !data.discard) throw Error('当前文档有未保存修改。请先保存，或明确放弃修改后再切换。');
     const args = [prop('MacroExecutionMode', short(css.document.MacroExecMode.NEVER_EXECUTE)),
       prop('UpdateDocMode', short(css.document.UpdateDocMode.NO_UPDATE)), prop('InteractionHandler', rejectInteraction),
@@ -150,6 +341,7 @@ Module.zetajs.then(zetajs => {
     const model = desktop.loadComponentFromURL(url, '_blank', 0, args);
     if (!model) throw Error('无法打开此文档。请确认文件格式；加密文档请先在原应用解密。');
     if (!model.supportsService(type.service)) { model.close(true); throw Error('文件内容与所选文档类型不一致。'); }
+    let openingDocument = null;
     try {
       if (data.isNew && data.kind === 'word') {
         const cursor = model.getText().createTextCursor();
@@ -157,7 +349,7 @@ Module.zetajs.then(zetajs => {
         cursor.setPropertyValue('CharFontName', 'Carlito');
       }
       model.setModified(false);
-      const document = { id: data.id, name: data.name, kind: data.kind, extension: data.extension, model,
+      const document = openingDocument = { id: data.id, name: data.name, kind: data.kind, extension: data.extension, model,
         dirty: false, revision: 0, suppressed: false, path: data.isNew ? null : data.path,
         pageIdentities: [], nextPageIdentity: 0 };
       document.listener = zetajs.unoObject([css.util.XModifyListener], {
@@ -173,6 +365,7 @@ Module.zetajs.then(zetajs => {
       model.addModifyListener(document.listener);
       installInterception(document);
       listenWorkbench(document);
+      installChartMonitor(document);
       const previous = current;
       closeDocument(previous);
       current = document;
@@ -180,15 +373,16 @@ Module.zetajs.then(zetajs => {
       const window = document.frame.getContainerWindow(); window.FullScreen = true;
       document.frame.activate(); window.setFocus();
       return { closedPath, id: document.id, dirty: false, revision: 0, language: 'en-US', security: { macros: 'never', externalUpdates: 'never' } };
-    } catch (error) { try { model.setModified(false); model.close(true); } catch (error) { recoverOptional(error); } throw error; }
+    } catch (error) { if (openingDocument) removeChartMonitor(openingDocument); try { model.setModified(false); model.close(true); } catch (error) { recoverOptional(error); } throw error; }
   }
   function exportFile(data) {
-    const format = data.format || current.extension;
+    const format = data.format || ({ doc: 'docx', rtf: 'docx', xls: 'xlsx', ppt: 'pptx' }[current.extension] || current.extension);
     const type = documentTypes[current.kind], supported = [...type.formats, 'pdf'];
     if (!supported.includes(format)) throw Error('当前文档不能导出为此格式。');
     const filter = format === 'pdf' ? type.pdf : filters[format];
     const path = `/tmp/open-office-export-${++outputCounter}.${format}`;
     const revision = current.revision;
+    const proofBefore = current.kind === 'presentation' && format === 'pptx' ? chartModificationProof(current) : null;
     // UNO isModified is authoritative even if the UI dirty notification is still queued.
     current.dirty = current.model.isModified();
     const dirty = current.dirty;
@@ -206,7 +400,17 @@ Module.zetajs.then(zetajs => {
       // notification when there is no flag to restore.
       if (current.model.isModified() !== dirty) current.model.setModified(dirty);
     } finally { current.suppressed = false; }
-    return { path, extension: format, name: current.name.replace(/\.[^.]+$/, '') + '.' + format, revision, dirty };
+    const chartProof = proofBefore && chartModificationProof(current).map(proof => {
+      const before = proofBefore.find(before => before.pageId === proof.pageId && before.sourceShapeName
+        && before.sourceShapeName === proof.sourceShapeName);
+      // An association must exist on both sides of export; never forward a new
+      // identity claim first observed after native serialization.
+      const sourceShapeName = before?.sourceShapeName && before.sourceShapeName === proof.sourceShapeName ? proof.sourceShapeName : undefined;
+      return { pageId: proof.pageId, shapeName: proof.shapeName, sourceEligible: !!sourceShapeName && proof.sourceEligible && before.sourceEligible,
+        ...(sourceShapeName ? { sourceShapeName } : {}) };
+    });
+    return { path, extension: format, name: current.name.replace(/\.[^.]+$/, '') + '.' + format, revision, dirty,
+      ...(chartProof ? { chartProof } : {}) };
   }
   function insertImage(path) {
     const provider = css.graphic.GraphicProvider.create(context);
@@ -340,6 +544,7 @@ Module.zetajs.then(zetajs => {
     if (data.expectedRevision !== undefined && data.expectedRevision !== current.revision) throw Error('演示文稿已更新，请刷新后再操作，未应用过期更改。');
     const pageIndex = data.pageIndex === undefined ? activeSlideIndex() : data.pageIndex;
     const page = slideAt(pageIndex);
+    const chartNavigation = ['select-page', 'move-page'].includes(data.type) ? beginChartNavigation(current) : null;
     switch (data.type) {
       case 'select-page': controller.setCurrentPage(page); break;
       case 'add-page': {
@@ -413,7 +618,9 @@ Module.zetajs.then(zetajs => {
       default: throw Error('不支持的演示文稿操作。');
     }
     reportWorkbenchChanged(current);
-    return presentationState();
+    const state = presentationState();
+    finishChartNavigation(current, chartNavigation);
+    return state;
   }
   function smokeTest() {
     const report = { ok: false, engine: 'ZetaOffice / LibreOffice 24.2.8.0', writer: {}, calc: {}, impress: {}, artifacts: [] };
@@ -504,6 +711,10 @@ Module.zetajs.then(zetajs => {
     if (message.action === 'open') return open(message.data);
     if (!current || message.documentId !== current.id) throw Error('当前文档已经切换，旧操作已取消。');
     if (message.action === 'smoke-test') return smokeTest();
+    if (message.action === 'offline-audit') {
+      if (typeof globalThis.auditOfficeOfflinePolicy !== 'function') throw Error('本地策略审计仅供测试模式使用。');
+      return globalThis.auditOfficeOfflinePolicy({ css, zetajs, context, document: current });
+    }
     if (/^(word|sheet)-(state|action|data|command)$/.test(message.action)) {
       const [kind, operation] = message.action.split('-');
       if (current.kind !== kind) throw Error('此操作与当前文档类型不匹配。');

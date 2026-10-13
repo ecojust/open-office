@@ -370,6 +370,18 @@ for (const [kind, method] of [['word','writerData'], ['sheet','calcData']]) {
   })
 }
 
+test('import-only sources explicitly request a modern format on their first save', async t => {
+  for(const [extension,kind,format] of [['doc','word','docx'],['rtf','word','docx'],['xls','sheet','xlsx'],['ppt','presentation','pptx']]) {
+    const h=await editor(t,kind)
+    h.state.loaded.extension=extension;h.props.document.extension=extension
+    h.enqueue('export',{...exportResult(),extension:format,name:'Converted.'+format})
+    const result=await h.exposed.exportFile()
+    assert.equal(h.calls.findLast(call=>call.action==='export').data.format,format)
+    assert.equal(result.extension,format)
+    assert.equal(h.state.loaded.extension,extension,'Exporting does not relabel or overwrite the import source')
+  }
+})
+
 test('Writer command uses one RPC and rejects a response after the document changes', async t => {
   const h=await editor(t,'word'), pending=deferred(), command={action:{type:'format-text',bold:true},target:{documentId:'A',revision:7}}
   h.enqueue('word-command',pending.promise)

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "runs": [
+    {
+      "report": "test-results/pptx-chart-data/report.json",
+      "sha256": "460e9ca68131734356b08ac6dcec94226bd592e1732f46ad6e86bebfffa9bac2",
+      "ok": true,
+      "scope": "real DOM and ZIP, no WASM",
+      "checks": [
+        "unchanged-proof-restores-exact-workbook-preserves-current-format",
+        "same-cache-without-native-proof-refused",
+        "changed-data-has-real-current-xlsx-and-keeps-format-code",
+        "valid-current-same-cache-new-binding-wins",
+        "missing-original-workbook-refused",
+        "missing-point-index-refused",
+        "missing-cache-count-refused",
+        "unknown-data-reference-extension-refused",
+        "signed-original-refused",
+        "reordered-page-uses-explicit-source-mapping",
+        "deleted-chart-not-resurrected",
+        "ambiguous-renaming-refused",
+        "native-proven-object-rename-maps-original-workbook",
+        "new-chart-has-editable-xlsx",
+        "effects-snapshot-does-not-rebase-native-chart-source-lineage"
+      ]
+    },
+    {
+      "report": "test-results/pptx-chart-native/report.json",
+      "sha256": "b924c3ac455e6c5c891d7e573d445854bb6c49731ebb87a6c63ef454ea857b26",
+      "ok": true,
+      "scope": "Chromium + shipped WASM + actual OfficeEditor export",
+      "checks": [
+        "native-edit-invalidates-source-proof",
+        "current-cache-and-embedded-xlsx-both99",
+        "chart-edit-then-effects-edit-resaves-current-data",
+        "edited-chart-remains-editable-after-reopen-and-resave",
+        "native-same-value-edit-cannot-reuse-original-workbook",
+        "native-reordered-untouched-chart-preserves-workbook",
+        "reorder-then-effects-edit-keeps-original-chart-lineage",
+        "duplicated-chart-page-has-two-editable-current-workbooks-and-reopens"
+      ],
+      "errors": [],
+      "externalRequests": []
+    }
+  ]
+}

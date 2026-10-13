@@ -2,7 +2,8 @@
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { OfficeBridge } from '../office/bridge'
 import { PresentationSession } from '../presentation/session'
-import { base64ToBytes, bytesToBase64 } from '../shared/document'
+import type { ChartSourceProof } from '../presentation/pptx-package'
+import { base64ToBytes, bytesToBase64, defaultSaveExtension } from '../shared/document'
 import type { PresentationState, PresentationAction } from '../presentation/types'
 import type { WriterState, WriterAction, WriterCommand, WriterQuery } from '../word/types'
 import type { CalcState, CalcAction, CalcDataQuery } from '../sheet/types'
@@ -100,12 +101,13 @@ async function exportFile(options: OfficeExportRequest = {}): Promise<OfficeExpo
   const id = loaded.id, client = bridge, source = presentation
   const state = loaded.kind === 'presentation' ? await getPresentationState() : null
   const featureRevision = source.revision
-  const format = options.format || loaded.extension
+  const format = options.format || defaultSaveExtension(loaded.extension)
   if (state && format === 'odp' && source.requiresPptx(state)) throw Error('此文稿包含或修改过转场、动画或媒体，请先保存为 PPTX。若已移除所有效果，请重新打开保存后的 PPTX，再导出 ODP。')
-  const result = await client.request<OfficeExportResult>('export', options, id)
+  const result = await client.request<OfficeExportResult>('export', { ...options, format }, id)
   if (disposed || bridge !== client || loaded?.id !== id || props.document.id !== id || presentation !== source) throw Error('导出期间文档已切换，旧结果已丢弃。')
   if (state && result.revision !== state.revision) throw Error('导出期间幻灯片发生变化，请重新保存。')
-  if (state && result.extension === 'pptx') result.base64 = bytesToBase64(await source.merge(base64ToBytes(result.base64), state))
+  if (state && result.extension === 'pptx') result.base64 = bytesToBase64(await source.merge(base64ToBytes(result.base64), state,
+    (result as OfficeExportResult & { chartProof?: ChartSourceProof[] }).chartProof || []))
   result.dirty ||= source.dirty
   if (featureRevision !== source.revision) throw Error('导出期间演示效果发生变化，请重新保存。')
   if (disposed || bridge !== client || loaded?.id !== id || props.document.id !== id || presentation !== source) throw Error('导出期间文档已切换，旧结果已丢弃。')

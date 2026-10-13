@@ -5,6 +5,10 @@ const session = new URLSearchParams(location.hash.slice(1)).get('session');
 const canvas = document.getElementById('qtcanvas');
 const runtimeBase = new URL('../office-runtime/', location.href).href;
 const adapterBase = new URL('./', location.href).href;
+// Install before loading any engine code, including its pthread bootstraps.
+// The native HTTP server enforces an equivalent CSP; host.html also confines
+// browser-preview builds to local resources instead of relying on a firewall.
+OpenOfficeOfflinePolicy.installLocalTransport(window, location.origin);
 let port, activeDocumentId = '', activeDocumentKind = '', disposed = false, fileCounter = 0;
 const pending = new Map();
 const allowed = new Set(['open','export','undo','redo','search','mark-saved','discard','focus','insert-image',
@@ -20,7 +24,7 @@ function smokeOperation(action, data = {}, kind = activeDocumentKind) {
   for (const name of ['revision','expectedRevision']) if (Number.isSafeInteger(data[name]) && data[name] >= 0 && data[name] <= 1000000000) detail[name] = data[name];
   return detail;
 }
-if (smokeMode) allowed.add('smoke-test');
+if (smokeMode) { allowed.add('smoke-test'); allowed.add('offline-audit'); }
 const send = (message) => { if (!disposed) parent.postMessage({ channel: CHANNEL, session, ...message }, location.origin); };
 const progress = (text, percent) => send({ event: 'progress', data: { text, percent } });
 const errorText = error => String(error?.message || error || '未知错误').slice(0, 1500);
@@ -161,8 +165,8 @@ window.addEventListener('message', (event) => {
     let data = message.data || {};
     if (message.action === 'open') {
       if (typeof data.id !== 'string' || !['word','sheet','presentation'].includes(data.kind)) throw Error('不支持的文档类型。');
-      const extensions = { word: ['docx','odt'], sheet: ['xlsx','ods'], presentation: ['pptx','odp'] }[data.kind];
-      if (!extensions.includes(data.extension)) throw Error('请使用 DOCX、ODT、XLSX、ODS、PPTX 或 ODP 文档。');
+      const extensions = { word: ['docx','odt','doc','rtf'], sheet: ['xlsx','ods','xls'], presentation: ['pptx','odp','ppt'] }[data.kind];
+      if (!extensions.includes(data.extension)) throw Error('请选择支持的本地 Word、Excel 或 PowerPoint 文档。');
       const path = `/tmp/open-office-${++fileCounter}.${data.extension}`;
       const bytes = fromBase64(data.base64);
       if (bytes.length) FS.writeFile(path, bytes);
@@ -221,9 +225,24 @@ function workerMessage(event) {
       const bytes = FS.readFile(message.data.path);
       const base64 = toBase64(bytes);
       FS.unlink(message.data.path);
-      reply(request, true, { base64, extension: message.data.extension, name: message.data.name, revision: message.data.revision, dirty: message.data.dirty });
+      reply(request, true, { base64, extension: message.data.extension, name: message.data.name, revision: message.data.revision, dirty: message.data.dirty,
+        ...(message.data.extension === 'pptx' ? { chartProof: validateChartProof(message.data.chartProof) } : {}) });
     } else reply(request, true, message.data);
   } catch (error) { reply(request, false, undefined, errorText(error)); }
+}
+// Native evidence is forwarded only as bounded primitive fields. The outer
+// editor still binds the response to the same document/session and revision.
+function validateChartProof(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 20000) throw Error('图表修改证据无效，已停止保存。');
+  return value.map(item => {
+    if (!item || typeof item.pageId !== 'string' || !item.pageId.length || item.pageId.length > 500
+      || typeof item.shapeName !== 'string' || !item.shapeName.length || item.shapeName.length > 300
+      || /[\x00-\x1f\x7f]/.test(item.pageId + item.shapeName) || typeof item.sourceEligible !== 'boolean'
+      || (item.sourceShapeName !== undefined && (typeof item.sourceShapeName !== 'string' || !item.sourceShapeName.length || item.sourceShapeName.length > 300 || /[\x00-\x1f\x7f]/.test(item.sourceShapeName)))) throw Error('图表修改证据无效，已停止保存。');
+    return { pageId: item.pageId, shapeName: item.shapeName, sourceEligible: item.sourceEligible,
+      ...(item.sourceShapeName !== undefined ? { sourceShapeName: item.sourceShapeName } : {}) };
+  });
 }
 canvas.addEventListener('wheel', event => event.preventDefault(), { passive: false });
 window.addEventListener('keydown', event => {
@@ -252,9 +271,9 @@ async function start() {
   smokeDiagnostic('font-ready', { bytes: font.byteLength });
   window.Module = {
     canvas,
-    uno_scripts: ['zeta.js', 'presentation-objects.js', 'writer-tools.js', 'calc-tools.js', 'office-worker.js'].map(name => new URL(name, adapterBase).href),
+    uno_scripts: ['offline-policy.js', ...(smokeMode ? ['offline-audit.js'] : []), 'zeta.js', 'presentation-objects.js', 'writer-tools.js', 'calc-tools.js', 'office-worker.js'].map(name => new URL(name, adapterBase).href),
     locateFile: path => new URL(path, runtimeBase).href,
-    mainScriptUrlOrBlob: new Blob([`importScripts(${JSON.stringify(new URL('soffice.js', runtimeBase).href)});`], { type: 'application/javascript' }),
+    mainScriptUrlOrBlob: new Blob([`importScripts(${JSON.stringify(new URL('offline-policy.js', adapterBase).href)});OpenOfficeOfflinePolicy.installLocalTransport(globalThis,${JSON.stringify(location.origin)});importScripts(${JSON.stringify(new URL('soffice.js', runtimeBase).href)});`], { type: 'application/javascript' }),
     preRun: [() => {
       // This directory is explicitly listed in the runtime fontconfig.
       FS.mkdirTree('/usr/share/fonts/open-office');
@@ -264,8 +283,16 @@ async function start() {
       const match = String(text).match(/\((\d+)\/(\d+)\)/);
       progress('正在加载本地办公引擎，首次启动需要稍候', match ? Math.min(90, 10 + Number(match[1]) / Number(match[2]) * 80) : 25);
     },
-    ...(smokeMode ? { onRuntimeInitialized: () => smokeDiagnostic('runtime-initialized'),
-      monitorRunDependencies: count => { diagnosticDependencies = count; } } : {}),
+    onRuntimeInitialized: () => {
+      // preRun downloads soffice.data asynchronously. At this hook the complete
+      // virtual FS exists, and application main/configuration have not run yet.
+      try {
+        const offline = OpenOfficeOfflinePolicy.prepareFileSystem(FS);
+        smokeDiagnostic('offline-policy', offline);
+        smokeDiagnostic('runtime-initialized');
+      } catch (error) { fail(error); throw error; }
+    },
+    ...(smokeMode ? { monitorRunDependencies: count => { diagnosticDependencies = count; } } : {}),
     onAbort: reason => fail(reason, '办公引擎已停止：'),
     print: () => {}, printErr: value => {
       console.warn('[Office engine]', value);

@@ -1,0 +1,40 @@
+/* Real DOM/ZIP regression. No WASM engine: its independent proof is an input,
+ * not inferred from equality of chart caches. */
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {chromium}=require('playwright'),{zipSync,unzipSync,strToU8,strFromU8}=require('fflate');
+const root=path.resolve(__dirname,'../..'),source=fs.readFileSync(path.join(root,'tests/compatibility/fixtures/generated/presentation-rich.pptx'));
+const original=unzipSync(source),chart='ppt/charts/chart1.xml',rels='ppt/charts/_rels/chart1.xml.rels',embedding='ppt/embeddings/Microsoft_Excel_Sheet1.xlsx';
+const mapping=[{sourceIndex:1,targetIndex:1}],proof={sourceEligibleCharts:[{targetIndex:1,name:'Chart 3'}]};
+function broken(change=x=>x){const parts=unzipSync(source);parts[chart]=strToU8(change(strFromU8(parts[chart]).replace(/<c:f>.*?<\/c:f>/g,'<c:f>categories</c:f>').replace(/<c:externalData[\s\S]*?<\/c:externalData>/,'')));delete parts[rels];delete parts[embedding];return zipSync(parts)}
+function modify(bytes,part,fn){const parts=unzipSync(bytes);parts[part]=strToU8(fn(strFromU8(parts[part])));return zipSync(parts)}
+function workbook(parts){const relation=strFromU8(parts[rels]),xml=strFromU8(parts[chart]),id=xml.match(/<c:externalData[^>]*r:id="([^"]+)"/)?.[1];assert.ok(id);const tag=relation.match(new RegExp('<Relationship\\s[^>]*Id="'+id+'"[^>]*>'))?.[0];assert.ok(tag);const target=tag.match(/Target="([^"]+)"/)[1];return parts[path.posix.normalize('ppt/charts/'+target)]}
+(async()=>{const {createServer}=await import('vite');const server=await createServer({configFile:false,root,cacheDir:'node_modules/.vite-chart-test',optimizeDeps:{include:['fflate'],noDiscovery:true,entries:[]},server:{host:'127.0.0.1',port:5294,strictPort:true},plugins:[{name:'test-page',configureServer(server){server.middlewares.use((req,res,next)=>{if(req.url==='/'){res.setHeader('Content-Type','text/html');res.end('<!doctype html><title>Chart package test</title>')}else next()})}}]});await server.listen();let browser;const checks=[];try{
+ browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE||'/usr/bin/chromium',args:['--no-sandbox','--disable-dev-shm-usage']});const page=await browser.newPage();await page.goto('http://127.0.0.1:5294/');await page.evaluate(async()=>{window.repair=(await import('/src/presentation/pptx-package.ts')).repairPresentationChartData});
+ const repair=(from,to,map=mapping,options=proof)=>page.evaluate(async({from,to,map,options})=>Array.from(await window.repair(from?Uint8Array.from(from):null,Uint8Array.from(to),map,options)),{from:from?Array.from(from):null,to:Array.from(to),map,options}).then(value=>Uint8Array.from(value));
+ const target=broken(x=>x.replace('sz="1800"','sz="2200"').replace('<c:formatCode>General</c:formatCode>','<c:formatCode>0.00%</c:formatCode>'));
+ const restored=await repair(source,target),restoredParts=unzipSync(restored),restoredXml=strFromU8(restoredParts[chart]);assert.deepEqual(workbook(restoredParts),original[embedding]);assert.ok(restoredXml.includes('Sheet1!$B$2:$B$4'));assert.ok(restoredXml.includes('sz="2200"'));assert.ok(restoredXml.includes('0.00%'));checks.push('unchanged-proof-restores-exact-workbook-preserves-current-format');
+ await assert.rejects(repair(source,target,mapping,{}),/无法确认此图表/);checks.push('same-cache-without-native-proof-refused');
+ const changed=await repair(source,broken(x=>x.replace('<c:v>24</c:v>','<c:v>99</c:v>').replace('<c:formatCode>General</c:formatCode>','<c:formatCode>0.00%</c:formatCode>')),mapping,{}),changedParts=unzipSync(changed),newWorkbook=unzipSync(workbook(changedParts));assert.match(strFromU8(newWorkbook['xl/worksheets/sheet1.xml']),/<c r="B2"[^>]*><v>99<\/v>/);assert.ok(strFromU8(changedParts[chart]).includes('0.00%'));checks.push('changed-data-has-real-current-xlsx-and-keeps-format-code');
+ const liveParts=unzipSync(source);liveParts[chart]=strToU8(strFromU8(liveParts[chart]).replaceAll('Sheet1!','OtherSheet!'));const liveBook=unzipSync(liveParts[embedding]);liveBook['xl/workbook.xml']=strToU8(strFromU8(liveBook['xl/workbook.xml']).replace('name="Sheet1"','name="OtherSheet"'));liveParts[embedding]=zipSync(liveBook);const live=zipSync(liveParts);assert.deepEqual(await repair(source,live,mapping,{}),live);checks.push('valid-current-same-cache-new-binding-wins');
+ const missing=unzipSync(source);delete missing[embedding];await assert.rejects(repair(zipSync(missing),target),/原工作簿或依赖缺失/);checks.push('missing-original-workbook-refused');
+ await assert.rejects(repair(source,broken(x=>x.replace('idx="0"><c:v>24','><c:v>24'))),/索引/);checks.push('missing-point-index-refused');
+ await assert.rejects(repair(source,broken(x=>x.replace('<c:ptCount val="3"/>','<c:ptCount/>'))),/数量/);checks.push('missing-cache-count-refused');
+ await assert.rejects(repair(source,broken(x=>x.replace('<c:v>24</c:v>','<c:v>99</c:v>').replace('</c:numRef>','<c:extLst/></c:numRef>'))),/未知扩展/);checks.push('unknown-data-reference-extension-refused');
+ const signed=unzipSync(source);signed['_xmlsignatures/sig1.xml']=strToU8('<signature/>');await assert.rejects(repair(zipSync(signed),target),/数字签名/);checks.push('signed-original-refused');
+ const reordered=modify(target,'ppt/presentation.xml',x=>x.replace(/(<p:sldId[^>]*\bid="256"[^>]*\/>)((?:<p:sldId[^>]*\/>)*)/,(_,first,others)=>others+first));
+ const moved=await repair(source,reordered,[{sourceIndex:1,targetIndex:0}],{sourceEligibleCharts:[{targetIndex:0,name:'Chart 3'}]});assert.deepEqual(workbook(unzipSync(moved)),original[embedding]);checks.push('reordered-page-uses-explicit-source-mapping');
+ const removed=modify(target,'ppt/slides/slide2.xml',x=>x.replace(/<p:graphicFrame>[^]*?<\/p:graphicFrame>/g,frame=>frame.includes('Chart 3')?'':frame));assert.deepEqual(await repair(source,removed),removed);checks.push('deleted-chart-not-resurrected');
+ const renamed=modify(target,'ppt/slides/slide2.xml',x=>x.replace('name="Chart 3"','name="Renamed chart"'));await assert.rejects(repair(source,renamed),/名称发生歧义/);checks.push('ambiguous-renaming-refused');
+ const mapped=await repair(source,renamed,mapping,{sourceEligibleCharts:[{targetIndex:1,name:'Renamed chart'}],chartMappings:[{targetIndex:1,name:'Renamed chart',sourceName:'Chart 3'}]});assert.deepEqual(workbook(unzipSync(mapped)),original[embedding]);checks.push('native-proven-object-rename-maps-original-workbook');
+ const noOriginal=await repair(null,broken(),mapping,{});assert.ok(unzipSync(workbook(unzipSync(noOriginal)))['xl/worksheets/sheet1.xml']);checks.push('new-chart-has-editable-xlsx');
+ const sessionResult=await page.evaluate(async({source,target})=>{
+  const {PresentationSession}=await import('/src/presentation/session.ts'),session=new PresentationSession();
+  const initial={pages:[0,1,2].map(index=>({id:'p'+index,index}))},moved={pages:[1,2,0].map((id,index)=>({id:'p'+id,index}))};
+  const evidence=[{pageId:'p1',shapeName:'Renamed chart',sourceShapeName:'Chart 3',sourceEligible:true}];
+  await session.open(Uint8Array.from(source),initial);const first=await session.merge(Uint8Array.from(target),moved,evidence);
+  await session.edit(first,moved,'p1',{transition:{type:'fade',durationMs:500}});
+  return Array.from(await session.merge(Uint8Array.from(target),moved,evidence));
+ },{source:Array.from(source),target:Array.from(modify(reordered,'ppt/slides/slide2.xml',x=>x.replace('name="Chart 3"','name="Renamed chart"')))});
+ assert.deepEqual(workbook(unzipSync(Uint8Array.from(sessionResult))),original[embedding]);checks.push('effects-snapshot-does-not-rebase-native-chart-source-lineage');
+ const output=path.join(root,'test-results/pptx-chart-data');fs.mkdirSync(output,{recursive:true});fs.writeFileSync(path.join(output,'restored.pptx'),restored);fs.writeFileSync(path.join(output,'changed.pptx'),changed);fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({ok:true,scope:'real DOM and ZIP, no WASM',checks},null,2));console.log(JSON.stringify({ok:true,checks},null,2));
+ }finally{await browser?.close();await server.close()}})().catch(error=>{console.error(error);process.exitCode=1});

@@ -1,4 +1,5 @@
 import { inflate, zlibSync } from 'fflate'
+import { buildChartWorkbook } from './chart-workbook.ts'
 
 export type TransitionType = 'none' | 'fade' | 'push' | 'wipe' | 'cover' | 'uncover' | 'split' | 'unknown'
 export type TransitionDirection = 'l' | 'r' | 'u' | 'd' | 'lu' | 'ru' | 'ld' | 'rd' | 'in' | 'out'
@@ -630,4 +631,212 @@ export async function transplantPresentationFeatures(sourceInput: Uint8Array | A
     putXml(target, targetPart, to, options); putXml(target, toRels.path, toRels.doc, options)
   }
   putXml(target, '[Content_Types].xml', targetTypes.doc, options); abort(options); return saveArchive(target)
+}
+
+const C = 'http://schemas.openxmlformats.org/drawingml/2006/chart'
+const chartDataSlots = ['tx','cat','val','xVal','yVal','bubbleSize'] as const
+interface ChartCacheField { node: Element; ref: Element | null; values: Array<string | number | null>; numeric: boolean }
+function chartField(series: Element, slot: string): ChartCacheField | null {
+  const node = child(series, slot)
+  if (!node) return null
+  const direct = child(node, 'v')
+  if (direct) return { node, ref: null, values: [direct.textContent || ''], numeric: false }
+  const ref = children(node).find(item => ['strRef','numRef'].includes(item.localName)) || null
+  const cache = ref ? children(ref).find(item => ['strCache','numCache'].includes(item.localName))
+    : children(node).find(item => ['strLit','numLit'].includes(item.localName))
+  requireValue(cache, 'CHART_DATA', '图表数据包含无缓存引用或多级分类，不能保证可编辑数据完整，已停止保存。')
+  const countText = child(cache, 'ptCount')?.getAttribute('val') || ''
+  requireValue(/^\d+$/.test(countText), 'CHART_DATA', '图表缓存缺少有效数量。')
+  const count = Number(countText)
+  requireValue(Number.isInteger(count) && count >= 0 && count <= 1000, 'CHART_DATA', '图表缓存数量无效或超过 1000 项。')
+  const numeric = ['numCache','numLit'].includes(cache.localName), values: Array<string | number | null> = Array(count).fill(null), indices = new Set<number>()
+  for (const point of children(cache, 'pt')) {
+    const indexText = point.getAttribute('idx') || ''
+    requireValue(/^\d+$/.test(indexText), 'CHART_DATA', '图表缓存缺少有效索引。')
+    const index = Number(indexText), value = child(point, 'v')?.textContent
+    requireValue(Number.isInteger(index) && index >= 0 && index < count && !indices.has(index) && value !== undefined && value !== null,
+      'CHART_DATA', '图表缓存缺值、重复或越界，已停止保存。')
+    indices.add(index)
+    requireValue(value.length <= 10000, 'CHART_DATA', '图表数据文本过长。')
+    if (numeric) { requireValue(value.trim() !== '' && Number.isFinite(Number(value)), 'CHART_DATA', '图表含无法安全写入 Excel 的数值。'); values[index] = Number(value) }
+    else values[index] = value
+  }
+  return { node, ref, values, numeric }
+}
+function chartSeries(doc: Document) {
+  const series = Array.from(doc.getElementsByTagNameNS(C, 'ser'))
+  requireValue(series.length > 0 && series.length <= 100, 'CHART_DATA', '图表序列为空或超过 100 项，不能安全保存数据源。')
+  return series.map(node => ({ node, fields: Object.fromEntries(chartDataSlots.map(slot => [slot, chartField(node, slot)])) as Record<typeof chartDataSlots[number], ChartCacheField | null> }))
+}
+function chartSignature(series: ReturnType<typeof chartSeries>) {
+  return JSON.stringify(series.map(item => chartDataSlots.map(slot => {
+    const field = item.fields[slot]; return field ? [slot, field.numeric, field.values] : [slot, null]
+  })))
+}
+function chartColumn(index: number) { let value = ''; for (let n = index; n; n = Math.floor((n - 1) / 26)) value = String.fromCharCode(65 + (n - 1) % 26) + value; return value }
+export interface ChartSourceProof { pageId: string; shapeName: string; sourceShapeName?: string; sourceEligible: boolean }
+export interface PptxChartRepairOptions extends PptxPackageOptions {
+  sourceEligibleCharts?: Array<{ targetIndex: number; name: string }>
+  chartMappings?: Array<{ targetIndex: number; name: string; sourceName: string }>
+}
+
+/** Preserve original workbook bindings for unchanged data, and create an actual
+ * embedded XLSX for changed/new basic charts. Never reuse stale source values.
+ * The target chart, shape geometry, title and formatting remain editor-owned. */
+export async function repairPresentationChartData(sourceInput: Uint8Array | null, targetInput: Uint8Array,
+  mapping: PptxSlideMapping[], options: PptxChartRepairOptions = {}): Promise<Uint8Array> {
+  const source = sourceInput ? openArchive(sourceInput) : null, target = openArchive(targetInput); checkEditable(target)
+  if (source) checkEditable(source)
+  const sourceLayout = source ? await structure(source, options) : null, targetLayout = await structure(target, options)
+  const sourceTypes = source ? await contents(source, options) : null, targetTypes = await contents(target, options)
+  const copied = new Map<string, string>(), handled = new Set<string>(), targets = new Set<number>()
+  let changed = false
+  async function copyDependency(name: string): Promise<string> {
+    const prior = copied.get(name); if (prior) return prior
+    requireValue(source && sourceTypes && source.has(name), 'CHART_WORKBOOK', '图表原工作簿或依赖缺失，已停止保存。')
+    // Validate CRC before preserving an opaque embedded workbook/relationship graph.
+    await get(source, name, options)
+    const destination = uniquePart(target, 'ppt/embeddings/openoffice-chart-source-', name.split('.').at(-1)!.replace(/[^a-zA-Z0-9]/g, '') || 'bin')
+    copied.set(name, destination); target.set(destination, { ...source.get(name)!, name: destination })
+    overrideType(targetTypes.doc, destination, sourceTypes.type(name))
+    if (source.has(relationPart(name))) {
+      const rels = await relationships(source, name, options)
+      for (const relation of rels.map.values()) if (!relation.external) relation.node.setAttribute('Target', relativePart(destination, await copyDependency(resolvePart(name, relation.target))))
+      putXml(target, relationPart(destination), rels.doc, options)
+    }
+    return destination
+  }
+  async function charts(archive: Archive, part: string) {
+    const doc = await xml(archive, part, options), rels = await relationships(archive, part, options), found = new Map<string, { part: string; doc: Document }>()
+    for (const shape of descendants(doc, 'graphicFrame')) {
+      const references = Array.from(shape.getElementsByTagNameNS(C, 'chart'))
+      requireValue(references.length || !descendants(shape, 'graphicData').some(node => /chart/i.test(node.getAttribute('uri') || '')),
+        'CHART_DATA', '图表使用尚未验证的新扩展格式，不能保证数据源完整，已停止保存。')
+      if (!references.length) continue
+      const name = descendants(shape, 'cNvPr')[0]?.getAttribute('name') || ''
+      requireValue(name && references.length === 1 && !found.has(name), 'CHART_MAPPING', '图表名称缺失或重复，无法安全对应数据源。请给图表设置唯一名称。')
+      const relation = rels.map.get(attribute(references[0]!, 'id'))
+      requireValue(relation && !relation.external && relation.type.endsWith('/chart'), 'CHART_MAPPING', '图表关系缺失或不是内嵌图表。')
+      const chartPart = resolvePart(part, relation.target)
+      found.set(name, { part: chartPart, doc: await xml(archive, chartPart, options) })
+    }
+    return { doc, found }
+  }
+  for (const pair of mapping) {
+    abort(options)
+    requireValue(Number.isInteger(pair.targetIndex) && targetLayout.slides[pair.targetIndex] && !targets.has(pair.targetIndex), 'CHART_MAPPING', '图表目标页面映射无效。')
+    targets.add(pair.targetIndex)
+    const to = await charts(target, targetLayout.slides[pair.targetIndex]!.partName)
+    const original = source && sourceLayout ? await charts(source, sourceLayout.slides[pair.sourceIndex]?.partName || fail('CHART_MAPPING', '图表原页面映射无效。')) : null
+    // Native default names can change when moving a slide. Only a monitor's
+    // same-UNO-object mapping may bridge that rename; never guess by position
+    // or cached values. New/copy/replaced shapes have no source mapping.
+    const sourceName = (name: string) => options.chartMappings?.find(item => item.targetIndex === pair.targetIndex && item.name === name)?.sourceName || name
+    const mappedNames = [...to.found.keys()].map(sourceName)
+    requireValue(new Set(mappedNames).size === mappedNames.length, 'CHART_MAPPING', '多个当前图表指向同一原图表，不能安全恢复工作簿。')
+    const missingOriginals = original ? [...original.found.keys()].filter(name => !mappedNames.includes(name)) : []
+    const newNames = [...to.found.keys()].filter(name => !original?.found.has(sourceName(name)))
+    requireValue(!missingOriginals.length || !newNames.length, 'CHART_MAPPING', '图表名称发生歧义，无法判断是重命名还是替换，已停止保存以保护原工作簿。')
+    for (const name of missingOriginals) requireValue(!shapeNames(to.doc).has(name), 'CHART_MAPPING', `图表“${name}”已变成非图表对象，不能静默丢弃其工作簿。`)
+    for (const [name, chart] of to.found) {
+      requireValue(!handled.has(chart.part), 'CHART_MAPPING', '多个对象共用同一图表文件，无法独立确认数据编辑，已停止保存。')
+      handled.add(chart.part)
+      const old = original?.found.get(sourceName(name))
+      const chartRels = await relationships(target, chart.part, options)
+      const liveExternal = child(chart.doc.documentElement, 'externalData'), liveRelation = liveExternal ? chartRels.map.get(attribute(liveExternal, 'id')) : null
+      const liveFormulas = Array.from(chart.doc.getElementsByTagNameNS(C, 'f')).map(node => node.textContent?.trim() || '')
+      // New or edited authoritative target bindings win even if their cached
+      // values happen to equal the original. Never restore an old same-value
+      // range/workbook over an intact current binding.
+      if (liveRelation?.type.endsWith('/package') && liveFormulas.length && liveFormulas.every(formula => formula && !/^(?:label \d+|categories|\d+)$/i.test(formula))) {
+        if (!liveRelation.external) {
+          const workbook = await get(target, resolvePart(chart.part, liveRelation.target), options)
+          const inspected = inspectPptxZip(workbook)
+          requireValue(inspected.entries.some(entry => entry.name === 'xl/workbook.xml'), 'CHART_WORKBOOK', '当前图表引用的工作簿容器无效。')
+        }
+        continue
+      }
+      const currentSeries = chartSeries(chart.doc), oldSeries = old ? chartSeries(old.doc) : null
+      const oldExternal = old ? child(old.doc.documentElement, 'externalData') : null
+      const unchanged = !!old && !!oldSeries && chartSignature(oldSeries) === chartSignature(currentSeries)
+      let relationId: string
+      if (unchanged && oldExternal && source) {
+        requireValue(options.sourceEligibleCharts?.some(item => item.targetIndex === pair.targetIndex && item.name === name),
+          'CHART_EDIT_PROOF', '无法确认此图表在导入后未修改数据源；已停止保存，避免用原工作簿覆盖同值但不同范围的编辑。')
+        const oldRels = await relationships(source, old!.part, options), relation = oldRels.map.get(attribute(oldExternal, 'id'))
+        requireValue(relation && relation.type.endsWith('/package'), 'CHART_WORKBOOK', '原图表的 Excel 工作簿关系无效。')
+        const destination = relation.external ? relation.target : relativePart(chart.part, await copyDependency(resolvePart(old!.part, relation.target)))
+        relationId = addRelation(chartRels, relation.type, destination)
+        if (relation.external) chartRels.map.get(relationId)!.node.setAttribute('TargetMode', 'External')
+        // Keep current caches/format codes; restore only valid original formulas.
+        for (let index = 0; index < currentSeries.length; index++) for (const slot of chartDataSlots) {
+          const from = oldSeries![index]!.fields[slot], toField = currentSeries[index]!.fields[slot]
+          if (!from || !toField) continue
+          if (from.ref && toField.ref && from.ref.localName === toField.ref.localName) {
+            requireValue(children(from.ref).every(node => ['f','strCache','numCache'].includes(node.localName)), 'CHART_DATA', '原图表数据引用含未知扩展，不能安全恢复。')
+            const formula = child(from.ref, 'f'); requireValue(formula?.textContent, 'CHART_WORKBOOK', '原图表引用公式缺失。')
+            const oldFormula = child(toField.ref, 'f'); if (oldFormula) oldFormula.remove()
+            toField.ref.insertBefore(chart.doc.importNode(formula, true), toField.ref.firstChild)
+          } else {
+            // Literal series labels have no workbook reference to invent.
+            requireValue(!from.ref, 'CHART_WORKBOOK', '原图表引用类型变化，无法保证原工作簿绑定完整。')
+            requireValue(children(from.node).every(node => ['v','strLit','numLit'].includes(node.localName))
+              && children(toField.node).every(node => ['v','strLit','numLit','strRef','numRef'].includes(node.localName)),
+              'CHART_DATA', '图表文字数据含无法无损替换的扩展，已停止保存。')
+            toField.node.parentNode!.replaceChild(chart.doc.importNode(from.node, true), toField.node)
+          }
+        }
+      } else {
+        requireValue(currentSeries.every(series => !series.fields.xVal && !series.fields.yVal && !series.fields.bubbleSize
+          && series.fields.tx?.values.length === 1 && typeof series.fields.tx.values[0] === 'string'
+          && series.fields.cat && !series.fields.cat.numeric && series.fields.cat.values.every(value => typeof value === 'string')
+          && series.fields.val?.numeric), 'CHART_DATA', '当前图表的数据源不是受支持的完整文本分类/数值序列，已停止保存；散点、多级分类或缺失缓存需要保留原格式处理。')
+        const categories = currentSeries[0]!.fields.cat!.values as string[]
+        requireValue(currentSeries.every(series => JSON.stringify(series.fields.cat!.values) === JSON.stringify(categories)
+          && series.fields.val!.values.length === categories.length), 'CHART_DATA', '图表各序列分类不一致，不能安全生成工作簿。')
+        const workbook = buildChartWorkbook({ categories, series: currentSeries.map(series => series.fields.tx!.values[0] as string),
+          values: categories.map((_, index) => currentSeries.map(series => series.fields.val!.values[index] as number | null)) })
+        const workbookPart = uniquePart(target, 'ppt/embeddings/openoffice-chart-data-', 'xlsx')
+        put(target, workbookPart, workbook); overrideType(targetTypes.doc, workbookPart, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        relationId = addRelation(chartRels, `${R}/package`, relativePart(chart.part, workbookPart))
+        currentSeries.forEach((series, index) => {
+          const column = chartColumn(index + 2)
+          for (const [slot, formula, referenceType] of [['tx', `Sheet1!$${column}$1`, 'strRef'],
+            ['cat', `Sheet1!$A$2:$A$${categories.length + 1}`, 'strRef'],
+            ['val', `Sheet1!$${column}$2:$${column}$${categories.length + 1}`, 'numRef']] as const) {
+            const field = series.fields[slot]!
+            requireValue(children(field.node).every(node => ['strRef','numRef','strLit','numLit','v'].includes(node.localName)),
+              'CHART_DATA', '图表数据含未知扩展，不能安全更新工作簿。')
+            if (field.ref) {
+              requireValue(field.ref.localName === referenceType && children(field.ref).every(node => ['f','strCache','numCache'].includes(node.localName)),
+                'CHART_DATA', '图表引用格式含未知扩展，已停止保存。')
+              const oldFormula = child(field.ref, 'f'); if (oldFormula) oldFormula.remove()
+              const newFormula = element(chart.doc, 'f', C, 'c'); newFormula.textContent = formula
+              field.ref.insertBefore(newFormula, field.ref.firstChild)
+            } else {
+              const reference = element(chart.doc, referenceType, C, 'c'); append(reference, 'f', {}, C, 'c').textContent = formula
+              const numeric = slot === 'val', literal = children(field.node).find(node => node.localName === (numeric ? 'numLit' : 'strLit'))
+              const cache = append(reference, numeric ? 'numCache' : 'strCache', {}, C, 'c')
+              if (literal) {
+                for (const attr of Array.from(literal.attributes)) cache.setAttributeNS(attr.namespaceURI, attr.name, attr.value)
+                for (const node of Array.from(literal.childNodes)) cache.appendChild(chart.doc.importNode(node, true))
+              } else {
+                append(cache, 'ptCount', { val: field.values.length }, C, 'c')
+                field.values.forEach((value, i) => { if (value !== null) append(append(cache, 'pt', { idx: i }, C, 'c'), 'v', {}, C, 'c').textContent = String(value) })
+              }
+              for (const existing of children(field.node)) existing.remove()
+              field.node.appendChild(reference)
+            }
+          }
+        })
+      }
+      for (const existing of children(chart.doc.documentElement, 'externalData')) existing.remove()
+      const external = element(chart.doc, 'externalData', C, 'c'); external.setAttributeNS(R, 'r:id', relationId)
+      append(external, 'autoUpdate', { val: 0 }, C, 'c')
+      chart.doc.documentElement.insertBefore(external, children(chart.doc.documentElement).find(node => ['printSettings','userShapes','extLst'].includes(node.localName)) || null)
+      putXml(target, chart.part, chart.doc, options); putXml(target, chartRels.path, chartRels.doc, options); changed = true
+    }
+  }
+  if (!changed) return targetInput
+  putXml(target, '[Content_Types].xml', targetTypes.doc, options); return saveArchive(target)
 }

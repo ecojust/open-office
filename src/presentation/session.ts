@@ -1,17 +1,18 @@
-import { parsePptxPackage, patchPptxPackage, patchPptxPageNames, transplantPresentationFeatures } from './pptx-package'
+import { parsePptxPackage, patchPptxPackage, patchPptxPageNames, transplantPresentationFeatures, repairPresentationChartData } from './pptx-package'
 import type { PptxPresentation } from './pptx-package'
+import type { ChartSourceProof } from './pptx-package'
 
 type Pages = { pages: Array<{ id: string; index: number; name?: string }> }
 type Patch = Parameters<typeof patchPptxPackage>[1]['slides'][number]
 type Snapshot = { bytes: Uint8Array; data: PptxPresentation }
-type SourcePage = { snapshot: Snapshot; index: number }
+type SourcePage = { snapshot: Snapshot; index: number; copiedChartData?: boolean; chartSource?: { snapshot: Snapshot; index: number } }
 
 // Includes retained ZIP buffers, embedded-media buffers and a conservative
 // estimate of text/metadata. Deleted slides remain available to UNO undo, but
 // preserving that history must not grow the session without a bound.
 export const PRESENTATION_HISTORY_LIMIT = 128 * 1024 * 1024
 function retainedSize(pages: Map<string, SourcePage>) {
-  const buffers = new Set<ArrayBufferLike>(), snapshots = new Set([...pages.values()].map(page => page.snapshot))
+  const buffers = new Set<ArrayBufferLike>(), snapshots = new Set([...pages.values()].flatMap(page => [page.snapshot, ...(page.chartSource ? [page.chartSource.snapshot] : [])]))
   let size = 0
   const buffer = (bytes: Uint8Array) => { if (!buffers.has(bytes.buffer)) { buffers.add(bytes.buffer); size += bytes.buffer.byteLength } }
   for (const snapshot of snapshots) {
@@ -41,7 +42,7 @@ export class PresentationSession {
   async open(bytes: Uint8Array | null, state: Pages) {
     const data = bytes ? await parsePptxPackage(bytes) : null
     const snapshot = bytes && data ? { bytes, data } : null
-    const mapping = new Map<string, SourcePage>(snapshot ? state.pages.map(page => [page.id, { snapshot, index: page.index }]) : [])
+    const mapping = new Map<string, SourcePage>(snapshot ? state.pages.map(page => [page.id, { snapshot, index: page.index, chartSource: { snapshot, index: page.index } }]) : [])
     checkRetainedSize(mapping)
     this.data = data; this.mapping = mapping
     this.edited.clear()
@@ -61,10 +62,12 @@ export class PresentationSession {
   requiresPptx(state: Pages) { return this.hasLiveFeatures(state) || state.pages.some(page => this.edited.has(page.id)) }
   duplicate(from: string, to: string) {
     const source = this.mapping.get(from)
-    if (source) this.mapping.set(to, source)
+    // A known duplicate is a new editable chart, not evidence that its native
+    // object is the source object. Preserve effects, rebuild current chart data.
+    if (source) this.mapping.set(to, { ...source, copiedChartData: true })
     if (this.edited.has(from)) this.edited.add(to)
   }
-  async merge(bytes: Uint8Array, state: Pages) {
+  async merge(bytes: Uint8Array, state: Pages, chartProof: ChartSourceProof[] = []) {
     // Impress currently omits user slide names on PPTX export. Put the real
     // cSld name back so the same names are read when the file opens again.
     if (state.pages.every(page => typeof page.name === 'string')) bytes = await patchPptxPageNames(bytes, state.pages.map(page => page.name!))
@@ -77,6 +80,28 @@ export class PresentationSession {
       group.push({sourceIndex: source.index, targetIndex: page.index}); groups.set(source.snapshot, group)
     }
     for (const [snapshot, mapping] of groups) bytes = await transplantPresentationFeatures(snapshot.bytes, bytes, mapping)
+    // Restore source bindings only with both matching current caches and native
+    // untouched-chart evidence. Cache equality alone cannot identify a changed
+    // range with the same values. Page mappings prevent cross-slide reuse.
+    const chartGroups = new Map<Snapshot, Array<{ sourceIndex: number; targetIndex: number }>>()
+    const freshPages: Array<{ sourceIndex: number; targetIndex: number }> = []
+    for (const page of state.pages) {
+      const pageSource = this.mapping.get(page.id), source = pageSource?.chartSource
+      if (source && !pageSource?.copiedChartData) {
+        const group = chartGroups.get(source.snapshot) || []
+        group.push({ sourceIndex: source.index, targetIndex: page.index }); chartGroups.set(source.snapshot, group)
+      } else freshPages.push({ sourceIndex: -1, targetIndex: page.index })
+    }
+    const sourceEligibleCharts = chartProof.filter(proof => proof.sourceEligible === true).flatMap(proof => {
+      const page = state.pages.find(item => item.id === proof.pageId)
+      return page ? [{ targetIndex: page.index, name: proof.shapeName }] : []
+    })
+    const chartMappings = chartProof.flatMap(proof => {
+      const page = state.pages.find(item => item.id === proof.pageId)
+      return page && proof.sourceShapeName ? [{ targetIndex: page.index, name: proof.shapeName, sourceName: proof.sourceShapeName }] : []
+    })
+    for (const [snapshot, mapping] of chartGroups) bytes = await repairPresentationChartData(snapshot.bytes, bytes, mapping, { sourceEligibleCharts, chartMappings })
+    if (freshPages.length) bytes = await repairPresentationChartData(null, bytes, freshPages)
     return bytes
   }
   async edit(bytes: Uint8Array, state: Pages, pageId: string, patch: Omit<Patch, 'slideIndex'>) {
@@ -88,7 +113,12 @@ export class PresentationSession {
     if (next.length > 40 * 1024 * 1024) throw Error('加入媒体后的文稿超过 40 MiB，请缩小媒体后重试。')
     const parsed = await parsePptxPackage(next)
     const snapshot = { bytes: next, data: parsed }, mapping = new Map(this.mapping)
-    for (const item of state.pages) mapping.set(item.id, { snapshot, index: item.index })
+    for (const item of state.pages) {
+      const previous = this.mapping.get(item.id)
+      // Chart proof is anchored to the native import, independently of later
+      // OOXML effects snapshots or names changed by page reordering.
+      mapping.set(item.id, { snapshot, index: item.index, copiedChartData: previous?.copiedChartData, chartSource: previous?.chartSource })
+    }
     checkRetainedSize(mapping)
     this.data = parsed; this.mapping = mapping
     this.edited.add(pageId)

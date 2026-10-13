@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "scope": "Real Vue App/PdfEditor in Chromium, actual local PDF backend, independent PyMuPDF saved-file readback; no native-dialog or Acrobat interoperability claim",
+  "startedAt": "2026-10-13T05:34:43.158Z",
+  "finishedAt": "2026-10-13T05:34:59.917Z",
+  "ok": true,
+  "rounds": [
+    {
+      "round": 1,
+      "pageCount": 12,
+      "replacements": [
+        "ROUND1 EDITED 中文"
+      ],
+      "untouchedPixelIdenticalPages": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "bookmarksPreserved": true,
+      "linksPreserved": true,
+      "imagesPreserved": true,
+      "widgetsPreserved": true,
+      "annotationsPreserved": true,
+      "rotationCropPreserved": true,
+      "watermarkPages": [],
+      "fileSha256": "586d3be098493a597e4f93a91ba5136e097890896779dc27805b337e22c5d5ad",
+      "bytes": 66190,
+      "file": "complex-round-1.pdf"
+    },
+    {
+      "round": 2,
+      "pageCount": 12,
+      "replacements": [
+        "ROUND1 EDITED 中文",
+        "ROUND2 EDITED 旋转"
+      ],
+      "untouchedPixelIdenticalPages": [
+        2,
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "bookmarksPreserved": true,
+      "linksPreserved": true,
+      "imagesPreserved": true,
+      "widgetsPreserved": true,
+      "annotationsPreserved": true,
+      "rotationCropPreserved": true,
+      "watermarkPages": [],
+      "fileSha256": "dd1ded8cc87bdc6ab0fa245719a347e46d839c2e8fb98734e5cfa80f612771e5",
+      "bytes": 69396,
+      "file": "complex-round-2.pdf"
+    },
+    {
+      "round": 3,
+      "pageCount": 12,
+      "replacements": [
+        "ROUND1 EDITED 中文",
+        "ROUND2 EDITED 旋转",
+        "ROUND3 EDITED 完成"
+      ],
+      "untouchedPixelIdenticalPages": [
+        2,
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "bookmarksPreserved": true,
+      "linksPreserved": true,
+      "imagesPreserved": true,
+      "widgetsPreserved": true,
+      "annotationsPreserved": true,
+      "rotationCropPreserved": true,
+      "watermarkPages": [
+        12
+      ],
+      "fileSha256": "80fe92dc590348848eb88524a6a69710ca825d967bf0046544071e0256954a20",
+      "bytes": 72690,
+      "file": "complex-round-3.pdf"
+    }
+  ],
+  "checks": [
+    {
+      "name": "12-page complex PDF renders; actual bookmark navigation reaches page 12",
+      "pixels": {
+        "width": 1190,
+        "height": 1684,
+        "light": 191582,
+        "ink": 6034,
+        "samples": 200396
+      }
+    },
+    {
+      "name": "Round 1: real saved PDF independently verified",
+      "sha256": "586d3be098493a597e4f93a91ba5136e097890896779dc27805b337e22c5d5ad"
+    },
+    {
+      "name": "Round 1: downloaded file reopened through Vue PDF editor"
+    },
+    {
+      "name": "Round 2: real saved PDF independently verified",
+      "sha256": "dd1ded8cc87bdc6ab0fa245719a347e46d839c2e8fb98734e5cfa80f612771e5"
+    },
+    {
+      "name": "Round 2: downloaded file reopened through Vue PDF editor"
+    },
+    {
+      "name": "Round 3: real saved PDF independently verified",
+      "sha256": "80fe92dc590348848eb88524a6a69710ca825d967bf0046544071e0256954a20"
+    },
+    {
+      "name": "Round 3: downloaded file reopened through Vue PDF editor"
+    },
+    {
+      "name": "All three rounds preserve unrelated-page pixels, original images/tables/text, bookmarks, links, forms and annotations"
+    },
+    {
+      "name": "No external HTTP or WebSocket request attempted; all actual backend calls remain local"
+    }
+  ],
+  "externalRequests": [],
+  "externalSockets": [],
+  "httpFailures": [],
+  "pageErrors": [],
+  "report": "test-results/pdf-complex/2026-10-13T05-34-43-157Z/report.json",
+  "reportSha256": "5d6659634a5e0184a7ec8258733570a8d3a56c914ad192121d6b3b594fbda2de"
+}

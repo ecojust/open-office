@@ -1,0 +1,7 @@
+# Optional development dependencies for generate-fixtures.py (including --check).
+# These are not application runtime dependencies.
+python-docx==1.2.0
+XlsxWriter==3.2.9
+python-pptx==1.0.2
+Pillow==12.3.0
+lxml==6.1.1

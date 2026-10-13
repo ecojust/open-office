@@ -5,24 +5,26 @@ import vm from 'node:vm'
 import { randomUUID } from 'node:crypto'
 import ts from 'typescript'
 import * as vue from 'vue'
+import { zipSync, strToU8 } from 'fflate'
+import { reviewOfficeImport } from '../src/office/import-review.ts'
 
 // Run the real App.vue setup logic with Vue's real reactivity. Editors and native
 // file dialogs are controlled doubles: these are shell-state regressions, not
 // LibreOffice/PDF engine or native WebView compatibility tests.
 const app = (await readFile(new URL('../src/App.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
 const utilities = await readFile(new URL('../src/shared/document.ts', import.meta.url), 'utf8')
-const names = 'tabs,activeKey,active,officeDocument,pdfDocument,officeEditor,pdfEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationWorkbench,presentationEffects,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest'
+const names = 'tabs,activeKey,active,officeDocument,pdfDocument,officeEditor,pdfEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationWorkbench,presentationEffects,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,browserFile,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest'
 
 function compile(source, require, extra = {}) {
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
   const module = { exports: {} }
   vm.runInNewContext(output, { module, exports: module.exports, require, console, URL, setTimeout, clearTimeout,
-    crypto: { randomUUID }, __BUILD_VERSION__: 'test', HTMLElement: class {}, document: { baseURI: 'http://127.0.0.1/' }, ...extra })
+    crypto: { randomUUID }, btoa, atob, __BUILD_VERSION__: 'test', HTMLElement: class {}, document: { baseURI: 'http://127.0.0.1/' }, ...extra })
   return module.exports
 }
 
 function shell({nativeEnabled = true, smoke = false} = {}) {
-  const calls = [], mounted = [], native = {
+  const calls = [], mounted = [], reviews = [], native = {
     isTauri: () => nativeEnabled,
     onCloseRequested: async () => () => {},
     bootstrap: async () => ({smokeMode:false}),
@@ -40,6 +42,7 @@ function shell({nativeEnabled = true, smoke = false} = {}) {
     if (name === './native') return native
     if (name === './smoke') return {smokeRequested:()=>smoke,smokeStage(){},smokeFeatures:()=>({}),smokeFailure:async(error,phase)=>{calls.push(['smoke-failure',phase,String(error)])},smokeAwait:async(_phase,action)=>action()}
     if (name === './shared/document') return helpers
+    if (name === './office/import-review') return {reviewOfficeImport(document){reviews.push(document);return reviewOfficeImport(document)}}
     if (name === '@tauri-apps/api/core') return { invoke: async () => {} }
     if (name.endsWith('.vue')) return {}
     throw Error(`Unexpected setup import ${name}`)
@@ -66,7 +69,29 @@ function shell({nativeEnabled = true, smoke = false} = {}) {
     for (let n = 0; n < 50 && state.busy.value; n++) { await Promise.resolve(); await vue.nextTick() }
     assert.equal(state.busy.value, '', 'The shell task should finish')
   }
-  return { state, native, calls, handle, tab, active, idle, async mount(){for(const callback of mounted)await callback()} }
+  return { state, native, calls, reviews, handle, tab, active, idle, async mount(){for(const callback of mounted)await callback()} }
+}
+
+function riskyWorkbook() {
+  const s='http://schemas.openxmlformats.org/spreadsheetml/2006/main',r='http://schemas.openxmlformats.org/officeDocument/2006/relationships',pr='http://schemas.openxmlformats.org/package/2006/relationships'
+  const entries={
+    '_rels/.rels':`<Relationships xmlns="${pr}"><Relationship Id="main" Type="${r}/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+    'xl/workbook.xml':`<workbook xmlns="${s}" xmlns:r="${r}"><sheets><sheet name="Source" sheetId="1" r:id="s1" state="veryHidden"/></sheets></workbook>`,
+    'xl/_rels/workbook.xml.rels':`<Relationships xmlns="${pr}"><Relationship Id="s1" Type="${r}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
+    'xl/worksheets/sheet1.xml':`<worksheet xmlns="${s}"><sheetData><row r="1"><c r="A1" t="b"><v>1</v></c></row></sheetData></worksheet>`,
+  }
+  return zipSync(Object.fromEntries(Object.entries(entries).map(([name,xml])=>[name,strToU8(xml)])))
+}
+
+function attachedWordDocument() {
+  const w='http://schemas.openxmlformats.org/wordprocessingml/2006/main',r='http://schemas.openxmlformats.org/officeDocument/2006/relationships',pr='http://schemas.openxmlformats.org/package/2006/relationships'
+  const entries={
+    '_rels/.rels':`<Relationships xmlns="${pr}"><Relationship Id="main" Type="${r}/officeDocument" Target="word/document.xml"/></Relationships>`,
+    'word/document.xml':`<w:document xmlns:w="${w}" xmlns:r="${r}" xmlns:o="urn:schemas-microsoft-com:office:office"><w:body><w:p><w:r><w:object><o:OLEObject Type="Embed" r:id="file"/></w:object></w:r></w:p></w:body></w:document>`,
+    'word/_rels/document.xml.rels':`<Relationships xmlns="${pr}"><Relationship Id="file" Type="${r}/oleObject" Target="embeddings/item.bin"/></Relationships>`,
+    'word/embeddings/item.bin':'Original embedded attachment',
+  }
+  return zipSync(Object.fromEntries(Object.entries(entries).map(([name,value])=>[name,strToU8(value)])))
 }
 
 test('native smoke URL reports failure even if Tauri injection is absent', async () => {
@@ -166,6 +191,127 @@ test('cancelled save and external conflict preserve dirty state and original ide
     assert.equal(a.dirty, true); assert.equal(a.fileId, 'A'); assert.equal(a.document.sha256, 'old-hash')
     assert.ok(!h.calls.some(call => call[0] === 'marked'))
   }
+})
+
+test('legacy imports save only as modern copies without an original-file overwrite token', async () => {
+  for(const [extension,modern,kind] of [['doc','docx','word'],['rtf','docx','word'],['xls','xlsx','sheet'],['ppt','pptx','presentation']]) {
+    const h=shell(),a=h.tab('original',{dirty:true,kind});h.active(a)
+    a.document.extension=extension;a.document.name=`Original.${extension}`
+    let requested
+    h.handle.exportFile=async options=>{requested=options;return{base64:'TkVX',extension:modern,name:`Original.${extension}`}}
+    assert.equal(await h.state.saveActive(),true)
+    assert.equal(requested.format,modern)
+    const request=h.calls.find(call=>call[0]==='save')[1]
+    assert.equal(request.extension,modern);assert.equal(request.name,`Original - 副本.${modern}`)
+    assert.equal(request.saveAs,true);assert.equal(request.documentId,undefined);assert.equal(request.expectedSha256,undefined)
+    assert.notEqual(a.fileId,'original');assert.equal(a.document.extension,modern)
+    assert.equal(a.requiresSaveAs,false);assert.equal(a.dirty,false)
+  }
+})
+
+test('legacy Save As protection survives a modern in-memory snapshot and a cancelled dialog', async () => {
+  const h=shell(),a=h.tab('legacy',{dirty:true});h.active(a)
+  a.document.extension='doc';a.document.name='Legacy.doc'
+  await h.state.stash()
+  assert.equal(a.document.extension,'docx');assert.equal(a.document.name,'Legacy.docx')
+  assert.equal(a.requiresSaveAs,true);assert.equal(a.fileId,'legacy')
+  const requests=[],save=h.native.saveDocument
+  h.native.saveDocument=async request=>{requests.push(request);return{status:'cancelled'}}
+  assert.equal(await h.state.saveActive(),false)
+  assert.equal(a.requiresSaveAs,true);assert.equal(a.dirty,true);assert.equal(a.fileId,'legacy')
+  assert.equal(a.document.sha256,'old-hash');assert.ok(!h.calls.some(call=>call[0]==='marked'))
+  h.native.saveDocument=save
+  assert.equal(await h.state.saveActive(),true)
+  const successful=h.calls.find(call=>call[0]==='save')[1]
+  for(const request of [...requests,successful]) {
+    assert.equal(request.saveAs,true);assert.equal(request.documentId,undefined);assert.equal(request.expectedSha256,undefined)
+  }
+  assert.equal(a.requiresSaveAs,false)
+  await h.state.saveActive()
+  assert.equal(h.calls.filter(call=>call[0]==='save').at(-1)[1].documentId,a.fileId,'Later saves may update only the new modern file')
+})
+
+test('legacy source protection is set at import and unsafe legacy exports never reach the file bridge', async () => {
+  const h=shell()
+  await h.state.addDocument({id:'source',kind:'word',extension:'doc',name:'Source.doc',base64:'OLD',sha256:'old-hash',sizeBytes:3},'source')
+  const a=h.state.tabs.value[0];a.ready=true
+  assert.equal(a.requiresSaveAs,true)
+  let exports=0
+  h.handle.exportFile=async()=>{exports++;return{base64:'TkVX',extension:'doc'}}
+  await assert.rejects(h.state.saveActive(false,'doc'),/仅支持导入/)
+  assert.equal(exports,0)
+  await assert.rejects(h.state.saveActive(),/未生成现代格式/)
+  await assert.rejects(h.state.stash(),/仅支持导入/)
+  assert.equal(h.calls.length,0);assert.equal(a.fileId,'source');assert.equal(a.document.extension,'doc')
+  assert.equal(a.requiresSaveAs,true)
+})
+
+test('browser import checks document bytes before creating a tab', async () => {
+  const h=shell({nativeEnabled:false})
+  const open=async(name,contents)=>{
+    const bytes=new TextEncoder().encode(contents)
+    const input={value:name,files:[{name,size:bytes.length,arrayBuffer:async()=>bytes.buffer}]}
+    await h.state.browserFile({target:input});assert.equal(input.value,'')
+  }
+  await open('renamed.doc','This is not an OLE document')
+  assert.equal(h.state.tabs.value.length,0);assert.match(h.state.error.value,/格式不符/)
+  await open('valid.rtf','{\\rtf1\\ansi Hello}')
+  assert.equal(h.state.tabs.value.length,1)
+  assert.equal(h.state.tabs.value[0].document.extension,'rtf')
+  assert.equal(h.state.tabs.value[0].requiresSaveAs,true)
+})
+
+test('risky XLSX is inspected once and requires Save As after switching or cancelling',async()=>{
+  const h=shell(),bytes=riskyWorkbook()
+  const original={id:'source',kind:'sheet',extension:'xlsx',name:'Source.v2.xlsx',base64:Buffer.from(bytes).toString('base64'),sha256:'source-hash',sizeBytes:bytes.length}
+  await h.state.addDocument(original,'source')
+  const a=h.state.tabs.value[0];a.ready=true;a.dirty=true
+  assert.equal(h.reviews.length,1);assert.equal(a.requiresSaveAs,true);assert.equal(a.importWarnings.length,2)
+  await h.state.addDocument(original,'source')
+  assert.equal(h.reviews.length,1,'Reactivating an already-open source does not rebind its original review')
+  h.handle.exportFile=async()=>({base64:'TkVX',extension:'xlsx',dirty:true})
+  const b=h.tab('B');await h.state.activate(b);b.ready=true;await h.state.activate(a);a.ready=true
+  assert.equal(a.requiresSaveAs,true);assert.equal(a.importWarnings.length,2)
+  assert.equal(h.reviews.length,1,'A modern snapshot must not erase the source review')
+  const saved=h.native.saveDocument,requests=[]
+  h.native.saveDocument=async request=>{requests.push(request);return{status:'cancelled'}}
+  assert.equal(await h.state.saveActive(),false)
+  assert.equal(a.requiresSaveAs,true);assert.equal(a.importWarnings.length,2)
+  assert.equal(a.fileId,'source');assert.equal(a.dirty,true)
+  h.native.saveDocument=saved
+  assert.equal(await h.state.saveActive(),true)
+  const accepted=h.calls.find(call=>call[0]==='save')[1]
+  for(const request of [...requests,accepted]) {
+    assert.equal(request.saveAs,true);assert.equal(request.documentId,undefined);assert.equal(request.expectedSha256,undefined)
+    assert.equal(request.name,'Source.v2 - 副本.xlsx')
+  }
+  assert.equal(a.requiresSaveAs,false);assert.equal(a.importWarnings.length,0);assert.notEqual(a.fileId,'source')
+  assert.equal(a.document.extension,'xlsx')
+})
+
+test('the browser import path applies the same XLSX warning and source-copy safeguard',async()=>{
+  const h=shell({nativeEnabled:false}),bytes=riskyWorkbook()
+  await h.state.browserFile({target:{value:'Source.xlsx',files:[{name:'Source.xlsx',size:bytes.length,arrayBuffer:async()=>bytes.buffer}]}})
+  const a=h.state.tabs.value[0]
+  assert.equal(h.reviews.length,1);assert.equal(a.requiresSaveAs,true)
+  assert.match(a.importWarnings[0],/ISFORMULA/);assert.match(a.importWarnings[1],/veryHidden/)
+})
+
+test('DOCX embedded attachment warning survives snapshots and cancelled saving until a new copy succeeds',async()=>{
+  const h=shell(),bytes=attachedWordDocument()
+  await h.state.addDocument({id:'word-source',kind:'word',extension:'docx',name:'Attachments.docx',base64:Buffer.from(bytes).toString('base64'),sha256:'source-hash',sizeBytes:bytes.length},'word-source')
+  const a=h.state.tabs.value[0];a.ready=true;a.dirty=true
+  assert.equal(h.reviews.length,1);assert.equal(a.requiresSaveAs,true);assert.match(a.importWarnings[0],/嵌入附件/)
+  await h.state.stash()
+  assert.equal(a.requiresSaveAs,true);assert.match(a.importWarnings[0],/丢失附件内容/)
+  const save=h.native.saveDocument
+  h.native.saveDocument=async()=>({status:'cancelled'})
+  assert.equal(await h.state.saveActive(),false);assert.equal(a.fileId,'word-source');assert.equal(a.requiresSaveAs,true)
+  h.native.saveDocument=save
+  assert.equal(await h.state.saveActive(),true)
+  const request=h.calls.find(call=>call[0]==='save')[1]
+  assert.equal(request.saveAs,true);assert.equal(request.documentId,undefined);assert.equal(request.name,'Attachments - 副本.docx')
+  assert.notEqual(a.fileId,'word-source');assert.equal(a.importWarnings.length,0);assert.equal(a.requiresSaveAs,false)
 })
 
 test('reopening an already-open file retains its in-memory edits', async () => {

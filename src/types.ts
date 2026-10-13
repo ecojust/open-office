@@ -1,5 +1,5 @@
 export type DocumentKind = 'word' | 'sheet' | 'presentation' | 'pdf'
-export type DocumentExtension = 'docx' | 'odt' | 'xlsx' | 'ods' | 'pptx' | 'odp' | 'pdf'
+export type DocumentExtension = 'docx' | 'odt' | 'doc' | 'rtf' | 'xlsx' | 'ods' | 'xls' | 'pptx' | 'odp' | 'ppt' | 'pdf'
 
 export interface DocumentReceipt {
   id: string

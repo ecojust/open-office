@@ -27,17 +27,23 @@ const IMAGE_LIMIT: u64 = 20 * 1024 * 1024;
 const ENCODED_LIMIT: usize = ((DOCUMENT_LIMIT as usize + 2) / 3) * 4;
 const HISTORY_LIMIT: u64 = 2 * 1024 * 1024;
 const MAX_RECENT: usize = 100;
-const EXTENSIONS: &[&str] = &["docx", "odt", "xlsx", "ods", "pptx", "odp", "pdf"];
+const EXTENSIONS: &[&str] = &[
+    "docx", "odt", "doc", "rtf", "xlsx", "ods", "xls", "pptx", "odp", "ppt", "pdf",
+];
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum DocExt {
     Docx,
     Odt,
+    Doc,
+    Rtf,
     Xlsx,
     Ods,
+    Xls,
     Pptx,
     Odp,
+    Ppt,
     Pdf,
 }
 
@@ -46,10 +52,14 @@ impl DocExt {
         match self {
             Self::Docx => "docx",
             Self::Odt => "odt",
+            Self::Doc => "doc",
+            Self::Rtf => "rtf",
             Self::Xlsx => "xlsx",
             Self::Ods => "ods",
+            Self::Xls => "xls",
             Self::Pptx => "pptx",
             Self::Odp => "odp",
+            Self::Ppt => "ppt",
             Self::Pdf => "pdf",
         }
     }
@@ -62,22 +72,33 @@ impl DocExt {
         match extension.to_ascii_lowercase().as_str() {
             "docx" => Ok(Self::Docx),
             "odt" => Ok(Self::Odt),
+            "doc" => Ok(Self::Doc),
+            "rtf" => Ok(Self::Rtf),
             "xlsx" => Ok(Self::Xlsx),
             "ods" => Ok(Self::Ods),
+            "xls" => Ok(Self::Xls),
             "pptx" => Ok(Self::Pptx),
             "odp" => Ok(Self::Odp),
+            "ppt" => Ok(Self::Ppt),
             "pdf" => Ok(Self::Pdf),
-            _ => Err("仅支持 DOCX、ODT、XLSX、ODS、PPTX、ODP 和 PDF 文件；不支持旧版 PPT。".into()),
+            _ => Err("请选择 DOCX、ODT、DOC、RTF、XLSX、ODS、XLS、PPTX、ODP、PPT 或 PDF 文件；宏、加密文件及其他格式暂不支持。".into()),
         }
     }
 
     fn kind(self) -> DocumentKind {
         match self {
-            Self::Docx | Self::Odt => DocumentKind::Word,
-            Self::Xlsx | Self::Ods => DocumentKind::Sheet,
-            Self::Pptx | Self::Odp => DocumentKind::Presentation,
+            Self::Docx | Self::Odt | Self::Doc | Self::Rtf => DocumentKind::Word,
+            Self::Xlsx | Self::Ods | Self::Xls => DocumentKind::Sheet,
+            Self::Pptx | Self::Odp | Self::Ppt => DocumentKind::Presentation,
             Self::Pdf => DocumentKind::Pdf,
         }
+    }
+
+    fn ensure_exportable(self) -> Result<(), String> {
+        if matches!(self, Self::Doc | Self::Rtf | Self::Xls | Self::Ppt) {
+            return Err("旧格式仅供导入。请另存为 DOCX、XLSX 或 PPTX 副本，原文件将保留。".into());
+        }
+        Ok(())
     }
 }
 
@@ -305,6 +326,7 @@ impl DocumentStore {
             return Err("所选链接的目标文件类型不同，请直接选择实际文档。".into());
         }
         let bytes = read_document(&path)?;
+        validate_document_signature(&bytes, extension)?;
         let hash = hash_bytes(&bytes);
         let mut records = self.records()?;
         let record = upsert_record(&mut records, path, extension, hash.clone())?;
@@ -331,6 +353,7 @@ impl DocumentStore {
         extension: DocExt,
         bytes: Vec<u8>,
     ) -> Result<SaveResult, String> {
+        extension.ensure_exportable()?;
         let mut records = self.records()?;
         let hash = hash_bytes(&bytes);
         let record = upsert_record(&mut records, snapshot.path.clone(), extension, hash.clone())?;
@@ -452,6 +475,52 @@ fn validate_file_name(name: &str, extension: DocExt) -> Result<(), String> {
         || DocExt::from_path(Path::new(name))? != extension
     {
         return Err("文件名或扩展名与保存类型不一致。".into());
+    }
+    Ok(())
+}
+
+/// Screen the container header before passing local bytes to the Office engine.
+/// This is not a full ZIP/CFB parser: the engine must still parse and check its
+/// Word/Calc/Impress service, and refuse encrypted or damaged payloads.
+fn validate_document_signature(bytes: &[u8], extension: DocExt) -> Result<(), String> {
+    if bytes.is_empty() {
+        return Err("文档为空，无法打开。".into());
+    }
+    let valid = match extension {
+        DocExt::Pdf => bytes[..bytes.len().min(1024)]
+            .windows(5)
+            .any(|window| window == b"%PDF-"),
+        DocExt::Rtf => {
+            let digits = bytes.get(5..).unwrap_or_default();
+            let end = digits
+                .iter()
+                .position(|byte| !byte.is_ascii_digit())
+                .unwrap_or(digits.len());
+            bytes.starts_with(b"{\\rtf")
+                && digits
+                    .first()
+                    .is_some_and(|byte| matches!(byte, b'1'..=b'9'))
+                && digits
+                    .get(end)
+                    .is_some_and(|byte| *byte == b'\\' || byte.is_ascii_whitespace())
+        }
+        DocExt::Doc | DocExt::Xls | DocExt::Ppt => {
+            if bytes.len() < 512 || !bytes.starts_with(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1") {
+                false
+            } else {
+                let value = |index| u16::from_le_bytes([bytes[index], bytes[index + 1]]);
+                value(28) == 0xfffe
+                    && value(32) == 6
+                    && matches!((value(26), value(30)), (3, 9) | (4, 12))
+            }
+        }
+        _ => bytes.len() >= 30 && bytes.starts_with(b"PK\x03\x04"),
+    };
+    if !valid {
+        return Err(format!(
+            "文件内容与 .{} 格式不符，或文件已损坏。请使用原始文档；加密文件请先在原应用解密。",
+            extension.as_str()
+        ));
     }
     Ok(())
 }
@@ -753,7 +822,9 @@ pub async fn save_document(
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = store.begin_operation()?;
         validate_file_name(&request.name, request.extension)?;
+        request.extension.ensure_exportable()?;
         let bytes = decode_document(&request.base64)?;
+        validate_document_signature(&bytes, request.extension)?;
         let existing = request
             .document_id
             .as_deref()
@@ -815,8 +886,136 @@ pub async fn save_document(
 mod tests {
     use super::*;
 
+    // Container-header fixtures for file-capability tests, not engine documents.
+    // Real parsing/import and exported package checks run in browser tests.
+    fn zip_header_fixture(body: &[u8]) -> Vec<u8> {
+        let mut bytes = b"PK\x03\x04".to_vec();
+        bytes.resize(30, 0);
+        bytes.extend_from_slice(body);
+        bytes
+    }
+
+    fn ole_header_fixture() -> Vec<u8> {
+        let mut bytes = vec![0; 512];
+        bytes[..8].copy_from_slice(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1");
+        for (position, value) in [(26, 3_u16), (28, 0xfffe), (30, 9), (32, 6)] {
+            bytes[position..position + 2].copy_from_slice(&value.to_le_bytes());
+        }
+        bytes
+    }
+
     #[test]
-    fn presentation_formats_serialize_without_enabling_legacy_or_mismatched_files() {
+    fn import_only_formats_retain_kind_and_cannot_be_written_back() {
+        for (extension, name, kind) in [
+            (DocExt::Doc, "doc", DocumentKind::Word),
+            (DocExt::Rtf, "rtf", DocumentKind::Word),
+            (DocExt::Xls, "xls", DocumentKind::Sheet),
+            (DocExt::Ppt, "ppt", DocumentKind::Presentation),
+        ] {
+            assert!(EXTENSIONS.contains(&name));
+            assert_eq!(
+                DocExt::from_path(Path::new(&format!("Source.{}", name.to_uppercase()))).unwrap(),
+                extension
+            );
+            assert_eq!(extension.kind(), kind);
+            assert_eq!(serde_json::to_value(extension).unwrap(), name);
+            assert!(extension.ensure_exportable().is_err());
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join(format!("source.{name}"));
+            let original = if extension == DocExt::Rtf {
+                b"{\\rtf1\\ansi example}".to_vec()
+            } else {
+                ole_header_fixture()
+            };
+            fs::write(&path, &original).unwrap();
+            let store = DocumentStore::new(directory.path().join("data")).unwrap();
+            let opened = store.register_open(path.clone()).unwrap();
+            let target = TargetSnapshot::capture(path.clone()).unwrap();
+            assert!(store
+                .save_to_target(target, extension, b"wrong overwrite".to_vec())
+                .is_err());
+            assert_eq!(fs::read(&path).unwrap(), original);
+            assert_eq!(store.record(&opened.id).unwrap().sha256, opened.sha256);
+            let export = match kind {
+                DocumentKind::Word => DocExt::Docx,
+                DocumentKind::Sheet => DocExt::Xlsx,
+                _ => DocExt::Pptx,
+            };
+            let target = directory.path().join(format!("copy.{}", export.as_str()));
+            assert!(matches!(
+                store
+                    .save_to_target(
+                        TargetSnapshot::capture(target).unwrap(),
+                        export,
+                        zip_header_fixture(b"converted copy")
+                    )
+                    .unwrap(),
+                SaveResult::Saved { .. }
+            ));
+            assert_eq!(
+                fs::read(&path).unwrap(),
+                original,
+                "A converted copy must preserve the original bytes"
+            );
+        }
+    }
+
+    #[test]
+    fn document_headers_reject_empty_mislabeled_and_broken_containers() {
+        let ole = ole_header_fixture();
+        for extension in [DocExt::Doc, DocExt::Xls, DocExt::Ppt] {
+            assert!(validate_document_signature(&ole, extension).is_ok());
+            assert!(validate_document_signature(&ole[..100], extension).is_err());
+            let mut broken = ole.clone();
+            broken[28] = 0;
+            assert!(validate_document_signature(&broken, extension).is_err());
+            assert!(
+                validate_document_signature(&zip_header_fixture(b"renamed zip"), extension)
+                    .is_err()
+            );
+        }
+        for extension in [
+            DocExt::Docx,
+            DocExt::Odt,
+            DocExt::Xlsx,
+            DocExt::Ods,
+            DocExt::Pptx,
+            DocExt::Odp,
+        ] {
+            assert!(
+                validate_document_signature(&zip_header_fixture(b"package"), extension).is_ok()
+            );
+            assert!(
+                validate_document_signature(&ole, extension).is_err(),
+                "Encrypted OOXML uses an OLE container and must be refused"
+            );
+            assert!(validate_document_signature(b"PK\x03\x04", extension).is_err());
+            assert!(
+                validate_document_signature(b"<html>renamed document</html>", extension).is_err()
+            );
+        }
+        assert!(validate_document_signature(b"{\\rtf1\\ansi text}", DocExt::Rtf).is_ok());
+        assert!(validate_document_signature(b"{\\rtf0 text}", DocExt::Rtf).is_err());
+        assert!(validate_document_signature(b"{\\rtf1invalid}", DocExt::Rtf).is_err());
+        assert!(validate_document_signature(b"\n%PDF-1.7", DocExt::Pdf).is_ok());
+        assert!(validate_document_signature(b"not PDF", DocExt::Pdf).is_err());
+        for name in EXTENSIONS {
+            let extension = DocExt::from_path(Path::new(&format!("file.{name}"))).unwrap();
+            assert!(validate_document_signature(&[], extension).is_err());
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let bad = directory.path().join("renamed.docx");
+        fs::write(&bad, b"malformed document").unwrap();
+        assert!(store.register_open(bad).is_err());
+        assert!(
+            store.records().unwrap().is_empty(),
+            "Rejected bytes must not grant a recent-file capability"
+        );
+    }
+
+    #[test]
+    fn presentation_formats_serialize_without_enabling_mismatched_files() {
         for (extension, name) in [(DocExt::Pptx, "pptx"), (DocExt::Odp, "odp")] {
             assert!(
                 EXTENSIONS.contains(&name),
@@ -860,8 +1059,11 @@ mod tests {
         }
         assert!(validate_file_name("项目汇报.odp", DocExt::Pptx).is_err());
         assert!(validate_file_name("项目汇报.pptx", DocExt::Odp).is_err());
-        assert!(serde_json::from_value::<DocExt>(serde_json::json!("ppt")).is_err());
-        assert!(!EXTENSIONS.contains(&"ppt"));
+        assert_eq!(
+            serde_json::from_value::<DocExt>(serde_json::json!("ppt")).unwrap(),
+            DocExt::Ppt
+        );
+        assert!(EXTENSIONS.contains(&"ppt"));
     }
 
     #[test]
@@ -872,31 +1074,41 @@ mod tests {
         let data = directory.path().join("app-data");
         let store = DocumentStore::new(data.clone()).unwrap();
         let existing = directory.path().join("已有文档.docx");
-        fs::write(&existing, b"existing word document").unwrap();
+        fs::write(&existing, zip_header_fixture(b"existing word document")).unwrap();
         let word = store.register_open(existing).unwrap();
         for extension in [DocExt::Pptx, DocExt::Odp] {
             let path = directory
                 .path()
                 .join(format!("汇报.{}", extension.as_str()));
-            fs::write(&path, b"original slide fixture").unwrap();
+            fs::write(&path, zip_header_fixture(b"original slide fixture")).unwrap();
             let opened = store.register_open(path.clone()).unwrap();
             assert_eq!(opened.kind, DocumentKind::Presentation);
             assert_eq!(opened.extension, extension);
             assert_eq!(
                 STANDARD.decode(&opened.base64).unwrap(),
-                b"original slide fixture"
+                zip_header_fixture(b"original slide fixture")
             );
             let snapshot = TargetSnapshot::capture(path.clone()).unwrap();
             let SaveResult::Saved { document } = store
-                .save_to_target(snapshot, extension, b"edited slide fixture".to_vec())
+                .save_to_target(
+                    snapshot,
+                    extension,
+                    zip_header_fixture(b"edited slide fixture"),
+                )
                 .unwrap()
             else {
                 panic!("Expected saved presentation")
             };
             assert_eq!(document.id, opened.id);
             assert_eq!(document.kind, DocumentKind::Presentation);
-            assert_eq!(document.sha256, hash_bytes(b"edited slide fixture"));
-            assert_eq!(fs::read(&path).unwrap(), b"edited slide fixture");
+            assert_eq!(
+                document.sha256,
+                hash_bytes(&zip_header_fixture(b"edited slide fixture"))
+            );
+            assert_eq!(
+                fs::read(&path).unwrap(),
+                zip_header_fixture(b"edited slide fixture")
+            );
             let receipt = serde_json::to_value(&document).unwrap();
             assert_eq!(receipt["kind"], "presentation");
             assert_eq!(receipt["extension"], extension.as_str());
@@ -909,7 +1121,7 @@ mod tests {
             assert_eq!(reopened.sha256, document.sha256);
             assert_eq!(
                 STANDARD.decode(&reopened.base64).unwrap(),
-                b"edited slide fixture"
+                zip_header_fixture(b"edited slide fixture")
             );
             assert_eq!(restored.record(&word.id).unwrap().extension, DocExt::Docx);
         }
@@ -922,7 +1134,7 @@ mod tests {
             let path = directory
                 .path()
                 .join(format!("slides.{}", extension.as_str()));
-            fs::write(&path, b"original slides").unwrap();
+            fs::write(&path, zip_header_fixture(b"original slides")).unwrap();
             let store = DocumentStore::new(directory.path().join("data")).unwrap();
             let opened = store.register_open(path.clone()).unwrap();
             let snapshot = TargetSnapshot::capture(path.clone()).unwrap();
@@ -999,7 +1211,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let data = directory.path().join("app-data");
         let path = directory.path().join("report.docx");
-        fs::write(&path, b"original").unwrap();
+        fs::write(&path, zip_header_fixture(b"original")).unwrap();
         let store = DocumentStore::new(data.clone()).unwrap();
         let first = store.register_open(path.clone()).unwrap();
         let target = TargetSnapshot::capture(path.clone()).unwrap();
@@ -1027,7 +1239,7 @@ mod tests {
     fn rejected_save_does_not_change_record_or_source() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("report.xlsx");
-        fs::write(&path, b"original").unwrap();
+        fs::write(&path, zip_header_fixture(b"original")).unwrap();
         let store = DocumentStore::new(directory.path().join("data")).unwrap();
         let opened = store.register_open(path.clone()).unwrap();
         let target = TargetSnapshot::capture(path.clone()).unwrap();
@@ -1045,7 +1257,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let data = directory.path().join("data");
         let path = directory.path().join("report.pdf");
-        fs::write(&path, b"original").unwrap();
+        fs::write(&path, b"%PDF-1.7 original").unwrap();
         let store = DocumentStore::new(data.clone()).unwrap();
         let opened = store.register_open(path.clone()).unwrap();
         fs::remove_dir_all(&data).unwrap();
@@ -1054,7 +1266,7 @@ mod tests {
         assert!(store
             .save_to_target(target, DocExt::Pdf, b"edits".to_vec())
             .is_err());
-        assert_eq!(fs::read(path).unwrap(), b"original");
+        assert_eq!(fs::read(path).unwrap(), b"%PDF-1.7 original");
         assert_eq!(store.record(&opened.id).unwrap().sha256, opened.sha256);
     }
 
@@ -1114,7 +1326,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("report.docx");
         let other = directory.path().join("other.docx");
-        fs::write(&path, b"original").unwrap();
+        fs::write(&path, zip_header_fixture(b"original")).unwrap();
         fs::write(&other, b"other file").unwrap();
         let store = DocumentStore::new(directory.path().join("data")).unwrap();
         let opened = store.register_open(path.clone()).unwrap();

@@ -7,6 +7,7 @@ import vm from 'node:vm'
 // These tests do not prove native UNO or document round-trip compatibility;
 // those require the separate browser/native engine integration tests.
 const source = await readFile(new URL('../public/office/office-worker.js', import.meta.url), 'utf8')
+const offlinePolicy = await readFile(new URL('../public/office/offline-policy.js', import.meta.url), 'utf8')
 async function engine(initial = { kind: 'word', extension: 'docx' }) {
   const messages = [], models = [], imports = [], stores = [], dispatches = []
   const controls = { failNextLoad: false, rejectNextService: false, ignoreMove: false, refusePageSwitch: false, configureNextModel: null, modifyDuringDataRead: false, acceptTableSnapshot: false, acceptCommand: false }
@@ -114,7 +115,7 @@ async function engine(initial = { kind: 'word', extension: 'docx' }) {
       XDispatchProviderInterceptor: 'interceptor', XInterceptorInfo: 'info', XDispatch: 'dispatch', FeatureStateEvent: Value },
     beans: { PropertyValue: Value, XPropertyChangeListener: 'property-listener' }, view: { XSelectionChangeListener: 'selection-listener' },
     drawing: { FillStyle: { NONE: 0, SOLID: 1 } }, task: { XInteractionHandler: 'handler', XInteractionAbort: 'abort' },
-    document: { MacroExecMode: { NEVER_EXECUTE: 0 }, UpdateDocMode: { NO_UPDATE: 0 } }, util: { XModifyListener: 'listener' },
+    document: { MacroExecMode: { NEVER_EXECUTE: 0 }, UpdateDocMode: { NO_UPDATE: 0 } }, util: { XModifyListener: 'listener', XModifiable: 'modifiable' },
     graphic: { GraphicProvider: { create: () => ({ queryGraphic: () => ({ getPropertyValue: () => ({ Width: 1000, Height: 3000 }) }) }) } },
     awt: { Size: Value, Point: Value } }
   const port = { postMessage: message => messages.push(message) }
@@ -144,7 +145,7 @@ async function engine(initial = { kind: 'word', extension: 'docx' }) {
       getModel().edit();
     },
   })
-  vm.runInNewContext(source, { Module: { zetajs: Promise.resolve(zeta) }, console, WebAssembly,
+  vm.runInNewContext(offlinePolicy + '\n' + source, { Module: { zetajs: Promise.resolve(zeta) }, console, WebAssembly,
     createWriterTools: toolFactory('word'), createCalcTools: toolFactory('sheet') })
   await Promise.resolve()
   let seq = 0
@@ -723,6 +724,62 @@ test('unknown top-level worker actions reject without dispatching or changing do
   assert.equal(messages.filter(message => message.event).length, eventCount)
 })
 
+test('audited offline dispatches are disabled and cannot reach shell or native delegate', async () => {
+  const { frame, messages, model } = await engine()
+  const forwarded = []
+  frame.interceptor.setSlaveDispatchProvider({ queryDispatch(url) {
+    forwarded.push(url.Complete)
+    return { dispatch() { forwarded.push('executed') }, addStatusListener() {}, removeStatusListener() {} }
+  } })
+  for (const command of ['.uno:OpenRemote', '.uno:SaveAsRemote?URL:string=https://example.invalid',
+    '.uno:OpenHyperlinkOnCursor', '.uno:MailMergeEmailDocuments', '.uno:Documentation',
+    '.uno:DataStreamsPlay', 'https://example.invalid/document']) {
+    const url = { Complete: command }, dispatch = frame.interceptor.queryDispatch(url, '', 0)
+    let enabled
+    dispatch.addStatusListener({ statusChanged: event => { enabled = event.IsEnabled } }, url)
+    assert.equal(enabled, false, command)
+    dispatch.dispatch(url, [])
+  }
+  assert.deepEqual(forwarded, [])
+  assert.equal(messages.filter(message => message.event === 'native-request').length, 0)
+  assert.equal(model.isModified(), false)
+  for (const command of ['.uno:SpellOnline', '.uno:SendToBack', '.uno:UpdateAllIndexes', '.uno:EditHyperlink']) {
+    const url = { Complete: command }
+    frame.interceptor.queryDispatch(url, '', 0).dispatch(url, [])
+  }
+  assert.equal(forwarded.filter(item => item === 'executed').length, 4)
+  const url = { Complete: '.uno:InsertDoc' }
+  frame.interceptor.queryDispatch(url, '', 0).dispatch(url, [{ Name: 'FileName', Value: 'https://example.invalid/file' }])
+  assert.equal(forwarded.filter(item => item === 'executed').length, 4, 'A late remote file argument does not reach the native command')
+})
+
+test('local open aliases route to native picker and late remote arguments cannot bypass it', async () => {
+  const { frame, messages } = await engine()
+  for (const command of ['.uno:OpenFromWriter', '.uno:OpenFromCalc', '.uno:Open?ReadOnly:boolean=true']) {
+    const url = { Complete: command }
+    frame.interceptor.queryDispatch(url, '', 0).dispatch(url, [])
+  }
+  const before = messages.filter(message => message.event === 'native-request').length
+  assert.equal(before, 3)
+  const url = { Complete: '.uno:Open' }
+  frame.interceptor.queryDispatch(url, '', 0).dispatch(url, [{ Name: 'URL', Value: 'https://example.invalid/file' }])
+  assert.equal(messages.filter(message => message.event === 'native-request').length, before)
+})
+
+for (const [kind, extension, modern] of [['word','doc','docx'], ['word','rtf','docx'], ['sheet','xls','xlsx'], ['presentation','ppt','pptx']]) {
+  test(`${extension} imports use protected local pipeline and export a modern copy by default`, async () => {
+    const { request, imports, stores } = await engine({ kind, extension })
+    const args = imports[0].args
+    for (const name of ['MacroExecutionMode','UpdateDocMode']) assert.equal(args.find(item => item.Name === name)?.Value.value, 0)
+    const result = request('export')
+    assert.equal(result.ok, true)
+    assert.equal(result.data.extension, modern)
+    const count = stores.length
+    assert.equal(request('export', { format: extension }).ok, false)
+    assert.equal(stores.length, count, 'Legacy source must not be rewritten through an unverified legacy exporter')
+  })
+}
+
 test('imported notes placeholder is reused when its shape type is specific but services are generic', async () => {
   const { request, model } = await presentation()
   const notes = model.pages[0].getNotesPage()
@@ -792,7 +849,7 @@ test('optional presentation reads consume each ignored native UNO exception once
   fallback.getText().setString('可读取的备用标题')
   fallback.getShapeType = () => { throw nativeException('getShapeType native UNO failure') }
   model.pages[0].add(fallback)
-  const saved = request('export', { format: 'pptx' }).data
+  const saved = request('export', { format: 'pdf' }).data
   request('mark-saved', { revision: saved.revision })
   const mutations = model.mutations.length
   for (let read = 1; read <= 2; read++) {
@@ -836,7 +893,7 @@ test('optional presentation metadata reads propagate WASM traps instead of repor
     const trap = new WebAssembly.RuntimeError(`unaligned memory access in ${failingMethod}`)
     shape[failingMethod] = () => { throw trap }
     model.pages[0].add(shape)
-    const saved = request('export', { format: 'pptx' }).data
+    const saved = request('export', { format: 'pdf' }).data
     request('mark-saved', { revision: saved.revision })
     const mutations = model.mutations.length
     const result = request('presentation-state')
@@ -866,4 +923,234 @@ test('Writer immediate commands use one bounded production route while drafts ke
   assert.equal(h.request('word-command',command,'B').ok,false)
   const sheet=await engine({kind:'sheet',extension:'xlsx'});sheet.controls.acceptCommand=true
   assert.equal(sheet.request('sheet-command',command).ok,false)
+})
+
+// Controlled native chart identities/listeners exercise proof generation only.
+// Actual Impress import flags and notifications still require WASM integration.
+function monitoredChart(name = 'Sales chart') {
+  const listeners = new Set()
+  const model = { modified: false, attached: 0, removed: 0, cleared: 0,
+    queryInterface(type) { assert.equal(type, 'modifiable'); return this },
+    isModified() { return this.modified },
+    setModified(value) { this.cleared++; this.modified = value },
+    addModifyListener(listener) { this.attached++; listeners.add(listener) },
+    removeModifyListener(listener) { this.removed++; listeners.delete(listener) },
+    edit() { this.modified = true; for (const listener of listeners) listener.modified() },
+    dispose() { for (const listener of listeners) listener.disposing() },
+  }
+  const shape = { name, model, modelReads: 0,
+    getShapeType: () => 'com.sun.star.drawing.OLE2Shape',
+    getName() { return this.name },
+    getPropertySetInfo: () => ({ hasPropertyByName: name => ['Name', 'CLSID', 'Model'].includes(name) }),
+    getPropertyValue(key) {
+      if (key === 'Name') return this.name
+      if (key === 'CLSID') return '{12dcae26-281f-416f-a234-c3086127382e}'
+      if (key === 'Model') { this.modelReads++; return this.model }
+      throw Error(`Unknown property ${key}`)
+    },
+  }
+  return { shape, model, listeners }
+}
+async function importedCharts(configure) {
+  const h = await engine({ kind: 'presentation', extension: 'pptx' })
+  h.controls.configureNextModel = configure
+  const opened = h.request('open', { id: 'B', name: 'charts.pptx', kind: 'presentation', extension: 'pptx', path: '/tmp/charts.pptx', isNew: false })
+  return { ...h, opened, imported: h.models.at(-1), exportChart: (data = {}) => h.request('export', { format: 'pptx', ...data }, 'B') }
+}
+
+test('imported nested charts obtain worker-owned bounded proof; ordinary OLE objects stay unopened', async () => {
+  const chart = monitoredChart()
+  const foreign = monitoredChart('Spreadsheet object')
+  const original = foreign.shape.getPropertyValue
+  foreign.shape.getPropertyValue = function (name) { return name === 'CLSID' ? '00020820-0000-0000-C000-000000000046' : original.call(this, name) }
+  const group = { getShapeType: () => 'com.sun.star.drawing.GroupShape', getName: () => 'Group', getCount: () => 1, getByIndex: () => chart.shape }
+  const h = await importedCharts(model => { model.pages[0].add(group); model.pages[0].add(foreign.shape) })
+  assert.equal(h.opened.ok, true)
+  const first = h.exportChart({ chartProof: [{ pageId: 'forged', shapeName: 'forged', sourceEligible: true }] })
+  assert.equal(first.ok, true)
+  assert.equal(first.data.chartProof.length, 1)
+  assert.deepEqual(JSON.parse(JSON.stringify(first.data.chartProof)), [{ pageId: 'B:slide:1', shapeName: 'Sales chart', sourceShapeName: 'Sales chart', sourceEligible: true }])
+  assert.equal(chart.model.attached, 1)
+  assert.equal(chart.model.cleared, 0, 'Collecting evidence must not clear the native modification flag')
+  assert.equal(foreign.shape.modelReads, 0, 'Never activate arbitrary embedded OLE objects')
+  for (const format of ['pdf', 'odp']) assert.equal('chartProof' in h.exportChart({ format }).data, false)
+  assert.equal(h.exportChart().data.chartProof[0].sourceEligible, true)
+})
+
+test('chart modification evidence is sticky through clearing native state, save, undo-like changes and export', async () => {
+  const chart = monitoredChart(), h = await importedCharts(model => model.pages[0].add(chart.shape))
+  assert.equal(h.exportChart().data.chartProof[0].sourceEligible, true)
+  chart.model.edit()
+  chart.model.modified = false // Native save/undo can clear the flag but not our event history.
+  const saved = h.exportChart()
+  assert.equal(saved.data.chartProof[0].sourceEligible, false)
+  assert.equal(saved.data.chartProof[0].sourceShapeName, 'Sales chart', 'An edit revokes data reuse, not the established native source identity')
+  assert.equal(h.request('mark-saved', { revision: saved.data.revision }, 'B').ok, true)
+  assert.equal(h.exportChart().data.chartProof[0].sourceEligible, false)
+  assert.equal(chart.model.cleared, 0)
+})
+
+test('chart edits emitted inside an otherwise suppressed export invalidate the returned proof', async () => {
+  const chart = monitoredChart(), h = await importedCharts(model => model.pages[0].add(chart.shape))
+  const store = h.imported.storeToURL
+  h.imported.storeToURL = function (...args) { chart.model.edit(); chart.model.modified = false; return store.apply(this, args) }
+  const exported = h.exportChart()
+  assert.equal(exported.ok, true)
+  assert.equal(exported.data.chartProof[0].sourceEligible, false)
+  assert.equal(h.exportChart().data.chartProof[0].sourceEligible, false)
+})
+
+for (const change of ['new-shape', 'replaced-model', 'duplicate-name', 'moved-page', 'initially-dirty', 'unnotified-dirty', 'disposed']) {
+  test(`chart source proof rejects ${change}`, async () => {
+    const chart = monitoredChart()
+    if (change === 'initially-dirty') chart.model.modified = true
+    const h = await importedCharts(model => model.pages[0].add(chart.shape))
+    if (change === 'new-shape') h.imported.pages[0].pageShapes[0] = monitoredChart().shape
+    if (change === 'replaced-model') chart.shape.model = monitoredChart().model
+    if (change === 'duplicate-name') h.imported.pages[0].add(monitoredChart().shape)
+    if (change === 'moved-page') {
+      const destination = h.imported.getDrawPages().insertNewByIndex(0)
+      h.imported.pages[0].pageShapes.length = 0; destination.add(chart.shape)
+    }
+    if (change === 'unnotified-dirty') chart.model.modified = true
+    if (change === 'disposed') chart.model.dispose()
+    const exported = h.exportChart({ chartProof: [{ pageId: 'B:slide:1', shapeName: chart.shape.name, sourceEligible: true }] })
+    assert.equal(exported.ok, true)
+    assert.ok(exported.data.chartProof.length >= 1)
+    assert.ok(exported.data.chartProof.every(item => item.sourceEligible === false))
+    if (!['initially-dirty', 'unnotified-dirty'].includes(change)) assert.ok(exported.data.chartProof.every(item => item.sourceShapeName === undefined))
+    assert.equal(chart.model.cleared, 0)
+  })
+}
+
+test('renaming or slide reordering keeps a verified chart source association without confusing it with data reuse', async () => {
+  const chart = monitoredChart('Chart 3'), h = await importedCharts(model => {
+    const page = model.getDrawPages().insertNewByIndex(0); page.add(chart.shape)
+  })
+  const before = h.exportChart().data.chartProof[0]
+  h.imported.pages.reverse()
+  chart.shape.name = 'Chart 1' // Impress renumbers its default name after moving the page.
+  const moved = h.exportChart().data.chartProof[0]
+  assert.equal(moved.pageId, before.pageId)
+  assert.equal(moved.shapeName, 'Chart 1')
+  assert.equal(moved.sourceShapeName, 'Chart 3')
+  assert.equal(moved.sourceEligible, true)
+  chart.model.edit(); chart.model.modified = false
+  const edited = h.exportChart().data.chartProof[0]
+  assert.equal(edited.sourceShapeName, 'Chart 3')
+  assert.equal(edited.shapeName, 'Chart 1')
+  assert.equal(edited.sourceEligible, false, 'Identity mapping must never become authorization to restore edited data')
+})
+
+test('initially ambiguous chart names cannot gain source identity by renaming later', async () => {
+  const first = monitoredChart('Same'), second = monitoredChart('Same')
+  const h = await importedCharts(model => { model.pages[0].add(first.shape); model.pages[0].add(second.shape) })
+  second.shape.name = 'Unique'
+  const result = h.exportChart().data.chartProof
+  assert.equal(result.length, 2)
+  assert.ok(result.every(proof => !proof.sourceEligible && proof.sourceShapeName === undefined))
+})
+
+test('native renaming during serialization retains only the same tracked chart identity across export', async () => {
+  const chart = monitoredChart('Chart 3'), h = await importedCharts(model => model.pages[0].add(chart.shape))
+  const store = h.imported.storeToURL
+  h.imported.storeToURL = function (...args) { chart.shape.name = 'Chart 1'; return store.apply(this, args) }
+  const proof = h.exportChart().data.chartProof[0]
+  assert.equal(proof.sourceShapeName, 'Chart 3')
+  assert.equal(proof.shapeName, 'Chart 1')
+  assert.equal(proof.sourceEligible, true)
+  h.imported.storeToURL = function (...args) { h.imported.pages[0].pageShapes[0] = monitoredChart('Chart 1').shape; return store.apply(this, args) }
+  const replaced = h.exportChart().data.chartProof[0]
+  assert.equal(replaced.sourceShapeName, undefined)
+  assert.equal(replaced.sourceEligible, false, 'A replacement with the same label cannot inherit the former object identity')
+})
+
+for (const operation of ['select-page', 'move-page']) test(`only verified ${operation} can renew an unedited disposed native chart model`, async () => {
+  const chart = monitoredChart('Chart 3'), h = await importedCharts(model => { model.pages[0].add(chart.shape); model.getDrawPages().insertNewByIndex(0) })
+  const fresh = monitoredChart('Chart 1'), controller = h.imported.getCurrentController(), select = controller.setCurrentPage
+  let replaced = false
+  controller.setCurrentPage = function (page) {
+    if (!replaced) { chart.model.dispose(); chart.shape.model = fresh.model; chart.shape.name = 'Chart 1'; replaced = true }
+    return select.call(this, page)
+  }
+  const result = h.request('presentation-action', operation === 'select-page' ? { type: operation, pageIndex: 1 } : { type: operation, pageIndex: 0, direction: 'down' }, 'B')
+  assert.equal(result.ok, true, result.error)
+  const proof = h.exportChart().data.chartProof[0]
+  assert.equal(proof.sourceEligible, true)
+  assert.equal(proof.sourceShapeName, 'Chart 3')
+  assert.equal(proof.shapeName, 'Chart 1')
+  assert.equal(chart.listeners.size, 0)
+  assert.equal(fresh.listeners.size, 1)
+  fresh.model.edit(); fresh.model.modified = false
+  assert.equal(h.exportChart().data.chartProof[0].sourceEligible, false, 'The replacement remains actively monitored')
+})
+
+for (const unsafe of ['previous-edit', 'outside-navigation', 'during-navigation-edit', 'replacement-without-dispose', 'dirty-replacement']) {
+  test(`controlled navigation cannot renew chart proof after ${unsafe}`, async () => {
+    const chart = monitoredChart(), h = await importedCharts(model => { model.pages[0].add(chart.shape); model.getDrawPages().insertNewByIndex(0) })
+    const fresh = monitoredChart(), controller = h.imported.getCurrentController(), select = controller.setCurrentPage
+    if (unsafe === 'previous-edit') { chart.model.edit(); chart.model.modified = false }
+    if (unsafe === 'outside-navigation') { chart.model.dispose(); chart.shape.model = fresh.model }
+    if (unsafe === 'dirty-replacement') fresh.model.modified = true
+    controller.setCurrentPage = function (page) {
+      if (unsafe === 'during-navigation-edit') { chart.model.edit(); chart.model.modified = false }
+      if (unsafe !== 'replacement-without-dispose') chart.model.dispose()
+      chart.shape.model = fresh.model
+      return select.call(this, page)
+    }
+    const result = h.request('presentation-action', { type: 'select-page', pageIndex: 1 }, 'B')
+    assert.equal(result.ok, true, result.error)
+    const proof = h.exportChart().data.chartProof[0]
+    assert.equal(proof.sourceEligible, false)
+    assert.equal(proof.sourceShapeName, undefined)
+    assert.equal(fresh.listeners.size, 0, 'No ineligible baseline is registered for future trust')
+  })
+}
+
+test('chart listener installation failures consume native exceptions and cannot yield trusted evidence', async () => {
+  const h = await engine({ kind: 'presentation', extension: 'pptx' }), chart = monitoredChart()
+  const error = h.nativeException('chart listener unavailable')
+  chart.model.addModifyListener = () => { throw error }
+  h.controls.configureNextModel = model => model.pages[0].add(chart.shape)
+  assert.equal(h.request('open', { id: 'B', name: 'B.pptx', kind: 'presentation', extension: 'pptx', path: '/tmp/b.pptx', isNew: false }).ok, true)
+  assert.equal(h.request('export', { format: 'pptx' }, 'B').data.chartProof[0].sourceEligible, false)
+  assert.equal(h.nativeExceptions.get(error).consumed, 1)
+})
+
+test('native chart Model errors are consumed; WASM traps fail exports rather than produce trusted output', async () => {
+  for (const trapped of [false, true]) {
+    const chart = monitoredChart(), h = await importedCharts(model => model.pages[0].add(chart.shape))
+    const thrown = []
+    const original = chart.shape.getPropertyValue
+    chart.shape.getPropertyValue = function (name) {
+      if (name !== 'Model') return original.call(this, name)
+      const error = trapped ? new WebAssembly.RuntimeError('chart Model memory trap') : h.nativeException('chart Model unavailable')
+      thrown.push(error); throw error
+    }
+    const exported = h.exportChart()
+    assert.equal(exported.ok, !trapped)
+    if (trapped) { assert.match(exported.error, /chart Model memory trap/); assert.equal(h.stores.length, 0); assert.equal(thrown.length, 1) }
+    else {
+      assert.equal(exported.data.chartProof[0].sourceEligible, false)
+      for (const error of thrown) assert.equal(h.nativeExceptions.get(error).consumed, 1)
+    }
+  }
+})
+
+test('chart listeners are released when a presentation is replaced and on failed import setup', async () => {
+  const chart = monitoredChart(), h = await importedCharts(model => model.pages[0].add(chart.shape))
+  assert.equal(chart.listeners.size, 1)
+  assert.equal(h.request('open', { id: 'C', name: 'C.docx', kind: 'word', extension: 'docx', isNew: true }, 'B').ok, true)
+  assert.equal(chart.listeners.size, 0)
+  assert.equal(chart.model.removed, 1)
+  const first = monitoredChart('First'), second = monitoredChart('Second')
+  second.model.addModifyListener = () => { throw new WebAssembly.RuntimeError('chart setup memory trap') }
+  h.controls.configureNextModel = model => { model.pages[0].add(first.shape); model.pages[0].add(second.shape) }
+  const failed = h.request('open', { id: 'D', name: 'D.pptx', kind: 'presentation', extension: 'pptx', path: '/tmp/d.pptx', isNew: false }, 'C')
+  assert.equal(failed.ok, false)
+  assert.match(failed.error, /chart setup memory trap/)
+  assert.equal(first.listeners.size, 0)
+  assert.equal(first.model.removed, 1, 'Earlier chart listeners are removed exactly once if later setup traps')
+  assert.equal(h.models.at(-1).closed, true)
+  assert.equal(h.request('export', { format: 'docx' }, 'C').ok, true, 'The prior document survives failed setup')
 })

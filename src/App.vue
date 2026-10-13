@@ -17,9 +17,10 @@ import * as native from './native'
 import { smokeAwait, smokeFailure, smokeFeatures, smokeRequested, smokeStage } from './smoke'
 import type { NativeDocument, RecentDocument } from './types'
 import type { OfficeDocument } from './office/types'
-import { bytesToBase64, base64ToBytes, extensionOf, kindOf, withExtension, type Kind, type Extension, type EditorHandle } from './shared/document'
+import { reviewOfficeImport } from './office/import-review'
+import { bytesToBase64, base64ToBytes, extensionOf, kindOf, withExtension, defaultSaveExtension, isImportOnly, validateDocumentSignature, type Kind, type Extension, type EditorHandle } from './shared/document'
 
-interface Tab { key: string; document: NativeDocument; fileId?: string; dirty: boolean; ready: boolean; loadError?: string }
+interface Tab { key: string; document: NativeDocument; fileId?: string; requiresSaveAs?: boolean; importWarnings?:string[]; dirty: boolean; ready: boolean; loadError?: string }
 const buildVersion = __BUILD_VERSION__
 const brandIcon = new URL('./favicon.svg', document.baseURI).href
 const smokeMode = ref(smokeRequested())
@@ -121,10 +122,11 @@ async function awaitReady(tab:Tab):Promise<void> {
 }
 async function capture(tab:Tab) {
   assertWorkbenchDrafts()
-  const handle=requireEditor(tab), exported=await handle.exportFile()
+  const handle=requireEditor(tab), exported=await handle.exportFile({format:defaultSaveExtension(tab.document.extension)})
   if(activeKey.value!==tab.key)throw Error('文档已切换，旧的导出结果未被使用。')
+  if(isImportOnly(exported.extension))throw Error('旧版格式仅支持导入，请另存为现代格式。原文件未被修改。')
   if(exported.dirty)tab.dirty=true
-  return {handle,exported,document:{...tab.document,base64:exported.base64,extension:exported.extension,sizeBytes:Math.floor(exported.base64.length*.75)}}
+  return {handle,exported,document:{...tab.document,name:withExtension(tab.document.name,exported.extension),base64:exported.base64,extension:exported.extension,sizeBytes:Math.floor(exported.base64.length*.75)}}
 }
 async function stash() {
   const tab=active.value
@@ -133,6 +135,9 @@ async function stash() {
   // Export also refuses un-applied PDF drafts, and Office discard checks this revision.
   const snapshot=await capture(tab)
   await snapshot.handle.discardChanges?.()
+  // An imported legacy source stays read-only even after an in-memory snapshot
+  // has a modern extension. Only a successful Save As clears this safeguard.
+  tab.requiresSaveAs=tab.requiresSaveAs||isImportOnly(tab.document.extension)
   tab.document=snapshot.document
 }
 async function activate(tab:Tab) {
@@ -161,7 +166,8 @@ async function addDocument(doc:NativeDocument, fileId?:string) {
   const existing=fileId && tabs.value.find(t=>t.fileId===fileId)
   if(existing) { await activate(existing); return }
   const key=crypto.randomUUID()
-  const tab:Tab={key,document:{...doc,id:key},fileId,dirty:!fileId,ready:false}
+  const review=reviewOfficeImport(doc)
+  const tab:Tab={key,document:{...doc,id:key},fileId,requiresSaveAs:isImportOnly(doc.extension)||review.requiresSaveAs,importWarnings:review.warnings,dirty:!fileId,ready:false}
   await stash()
   tabs.value.push(tab); activeKey.value=key; home.value=false
   if(doc.kind==='pdf') pdfDocument.value=tab.document
@@ -188,7 +194,9 @@ async function browserFile(event:Event) {
   await task('正在读取文件',async()=>{
     const extension=extensionOf(file.name)
     if(file.size>40*1024*1024) throw Error('请选择不超过 40 MB 的文档。')
-    await addDocument({id:'',name:file.name,extension,kind:kindOf(extension),base64:bytesToBase64(new Uint8Array(await file.arrayBuffer())),sha256:'',sizeBytes:file.size})
+    const bytes=new Uint8Array(await file.arrayBuffer())
+    validateDocumentSignature(bytes,extension)
+    await addDocument({id:'',name:file.name,extension,kind:kindOf(extension),base64:bytesToBase64(bytes),sha256:'',sizeBytes:file.size})
   })
 }
 function openRecent(item:RecentDocument) { void task('正在打开最近文件',async()=>{const doc=await native.openRecent(item.id);await addDocument(doc,doc.id);await refreshRecents()}) }
@@ -199,23 +207,29 @@ function download(base64:string,name:string) {
 async function saveActive(saveAs=false, format?:Extension):Promise<boolean> {
   const tab=active.value;if(!tab)return false
   assertWorkbenchDrafts()
+  if(format&&isImportOnly(format))throw Error('旧版格式仅支持导入，请选择 DOCX、XLSX 或 PPTX 保存副本。')
   const handle=requireEditor(tab)
-  const exported=await handle.exportFile(format?{format}:undefined)
+  const exported=await handle.exportFile({format:format||defaultSaveExtension(tab.document.extension)})
   if(activeKey.value!==tab.key)throw Error('文档已切换，本次保存已取消。')
+  if(isImportOnly(exported.extension))throw Error('编辑器未生成现代格式，保存已取消，原文件未被修改。')
   if(exported.dirty)tab.dirty=true
   const isCopy=!!format && format!==tab.document.extension
-  const name=exported.name || withExtension(tab.document.name,exported.extension)
+  const protectSource=tab.requiresSaveAs||isImportOnly(tab.document.extension)
+  const exportName=withExtension(exported.name||tab.document.name,exported.extension)
+  const name=protectSource?exportName.replace(/\.[^.]+$/,` - 副本.${exported.extension}`):exportName
   if(!native.isTauri()) {
     download(exported.base64,name)
-    if(!isCopy) { tab.document={...tab.document,base64:exported.base64,name};tab.dirty=false;await handle.markSaved?.(exported.base64) }
+    if(!isCopy) { tab.document={...tab.document,base64:exported.base64,name,extension:exported.extension};tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false;await handle.markSaved?.(exported.base64) }
     status.value='已生成下载文件';return true
   }
-  const result=await native.saveDocument({documentId:isCopy?undefined:tab.fileId,name,extension:exported.extension,base64:exported.base64,expectedSha256:isCopy?undefined:tab.document.sha256,saveAs:saveAs||isCopy||exported.saveAs||!tab.fileId})
+  const result=await native.saveDocument({documentId:isCopy||protectSource?undefined:tab.fileId,name,extension:exported.extension,base64:exported.base64,expectedSha256:isCopy||protectSource?undefined:tab.document.sha256,saveAs:saveAs||isCopy||protectSource||exported.saveAs||!tab.fileId})
   if(result.status==='cancelled') return false
   if(result.status==='conflict') { error.value=`${result.message} 请使用“另存为”保留当前修改。`;return false }
   if(!isCopy) {
     tab.fileId=result.document.id
     tab.document={...result.document,id:tab.key,base64:exported.base64}
+    tab.requiresSaveAs=false
+    tab.importWarnings=[]
     tab.dirty=false;await handle.markSaved?.(exported.base64)
   }
   await refreshRecents();status.value=isCopy?`${exported.extension.toUpperCase()} 副本已保存`:'已保存到本机';return true
@@ -503,7 +517,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 
 <template>
   <div class="app-shell" :class="{'editing':!home}">
-    <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.odt,.xlsx,.ods,.pptx,.odp,.pdf" @change="browserFile" />
+    <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.odt,.doc,.rtf,.xlsx,.ods,.xls,.pptx,.odp,.ppt,.pdf" @change="browserFile" />
     <input ref="imageInput" class="visually-hidden" type="file" accept="image/png,image/jpeg" @change="browserImage" />
     <header class="titlebar">
       <button class="brand" @click="home=true;section='home'" aria-label="返回工作台"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
@@ -515,7 +529,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <button class="primary open-sidebar" @click="openFile"><Icon name="folder"/>打开文件<kbd>⌘ O</kbd></button>
         <nav aria-label="工作区"><button :class="{selected:section==='home'}" @click="section='home'"><Icon name="home"/>工作台</button><button :class="{selected:section==='recent'}" @click="section='recent'"><Icon name="clock"/>最近打开</button></nav>
         <div v-if="tabs.length" class="sidebar-documents"><span class="eyebrow">正在编辑</span><button v-for="tab in tabs" :key="tab.key" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button></div>
-        <div class="sidebar-bottom"><Icon name="shield"/><strong>安心，离线处理</strong><p>你的文档留在本机。<br/>无需账户，也无需上传。</p><button @click="help=true">了解编辑与格式兼容 <Icon name="arrow" :size="15"/></button></div>
+        <div class="sidebar-bottom"><Icon name="shield"/><strong>专注本地办公</strong><p>本地打开、编辑和保存。<br/>不提供账户与云端服务。</p><button @click="help=true">了解编辑与格式兼容 <Icon name="arrow" :size="15"/></button></div>
       </aside>
       <main class="home-main">
         <div class="home-heading"><div><span class="eyebrow">YOUR SPACE TO CREATE</span><h1>{{section==='home'?'今天，从一个好想法开始。':'继续上一次的工作。'}}</h1><p>文字、表格、演示与 PDF，在一个安静的工作空间里。</p></div><span class="workspace-mark">OO<span>WORKSPACE</span></span></div>
@@ -535,6 +549,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
     <section v-show="!home" class="editor-workspace">
       <div class="tab-bar"><button class="home-tab" @click="home=true" aria-label="工作台"><Icon name="home" :size="18"/></button><div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div><button class="new-tab" @click="home=true" aria-label="新建文档"><Icon name="plus" :size="18"/></button></div>
       <div class="command-bar"><button @click="openFile"><Icon name="folder" :size="17"/>打开</button><span class="separator"/><button :disabled="!active?.ready" @click="save()"><Icon name="save" :size="17"/>保存</button><button :disabled="!active?.ready" @click="save(true)">另存为</button><button v-if="active?.document.kind!=='pdf'" :disabled="!active?.ready" @click="save(true,'pdf')"><Icon name="download" :size="17"/>导出 PDF</button><span class="separator"/><button :disabled="!active?.ready" @click="editCommand('undo')" title="撤销"><Icon name="undo" :size="17"/></button><button :disabled="!active?.ready" @click="editCommand('redo')" title="重做"><Icon name="redo" :size="17"/></button><template v-if="active?.document.kind==='presentation'"><span class="separator"/><button :disabled="!active?.ready" @click="newSlide" data-testid="presentation-new-slide"><Icon name="plus" :size="17"/>新建幻灯片</button><button :disabled="!active?.ready" @click="insertImage"><Icon name="image" :size="17"/>插入图片</button><button :disabled="!active?.ready" @click="previewSlides()" title="内置放映、转场与本地音视频 · F5" data-testid="presentation-preview"><Icon name="presentation" :size="17"/>预览放映</button><button :disabled="!active?.ready" @click="save(true,active.document.extension==='odp'?'pptx':'odp')" data-testid="presentation-export-alternate">导出 {{active.document.extension==='odp'?'PPTX':'ODP'}}</button></template><span class="command-spacer"/><span class="save-state"><i :class="{'dirty-dot':active?.dirty}"/>{{active?.dirty?'尚未保存':'已保存'}}</span></div>
+      <div v-if="active?.importWarnings?.length" class="import-review-notice" role="note" data-testid="import-review-notice"><Icon name="info" :size="16"/><div><p v-for="warning in active.importWarnings" :key="warning">{{warning}}</p><strong>保存需另存副本，避免自动覆盖原件。</strong></div></div>
       <div class="editor-content" :inert="!!busy">
         <WordWorkbench v-if="officeDocument" v-show="active?.document.kind!=='pdf'" ref="wordWorkbench" :active="active?.document.kind==='word'" :state="writerState" :read-data="readWriterData" :refresh-state="readFreshWriterState" :busy="!!busy" :disabled="!active?.ready" @action="runWriterAction" @command="runWriterCommand" @refresh="refreshWriter" @insert-image="insertImage" @draft-change="dirtyFor(activeKey,$event)">
         <SheetWorkbench ref="sheetWorkbench" :active="active?.document.kind==='sheet'" :state="calcState" :read-data="readCalcData" :busy="!!busy" :disabled="!active?.ready" @action="runCalcAction" @refresh="refreshCalc" @insert-image="insertImage" @draft-change="dirtyFor(activeKey,$event)">
@@ -552,6 +567,10 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
     <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{error}}</span><button @click="error=''" aria-label="关闭错误提示"><Icon name="close" :size="16"/></button></div>
     <div v-if="busy" class="busy-overlay" role="status"><span class="busy-pill"><i/>{{busy}}</span></div>
     <div v-if="closeTarget" class="modal-backdrop" @keydown.esc="closeTarget=null"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="close-heading"><span class="modal-icon"><Icon name="save" :size="27"/></span><h2 id="close-heading">保存你的修改？</h2><p>{{closeTarget==='window'?'有文档尚未保存。保存后再退出，可以保留所有修改。':`“${closeTarget.document.name}”有尚未保存的修改。`}}</p><div class="modal-actions"><button @click="closeTarget=null">取消</button><button @click="resolveClose('discard')">不保存</button><button class="primary" @click="resolveClose('save')">{{closeTarget==='window'?'全部保存并退出':'保存并关闭'}}</button></div></section></div>
-    <div v-if="help" class="modal-backdrop" @click.self="help=false"><section class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>提供中文文字排版、表格与公式、数据分析、幻灯片编排及 PDF 导出。文档使用本地引擎处理，高级内置菜单目前为英文。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持原有文字替换、文字和图片、批注、手写签名、页面整理，以及页码、透明水印和书签导航。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件时会另存副本。演示文稿提供中文编排、对象与图表编辑、备注、转场和本地媒体放映。SmartArt、逐对象动画、Morph 和微软云端功能尚未完整实现。完整 Microsoft 365 功能尚未对齐：复杂排版、最新函数、宏与插件、云协作仍有差距。请检查导出结果；宏不自动执行。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 0.4.0 · 构建 {{buildVersion}} · 使用 LibreOffice / ZetaOffice、PDF.js 与 PyMuPDF。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
+    <div v-if="help" class="modal-backdrop" @click.self="help=false"><section class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>提供中文文字排版、表格与公式、数据分析、幻灯片编排及 PDF 导出。文档使用本地引擎处理，高级内置菜单目前为英文。导入 DOC、RTF、XLS、PPT 后保存为现代格式副本，保留旧格式原件。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持原有文字替换、文字和图片、批注、手写签名、页面整理，以及页码、透明水印和书签导航。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件时会另存副本。演示文稿提供中文编排、对象与图表编辑、备注、转场和本地媒体放映。SmartArt、逐对象动画和 Morph 尚未完整实现。Microsoft 365 的本地文档能力尚未完全对齐：复杂排版、最新函数、宏与插件仍有差异。请检查导出结果；宏不自动执行。</p><p class="help-note"><strong>永久本地范围：</strong>不提供账户、云盘、云协作或云 AI，也不将这些服务列入后续功能计划。安装包内的编辑引擎在本机处理文档。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 0.4.0 · 构建 {{buildVersion}} · 使用 LibreOffice / ZetaOffice、PDF.js 与 PyMuPDF。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
   </div>
 </template>
+
+<style scoped>
+.import-review-notice{display:flex;align-items:flex-start;gap:9px;flex:none;padding:8px 17px;background:#fff8e9;border-bottom:1px solid #e9dcb9;color:#8b6a37;font-size:11px;line-height:1.6;overflow-wrap:anywhere}.import-review-notice>svg{flex:none;margin-top:2px}.import-review-notice p{margin:0}.import-review-notice strong{font-weight:600}
+</style>
