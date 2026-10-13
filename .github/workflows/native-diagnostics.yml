@@ -8,7 +8,7 @@ on:
         type: string
         required: true
       job_id:
-        description: Optional failed job ID; expose only known Rust test names, error codes, and fixed failure categories
+        description: Optional failed job ID; expose only repository-known test names, compiler codes, and fixed failure categories
         type: string
         required: false
         default: ''
@@ -30,8 +30,7 @@ jobs:
           SOURCE_RUN_ID: ${{ inputs.run_id }}
         run: node -e 'if(!/^[0-9]+$/.test(process.env.SOURCE_RUN_ID))throw Error("Invalid run ID")'
       - uses: actions/checkout@v4
-        if: inputs.job_id != ''
-      - name: Summarize only allowlisted Rust failure identifiers without exposing logs
+      - name: Summarize only allowlisted failure identifiers without exposing logs
         if: inputs.job_id != ''
         env:
           SOURCE_RUN_ID: ${{ inputs.run_id }}
@@ -53,25 +52,18 @@ jobs:
           node --input-type=module <<'NODE'
           import { appendFileSync, readFileSync, readdirSync, statSync } from 'node:fs';
           import assert from 'node:assert/strict';
+          import { nativeReportSummary } from './scripts/native-report-summary.mjs';
           const files = readdirSync('diagnostics').filter(name => /^[a-z0-9-]+-native-smoke\.json$/.test(name));
           assert.ok(files.length > 0, 'No existing native verification reports were found');
           const escape = value => String(value).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
           for (const file of files) {
             assert.ok(statSync(`diagnostics/${file}`).size <= 1024 * 1024, 'Diagnostic report exceeds 1 MiB');
             const report = JSON.parse(readFileSync(`diagnostics/${file}`, 'utf8'));
-            const details = JSON.stringify(report, null, 2);
             // GitHub truncates each annotation message at 4096 bytes. Preserve
             // valid JSON through numbered ASCII chunks instead of cutting JSON
             // in the middle of an error or losing the final resource events.
-            const { stdoutTail, stderrTail, ...processInfo } = report.process || {};
-            const excerpt = { ...report, process: processInfo,
-              annotationLogTailsOmitted: true,
-              ...(report.nativeDiagnostics ? { nativeDiagnostics: {
-                ...report.nativeDiagnostics,
-                events: report.nativeDiagnostics.events?.slice(-60),
-                earlierEventsOmitted: Math.max(0, (report.nativeDiagnostics.events?.length || 0) - 60),
-              } } : {}),
-            };
+            const excerpt = nativeReportSummary(report);
+            const details = JSON.stringify(excerpt, null, 2);
             const encoded = Buffer.from(JSON.stringify(excerpt), 'utf8').toString('base64');
             const count = Math.ceil(encoded.length / 3000);
             for (let index = 0; index < count; index++) {

@@ -5,6 +5,9 @@ import { pathToFileURL } from 'node:url';
 
 const MAX_LOG_BYTES = 16 * 1024 * 1024;
 const CATEGORIES = new Set(['assertion', 'linker', 'compiler', 'timeout', 'unknown']);
+// These are public, checked-in test labels, not arbitrary text from a job log.
+// No control characters, URLs, backslashes, markup or escaped source literals.
+const SAFE_TEST_NAME = /^[A-Za-z0-9_][A-Za-z0-9_ ,.'()\/;-]{0,239}$/;
 
 export function validateFailedJob(job, runId, jobId) {
   assert.match(runId, /^[0-9]+$/);
@@ -31,31 +34,60 @@ export function knownRustTests(root = 'src-tauri/src') {
   visit(root); return names;
 }
 
+export function knownNodeTests(root = 'tests') {
+  const names = new Set();
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.test.mjs')) continue;
+    const source = readFileSync(join(root, entry.name), 'utf8');
+    // Skip comments and quoted/template strings rather than importing tests or
+    // evaluating titles. Only direct, line-start test('literal', ...) calls are
+    // admitted. Interpolation, concatenation and escaped literals are omitted.
+    const declarations = /\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|`(?:\\[\s\S]|[^`\\])*`|^[ \t]*test(?:\.(?:only|skip|todo))?\s*\(\s*(?:'([^'\\\r\n]*)'|"([^"\\\r\n]*)")\s*,|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"/gm;
+    for (const match of source.matchAll(declarations)) {
+      const title = match[1] ?? match[2];
+      if (typeof title === 'string' && SAFE_TEST_NAME.test(title)) names.add(title);
+    }
+  }
+  return names;
+}
+
+export function knownRepositoryTests() {
+  return new Set([...knownRustTests(), ...knownNodeTests()]);
+}
+
 export function sanitizeFailureLog(log, knownTests) {
   const clean = log.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '');
   const failed = new Set();
-  for (const line of clean.split(/\r?\n/)) {
-    const match = line.match(/(?:^|\s)test\s+(?:[A-Za-z_][A-Za-z0-9_]*::)*([A-Za-z_][A-Za-z0-9_]*)\s+\.\.\.\s+FAILED\s*$/);
-    if (match && knownTests.has(match[1])) failed.add(match[1]);
+  for (const rawLine of clean.split(/\r?\n/)) {
+    const line = rawLine.replace(/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z[ \t]+/, '');
+    const match = line.match(/^\s*test\s+(?:[A-Za-z_][A-Za-z0-9_]*::)*([A-Za-z_][A-Za-z0-9_]*)\s+\.\.\.\s+FAILED\s*$/);
+    const tap = line.match(/^\s*not ok\s+[0-9]+\s+-\s+(.+?)\s*$/);
+    const spec = line.match(/^\s*✖\s+(.+?)(?:\s+\([0-9]+(?:\.[0-9]+)?ms\))?\s*$/);
+    for (const name of [match?.[1], tap?.[1], spec?.[1]]) {
+      if (typeof name === 'string' && SAFE_TEST_NAME.test(name) && knownTests.has(name)) failed.add(name);
+    }
   }
   const rustErrorCodes = [...new Set([...clean.matchAll(/\berror\[(E[0-9]{4})\]/g)].map(match => match[1]))].sort();
+  const typescriptErrorCodes = [...new Set([...clean.matchAll(/\berror\s+(TS[0-9]{4}):/g)].map(match => match[1]))].sort();
   const categories = [];
-  if (/assertion[^\r\n]{0,80}failed/.test(clean)) categories.push('assertion');
+  if (/assertion[^\r\n]{0,80}failed|\b(?:ERR_ASSERTION|AssertionError)\b/.test(clean)) categories.push('assertion');
   if (/linking with[^\r\n]{0,150}failed|linker command failed/.test(clean)) categories.push('linker');
-  if (rustErrorCodes.length || /error: could not compile/.test(clean)) categories.push('compiler');
+  if (rustErrorCodes.length || typescriptErrorCodes.length || /error: could not compile/.test(clean)) categories.push('compiler');
   if (/\b(?:timed out|timeout|time limit exceeded)\b/i.test(clean)) categories.push('timeout');
   if (!categories.length) categories.push('unknown');
-  return { failedTestNames: [...failed].sort(), rustErrorCodes, categories };
+  return { failedTestNames: [...failed].sort(), rustErrorCodes, typescriptErrorCodes, categories };
 }
 
 export function validatePublicSummary(report, knownTests) {
-  assert.deepEqual(Object.keys(report).sort(), ['schemaVersion', 'runId', 'jobId', 'failedTestNames', 'rustErrorCodes', 'categories'].sort());
-  assert.equal(report.schemaVersion, 2);
+  assert.deepEqual(Object.keys(report).sort(), ['schemaVersion', 'runId', 'jobId', 'failedTestNames', 'rustErrorCodes', 'typescriptErrorCodes', 'categories'].sort());
+  assert.equal(report.schemaVersion, 3);
   assert.match(report.runId, /^[0-9]+$/); assert.match(report.jobId, /^[0-9]+$/);
   assert.ok(Array.isArray(report.failedTestNames) && report.failedTestNames.length <= knownTests.size);
-  for (const name of report.failedTestNames) assert.ok(typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && knownTests.has(name));
+  for (const name of report.failedTestNames) assert.ok(typeof name === 'string' && SAFE_TEST_NAME.test(name) && knownTests.has(name));
   assert.ok(Array.isArray(report.rustErrorCodes) && report.rustErrorCodes.length <= 10000);
   for (const code of report.rustErrorCodes) assert.ok(typeof code === 'string' && /^E[0-9]{4}$/.test(code));
+  assert.ok(Array.isArray(report.typescriptErrorCodes) && report.typescriptErrorCodes.length <= 10000);
+  for (const code of report.typescriptErrorCodes) assert.ok(typeof code === 'string' && /^TS[0-9]{4}$/.test(code));
   assert.ok(Array.isArray(report.categories) && report.categories.length > 0 && report.categories.length <= CATEGORIES.size);
   for (const category of report.categories) assert.ok(CATEGORIES.has(category));
   return report;
@@ -72,7 +104,7 @@ async function boundedText(response) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-export async function readFailedJobLog(env = process.env, fetcher = fetch, knownTests = knownRustTests()) {
+export async function readFailedJobLog(env = process.env, fetcher = fetch, knownTests = knownRepositoryTests()) {
   const runId = env.SOURCE_RUN_ID || ''; const jobId = env.SOURCE_JOB_ID || '';
   const repository = env.SOURCE_REPOSITORY || '';
   assert.match(runId, /^[0-9]+$/); assert.match(jobId, /^[0-9]+$/);
@@ -96,7 +128,7 @@ export async function readFailedJobLog(env = process.env, fetcher = fetch, known
   const log = await boundedText(download);
   // Raw log bytes stay in this process only. No excerpts, panic values, paths,
   // arbitrary messages, URLs, hashes, or encoded log payloads leave this scope.
-  return validatePublicSummary({ schemaVersion: 2, runId, jobId, ...sanitizeFailureLog(log, knownTests) }, knownTests);
+  return validatePublicSummary({ schemaVersion: 3, runId, jobId, ...sanitizeFailureLog(log, knownTests) }, knownTests);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
