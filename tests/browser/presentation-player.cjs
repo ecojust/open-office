@@ -124,6 +124,7 @@ async function attachMedia(slideIndex, kind = 'audio', start = 'click', delay = 
         await mount(data); await page.keyboard.press('ArrowRight');
         await page.waitForFunction(() => document.getAnimations().length > 0); await page.screenshot({ path: path.join(out, `transition-${effect}.png`) }); await rendered(1);
         assert.equal(await page.evaluate(() => document.getAnimations().length), 0);
+        assert.deepEqual(await page.locator('.slide-previous-canvas').evaluate(canvas => [canvas.width, canvas.height]), [1, 1], `${effect} releases its completed transition frame`);
       }
     });
     await check('Hidden slides are skipped, endpoints disabled, notes name next visible slide', async () => {
@@ -163,6 +164,10 @@ async function attachMedia(slideIndex, kind = 'audio', start = 'click', delay = 
         await page.evaluate(kind => { window.lastMedia = document.querySelector(kind); window.lastMediaUrl = window.lastMedia.src; document.querySelector('#gesture-play').remove(); }, kind);
         await page.getByTestId('slide-preview-close').click(); await page.getByTestId('slide-preview').waitFor({ state: 'hidden' });
         assert.equal(await page.evaluate(() => window.lastMedia.paused), true); assert.equal(await page.evaluate(() => window.qa.revoked.includes(window.lastMediaUrl)), true);
+        assert.equal(await page.evaluate(() => window.lastMedia.hasAttribute('src')), false);
+        // Chromium can retain the last currentSrc string after load() clears a
+        // detached element; HAVE_NOTHING + NETWORK_EMPTY prove decoder reset.
+        await page.waitForFunction(() => window.lastMedia.readyState === HTMLMediaElement.HAVE_NOTHING && window.lastMedia.networkState === HTMLMediaElement.NETWORK_EMPTY);
       }
     });
     await check('Media auto-start delay survives resizing and stops when leaving slide', async () => {
@@ -171,6 +176,17 @@ async function attachMedia(slideIndex, kind = 'audio', start = 'click', delay = 
       await page.keyboard.press('ArrowRight'); await page.waitForFunction(() => document.getAnimations().length > 0); await page.setViewportSize({ width: 1200, height: 780 });
       await rendered(1); await page.waitForFunction(() => document.querySelector('audio')?.currentTime > .1 && !document.querySelector('audio')?.paused);
       await page.evaluate(() => { window.lastMedia = document.querySelector('audio'); }); await page.keyboard.press('ArrowRight'); await rendered(2); assert.equal(await page.evaluate(() => window.lastMedia.paused), true);
+      assert.equal(await page.evaluate(() => window.lastMedia.hasAttribute('src')), false);
+      await page.waitForFunction(() => window.lastMedia.readyState === HTMLMediaElement.HAVE_NOTHING && window.lastMedia.networkState === HTMLMediaElement.NETWORK_EMPTY);
+    });
+    await check('Closing during a transition releases both retained canvas backing stores', async () => {
+      const data = presentation(); data.slides[1].transition = { ...data.slides[1].transition, type: 'push', durationMs: 4000 };
+      await mount(data); await page.keyboard.press('ArrowRight'); await page.waitForFunction(() => document.getAnimations().length > 0);
+      await page.evaluate(() => { window.closedCanvases = [...document.querySelectorAll('.slide-preview-stage canvas')]; });
+      assert.equal(await page.evaluate(() => window.closedCanvases.every(canvas => canvas.width > 1 && canvas.height > 1)), true);
+      await page.getByTestId('slide-preview-close').click(); await page.getByTestId('slide-preview').waitFor({ state: 'hidden' });
+      await page.waitForFunction(() => window.closedCanvases.every(canvas => canvas.width === 1 && canvas.height === 1));
+      assert.equal(await page.evaluate(() => document.getAnimations().length), 0);
     });
     await check('Escape closes player, cancels timers, and restores prior focus', async () => {
       const data = presentation(); data.slides[0].transition.advanceAfterMs = 2000; await mount(data); await page.keyboard.press('Escape'); await page.getByTestId('slide-preview').waitFor({ state: 'hidden' });

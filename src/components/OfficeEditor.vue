@@ -18,7 +18,9 @@ const frame = ref<HTMLIFrameElement>()
 const loading = ref(true), problem = ref(''), status = ref('正在准备完整办公编辑器'), progress = ref(0)
 const dirty = ref(false), confirmRetry = ref(false)
 let bridge: OfficeBridge | null = null, generation = 0, disposed = false
-let loaded: OfficeDocument | null = null, savedExport: { id: string; revision: number; featureRevision: number } | null = null
+// The tab owns the import bytes. Retaining another full document here would
+// keep obsolete base64 alive after the tab has captured a newer snapshot.
+let loaded: Pick<OfficeDocument, 'id' | 'kind' | 'extension'> | null = null, savedExport: { id: string; revision: number; featureRevision: number } | null = null
 let opening: Promise<void> = Promise.resolve()
 let presentation = new PresentationSession(), presentationState: PresentationState | null = null
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
@@ -47,6 +49,7 @@ function reportError(error: unknown) {
   problem.value = message; emit('error', message)
 }
 function eventReceived(event: OfficeEvent) {
+  if (disposed) return
   if (event.documentId && event.documentId !== loaded?.id) return
   if (event.event === 'progress') {
     status.value = event.data.text; progress.value = Math.max(progress.value, event.data.percent || 0)
@@ -63,6 +66,7 @@ function startBridge() {
   frame.value.src = bridge.hostUrl
 }
 async function loadDocument(document: OfficeDocument, options: { discard?: boolean } = {}) {
+  if (disposed) return
   const token = ++generation
   if (!bridge) throw Error('办公编辑器尚未准备好。')
   if (loaded?.id === document.id) {
@@ -74,12 +78,13 @@ async function loadDocument(document: OfficeDocument, options: { discard?: boole
   try {
     await client.request('open', { ...document, discard: options.discard === true })
     if (disposed || token !== generation || bridge !== client) return
-    loaded = { ...document }; savedExport = null
-    presentation = new PresentationSession(); presentationState = null
+    loaded = { id: document.id, kind: document.kind, extension: document.extension }; savedExport = null
+    const source = presentation = new PresentationSession(); presentationState = null
     if (document.kind === 'presentation') {
       const state = await client.request<PresentationState>('presentation-state', {}, document.id)
       if (disposed || token !== generation || bridge !== client) return
-      await presentation.open(document.extension === 'pptx' && document.base64 ? base64ToBytes(document.base64) : null, state)
+      await source.open(document.extension === 'pptx' && document.base64 ? base64ToBytes(document.base64) : null, state)
+      if (disposed || token !== generation || bridge !== client || presentation !== source) return
       presentationState = state; emit('presentation-state', state); emitFeatures()
     } else {
       await (document.kind === 'word' ? getWriterState() : getCalcState())
@@ -233,13 +238,22 @@ async function smokeTest() {
 }
 function retry(force = false) {
   if (dirty.value && !force) { confirmRetry.value = true; return }
-  confirmRetry.value = false; generation++; loaded = null; savedExport = null
+  confirmRetry.value = false; generation++; releaseDocumentState()
   dirty.value = false; emit('dirty', false); loading.value = true; problem.value = ''; progress.value = 0
   startBridge(); queueLoad(props.document)
 }
+function releaseDocumentState() {
+  clearTimeout(refreshTimer); refreshTimer = undefined; refreshQueued = false
+  loaded = null; savedExport = null; presentationState = null
+  presentation = new PresentationSession()
+  emitFeatures()
+}
 onMounted(() => { startBridge(); queueLoad(props.document) })
 watch(() => props.document.id, () => queueLoad(props.document))
-onBeforeUnmount(() => { disposed = true; generation++; clearTimeout(refreshTimer); bridge?.dispose(); if (frame.value) frame.value.src = 'about:blank' })
+onBeforeUnmount(() => {
+  disposed = true; generation++; releaseDocumentState()
+  bridge?.dispose(); bridge = null; opening = Promise.resolve()
+})
 defineExpose({ exportFile, markSaved, discardChanges, loadDocument, undo, redo, search, insertImage, newSlide, presentationObjectData, getPresentationState, presentationAction, presentationEdit, getWriterState, writerAction, writerCommand, writerData, getCalcState, calcAction, calcData, smokeTest, retry, focus: () => command('focus') })
 </script>
 

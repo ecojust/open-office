@@ -44,7 +44,27 @@ export function validateDocumentSignature(bytes:Uint8Array,extension:Extension):
  } else valid=bytes.length>=30&&starts([0x50,0x4b,0x03,0x04])
  if(!valid)throw Error(`文件内容与 .${extension} 格式不符，或文件已损坏。请使用原始文档；加密文件请先在原应用解密。`)
 }
-export function bytesToBase64(bytes:Uint8Array):string{let value='';for(let i=0;i<bytes.length;i+=32768)value+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(value)}
-export function base64ToBytes(base64:string):Uint8Array{const value=atob(base64);return Uint8Array.from(value,c=>c.charCodeAt(0))}
+export function bytesToBase64(bytes:Uint8Array):string {
+ const native=bytes as Uint8Array & {toBase64?:()=>string}
+ if(typeof native.toBase64==='function')return native.toBase64()
+ // Encode whole groups of three bytes. No full-size binary string is retained
+ // alongside the document and its base64 copy, including on older WebKit.
+ const parts:string[]=[]
+ for(let i=0;i<bytes.length;i+=24576)parts.push(btoa(String.fromCharCode(...bytes.subarray(i,i+24576))))
+ return parts.join('')
+}
+export function base64ToBytes(base64:string):Uint8Array {
+ // Keep atob's whitespace / unpadded-input contract, but decode in bounded
+ // chunks instead of allocating another document-sized binary string.
+ const input=base64.replace(/[\t\n\f\r ]/g,'')
+ if(!/^[A-Za-z0-9+/]*={0,2}$/.test(input)||input.length%4===1||(input.includes('=')&&input.length%4!==0))throw Error('文档编码无效。')
+ const native=Uint8Array as typeof Uint8Array & {fromBase64?:(value:string)=>Uint8Array}
+ if(typeof native.fromBase64==='function')return native.fromBase64(input)
+ const padding=input.endsWith('==')?2:input.endsWith('=')?1:0
+ const bytes=new Uint8Array(Math.floor(input.length*3/4)-padding)
+ let offset=0
+ for(let i=0;i<input.length;i+=32768){const chunk=atob(input.slice(i,i+32768));for(let j=0;j<chunk.length;j++)bytes[offset++]=chunk.charCodeAt(j)}
+ return bytes
+}
 export function sizeLabel(bytes:number):string{return bytes<1024?'不到 1 KB':bytes<1024*1024?`${Math.round(bytes/1024)} KB`:`${(bytes/1024/1024).toFixed(1)} MB`}
 export function withExtension(name:string,extension:Extension):string{return `${name.replace(/\.[^.]+$/,'')}.${extension}`}

@@ -330,6 +330,74 @@ test('a nominally clean tab with un-applied draft requires close confirmation', 
   assert.equal(h.state.tabs.value.length, 1); assert.ok(!h.calls.some(call => call[0] === 'discard'))
 })
 
+test('closing the active Office tab releases its engine even when a PDF remains open', async () => {
+  const h=shell(), a=h.tab('office'), pdf=h.tab('pdf',{kind:'pdf'});h.active(a)
+  h.state.closeTab(a);await h.idle()
+  assert.equal(h.state.activeKey.value,pdf.key)
+  assert.equal(h.state.tabs.value.length,1)
+  assert.equal(h.state.officeDocument.value,undefined,'The Office v-if must unmount its iframe')
+  assert.equal(h.state.pdfDocument.value.id,pdf.key)
+})
+
+test('closing a hidden Office model releases only the closed tab and leaves the active PDF intact', async () => {
+  const h=shell(), a=h.tab('office'), other=h.tab('other'), pdf=h.tab('pdf',{kind:'pdf'});h.active(a)
+  await h.state.activate(pdf);h.state.readyFor(pdf.key)
+  const pdfDocument=h.state.pdfDocument.value, discardCount=h.calls.filter(call=>call[0]==='discard').length
+  h.state.closeTab(a);await h.idle()
+  assert.equal(h.state.officeDocument.value,undefined)
+  assert.equal(h.state.activeKey.value,pdf.key);assert.equal(pdf.ready,true)
+  assert.equal(h.state.pdfDocument.value,pdfDocument)
+  assert.equal(h.calls.filter(call=>call[0]==='discard').length,discardCount,'The active PDF must not be discarded')
+  assert.ok(h.state.tabs.value.some(tab=>tab.key===other.key),'Other Office snapshots remain available')
+})
+
+test('closing another background Office tab keeps the loaded model and its undo history', async () => {
+  const h=shell(), a=h.tab('office'), other=h.tab('other'), pdf=h.tab('pdf',{kind:'pdf'});h.active(a)
+  await h.state.activate(pdf);h.state.readyFor(pdf.key)
+  const document=h.state.officeDocument.value
+  h.state.closeTab(other);await h.idle()
+  assert.equal(h.state.officeDocument.value,document)
+  assert.equal(a.ready,true)
+})
+
+test('Office to PDF and back reuses the same live editor after capturing unsaved content', async () => {
+  const h=shell(), a=h.tab('office'), pdf=h.tab('pdf',{kind:'pdf'});h.active(a)
+  const handle=h.state.officeEditor.value
+  h.handle.exportFile=async()=>({base64:'RURJVA==',extension:'docx',dirty:true})
+  await h.state.activate(pdf);h.state.readyFor(pdf.key)
+  assert.equal(a.document.base64,'RURJVA==');assert.equal(a.dirty,true)
+  assert.equal(h.state.officeDocument.value.id,a.key);assert.equal(a.ready,true)
+  h.handle.exportFile=async()=>({base64:'UERGCg==',extension:'pdf',dirty:false})
+  let refreshed=0;h.handle.getWriterState=async()=>{refreshed++;return {documentId:a.key,revision:3}}
+  await h.state.activate(a)
+  assert.equal(a.ready,true);assert.equal(h.state.officeEditor.value,handle)
+  assert.equal(refreshed,1);assert.equal(h.state.writerState.value.revision,3)
+})
+
+for(const failure of ['draft','cancelled','conflict','save-error']) test(`failed Office close retains the live engine and content after ${failure}`,async()=>{
+  const h=shell(), a=h.tab('office',{dirty:true});h.tab('pdf',{kind:'pdf'});h.active(a)
+  const original=h.state.officeDocument.value
+  if(failure==='draft')h.state.wordWorkbench.value={assertNoPendingEdits(){throw Error('Pending draft')},discardDrafts(){assert.fail('Draft must remain')}}
+  else h.native.saveDocument=async()=>{
+    if(failure==='save-error')throw Error('Write failed')
+    return {status:failure,message:'External change'}
+  }
+  h.state.closeTarget.value=a;await h.state.resolveClose('save')
+  assert.equal(h.state.officeDocument.value,original)
+  assert.equal(h.state.activeKey.value,a.key);assert.equal(a.dirty,true)
+  assert.equal(h.state.tabs.value.length,2);assert.equal(h.state.closeTarget.value.key,a.key)
+  assert.ok(!h.calls.some(call=>call[0]==='discard'))
+})
+
+test('confirmed Office discard releases its model after dropping the explicitly abandoned drafts',async()=>{
+  const h=shell(),a=h.tab('office',{dirty:true});h.tab('pdf',{kind:'pdf'});h.active(a)
+  let discarded=0;h.state.wordWorkbench.value={discardDrafts(){discarded++}}
+  h.state.closeTarget.value=a;await h.state.resolveClose('discard')
+  assert.equal(discarded,1);assert.equal(h.state.officeDocument.value,undefined)
+  assert.equal(h.state.closeTarget.value,null)
+  assert.ok(h.calls.some(call=>call[0]==='discard'&&call[1]?.force===true))
+})
+
 test('save-and-close of a background tab waits for its own editor to become ready', async () => {
   const h = shell(), a = h.tab('A'), b = h.tab('B', { dirty: true }); h.active(a)
   h.state.closeTarget.value = b

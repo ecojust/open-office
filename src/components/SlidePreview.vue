@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs'
 import type { PptxPresentation } from '../presentation/pptx-package'
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
+import { canvasOutputScale, releaseCanvas } from '../pdf/resources'
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
 
@@ -10,7 +11,6 @@ const props = defineProps<{ base64: string; name: string; startPage?: number; pr
 const emit = defineEmits<{ close: []; error: [message: string] }>()
 const MAX_BYTES = 100 * 1024 * 1024
 const MAX_PAGES = 500
-const MAX_CANVAS_PIXELS = 16 * 1024 * 1024
 const root = ref<HTMLElement>(), stage = ref<HTMLElement>(), canvas = ref<HTMLCanvasElement>()
 const surface = ref<HTMLElement>(), previousCanvas = ref<HTMLCanvasElement>()
 const notesOpen = ref(false), blank = ref<''|'black'|'white'>(''), laser = ref(false), pointer = ref({x:0,y:0}), elapsed = ref(0)
@@ -56,13 +56,13 @@ async function loadDocument() {
   const epoch = ++loadEpoch
   cancelRender()
   for (const animation of animations) animation.cancel(); animations=[]
-  for (const url of mediaUrls) URL.revokeObjectURL(url); mediaUrls=[]; mediaItems.value=[]
-  if(previousCanvas.value){previousCanvas.value.width=1;previousCanvas.value.height=1;previousCanvas.value.style.visibility='hidden'}
+  releaseMedia()
+  if(previousCanvas.value){releaseCanvas(previousCanvas.value);previousCanvas.value.style.visibility='hidden'}
   const oldTask = documentTask
   documentTask = undefined; pdf = undefined
   clearTimeout(autoTimer);stopMedia();playbackPageIndex=-1
   loading.value = true; rendering.value = false; pageCount.value = 0; renderedPageIndex.value = -1; problem.value = ''
-  if (canvas.value) { canvas.value.width = 1; canvas.value.height = 1 }
+  releaseCanvas(canvas.value)
   try {
     if (oldTask) await oldTask.destroy().catch(() => {})
     if (disposed || epoch !== loadEpoch) return
@@ -89,7 +89,12 @@ async function loadDocument() {
     await nextTick()
     if (!disposed && epoch === loadEpoch) await renderPage()
   } catch (error) {
-    if (!disposed && epoch === loadEpoch) { loading.value = false; fail(error) }
+    if (!disposed && epoch === loadEpoch) {
+      const failedTask = documentTask
+      documentTask = undefined; pdf = undefined; pageCount.value = 0
+      await failedTask?.destroy().catch(() => {})
+      if (!disposed && epoch === loadEpoch) { loading.value = false; fail(error) }
+    }
   }
 }
 async function renderPage() {
@@ -97,24 +102,26 @@ async function renderPage() {
   if (!source || !container || disposed || loading.value) return
   const epoch = ++renderEpoch, page = pageNumber.value
   const prior = renderTask
+  let slide: pdfjs.PDFPageProxy | undefined
+  let buffer: HTMLCanvasElement | undefined
   prior?.cancel()
   rendering.value = true; problem.value = ''
   try {
     if (prior) await prior.promise.catch(() => {})
     if (disposed || epoch !== renderEpoch || source !== pdf) return
-    const slide = await source.getPage(page)
+    slide = await source.getPage(page)
     if (disposed || epoch !== renderEpoch || source !== pdf) return
     const original = slide.getViewport({ scale: 1 })
     if (![original.width, original.height].every(value => Number.isFinite(value) && value > 0)) throw Error('幻灯片尺寸无效。')
     const width = Math.max(1, container.clientWidth - 24), height = Math.max(1, container.clientHeight - 24)
     const scale = Math.min(width / original.width, height / original.height)
     const viewport = slide.getViewport({ scale })
-    const density = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(MAX_CANVAS_PIXELS / (viewport.width * viewport.height)))
+    const density = canvasOutputScale(viewport.width, viewport.height, Math.min(window.devicePixelRatio || 1, 2))
     // Render into a private canvas. A cancelled or late page must never paint
     // over the currently selected slide while navigation/resizing is pending.
-    const buffer = document.createElement('canvas')
-    buffer.width = Math.max(1, Math.round(viewport.width * density))
-    buffer.height = Math.max(1, Math.round(viewport.height * density))
+    buffer = document.createElement('canvas')
+    buffer.width = Math.max(1, Math.floor(viewport.width * density))
+    buffer.height = Math.max(1, Math.floor(viewport.height * density))
     const context = buffer.getContext('2d', { alpha: false })
     if (!context) throw Error('无法创建放映画布。')
     const task = slide.render({ canvas: buffer, canvasContext: context, viewport, transform: [density, 0, 0, density, 0, 0] })
@@ -125,13 +132,15 @@ async function renderPage() {
       if (!target || disposed || epoch !== renderEpoch || source !== pdf || page !== pageNumber.value) return
       const changed = renderedPageIndex.value !== page - 1
       const previous = previousCanvas.value
-      for (const animation of animations) animation.cancel(); animations = [];if(previous){previous.style.visibility='hidden';previous.style.zIndex='1'}
-      if (previous && target.width > 1 && changed) {previous.width=target.width;previous.height=target.height;previous.getContext('2d')?.drawImage(target,0,0)}
+      for (const animation of animations) animation.cancel(); animations = [];if(previous){previous.style.visibility='hidden';previous.style.zIndex='1';releaseCanvas(previous)}
+      if (previous && target.width > 1 && changed && transitionDuration(page - 1) > 0) {previous.width=target.width;previous.height=target.height;previous.getContext('2d')?.drawImage(target,0,0)}
       target.width = buffer.width; target.height = buffer.height
       target.style.width = `${viewport.width}px`; target.style.height = `${viewport.height}px`
       const visibleContext = target.getContext('2d', { alpha: false })
       if (!visibleContext) throw Error('无法显示幻灯片。')
       visibleContext.drawImage(buffer, 0, 0)
+      releaseCanvas(buffer)
+      slide.cleanup()
       if (surface.value) {surface.value.style.width=`${viewport.width}px`;surface.value.style.height=`${viewport.height}px`}
       if(previous){previous.style.width=`${viewport.width}px`;previous.style.height=`${viewport.height}px`}
       renderedPageIndex.value = page - 1
@@ -142,11 +151,11 @@ async function renderPage() {
       }
     } finally {
       if (renderTask === task) renderTask = undefined
-      buffer.width = 1; buffer.height = 1
+      releaseCanvas(buffer)
     }
   } catch (error) {
     if (!disposed && epoch === renderEpoch && source === pdf && !(error instanceof Error && error.name === 'RenderingCancelledException')) fail(error)
-  } finally { if (!disposed && epoch === renderEpoch) rendering.value = false }
+  } finally { releaseCanvas(buffer); slide?.cleanup(); if (!disposed && epoch === renderEpoch) rendering.value = false }
 }
 function visiblePage(page:number, direction:number) {
   if (!props.presentation) return page
@@ -225,8 +234,17 @@ function keydown(event: KeyboardEvent) {
 }
 
 function stopMedia() {for(const timer of mediaTimers)clearTimeout(timer);mediaTimers=[]; for(const element of surface.value?.querySelectorAll<HTMLMediaElement>('audio,video') || [])element.pause() }
+function releaseMedia() {
+  stopMedia()
+  for (const element of surface.value?.querySelectorAll<HTMLMediaElement>('audio,video') || []) {
+    element.removeAttribute('src')
+    element.load()
+  }
+  for (const url of mediaUrls) URL.revokeObjectURL(url)
+  mediaUrls = []; mediaItems.value = []
+}
 function resetMedia() {
-  stopMedia();for(const url of mediaUrls)URL.revokeObjectURL(url);mediaUrls=[];mediaNotice.value=''
+  releaseMedia();mediaNotice.value=''
   mediaItems.value=(currentSlide.value?.media || []).flatMap(item=>{
     if(!item.data || !item.rect || item.external){mediaNotice.value='部分媒体无法在此播放；外部链接不会自动加载。';return []}
     const url=URL.createObjectURL(new Blob([item.data.slice().buffer as ArrayBuffer],{type:item.mimeType}));mediaUrls.push(url)
@@ -246,11 +264,16 @@ function scheduleAdvance() {
   const ms=currentSlide.value?.transition.advanceAfterMs
   if(typeof ms==='number' && ms>=0 && hasNext.value)autoTimer=setTimeout(()=>goTo(pageNumber.value+1),Math.max(100,ms))
 }
+function transitionDuration(index: number): number {
+  const effect = props.presentation?.slides[index]?.transition
+  if (!effect?.supported || effect.type === 'none' || matchMedia('(prefers-reduced-motion: reduce)').matches) return 0
+  return Math.min(10000, Math.max(0, effect.durationMs ?? ({ fast: 400, med: 700, slow: 1000 }[effect.speed || 'med'])))
+}
 async function transitionPage(index:number, epoch:number) {
   const next=surface.value, prior=previousCanvas.value, effect=props.presentation?.slides[index]?.transition
-  if(!next || !prior || !effect || !effect.supported || effect.type==='none' || prior.width<2 || matchMedia('(prefers-reduced-motion: reduce)').matches)return
-  const duration=Math.min(10000,Math.max(0,effect.durationMs ?? ({fast:400,med:700,slow:1000}[effect.speed || 'med'])))
-  if(!duration)return
+  if(!next || !prior || !effect || prior.width<2){releaseCanvas(prior);return}
+  const duration=transitionDuration(index)
+  if(!duration){releaseCanvas(prior);return}
   const direction=effect.direction || 'l'
   const offsets:Record<string,[number,number]>={l:[100,0],r:[-100,0],u:[0,100],d:[0,-100],lu:[100,100],ru:[-100,100],ld:[100,-100],rd:[-100,-100]}
   const [x,y]=offsets[direction] || offsets.l!
@@ -269,6 +292,7 @@ async function transitionPage(index:number, epoch:number) {
   await Promise.allSettled(animations.map(animation=>animation.finished))
   if(disposed || epoch!==renderEpoch)return
   for(const animation of animations)animation.cancel();animations=[];prior.style.visibility='hidden';prior.style.zIndex='1'
+  releaseCanvas(prior)
 }
 function movePointer(event:PointerEvent) {const box=stage.value?.getBoundingClientRect();if(box)pointer.value={x:event.clientX-box.left,y:event.clientY-box.top}}
 
@@ -287,7 +311,8 @@ onMounted(() => {
   void loadDocument()
 })
 onBeforeUnmount(() => {
-  disposed = true; clearTimeout(autoTimer);clearInterval(clockTimer);stopMedia();for(const url of mediaUrls)URL.revokeObjectURL(url);for(const animation of animations)animation.cancel();loadEpoch++; cancelRender(); cancelAnimationFrame(resizeFrame)
+  disposed = true; clearTimeout(autoTimer);clearInterval(clockTimer);releaseMedia();for(const animation of animations)animation.cancel();animations=[];loadEpoch++; cancelRender(); cancelAnimationFrame(resizeFrame)
+  releaseCanvas(canvas.value); releaseCanvas(previousCanvas.value)
   observer?.disconnect()
   window.removeEventListener('keydown', keydown, true)
   window.removeEventListener('resize', resize)

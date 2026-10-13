@@ -24,6 +24,8 @@
     "postinstall": "npm run assets",
     "pdf:test": "node scripts/test-pdf-backend.mjs",
     "test:browser": "node tests/browser/pdf-ui.cjs",
+    "test:browser:pdf-memory": "node tests/browser/pdf-memory.cjs",
+    "test:browser:office-memory": "node tests/browser/office-memory.cjs",
     "test:browser:ppt": "node tests/browser/presentation-ui.cjs",
     "test:browser:impress": "node tests/browser/impress-engine.cjs",
     "test:browser:ppt-workbench": "node tests/browser/presentation-workbench.cjs",

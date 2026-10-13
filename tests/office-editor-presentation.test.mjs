@@ -14,9 +14,10 @@ const utilities = await readFile(new URL('../src/shared/document.ts', import.met
 const compile = source => ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText
-const compiled = compile(`${script}\nexport const inspect = {frame, startBridge,
+const compiled = compile(`${script}\nexport const inspect = {frame, startBridge, queueLoad,
   set openingPromise(value){opening=value},
-  get source(){return presentation}, get savedExport(){return savedExport}, get loaded(){return loaded}}`)
+  get source(){return presentation}, get savedExport(){return savedExport}, get loaded(){return loaded},
+  get bridge(){return bridge}, get presentationState(){return presentationState}}`)
 const utilityModule = { exports: {} }
 vm.runInNewContext(compile(utilities), { module: utilityModule, exports: utilityModule.exports, atob, btoa, Uint8Array })
 
@@ -58,7 +59,7 @@ async function editor(t, kind = 'presentation') {
   }
   class SessionDouble {
     constructor() { this.revision = 0; this.dirty = false; this.merges = []; this.edits = []; this.saved = []; this.discards = 0; sessions.push(this) }
-    async open(bytes, state) { this.opened = { bytes, state } }
+    async open(bytes, state) { this.opened = { bytes, state }; const queue=queued.get('session-open'); if(queue?.length)await queue.shift() }
     slide(id) { return { id } }
     hasLiveFeatures() { return false }
     requiresPptx() { return false }
@@ -87,7 +88,8 @@ async function editor(t, kind = 'presentation') {
   await exposed.loadDocument(props.document)
   t.after(() => { for (const callback of unmount) callback() })
   return {
-    state, exposed, props, sessions, events, calls,
+    state, exposed, props, sessions, events, calls, clients,
+    unmount(){for(const callback of unmount)callback()},
     enqueue(action, value) { if (!queued.has(action)) queued.set(action, []); queued.get(action).push(value) },
     count(action) { return calls.filter(call => call.action === action).length },
     async switchTo(id) { props.document = workDocument(id); await exposed.loadDocument(props.document, { discard: true }) },
@@ -103,6 +105,56 @@ test('consistent presentation export merges only its captured session and record
   assert.equal(source.merges[0].state.revision, result.revision)
   assert.equal(h.state.savedExport.id, 'A')
   assert.equal(h.state.savedExport.revision, 7)
+})
+
+test('loaded model metadata does not pin the tab source bytes',async t=>{
+  const h=await editor(t)
+  assert.equal(h.state.loaded.id,'A');assert.equal(h.state.loaded.extension,'pptx')
+  assert.equal('base64' in h.state.loaded,false)
+  assert.equal(h.props.document.base64,'U09VUkNF','The tab still owns its recovery source')
+})
+
+test('unmount releases the bridge, export revision and presentation source even with a retained editor handle',async t=>{
+  const h=await editor(t),source=h.state.source,client=h.state.bridge
+  await h.exposed.exportFile()
+  h.unmount()
+  assert.equal(client.disposed,true);assert.equal(h.state.bridge,null)
+  assert.equal(h.state.loaded,null);assert.equal(h.state.savedExport,null)
+  assert.equal(h.state.presentationState,null);assert.notEqual(h.state.source,source)
+  assert.equal(h.state.source.opened,undefined)
+  assert.deepEqual(h.events.at(-1),['presentation-features',null])
+})
+
+test('an open queued before unmount never starts a replacement model',async t=>{
+  const h=await editor(t),gate=deferred(),opens=h.count('open')
+  h.state.openingPromise=gate.promise;h.state.queueLoad(document('B'))
+  h.unmount();gate.resolve()
+  for(let i=0;i<20;i++)await Promise.resolve()
+  assert.equal(h.count('open'),opens);assert.equal(h.state.loaded,null)
+})
+
+test('unmount during asynchronous presentation parsing cannot restore state or emit ready',async t=>{
+  const h=await editor(t),gate=deferred()
+  h.enqueue('session-open',gate.promise)
+  const opening=h.switchTo('B')
+  await until(()=>h.state.source.opened?.state.documentId==='B')
+  h.unmount();const events=h.events.length
+  gate.resolve();await opening
+  assert.equal(h.state.loaded,null);assert.equal(h.state.presentationState,null)
+  assert.equal(h.events.length,events,'Parsing may finish, but the closed document must stay detached')
+})
+
+test('retry retains dirty presentation sources until discard is explicitly confirmed',async t=>{
+  const h=await editor(t),source=h.state.source,client=h.state.bridge
+  await h.exposed.presentationEdit({transition:{type:'fade'}})
+  h.exposed.retry()
+  assert.equal(h.state.source,source);assert.equal(h.state.bridge,client)
+  assert.equal(client.disposed,undefined)
+  const gate=deferred();h.enqueue('open',gate.promise)
+  h.exposed.retry(true)
+  assert.equal(client.disposed,true);assert.notEqual(h.state.source,source)
+  assert.equal(h.state.loaded,null);assert.equal(h.state.presentationState,null)
+  h.unmount();gate.resolve()
 })
 
 test('export rejects a different model revision before merging effects or recording a save', async t => {

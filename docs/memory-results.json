@@ -1,0 +1,1533 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-13",
+  "scope": "Linux Chromium browser process tree; natural collection; not native desktop or hardware GPU results",
+  "limitation": "Final code additionally preserves one oversized PDF undo snapshot; this change was regression tested separately, not re-profiled. Physical recycling is asynchronous and active Office memory remains high.",
+  "runs": [
+    {
+      "label": "baseline-complete",
+      "startedAt": "2026-10-13T08:16:07.310Z",
+      "finishedAt": "2026-10-13T08:18:15.512Z",
+      "baselineCommit": "29a6208c8ea4eb6358e36826d78d5a546508ca78",
+      "implementation": {
+        "sha256": "bab817da77e4a00bc0b381c70c0e8d3fff168357ebfb673715181c1d70988306",
+        "files": {
+          "src/App.vue": "641757f329bb98daed78270a972f3a11e14deb9f54b2c7e1f737ce0e700d8564",
+          "src/components/Icon.vue": "7903dc708c3ebd5fda8135d1193a6236be599c50b80dfa38f16453cc788cae95",
+          "src/components/OfficeEditor.vue": "ef2e3c7baee79993b95675b4c4642ef7423d45fa9f5b24a0dcc2b6ca33377145",
+          "src/components/PdfEditor.vue": "9a9606d56cbe1346f3d7372274658bef221c8f5eca58748562cb21a90fb212b2",
+          "src/components/PresentationEffects.vue": "d7ef306e7162dc8c59db546db6183d6e889e53382cc263e43ca8a5124f3b7806",
+          "src/components/PresentationWorkbench.vue": "6fe46199d04382421cfdb2aa6abcf47bf4ef9225a09714d97632fcb60e6c11a0",
+          "src/components/SheetWorkbench.vue": "0062f70ccb9bd48183d0a9cfd6aa6aaa3bcbdf34735414a96bd6d0b20e76aa1a",
+          "src/components/SlidePreview.vue": "40feba74add2ae025dabdd3aba624deb7496b86401815d48e9c79aa71d82e5d3",
+          "src/components/WordWorkbench.vue": "c84d4b57a9d25c3022271fca8aa7a6455e9579c0a3f89abdeb5f0cb61fa70720",
+          "src/env.d.ts": "5853f72b58c661647c5f3e9cdfbe2478d5501904ced4e11116564b1941744b19",
+          "src/main.ts": "bdbe20b0b723d281d98897e0f40de48a9a804c89b71242e4a317096d45cbff01",
+          "src/native.ts": "36622b32f6dac79abda2f6daec3fd7dfea0c1ae8882e77fdab6fc5ef57e749e8",
+          "src/office/README.md": "347bc644943291a04366cb24fa114f2ca73289635df4670bff673daf4e0e8e47",
+          "src/office/bridge.ts": "578056bfd23e04e99a718993bfd13deef48ee40c191d1e69b5954743e9a229d8",
+          "src/office/import-review.ts": "b6c571e6108ee36bf6e2f23c0ec657a2f171384c261e97ec08d6bc96b1a84d73",
+          "src/office/native-workbench-smoke.ts": "b7d0f34385876c0e6c486d67f80aa13756c635eeffd538b6d13d97d3a1e10ddd",
+          "src/office/pdf-readback.ts": "2bc56f680c250ff7521d443d54be2e4e3ddfd8f3080f19ba711d38c413ae6490",
+          "src/office/types.ts": "043c5248dc64d2a3e7541774cfb5df0d09314a987dc3f96101ef0df7f7c54183",
+          "src/office/workbench.css": "392e609727d3a43d38c9156a84b38ddc1ea1debbea99c956ed8207c811142b01",
+          "src/pdf/backend.ts": "8f4158c2d142b033c378ae1a4353fa8dee4e93e5f9c195b682bc9178f78dfa6c",
+          "src/pdf/pdf.css": "2686fa126a5d25cca0e81efc39aab0cfe71a5a57f60b2802fe98621086cef659",
+          "src/pdf/protocol.ts": "3a9694c660fba4b6003d2e1d4132de70ff4404fc875cf42fbec6913a957a2efe",
+          "src/presentation/chart-workbook.ts": "b7c7ac784bae3f4e8bf4704740b566439535e11cb9d86f4eda8013ba41de7bfa",
+          "src/presentation/native-smoke.ts": "647a90814196fa9a7d70d8b9276619ddf4ea61debe2894d16727848932e47f6a",
+          "src/presentation/pptx-package.ts": "f10bf635c68a540e219a651666262bf7f211fb5ee97f26b83e1b7041d6049217",
+          "src/presentation/session.ts": "67c5d89176b81cb57de4f785b5cff4c67b4a7a752af7317bc9896a5fce10ec5d",
+          "src/presentation/types.ts": "0eda2ced34e5da60d284cec136811a06ffd40eb65c187faf2cce1726936d8ae6",
+          "src/presentation/workbench.css": "93bfba9d8bdcca9b0be1eeb3eb35c09467f777171a9b72951871982d2fd6d041",
+          "src/shared/document.ts": "68585ed4f4893d79e524cd8abcc0c59d3ff515290a7ea1f5b3e7f85a90b813f5",
+          "src/sheet/types.ts": "2b970a4f66f28b17796317fe62c3b9f251071247dfd482986906afa1156a1e44",
+          "src/smoke.ts": "48cdab1bd13bf6d3259a1ecf45be07308428fa0dd561cead0bb9bda1da453d45",
+          "src/style.css": "8103b546036067d7809beeceeeb9e1cf769cd2539ad8731809834532243e2bdf",
+          "src/types.ts": "da14e0f998a83c9a2881a4fdcc6c8b8739a144d9ec8a2059ad2f699f8b54ae0e",
+          "src/word/draft-review.ts": "f6e3944e6babd67660100c11aea42319dcb5046e2de8694f1459fb0ef4a4982f",
+          "src/word/types.ts": "f7d44fe0f91544c9582ed51894bfbc87ad7e562588250e07df839b8924db2e67",
+          "public/office/Noto-CJK-LICENSE.txt": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+          "public/office/calc-tools.js": "bceeeb4531269617eea66b6ce92b7a73e978995846e53aee30cc62794377d395",
+          "public/office/clipboard-compat.js": "1da01796ffd5073481d00cf7f990433fe2718af52411c2e4dbfb4eae512e6ff4",
+          "public/office/host.css": "d46aab8f86b4ef001ee04586796abe39e901cf63f127d07a13012140eeb58add",
+          "public/office/host.html": "1e6fcdae8361765541ed2f8b8b443688c9fb40bb46a1811786037e0ae013e834",
+          "public/office/host.js": "6dc7b399527cd8504bd6a35aca18b440e5cdf506afc8624063417e54dee676aa",
+          "public/office/office-worker.js": "791d90f54c1baaaea10f84e41dc7bf684b171da2614af228ba8477eb0c21f043",
+          "public/office/offline-audit.js": "9027d9a6167204ba54a79f8688ffd2aba4e352059690ce58de5ca3f0dfd79ace",
+          "public/office/offline-policy.js": "a4b8f9f8a02bf829d866b8454beb292fc5888814d826a7ac214b5b11c2bdd2ad",
+          "public/office/presentation-objects.js": "c713083fbec71f5506859c66fd5c6cb639441dce99db45b9c72fe25b880808e4",
+          "public/office/writer-tools.js": "bc3a73f182d8c603f07fa9c29cfc18f4e39a99ab3c4692e3d4d50a549e7a8841",
+          "public/office/zeta.js": "7bdfa389a1d220c279f60602b2e0724b2280fa91d68d5237d1bce3bf0dedbf32",
+          "vendor/office-runtime-manifest.json": "d102bbe5549b0f51bf967d903c1f14cd269781372ffe3ee1a7d0c99e0bb4ba3a",
+          "package.json": "d71174fdba41c0e23887bca1fa4bff8a5bd47203e5b66d2dc32c3c0f3114bd37",
+          "vite.config.ts": "8055641a4e194c9ccc76bf2b8023ebc71db4c4c2d4dfb86c00cb8c1cb164a0bf"
+        }
+      },
+      "ok": true,
+      "implementationUnchanged": true,
+      "environment": {
+        "node": "v24.19.0",
+        "platform": "linux",
+        "arch": "x64",
+        "chromium": "154.0.8037.57"
+      },
+      "methodology": {
+        "settleMs": 5000,
+        "gcSettleMs": 2000,
+        "collectGc": false,
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "graphics": "headless Chromium, SwiftShader software WebGL; not a hardware GPU comparison",
+        "processes": "SystemInfo.getProcessInfo plus descendants of its browser PID; browser renderer GPU utility and zygote included",
+        "physicalMetric": "Sum of /proc/PID/smaps_rollup Pss; USS=Private_Clean+Private_Dirty+Private_Hugetlb. RSS may double-count shared pages.",
+        "gc": "Natural sample after fixed settle, then optional CDP page collection plus exposed gc in frames. Pthread workers may block JS execution and are not explicitly collected. Later stages follow earlier page GC.",
+        "excludes": "Vite/Node harness/Python PDF backend process memory; WASM byteLength is recorded separately and never added to physical totals.",
+        "finalIdleExtraMs": 0,
+        "finalIdleMinimumSinceCloseMs": null
+      },
+      "fixtures": [
+        {
+          "name": "writer-rich.docx",
+          "bytes": 41212,
+          "sha256": "ab9f2dffd9c8444a0f19406005b7fecb9bd352ea53ad358e737ece361ed66acb"
+        },
+        {
+          "name": "calc-2000-rows.xlsx",
+          "bytes": 96221,
+          "sha256": "da2a15e8c076fe864a60a6c45ce28594181ca418898a837e4d3601646e686159"
+        },
+        {
+          "name": "presentation-20-slides.pptx",
+          "bytes": 108621,
+          "sha256": "d465e9b0035591b6dca92a16f707a91c282f7bda71a3b8ca3ed93d7d3ed91f78"
+        }
+      ],
+      "exports": [
+        {
+          "name": "writer-export.docx",
+          "extension": "docx",
+          "bytes": 26923,
+          "sha256": "16438ac32f88e2b0fc45b76ca4637d0a32dcc7e1eb523f6ee472528e464a6ac2",
+          "validation": {
+            "writerMarker": true
+          }
+        },
+        {
+          "name": "calc-export.xlsx",
+          "extension": "xlsx",
+          "bytes": 105056,
+          "sha256": "c1cdb5e9477200a29886f1e373bb0da80044d8959804f42e6ca49f6315c4a89a",
+          "validation": {
+            "maximumSheetRows": 2001
+          }
+        },
+        {
+          "name": "presentation-export.pptx",
+          "extension": "pptx",
+          "bytes": 286131,
+          "sha256": "40ca31a2781c18f78f009ef587352189a2137a8c45c0be2212871bf00f5dcdb9",
+          "validation": {
+            "slides": 20
+          }
+        },
+        {
+          "name": "presentation-export.pdf",
+          "extension": "pdf",
+          "bytes": 40666,
+          "sha256": "d1dba2b42c4287aec5c4442b1926f5a75125fc3fcd9d635a07077b8ab9bc7bf4",
+          "validation": {
+            "pages": 20
+          }
+        },
+        {
+          "name": "writer-reopened.docx",
+          "extension": "docx",
+          "bytes": 26923,
+          "sha256": "bd9e6fd607860974c8e39f5dc8f1552616218b72280442566cf382e759e9bd35",
+          "validation": {
+            "writerMarker": true
+          }
+        }
+      ],
+      "measurementNotes": [
+        "The initial benchmark's sharedWasm field used instanceof across the parent/iframe realm and incorrectly reports false. This field is invalid for this run; the pinned WASM import independently requires shared=true. Physical /proc counters, heap byteLength, and thread counts are unaffected. The reporter is corrected for subsequent runs.",
+        "Forced worker GC was abandoned during separate unsuccessful harness runs because pthread workers may block JS evaluation. This complete baseline uses natural samples only, MEMORY_GC=0, with five seconds of settling at each stage.",
+        "Export content validation was performed independently on the saved baseline artifacts after browser exit: both DOCX files contain COMPAT-WORD-RICH; spreadsheet has a 2001-row sheet; PPTX and exported PDF each have 20 pages/slides. Subsequent runs perform these same checks inline."
+      ],
+      "stages": [
+        {
+          "name": "home",
+          "at": "2026-10-13T08:16:17.050Z",
+          "totalsBytes": {
+            "rss": 663355392,
+            "pss": 384971776,
+            "uss": 277905408,
+            "pssAnon": 238487552,
+            "pssFile": 143636480,
+            "pssShmem": 2839552,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": null,
+          "office": [],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "writer-rich",
+          "at": "2026-10-13T08:16:40.888Z",
+          "totalsBytes": {
+            "rss": 1631645696,
+            "pss": 1335216128,
+            "uss": 1211068416,
+            "pssAnon": 1160853504,
+            "pssFile": 157935616,
+            "pssShmem": 16421888,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": null,
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 3,
+                "unused": 0,
+                "maximumConcurrency": "4"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "calc-2000-rows",
+          "at": "2026-10-13T08:17:00.843Z",
+          "totalsBytes": {
+            "rss": 1797824512,
+            "pss": 1497877504,
+            "uss": 1370284032,
+            "pssAnon": 1319667712,
+            "pssFile": 158461952,
+            "pssShmem": 19743744,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": null,
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 5,
+                "unused": 0,
+                "maximumConcurrency": "4"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "presentation-20-slides",
+          "at": "2026-10-13T08:17:25.528Z",
+          "totalsBytes": {
+            "rss": 1848524800,
+            "pss": 1547988992,
+            "uss": 1419907072,
+            "pssAnon": 1368952832,
+            "pssFile": 159263744,
+            "pssShmem": 19764224,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": null,
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 2,
+                "unused": 3,
+                "maximumConcurrency": "4"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "pdf-office-retained",
+          "at": "2026-10-13T08:17:39.402Z",
+          "totalsBytes": {
+            "rss": 1966080000,
+            "pss": 1665042432,
+            "uss": 1536630784,
+            "pssAnon": 1484841984,
+            "pssFile": 160292864,
+            "pssShmem": 19899392,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": null,
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 2,
+                "unused": 3,
+                "maximumConcurrency": "4"
+              }
+            }
+          ],
+          "pdfEditorCount": 1
+        },
+        {
+          "name": "pdf-only-after-last-office-close",
+          "at": "2026-10-13T08:17:45.755Z",
+          "totalsBytes": {
+            "rss": 1888342016,
+            "pss": 1587123200,
+            "uss": 1458577408,
+            "pssAnon": 1406216192,
+            "pssFile": 161002496,
+            "pssShmem": 19899392,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": null,
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 2,
+                "unused": 3,
+                "maximumConcurrency": "4"
+              }
+            }
+          ],
+          "pdfEditorCount": 1
+        },
+        {
+          "name": "all-closed",
+          "at": "2026-10-13T08:17:51.284Z",
+          "totalsBytes": {
+            "rss": 1698254848,
+            "pss": 1413850112,
+            "uss": 1302130688,
+            "pssAnon": 1249675264,
+            "pssFile": 161145856,
+            "pssShmem": 3023872,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": null,
+          "office": [],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "office-reopened",
+          "at": "2026-10-13T08:18:09.529Z",
+          "totalsBytes": {
+            "rss": 2589782016,
+            "pss": 2288492544,
+            "uss": 2159951872,
+            "pssAnon": 2107308032,
+            "pssFile": 161292288,
+            "pssShmem": 19887104,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": null,
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 3,
+                "unused": 0,
+                "maximumConcurrency": "4"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "all-closed-again",
+          "at": "2026-10-13T08:18:15.506Z",
+          "totalsBytes": {
+            "rss": 2469998592,
+            "pss": 2185510912,
+            "uss": 2073772032,
+            "pssAnon": 2021132288,
+            "pssFile": 161300480,
+            "pssShmem": 3073024,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": null,
+          "office": [],
+          "pdfEditorCount": 0
+        }
+      ]
+    },
+    {
+      "label": "baseline-repeat",
+      "startedAt": "2026-10-13T08:28:52.011Z",
+      "finishedAt": "2026-10-13T08:31:54.696Z",
+      "baselineCommit": "29a6208c8ea4eb6358e36826d78d5a546508ca78",
+      "implementation": {
+        "sha256": "bab817da77e4a00bc0b381c70c0e8d3fff168357ebfb673715181c1d70988306",
+        "files": {
+          "src/App.vue": "641757f329bb98daed78270a972f3a11e14deb9f54b2c7e1f737ce0e700d8564",
+          "src/components/Icon.vue": "7903dc708c3ebd5fda8135d1193a6236be599c50b80dfa38f16453cc788cae95",
+          "src/components/OfficeEditor.vue": "ef2e3c7baee79993b95675b4c4642ef7423d45fa9f5b24a0dcc2b6ca33377145",
+          "src/components/PdfEditor.vue": "9a9606d56cbe1346f3d7372274658bef221c8f5eca58748562cb21a90fb212b2",
+          "src/components/PresentationEffects.vue": "d7ef306e7162dc8c59db546db6183d6e889e53382cc263e43ca8a5124f3b7806",
+          "src/components/PresentationWorkbench.vue": "6fe46199d04382421cfdb2aa6abcf47bf4ef9225a09714d97632fcb60e6c11a0",
+          "src/components/SheetWorkbench.vue": "0062f70ccb9bd48183d0a9cfd6aa6aaa3bcbdf34735414a96bd6d0b20e76aa1a",
+          "src/components/SlidePreview.vue": "40feba74add2ae025dabdd3aba624deb7496b86401815d48e9c79aa71d82e5d3",
+          "src/components/WordWorkbench.vue": "c84d4b57a9d25c3022271fca8aa7a6455e9579c0a3f89abdeb5f0cb61fa70720",
+          "src/env.d.ts": "5853f72b58c661647c5f3e9cdfbe2478d5501904ced4e11116564b1941744b19",
+          "src/main.ts": "bdbe20b0b723d281d98897e0f40de48a9a804c89b71242e4a317096d45cbff01",
+          "src/native.ts": "36622b32f6dac79abda2f6daec3fd7dfea0c1ae8882e77fdab6fc5ef57e749e8",
+          "src/office/README.md": "347bc644943291a04366cb24fa114f2ca73289635df4670bff673daf4e0e8e47",
+          "src/office/bridge.ts": "578056bfd23e04e99a718993bfd13deef48ee40c191d1e69b5954743e9a229d8",
+          "src/office/import-review.ts": "b6c571e6108ee36bf6e2f23c0ec657a2f171384c261e97ec08d6bc96b1a84d73",
+          "src/office/native-workbench-smoke.ts": "b7d0f34385876c0e6c486d67f80aa13756c635eeffd538b6d13d97d3a1e10ddd",
+          "src/office/pdf-readback.ts": "2bc56f680c250ff7521d443d54be2e4e3ddfd8f3080f19ba711d38c413ae6490",
+          "src/office/types.ts": "043c5248dc64d2a3e7541774cfb5df0d09314a987dc3f96101ef0df7f7c54183",
+          "src/office/workbench.css": "392e609727d3a43d38c9156a84b38ddc1ea1debbea99c956ed8207c811142b01",
+          "src/pdf/backend.ts": "8f4158c2d142b033c378ae1a4353fa8dee4e93e5f9c195b682bc9178f78dfa6c",
+          "src/pdf/pdf.css": "2686fa126a5d25cca0e81efc39aab0cfe71a5a57f60b2802fe98621086cef659",
+          "src/pdf/protocol.ts": "3a9694c660fba4b6003d2e1d4132de70ff4404fc875cf42fbec6913a957a2efe",
+          "src/presentation/chart-workbook.ts": "b7c7ac784bae3f4e8bf4704740b566439535e11cb9d86f4eda8013ba41de7bfa",
+          "src/presentation/native-smoke.ts": "647a90814196fa9a7d70d8b9276619ddf4ea61debe2894d16727848932e47f6a",
+          "src/presentation/pptx-package.ts": "f10bf635c68a540e219a651666262bf7f211fb5ee97f26b83e1b7041d6049217",
+          "src/presentation/session.ts": "67c5d89176b81cb57de4f785b5cff4c67b4a7a752af7317bc9896a5fce10ec5d",
+          "src/presentation/types.ts": "0eda2ced34e5da60d284cec136811a06ffd40eb65c187faf2cce1726936d8ae6",
+          "src/presentation/workbench.css": "93bfba9d8bdcca9b0be1eeb3eb35c09467f777171a9b72951871982d2fd6d041",
+          "src/shared/document.ts": "68585ed4f4893d79e524cd8abcc0c59d3ff515290a7ea1f5b3e7f85a90b813f5",
+          "src/sheet/types.ts": "2b970a4f66f28b17796317fe62c3b9f251071247dfd482986906afa1156a1e44",
+          "src/smoke.ts": "48cdab1bd13bf6d3259a1ecf45be07308428fa0dd561cead0bb9bda1da453d45",
+          "src/style.css": "8103b546036067d7809beeceeeb9e1cf769cd2539ad8731809834532243e2bdf",
+          "src/types.ts": "da14e0f998a83c9a2881a4fdcc6c8b8739a144d9ec8a2059ad2f699f8b54ae0e",
+          "src/word/draft-review.ts": "f6e3944e6babd67660100c11aea42319dcb5046e2de8694f1459fb0ef4a4982f",
+          "src/word/types.ts": "f7d44fe0f91544c9582ed51894bfbc87ad7e562588250e07df839b8924db2e67",
+          "public/office/Noto-CJK-LICENSE.txt": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+          "public/office/calc-tools.js": "bceeeb4531269617eea66b6ce92b7a73e978995846e53aee30cc62794377d395",
+          "public/office/clipboard-compat.js": "1da01796ffd5073481d00cf7f990433fe2718af52411c2e4dbfb4eae512e6ff4",
+          "public/office/host.css": "d46aab8f86b4ef001ee04586796abe39e901cf63f127d07a13012140eeb58add",
+          "public/office/host.html": "1e6fcdae8361765541ed2f8b8b443688c9fb40bb46a1811786037e0ae013e834",
+          "public/office/host.js": "6dc7b399527cd8504bd6a35aca18b440e5cdf506afc8624063417e54dee676aa",
+          "public/office/office-worker.js": "791d90f54c1baaaea10f84e41dc7bf684b171da2614af228ba8477eb0c21f043",
+          "public/office/offline-audit.js": "9027d9a6167204ba54a79f8688ffd2aba4e352059690ce58de5ca3f0dfd79ace",
+          "public/office/offline-policy.js": "a4b8f9f8a02bf829d866b8454beb292fc5888814d826a7ac214b5b11c2bdd2ad",
+          "public/office/presentation-objects.js": "c713083fbec71f5506859c66fd5c6cb639441dce99db45b9c72fe25b880808e4",
+          "public/office/writer-tools.js": "bc3a73f182d8c603f07fa9c29cfc18f4e39a99ab3c4692e3d4d50a549e7a8841",
+          "public/office/zeta.js": "7bdfa389a1d220c279f60602b2e0724b2280fa91d68d5237d1bce3bf0dedbf32",
+          "vendor/office-runtime-manifest.json": "d102bbe5549b0f51bf967d903c1f14cd269781372ffe3ee1a7d0c99e0bb4ba3a",
+          "package.json": "d71174fdba41c0e23887bca1fa4bff8a5bd47203e5b66d2dc32c3c0f3114bd37",
+          "vite.config.ts": "8055641a4e194c9ccc76bf2b8023ebc71db4c4c2d4dfb86c00cb8c1cb164a0bf"
+        }
+      },
+      "ok": true,
+      "implementationUnchanged": true,
+      "environment": {
+        "node": "v24.19.0",
+        "platform": "linux",
+        "arch": "x64",
+        "chromium": "154.0.8037.57"
+      },
+      "methodology": {
+        "settleMs": 5000,
+        "gcSettleMs": 2000,
+        "collectGc": false,
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "graphics": "headless Chromium, SwiftShader software WebGL; not a hardware GPU comparison",
+        "processes": "SystemInfo.getProcessInfo plus descendants of its browser PID; browser renderer GPU utility and zygote included",
+        "physicalMetric": "Sum of /proc/PID/smaps_rollup Pss; USS=Private_Clean+Private_Dirty+Private_Hugetlb. RSS may double-count shared pages.",
+        "gc": "Natural sample after fixed settle, then optional CDP page collection plus exposed gc in frames. Pthread workers may block JS execution and are not explicitly collected. Later stages follow earlier page GC.",
+        "jsMetric": "Performance/CDP JS heap counters describe the page isolate, not all pthread isolates, native WASM memory, or compiled code.",
+        "excludes": "Vite/Node harness/Python PDF backend process memory; WASM byteLength is recorded separately and never added to physical totals.",
+        "finalIdleExtraMs": 20000,
+        "finalIdleMinimumSinceCloseMs": 25000
+      },
+      "fixtures": [
+        {
+          "name": "writer-rich.docx",
+          "bytes": 41212,
+          "sha256": "ab9f2dffd9c8444a0f19406005b7fecb9bd352ea53ad358e737ece361ed66acb"
+        },
+        {
+          "name": "calc-2000-rows.xlsx",
+          "bytes": 96221,
+          "sha256": "da2a15e8c076fe864a60a6c45ce28594181ca418898a837e4d3601646e686159"
+        },
+        {
+          "name": "presentation-20-slides.pptx",
+          "bytes": 108621,
+          "sha256": "d465e9b0035591b6dca92a16f707a91c282f7bda71a3b8ca3ed93d7d3ed91f78"
+        }
+      ],
+      "exports": [
+        {
+          "name": "writer-export.docx",
+          "extension": "docx",
+          "bytes": 26923,
+          "sha256": "bdca3319f3cf35ff818c6710fe6f8b46cd68947016f38848ca30bcc48518d0e5",
+          "validation": {
+            "writerMarker": true
+          }
+        },
+        {
+          "name": "calc-export.xlsx",
+          "extension": "xlsx",
+          "bytes": 105056,
+          "sha256": "bde73f2a8daed1c753e606d967f90763fe4de2987d7a071f65ff9e5abb9d0397",
+          "validation": {
+            "maximumSheetRows": 2001
+          }
+        },
+        {
+          "name": "presentation-export.pptx",
+          "extension": "pptx",
+          "bytes": 286138,
+          "sha256": "c7ed5ac60bfea50cc07b391d9edf035646600a457665e1bf82b0d5e809904920",
+          "validation": {
+            "slides": 20
+          }
+        },
+        {
+          "name": "presentation-export.pdf",
+          "extension": "pdf",
+          "bytes": 40666,
+          "sha256": "7ccd26fe12be1d314d6941af14b45845e806181239176109d3d24493e64fe352",
+          "validation": {
+            "pages": 20
+          }
+        },
+        {
+          "name": "writer-reopened.docx",
+          "extension": "docx",
+          "bytes": 26923,
+          "sha256": "f73aeb654cf40a9503dd7bfee887424b873c557417664bfbbccced29f982f792",
+          "validation": {
+            "writerMarker": true
+          }
+        }
+      ],
+      "measurementNotes": [
+        "The final stage name denotes 20 additional seconds of idle after the regular 5-second close sample: at least 25 seconds after the final close, plus sampling overhead. The same timing applies to baseline-repeat and after-repeat."
+      ],
+      "stages": [
+        {
+          "name": "home",
+          "at": "2026-10-13T08:29:03.463Z",
+          "totalsBytes": {
+            "rss": 668852224,
+            "pss": 389883904,
+            "uss": 282652672,
+            "pssAnon": 240420864,
+            "pssFile": 146414592,
+            "pssShmem": 3044352,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": [],
+          "office": [],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "writer-rich",
+          "at": "2026-10-13T08:29:27.512Z",
+          "totalsBytes": {
+            "rss": 1631551488,
+            "pss": 1331295232,
+            "uss": 1203703808,
+            "pssAnon": 1153427456,
+            "pssFile": 157988864,
+            "pssShmem": 19874816,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": [
+            "office",
+            "office",
+            "office"
+          ],
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 3,
+                "unused": 0,
+                "maximumConcurrency": "4"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "calc-2000-rows",
+          "at": "2026-10-13T08:29:46.757Z",
+          "totalsBytes": {
+            "rss": 1727987712,
+            "pss": 1427523584,
+            "uss": 1299759104,
+            "pssAnon": 1249081344,
+            "pssFile": 158529536,
+            "pssShmem": 19907584,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": [
+            "office",
+            "office",
+            "office",
+            "office",
+            "office"
+          ],
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 5,
+                "unused": 0,
+                "maximumConcurrency": "4"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "presentation-20-slides",
+          "at": "2026-10-13T08:30:08.247Z",
+          "totalsBytes": {
+            "rss": 1851166720,
+            "pss": 1550078976,
+            "uss": 1421795328,
+            "pssAnon": 1370841088,
+            "pssFile": 159301632,
+            "pssShmem": 19928064,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": [
+            "office",
+            "office",
+            "office",
+            "office",
+            "office"
+          ],
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 2,
+                "unused": 3,
+                "maximumConcurrency": "4"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "pdf-office-retained",
+          "at": "2026-10-13T08:30:36.548Z",
+          "totalsBytes": {
+            "rss": 1993203712,
+            "pss": 1691598848,
+            "uss": 1563004928,
+            "pssAnon": 1511207936,
+            "pssFile": 160325632,
+            "pssShmem": 20059136,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": [
+            "office",
+            "office",
+            "office",
+            "office",
+            "office",
+            "pdf"
+          ],
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 2,
+                "unused": 3,
+                "maximumConcurrency": "4"
+              }
+            }
+          ],
+          "pdfEditorCount": 1
+        },
+        {
+          "name": "pdf-only-after-last-office-close",
+          "at": "2026-10-13T08:30:43.455Z",
+          "totalsBytes": {
+            "rss": 1985175552,
+            "pss": 1683389440,
+            "uss": 1554661376,
+            "pssAnon": 1502291968,
+            "pssFile": 161033216,
+            "pssShmem": 20059136,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": [
+            "office",
+            "office",
+            "office",
+            "office",
+            "office",
+            "pdf"
+          ],
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 2,
+                "unused": 3,
+                "maximumConcurrency": "4"
+              }
+            }
+          ],
+          "pdfEditorCount": 1
+        },
+        {
+          "name": "all-closed",
+          "at": "2026-10-13T08:30:49.611Z",
+          "totalsBytes": {
+            "rss": 1813630976,
+            "pss": 1528643584,
+            "uss": 1416728576,
+            "pssAnon": 1364277248,
+            "pssFile": 161177600,
+            "pssShmem": 3183616,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": [],
+          "office": [],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "office-reopened",
+          "at": "2026-10-13T08:31:28.442Z",
+          "totalsBytes": {
+            "rss": 1698766848,
+            "pss": 1396903936,
+            "uss": 1268170752,
+            "pssAnon": 1215498240,
+            "pssFile": 161349632,
+            "pssShmem": 20050944,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": [
+            "office",
+            "office",
+            "office"
+          ],
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 3,
+                "unused": 0,
+                "maximumConcurrency": "4"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "all-closed-again",
+          "at": "2026-10-13T08:31:34.494Z",
+          "totalsBytes": {
+            "rss": 1480609792,
+            "pss": 1195548672,
+            "uss": 1083617280,
+            "pssAnon": 1030952960,
+            "pssFile": 161357824,
+            "pssShmem": 3232768,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": [],
+          "office": [],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "all-closed-after-20s-idle",
+          "at": "2026-10-13T08:31:54.646Z",
+          "totalsBytes": {
+            "rss": 1477210112,
+            "pss": 1171000320,
+            "uss": 1058746368,
+            "pssAnon": 1005978624,
+            "pssFile": 161646592,
+            "pssShmem": 3367936,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": [],
+          "office": [],
+          "pdfEditorCount": 0
+        }
+      ]
+    },
+    {
+      "label": "after-first",
+      "startedAt": "2026-10-13T08:20:43.977Z",
+      "finishedAt": "2026-10-13T08:22:48.391Z",
+      "baselineCommit": null,
+      "implementation": {
+        "sha256": "5321ddcffae93852b3ab25b90c3dd209cbb5f68ccfd687751a4545e8b3b7a6fc",
+        "files": {
+          "src/App.vue": "b585f6dc33caa790f86f5fda4a01b10943f83c74dc877cf12135958c78f4306a",
+          "src/components/Icon.vue": "7903dc708c3ebd5fda8135d1193a6236be599c50b80dfa38f16453cc788cae95",
+          "src/components/OfficeEditor.vue": "947b451634116b2bb03616b65550496eac71064876aa2c1f51b90aa815008a83",
+          "src/components/PdfEditor.vue": "2f6428906c6e661c74b48dbd6cc43ff0713007e1d21d47524ca2f2a4f574e31a",
+          "src/components/PresentationEffects.vue": "d7ef306e7162dc8c59db546db6183d6e889e53382cc263e43ca8a5124f3b7806",
+          "src/components/PresentationWorkbench.vue": "6fe46199d04382421cfdb2aa6abcf47bf4ef9225a09714d97632fcb60e6c11a0",
+          "src/components/SheetWorkbench.vue": "0062f70ccb9bd48183d0a9cfd6aa6aaa3bcbdf34735414a96bd6d0b20e76aa1a",
+          "src/components/SlidePreview.vue": "c05b527b92030e3590b8a0e901b0f9f9361910788f638a478bfe11dbee5a7a2f",
+          "src/components/WordWorkbench.vue": "c84d4b57a9d25c3022271fca8aa7a6455e9579c0a3f89abdeb5f0cb61fa70720",
+          "src/env.d.ts": "5853f72b58c661647c5f3e9cdfbe2478d5501904ced4e11116564b1941744b19",
+          "src/main.ts": "bdbe20b0b723d281d98897e0f40de48a9a804c89b71242e4a317096d45cbff01",
+          "src/native.ts": "36622b32f6dac79abda2f6daec3fd7dfea0c1ae8882e77fdab6fc5ef57e749e8",
+          "src/office/README.md": "347bc644943291a04366cb24fa114f2ca73289635df4670bff673daf4e0e8e47",
+          "src/office/bridge.ts": "ee1f8fe2e43c3d67028015ac198810f4e24da3aa445e37a989eaac9a72b5f4b8",
+          "src/office/import-review.ts": "b6c571e6108ee36bf6e2f23c0ec657a2f171384c261e97ec08d6bc96b1a84d73",
+          "src/office/native-workbench-smoke.ts": "b7d0f34385876c0e6c486d67f80aa13756c635eeffd538b6d13d97d3a1e10ddd",
+          "src/office/pdf-readback.ts": "2bc56f680c250ff7521d443d54be2e4e3ddfd8f3080f19ba711d38c413ae6490",
+          "src/office/types.ts": "043c5248dc64d2a3e7541774cfb5df0d09314a987dc3f96101ef0df7f7c54183",
+          "src/office/workbench.css": "392e609727d3a43d38c9156a84b38ddc1ea1debbea99c956ed8207c811142b01",
+          "src/pdf/backend.ts": "8f4158c2d142b033c378ae1a4353fa8dee4e93e5f9c195b682bc9178f78dfa6c",
+          "src/pdf/pdf.css": "2686fa126a5d25cca0e81efc39aab0cfe71a5a57f60b2802fe98621086cef659",
+          "src/pdf/protocol.ts": "def1f5983eaa7218816ef4e4083126c50c44fcd412fcdc483ce4baf677b53762",
+          "src/pdf/resources.ts": "ffd05393798fc522b20298bd6a9cf5de2305bdc92c3152069367c13fdc68fb64",
+          "src/presentation/chart-workbook.ts": "b7c7ac784bae3f4e8bf4704740b566439535e11cb9d86f4eda8013ba41de7bfa",
+          "src/presentation/native-smoke.ts": "647a90814196fa9a7d70d8b9276619ddf4ea61debe2894d16727848932e47f6a",
+          "src/presentation/pptx-package.ts": "f10bf635c68a540e219a651666262bf7f211fb5ee97f26b83e1b7041d6049217",
+          "src/presentation/session.ts": "67c5d89176b81cb57de4f785b5cff4c67b4a7a752af7317bc9896a5fce10ec5d",
+          "src/presentation/types.ts": "0eda2ced34e5da60d284cec136811a06ffd40eb65c187faf2cce1726936d8ae6",
+          "src/presentation/workbench.css": "93bfba9d8bdcca9b0be1eeb3eb35c09467f777171a9b72951871982d2fd6d041",
+          "src/shared/document.ts": "7b9da6c4c8ed6c21a716c464bb854218914b4bf5bafd2454343f8bf19fb8d805",
+          "src/sheet/types.ts": "2b970a4f66f28b17796317fe62c3b9f251071247dfd482986906afa1156a1e44",
+          "src/smoke.ts": "48cdab1bd13bf6d3259a1ecf45be07308428fa0dd561cead0bb9bda1da453d45",
+          "src/style.css": "8103b546036067d7809beeceeeb9e1cf769cd2539ad8731809834532243e2bdf",
+          "src/types.ts": "da14e0f998a83c9a2881a4fdcc6c8b8739a144d9ec8a2059ad2f699f8b54ae0e",
+          "src/word/draft-review.ts": "f6e3944e6babd67660100c11aea42319dcb5046e2de8694f1459fb0ef4a4982f",
+          "src/word/types.ts": "f7d44fe0f91544c9582ed51894bfbc87ad7e562588250e07df839b8924db2e67",
+          "public/office/Noto-CJK-LICENSE.txt": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+          "public/office/calc-tools.js": "bceeeb4531269617eea66b6ce92b7a73e978995846e53aee30cc62794377d395",
+          "public/office/clipboard-compat.js": "1da01796ffd5073481d00cf7f990433fe2718af52411c2e4dbfb4eae512e6ff4",
+          "public/office/host.css": "d46aab8f86b4ef001ee04586796abe39e901cf63f127d07a13012140eeb58add",
+          "public/office/host.html": "1e6fcdae8361765541ed2f8b8b443688c9fb40bb46a1811786037e0ae013e834",
+          "public/office/host.js": "227d7ca78cf6bd480e5f32aaef470ebe73c0c4d925538072b194fa6449b93381",
+          "public/office/office-worker.js": "791d90f54c1baaaea10f84e41dc7bf684b171da2614af228ba8477eb0c21f043",
+          "public/office/offline-audit.js": "9027d9a6167204ba54a79f8688ffd2aba4e352059690ce58de5ca3f0dfd79ace",
+          "public/office/offline-policy.js": "a4b8f9f8a02bf829d866b8454beb292fc5888814d826a7ac214b5b11c2bdd2ad",
+          "public/office/presentation-objects.js": "c713083fbec71f5506859c66fd5c6cb639441dce99db45b9c72fe25b880808e4",
+          "public/office/writer-tools.js": "bc3a73f182d8c603f07fa9c29cfc18f4e39a99ab3c4692e3d4d50a549e7a8841",
+          "public/office/zeta.js": "7bdfa389a1d220c279f60602b2e0724b2280fa91d68d5237d1bce3bf0dedbf32",
+          "vendor/office-runtime-manifest.json": "d102bbe5549b0f51bf967d903c1f14cd269781372ffe3ee1a7d0c99e0bb4ba3a",
+          "package.json": "f984c6e3aa7095d249f61a1a5e423958d90d2625b91770ceed42ce9a52becd5d",
+          "vite.config.ts": "8055641a4e194c9ccc76bf2b8023ebc71db4c4c2d4dfb86c00cb8c1cb164a0bf"
+        }
+      },
+      "ok": true,
+      "implementationUnchanged": true,
+      "environment": {
+        "node": "v24.19.0",
+        "platform": "linux",
+        "arch": "x64",
+        "chromium": "154.0.8037.57"
+      },
+      "methodology": {
+        "settleMs": 5000,
+        "gcSettleMs": 2000,
+        "collectGc": false,
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "graphics": "headless Chromium, SwiftShader software WebGL; not a hardware GPU comparison",
+        "processes": "SystemInfo.getProcessInfo plus descendants of its browser PID; browser renderer GPU utility and zygote included",
+        "physicalMetric": "Sum of /proc/PID/smaps_rollup Pss; USS=Private_Clean+Private_Dirty+Private_Hugetlb. RSS may double-count shared pages.",
+        "gc": "Natural sample after fixed settle, then optional CDP page collection plus exposed gc in frames. Pthread workers may block JS execution and are not explicitly collected. Later stages follow earlier page GC.",
+        "jsMetric": "Performance/CDP JS heap counters describe the page isolate, not all pthread isolates, native WASM memory, or compiled code.",
+        "excludes": "Vite/Node harness/Python PDF backend process memory; WASM byteLength is recorded separately and never added to physical totals.",
+        "finalIdleExtraMs": 0,
+        "finalIdleMinimumSinceCloseMs": null
+      },
+      "fixtures": [
+        {
+          "name": "writer-rich.docx",
+          "bytes": 41212,
+          "sha256": "ab9f2dffd9c8444a0f19406005b7fecb9bd352ea53ad358e737ece361ed66acb"
+        },
+        {
+          "name": "calc-2000-rows.xlsx",
+          "bytes": 96221,
+          "sha256": "da2a15e8c076fe864a60a6c45ce28594181ca418898a837e4d3601646e686159"
+        },
+        {
+          "name": "presentation-20-slides.pptx",
+          "bytes": 108621,
+          "sha256": "d465e9b0035591b6dca92a16f707a91c282f7bda71a3b8ca3ed93d7d3ed91f78"
+        }
+      ],
+      "exports": [
+        {
+          "name": "writer-export.docx",
+          "extension": "docx",
+          "bytes": 26923,
+          "sha256": "426243a30686357d0bad449f012bbe297d54dc210bad87a8306140549af86796",
+          "validation": {
+            "writerMarker": true
+          }
+        },
+        {
+          "name": "calc-export.xlsx",
+          "extension": "xlsx",
+          "bytes": 105054,
+          "sha256": "7432897a9feb148a1ac2e6b2d96a867e37786280d66c26ca6492d9083f2db7ea",
+          "validation": {
+            "maximumSheetRows": 2001
+          }
+        },
+        {
+          "name": "presentation-export.pptx",
+          "extension": "pptx",
+          "bytes": 286146,
+          "sha256": "0a95aa53260ddc16cf3c0f34eb090c95166e9efa74cd2ecdeca2ced7163f1aec",
+          "validation": {
+            "slides": 20
+          }
+        },
+        {
+          "name": "presentation-export.pdf",
+          "extension": "pdf",
+          "bytes": 40666,
+          "sha256": "43f476467025671c5032e8d93853e74b6f15ce54cbd8f0d3ef4d9735cd28ba25",
+          "validation": {
+            "pages": 20
+          }
+        },
+        {
+          "name": "writer-reopened.docx",
+          "extension": "docx",
+          "bytes": 26923,
+          "sha256": "e7e9d04997732da98bf4d902d7e02697d032f6a647e43880145b64933faeb49a",
+          "validation": {
+            "writerMarker": true
+          }
+        }
+      ],
+      "measurementNotes": [],
+      "stages": [
+        {
+          "name": "home",
+          "at": "2026-10-13T08:20:55.085Z",
+          "totalsBytes": {
+            "rss": 668151808,
+            "pss": 389349376,
+            "uss": 282144768,
+            "pssAnon": 239833088,
+            "pssFile": 146468864,
+            "pssShmem": 3040256,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": null,
+          "office": [],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "writer-rich",
+          "at": "2026-10-13T08:21:20.478Z",
+          "totalsBytes": {
+            "rss": 1619730432,
+            "pss": 1319554048,
+            "uss": 1191964672,
+            "pssAnon": 1141727232,
+            "pssFile": 157961216,
+            "pssShmem": 19858432,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": null,
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 3,
+                "unused": 0,
+                "maximumConcurrency": "2"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "calc-2000-rows",
+          "at": "2026-10-13T08:21:33.350Z",
+          "totalsBytes": {
+            "rss": 1759621120,
+            "pss": 1459268608,
+            "uss": 1331527680,
+            "pssAnon": 1280901120,
+            "pssFile": 158472192,
+            "pssShmem": 19887104,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": null,
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 4,
+                "unused": 0,
+                "maximumConcurrency": "2"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "presentation-20-slides",
+          "at": "2026-10-13T08:21:55.773Z",
+          "totalsBytes": {
+            "rss": 1816895488,
+            "pss": 1515965440,
+            "uss": 1387745280,
+            "pssAnon": 1336890368,
+            "pssFile": 159157248,
+            "pssShmem": 19911680,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": null,
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 2,
+                "unused": 2,
+                "maximumConcurrency": "2"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "pdf-office-retained",
+          "at": "2026-10-13T08:22:10.588Z",
+          "totalsBytes": {
+            "rss": 1937965056,
+            "pss": 1636548608,
+            "uss": 1508024320,
+            "pssAnon": 1456191488,
+            "pssFile": 160304128,
+            "pssShmem": 20046848,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": null,
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 2,
+                "unused": 2,
+                "maximumConcurrency": "2"
+              }
+            }
+          ],
+          "pdfEditorCount": 1
+        },
+        {
+          "name": "pdf-only-after-last-office-close",
+          "at": "2026-10-13T08:22:16.967Z",
+          "totalsBytes": {
+            "rss": 1814315008,
+            "pss": 1529535488,
+            "uss": 1417707520,
+            "pssAnon": 1365218304,
+            "pssFile": 161143808,
+            "pssShmem": 3167232,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": null,
+          "office": [],
+          "pdfEditorCount": 1
+        },
+        {
+          "name": "all-closed",
+          "at": "2026-10-13T08:22:22.463Z",
+          "totalsBytes": {
+            "rss": 1602949120,
+            "pss": 1318171648,
+            "uss": 1206345728,
+            "pssAnon": 1153840128,
+            "pssFile": 161160192,
+            "pssShmem": 3163136,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": null,
+          "office": [],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "office-reopened",
+          "at": "2026-10-13T08:22:42.329Z",
+          "totalsBytes": {
+            "rss": 2537594880,
+            "pss": 2236006400,
+            "uss": 2107383808,
+            "pssAnon": 2054788096,
+            "pssFile": 161236992,
+            "pssShmem": 19973120,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": null,
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 3,
+                "unused": 0,
+                "maximumConcurrency": "2"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "all-closed-again",
+          "at": "2026-10-13T08:22:48.382Z",
+          "totalsBytes": {
+            "rss": 787578880,
+            "pss": 502721536,
+            "uss": 390877184,
+            "pssAnon": 338191360,
+            "pssFile": 161316864,
+            "pssShmem": 3208192,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": null,
+          "office": [],
+          "pdfEditorCount": 0
+        }
+      ]
+    },
+    {
+      "label": "after-repeat",
+      "startedAt": "2026-10-13T08:24:22.292Z",
+      "finishedAt": "2026-10-13T08:27:58.908Z",
+      "baselineCommit": null,
+      "implementation": {
+        "sha256": "5321ddcffae93852b3ab25b90c3dd209cbb5f68ccfd687751a4545e8b3b7a6fc",
+        "files": {
+          "src/App.vue": "b585f6dc33caa790f86f5fda4a01b10943f83c74dc877cf12135958c78f4306a",
+          "src/components/Icon.vue": "7903dc708c3ebd5fda8135d1193a6236be599c50b80dfa38f16453cc788cae95",
+          "src/components/OfficeEditor.vue": "947b451634116b2bb03616b65550496eac71064876aa2c1f51b90aa815008a83",
+          "src/components/PdfEditor.vue": "2f6428906c6e661c74b48dbd6cc43ff0713007e1d21d47524ca2f2a4f574e31a",
+          "src/components/PresentationEffects.vue": "d7ef306e7162dc8c59db546db6183d6e889e53382cc263e43ca8a5124f3b7806",
+          "src/components/PresentationWorkbench.vue": "6fe46199d04382421cfdb2aa6abcf47bf4ef9225a09714d97632fcb60e6c11a0",
+          "src/components/SheetWorkbench.vue": "0062f70ccb9bd48183d0a9cfd6aa6aaa3bcbdf34735414a96bd6d0b20e76aa1a",
+          "src/components/SlidePreview.vue": "c05b527b92030e3590b8a0e901b0f9f9361910788f638a478bfe11dbee5a7a2f",
+          "src/components/WordWorkbench.vue": "c84d4b57a9d25c3022271fca8aa7a6455e9579c0a3f89abdeb5f0cb61fa70720",
+          "src/env.d.ts": "5853f72b58c661647c5f3e9cdfbe2478d5501904ced4e11116564b1941744b19",
+          "src/main.ts": "bdbe20b0b723d281d98897e0f40de48a9a804c89b71242e4a317096d45cbff01",
+          "src/native.ts": "36622b32f6dac79abda2f6daec3fd7dfea0c1ae8882e77fdab6fc5ef57e749e8",
+          "src/office/README.md": "347bc644943291a04366cb24fa114f2ca73289635df4670bff673daf4e0e8e47",
+          "src/office/bridge.ts": "ee1f8fe2e43c3d67028015ac198810f4e24da3aa445e37a989eaac9a72b5f4b8",
+          "src/office/import-review.ts": "b6c571e6108ee36bf6e2f23c0ec657a2f171384c261e97ec08d6bc96b1a84d73",
+          "src/office/native-workbench-smoke.ts": "b7d0f34385876c0e6c486d67f80aa13756c635eeffd538b6d13d97d3a1e10ddd",
+          "src/office/pdf-readback.ts": "2bc56f680c250ff7521d443d54be2e4e3ddfd8f3080f19ba711d38c413ae6490",
+          "src/office/types.ts": "043c5248dc64d2a3e7541774cfb5df0d09314a987dc3f96101ef0df7f7c54183",
+          "src/office/workbench.css": "392e609727d3a43d38c9156a84b38ddc1ea1debbea99c956ed8207c811142b01",
+          "src/pdf/backend.ts": "8f4158c2d142b033c378ae1a4353fa8dee4e93e5f9c195b682bc9178f78dfa6c",
+          "src/pdf/pdf.css": "2686fa126a5d25cca0e81efc39aab0cfe71a5a57f60b2802fe98621086cef659",
+          "src/pdf/protocol.ts": "def1f5983eaa7218816ef4e4083126c50c44fcd412fcdc483ce4baf677b53762",
+          "src/pdf/resources.ts": "ffd05393798fc522b20298bd6a9cf5de2305bdc92c3152069367c13fdc68fb64",
+          "src/presentation/chart-workbook.ts": "b7c7ac784bae3f4e8bf4704740b566439535e11cb9d86f4eda8013ba41de7bfa",
+          "src/presentation/native-smoke.ts": "647a90814196fa9a7d70d8b9276619ddf4ea61debe2894d16727848932e47f6a",
+          "src/presentation/pptx-package.ts": "f10bf635c68a540e219a651666262bf7f211fb5ee97f26b83e1b7041d6049217",
+          "src/presentation/session.ts": "67c5d89176b81cb57de4f785b5cff4c67b4a7a752af7317bc9896a5fce10ec5d",
+          "src/presentation/types.ts": "0eda2ced34e5da60d284cec136811a06ffd40eb65c187faf2cce1726936d8ae6",
+          "src/presentation/workbench.css": "93bfba9d8bdcca9b0be1eeb3eb35c09467f777171a9b72951871982d2fd6d041",
+          "src/shared/document.ts": "7b9da6c4c8ed6c21a716c464bb854218914b4bf5bafd2454343f8bf19fb8d805",
+          "src/sheet/types.ts": "2b970a4f66f28b17796317fe62c3b9f251071247dfd482986906afa1156a1e44",
+          "src/smoke.ts": "48cdab1bd13bf6d3259a1ecf45be07308428fa0dd561cead0bb9bda1da453d45",
+          "src/style.css": "8103b546036067d7809beeceeeb9e1cf769cd2539ad8731809834532243e2bdf",
+          "src/types.ts": "da14e0f998a83c9a2881a4fdcc6c8b8739a144d9ec8a2059ad2f699f8b54ae0e",
+          "src/word/draft-review.ts": "f6e3944e6babd67660100c11aea42319dcb5046e2de8694f1459fb0ef4a4982f",
+          "src/word/types.ts": "f7d44fe0f91544c9582ed51894bfbc87ad7e562588250e07df839b8924db2e67",
+          "public/office/Noto-CJK-LICENSE.txt": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+          "public/office/calc-tools.js": "bceeeb4531269617eea66b6ce92b7a73e978995846e53aee30cc62794377d395",
+          "public/office/clipboard-compat.js": "1da01796ffd5073481d00cf7f990433fe2718af52411c2e4dbfb4eae512e6ff4",
+          "public/office/host.css": "d46aab8f86b4ef001ee04586796abe39e901cf63f127d07a13012140eeb58add",
+          "public/office/host.html": "1e6fcdae8361765541ed2f8b8b443688c9fb40bb46a1811786037e0ae013e834",
+          "public/office/host.js": "227d7ca78cf6bd480e5f32aaef470ebe73c0c4d925538072b194fa6449b93381",
+          "public/office/office-worker.js": "791d90f54c1baaaea10f84e41dc7bf684b171da2614af228ba8477eb0c21f043",
+          "public/office/offline-audit.js": "9027d9a6167204ba54a79f8688ffd2aba4e352059690ce58de5ca3f0dfd79ace",
+          "public/office/offline-policy.js": "a4b8f9f8a02bf829d866b8454beb292fc5888814d826a7ac214b5b11c2bdd2ad",
+          "public/office/presentation-objects.js": "c713083fbec71f5506859c66fd5c6cb639441dce99db45b9c72fe25b880808e4",
+          "public/office/writer-tools.js": "bc3a73f182d8c603f07fa9c29cfc18f4e39a99ab3c4692e3d4d50a549e7a8841",
+          "public/office/zeta.js": "7bdfa389a1d220c279f60602b2e0724b2280fa91d68d5237d1bce3bf0dedbf32",
+          "vendor/office-runtime-manifest.json": "d102bbe5549b0f51bf967d903c1f14cd269781372ffe3ee1a7d0c99e0bb4ba3a",
+          "package.json": "f984c6e3aa7095d249f61a1a5e423958d90d2625b91770ceed42ce9a52becd5d",
+          "vite.config.ts": "8055641a4e194c9ccc76bf2b8023ebc71db4c4c2d4dfb86c00cb8c1cb164a0bf"
+        }
+      },
+      "ok": true,
+      "implementationUnchanged": true,
+      "environment": {
+        "node": "v24.19.0",
+        "platform": "linux",
+        "arch": "x64",
+        "chromium": "154.0.8037.57"
+      },
+      "methodology": {
+        "settleMs": 5000,
+        "gcSettleMs": 2000,
+        "collectGc": false,
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        },
+        "graphics": "headless Chromium, SwiftShader software WebGL; not a hardware GPU comparison",
+        "processes": "SystemInfo.getProcessInfo plus descendants of its browser PID; browser renderer GPU utility and zygote included",
+        "physicalMetric": "Sum of /proc/PID/smaps_rollup Pss; USS=Private_Clean+Private_Dirty+Private_Hugetlb. RSS may double-count shared pages.",
+        "gc": "Natural sample after fixed settle, then optional CDP page collection plus exposed gc in frames. Pthread workers may block JS execution and are not explicitly collected. Later stages follow earlier page GC.",
+        "jsMetric": "Performance/CDP JS heap counters describe the page isolate, not all pthread isolates, native WASM memory, or compiled code.",
+        "excludes": "Vite/Node harness/Python PDF backend process memory; WASM byteLength is recorded separately and never added to physical totals.",
+        "finalIdleExtraMs": 20000,
+        "finalIdleMinimumSinceCloseMs": 25000
+      },
+      "fixtures": [
+        {
+          "name": "writer-rich.docx",
+          "bytes": 41212,
+          "sha256": "ab9f2dffd9c8444a0f19406005b7fecb9bd352ea53ad358e737ece361ed66acb"
+        },
+        {
+          "name": "calc-2000-rows.xlsx",
+          "bytes": 96221,
+          "sha256": "da2a15e8c076fe864a60a6c45ce28594181ca418898a837e4d3601646e686159"
+        },
+        {
+          "name": "presentation-20-slides.pptx",
+          "bytes": 108621,
+          "sha256": "d465e9b0035591b6dca92a16f707a91c282f7bda71a3b8ca3ed93d7d3ed91f78"
+        }
+      ],
+      "exports": [
+        {
+          "name": "writer-export.docx",
+          "extension": "docx",
+          "bytes": 26923,
+          "sha256": "7018b8c42e57b10f9c21b3c5cdf95047bead080f3ea5dbcc51d97235ca82a315",
+          "validation": {
+            "writerMarker": true
+          }
+        },
+        {
+          "name": "calc-export.xlsx",
+          "extension": "xlsx",
+          "bytes": 105055,
+          "sha256": "ecd87167f15ba2e31a86a3a6e939fc98022730c395f5b7246ba74a28ded7801f",
+          "validation": {
+            "maximumSheetRows": 2001
+          }
+        },
+        {
+          "name": "presentation-export.pptx",
+          "extension": "pptx",
+          "bytes": 286128,
+          "sha256": "61caabeeaa5cc6e35489a9848ec7129a0ba5af421a51359db786f9881813ecff",
+          "validation": {
+            "slides": 20
+          }
+        },
+        {
+          "name": "presentation-export.pdf",
+          "extension": "pdf",
+          "bytes": 40666,
+          "sha256": "7ed13745dfb2748b3e3810902d30d6b576bd18eb2fcf120dbc7031070889fd9b",
+          "validation": {
+            "pages": 20
+          }
+        },
+        {
+          "name": "writer-reopened.docx",
+          "extension": "docx",
+          "bytes": 26923,
+          "sha256": "0a795075c0fc1993506e60c3ba07d06b569629915372b2bbab72643cee6ed8e8",
+          "validation": {
+            "writerMarker": true
+          }
+        }
+      ],
+      "measurementNotes": [
+        "The final stage name denotes 20 additional seconds of idle after the regular 5-second close sample: at least 25 seconds after the final close, plus sampling overhead. The same timing applies to baseline-repeat and after-repeat."
+      ],
+      "stages": [
+        {
+          "name": "home",
+          "at": "2026-10-13T08:24:32.044Z",
+          "totalsBytes": {
+            "rss": 672800768,
+            "pss": 394087424,
+            "uss": 286969856,
+            "pssAnon": 244580352,
+            "pssFile": 146469888,
+            "pssShmem": 3027968,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": [],
+          "office": [],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "writer-rich",
+          "at": "2026-10-13T08:24:54.597Z",
+          "totalsBytes": {
+            "rss": 1615380480,
+            "pss": 1316525056,
+            "uss": 1190150144,
+            "pssAnon": 1138798592,
+            "pssFile": 157878272,
+            "pssShmem": 19842048,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": [
+            "office",
+            "office",
+            "office"
+          ],
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 3,
+                "unused": 0,
+                "maximumConcurrency": "2"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "calc-2000-rows",
+          "at": "2026-10-13T08:25:06.543Z",
+          "totalsBytes": {
+            "rss": 1752510464,
+            "pss": 1452267520,
+            "uss": 1324613632,
+            "pssAnon": 1273864192,
+            "pssFile": 158520320,
+            "pssShmem": 19878912,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": [
+            "office",
+            "office",
+            "office",
+            "office"
+          ],
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 4,
+                "unused": 0,
+                "maximumConcurrency": "2"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "presentation-20-slides",
+          "at": "2026-10-13T08:25:32.459Z",
+          "totalsBytes": {
+            "rss": 1803751424,
+            "pss": 1502490624,
+            "uss": 1374801920,
+            "pssAnon": 1323815936,
+            "pssFile": 158770176,
+            "pssShmem": 19899392,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": [
+            "office",
+            "office",
+            "office",
+            "office"
+          ],
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 2,
+                "unused": 2,
+                "maximumConcurrency": "2"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "pdf-office-retained",
+          "at": "2026-10-13T08:26:29.916Z",
+          "totalsBytes": {
+            "rss": 1834795008,
+            "pss": 1532370944,
+            "uss": 1403723776,
+            "pssAnon": 1351714816,
+            "pssFile": 160475136,
+            "pssShmem": 20173824,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": [
+            "office",
+            "office",
+            "office",
+            "office",
+            "pdf"
+          ],
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 2,
+                "unused": 2,
+                "maximumConcurrency": "2"
+              }
+            }
+          ],
+          "pdfEditorCount": 1
+        },
+        {
+          "name": "pdf-only-after-last-office-close",
+          "at": "2026-10-13T08:26:41.696Z",
+          "totalsBytes": {
+            "rss": 1719230464,
+            "pss": 1433587712,
+            "uss": 1321791488,
+            "pssAnon": 1269150720,
+            "pssFile": 161294336,
+            "pssShmem": 3134464,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": [
+            "pdf"
+          ],
+          "office": [],
+          "pdfEditorCount": 1
+        },
+        {
+          "name": "all-closed",
+          "at": "2026-10-13T08:26:47.865Z",
+          "totalsBytes": {
+            "rss": 1629978624,
+            "pss": 1344335872,
+            "uss": 1232543744,
+            "pssAnon": 1179886592,
+            "pssFile": 161310720,
+            "pssShmem": 3130368,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": [],
+          "office": [],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "office-reopened",
+          "at": "2026-10-13T08:27:31.426Z",
+          "totalsBytes": {
+            "rss": 2511077376,
+            "pss": 2187071488,
+            "uss": 2058510336,
+            "pssAnon": 2005684224,
+            "pssFile": 161303552,
+            "pssShmem": 20075520,
+            "swap": 0
+          },
+          "officeFrameCount": 1,
+          "workers": [
+            "office",
+            "office",
+            "office"
+          ],
+          "office": [
+            {
+              "wasmLinearBytes": 1073741824,
+              "threads": {
+                "running": 3,
+                "unused": 0,
+                "maximumConcurrency": "2"
+              }
+            }
+          ],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "all-closed-again",
+          "at": "2026-10-13T08:27:38.628Z",
+          "totalsBytes": {
+            "rss": 2413887488,
+            "pss": 2107028480,
+            "uss": 1994883072,
+            "pssAnon": 1942069248,
+            "pssFile": 161689600,
+            "pssShmem": 3265536,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": [],
+          "office": [],
+          "pdfEditorCount": 0
+        },
+        {
+          "name": "all-closed-after-20s-idle",
+          "at": "2026-10-13T08:27:58.860Z",
+          "totalsBytes": {
+            "rss": 807120896,
+            "pss": 500257792,
+            "uss": 388108288,
+            "pssAnon": 335290368,
+            "pssFile": 161697792,
+            "pssShmem": 3265536,
+            "swap": 0
+          },
+          "officeFrameCount": 0,
+          "workers": [],
+          "office": [],
+          "pdfEditorCount": 0
+        }
+      ]
+    }
+  ]
+}

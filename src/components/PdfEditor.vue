@@ -10,6 +10,7 @@ import {
 } from '../pdf/protocol'
 import '../pdf/pdf.css'
 import { hasPdfEditingEngine, pickPdfDocument, pickPdfImage, saveExtractedPdf } from '../pdf/backend'
+import { canvasOutputScale, releaseCanvas, trimHistoryBudget } from '../pdf/resources'
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
 
@@ -131,6 +132,8 @@ const loadingTasks = new Set<pdfjs.PDFDocumentLoadingTask>()
 const thumbnails = new Map<number, HTMLCanvasElement>()
 const thumbnailRevisions = new Map<number, number>()
 const thumbnailQueue = new Set<number>()
+const visibleThumbnails = new Set<number>()
+const thumbnailJobs = new Map<number, { cancelled: boolean; task?: pdfjs.RenderTask }>()
 const inspectedPages = new Set<number>()
 
 const pageCount = computed(() => metadata.value?.pageCount ?? pdf?.numPages ?? 0)
@@ -190,6 +193,8 @@ function cancelRenders() {
   for (const task of renderTasks) task.cancel()
   renderTasks.clear()
   thumbnailQueue.clear()
+  visibleThumbnails.clear()
+  for (const job of thumbnailJobs.values()) { job.cancelled = true; job.task?.cancel() }
 }
 function clearPlacement() {
   pendingRect.value = null
@@ -219,6 +224,10 @@ async function decodePdf(base64: string, epoch: number): Promise<pdfjs.PDFDocume
       throw new PdfOperationError('STALE_DOCUMENT', '文件已关闭。')
     }
     return result
+  } catch (error) {
+    // A rejected loading promise still owns its worker and network transport.
+    await task.destroy().catch(() => {})
+    throw error
   } finally { loadingTasks.delete(task) }
 }
 
@@ -233,17 +242,17 @@ async function installDocument(base64: string, response: PdfResponse, epoch: num
   metadata.value = response.metadata ?? { pageCount: nextPdf.numPages, pages: [] }
   outline.value = response.metadata?.outline ?? []
   if (!response.metadata?.outline) void readPreviewOutline(nextPdf, epoch)
-  textBlocks.value = response.textBlocks ?? []
+  pageIndex.value = Math.min(Math.max(0, pageIndex.value), nextPdf.numPages - 1)
+  textBlocks.value = (response.textBlocks ?? []).filter(block => block.pageIndex === pageIndex.value)
   inspectedPages.clear()
   for (const block of textBlocks.value) inspectedPages.add(block.pageIndex)
   warnings.value = response.warnings ?? []
   signedSource.value ||= !!metadata.value.signed
-  pageIndex.value = Math.min(Math.max(0, pageIndex.value), nextPdf.numPages - 1)
   selectedPages.value = selectedPages.value.filter(index => index < nextPdf.numPages)
   if (!selectedPages.value.length) selectedPages.value = [pageIndex.value]
   clearEditorSelection()
   thumbnailRevisions.clear()
-  for (const thumb of thumbnails.values()) { thumb.width = 1; thumb.height = 1 }
+  for (const thumb of thumbnails.values()) releaseCanvas(thumb)
   if (oldPdf) void oldPdf.loadingTask.destroy().catch(() => {})
   await nextTick()
   if (!alive(epoch)) return
@@ -328,6 +337,9 @@ async function openCurrentDocument(reset = true) {
     baselineDirty = !!props.initialDirty
     lastExportedBytes = ''
     currentBytes.value = ''
+    releaseCanvas(canvas.value)
+    for (const thumb of thumbnails.values()) releaseCanvas(thumb)
+    thumbnailRevisions.clear()
     metadata.value = null
     outline.value = []; stampMode.value = null; stampChanged.value = false
     password.value = ''
@@ -359,7 +371,7 @@ async function openCurrentDocument(reset = true) {
       const response: PdfResponse = { protocolVersion: 1, requestId: '', ok: true, metadata: { pageCount: previewPdf.numPages, pages: [] } }
       await installDocument(props.document.base64, response, epoch, previewPdf)
     } else {
-      const response = await requestPdf(props.document.base64 ? 'inspect' : 'new', props.document.base64, {}, password.value || undefined)
+      const response = await requestPdf(props.document.base64 ? 'inspect' : 'new', props.document.base64, props.document.base64 ? { pageIndices: [pageIndex.value] } : {}, password.value || undefined)
       if (!alive(epoch)) return
       const bytes = response.base64 || props.document.base64
       if (!bytes) throw new Error('PDF 引擎未返回文件数据。')
@@ -392,12 +404,13 @@ async function renderCurrentPage() {
   const revision = documentRevision
   const index = pageIndex.value
   const previousTask = mainRenderTask
+  let page: pdfjs.PDFPageProxy | undefined
   if (previousTask) previousTask.cancel()
   rendering.value = true
   try {
     if (previousTask) await previousTask.promise.catch(() => {})
     if (sequence !== renderSequence || source !== pdf || disposed) return
-    const page = await source.getPage(index + 1)
+    page = await source.getPage(index + 1)
     if (sequence !== renderSequence || source !== pdf || disposed) return
     const unitViewport = page.getViewport({ scale: 1 })
     if (fitWidth.value) zoom.value = Math.max(0.2, Math.min(2, (stage.value.clientWidth - 48) / unitViewport.width))
@@ -405,10 +418,10 @@ async function renderCurrentPage() {
     viewport.value = nextViewport
     await nextTick()
     if (!canvas.value || sequence !== renderSequence || revision !== documentRevision) return
-    const outputScale = Math.min(globalThis.devicePixelRatio || 1, 2)
+    const outputScale = canvasOutputScale(nextViewport.width, nextViewport.height, Math.min(globalThis.devicePixelRatio || 1, 2))
     const targetCanvas = canvas.value
-    targetCanvas.width = Math.floor(nextViewport.width * outputScale)
-    targetCanvas.height = Math.floor(nextViewport.height * outputScale)
+    targetCanvas.width = Math.max(1, Math.floor(nextViewport.width * outputScale))
+    targetCanvas.height = Math.max(1, Math.floor(nextViewport.height * outputScale))
     const context = targetCanvas.getContext('2d', { alpha: false })
     if (!context) throw new Error('无法创建 PDF 页面画布。')
     const task = page.render({ canvas: targetCanvas, canvasContext: context, viewport: nextViewport, transform: [outputScale, 0, 0, outputScale, 0, 0] })
@@ -417,29 +430,59 @@ async function renderCurrentPage() {
     try { await task.promise } finally { renderTasks.delete(task); if (mainRenderTask === task) mainRenderTask = null }
   } catch (error) {
     if (sequence === renderSequence && alive(documentEpoch) && !(error instanceof Error && error.name === 'RenderingCancelledException')) fail(error)
-  } finally { if (sequence === renderSequence) rendering.value = false }
+  } finally { page?.cleanup(); if (sequence === renderSequence) rendering.value = false }
 }
 
 function ensureResizeObserver() {
   if (resizeObserver || !stage.value) return
   resizeObserver = new ResizeObserver(() => {
     cancelAnimationFrame(resizeFrame)
-    resizeFrame = requestAnimationFrame(() => { if (fitWidth.value && !disposed) void renderCurrentPage() })
+    resizeFrame = requestAnimationFrame(() => {
+      if (disposed) return
+      if (fitWidth.value) void renderCurrentPage()
+      queueVisibleThumbnails()
+    })
   })
   resizeObserver.observe(stage.value)
 }
 function registerThumbnail(element: unknown, index: number) {
-  if (element instanceof HTMLCanvasElement) thumbnails.set(index, element)
-  else thumbnails.delete(index)
+  const previous = thumbnails.get(index)
+  if (previous === element) return
+  releaseCanvas(previous)
+  thumbnailJobs.get(index)?.task?.cancel()
+  const job = thumbnailJobs.get(index)
+  if (job) job.cancelled = true
+  thumbnailRevisions.delete(index)
+  if (element instanceof HTMLCanvasElement) {
+    releaseCanvas(element)
+    const page = metadata.value?.pages[index]
+    element.style.aspectRatio = page ? `${page.width} / ${page.height}` : '104 / 147'
+    thumbnails.set(index, element)
+  } else {
+    thumbnails.delete(index)
+    thumbnailQueue.delete(index)
+    visibleThumbnails.delete(index)
+  }
 }
 function queueVisibleThumbnails() {
   cancelAnimationFrame(thumbnailFrame)
   thumbnailFrame = requestAnimationFrame(() => {
-    if (!pdf || !thumbList.value || !showPages.value || disposed) return
-    const containerRect = thumbList.value.getBoundingClientRect()
+    if (disposed) return
+    visibleThumbnails.clear()
+    thumbnailQueue.clear()
+    const containerRect = pdf && thumbList.value && showPages.value && sidebarTab.value === 'pages'
+      ? thumbList.value.getBoundingClientRect() : null
     for (const [index, element] of thumbnails) {
       const bounds = element.getBoundingClientRect()
-      if (bounds.bottom >= containerRect.top - 180 && bounds.top <= containerRect.bottom + 180 && thumbnailRevisions.get(index) !== documentRevision) thumbnailQueue.add(index)
+      if (containerRect && bounds.bottom >= containerRect.top - 180 && bounds.top <= containerRect.bottom + 180) {
+        visibleThumbnails.add(index)
+        if (thumbnailRevisions.get(index) !== documentRevision) thumbnailQueue.add(index)
+      } else {
+        const job = thumbnailJobs.get(index)
+        if (job) { job.cancelled = true; job.task?.cancel() }
+        thumbnailRevisions.delete(index)
+        releaseCanvas(element)
+      }
     }
     runThumbnailQueue()
   })
@@ -451,39 +494,55 @@ function runThumbnailQueue() {
     const element = thumbnails.get(index)
     const source = pdf
     const revision = documentRevision
-    if (!element || thumbnailRevisions.get(index) === revision) continue
-    thumbnailRevisions.set(index, revision)
+    if (!element || !visibleThumbnails.has(index) || thumbnailJobs.has(index) || thumbnailRevisions.get(index) === revision) continue
+    const job: { cancelled: boolean; task?: pdfjs.RenderTask } = { cancelled: false }
+    thumbnailJobs.set(index, job)
     activeThumbnails++
     void (async () => {
+      let page: pdfjs.PDFPageProxy | undefined
       try {
-        const page = await source.getPage(index + 1)
-        if (source !== pdf || disposed) return
+        page = await source.getPage(index + 1)
+        if (source !== pdf || disposed || job.cancelled || !visibleThumbnails.has(index) || thumbnails.get(index) !== element) return
         const base = page.getViewport({ scale: 1 })
         const view = page.getViewport({ scale: 104 / base.width })
-        element.width = Math.ceil(view.width * 1.5)
-        element.height = Math.ceil(view.height * 1.5)
+        element.style.aspectRatio = `${base.width} / ${base.height}`
+        const density = canvasOutputScale(view.width, view.height, 1.5, 512 * 512)
+        element.width = Math.max(1, Math.floor(view.width * density))
+        element.height = Math.max(1, Math.floor(view.height * density))
         const context = element.getContext('2d', { alpha: false })
         if (!context) return
-        const task = page.render({ canvas: element, canvasContext: context, viewport: view, transform: [1.5, 0, 0, 1.5, 0, 0] })
+        const task = page.render({ canvas: element, canvasContext: context, viewport: view, transform: [density, 0, 0, density, 0, 0] })
+        job.task = task
         renderTasks.add(task)
         try { await task.promise } finally { renderTasks.delete(task) }
-      } catch (error) {
-        if (!(error instanceof Error && error.name === 'RenderingCancelledException')) thumbnailRevisions.delete(index)
-      } finally { activeThumbnails--; if (!disposed) runThumbnailQueue() }
+        if (!job.cancelled && source === pdf && thumbnails.get(index) === element) thumbnailRevisions.set(index, revision)
+      } catch { /* A later visibility pass can retry a failed thumbnail. */ }
+      finally {
+        page?.cleanup()
+        thumbnailJobs.delete(index)
+        if (job.cancelled || disposed || source !== pdf || thumbnails.get(index) !== element) releaseCanvas(element)
+        activeThumbnails--
+        if (!disposed) {
+          if (job.cancelled && visibleThumbnails.has(index)) thumbnailQueue.add(index)
+          runThumbnailQueue()
+        }
+      }
     })()
   }
 }
 
 async function inspectCurrentPage() {
+  // Even a cache hit invalidates inspection of the page we just left.
+  const sequence = ++textSequence
   if (!engineAvailable || !pdf || inspectedPages.has(pageIndex.value)) return
   const epoch = documentEpoch
   const revision = documentRevision
   const index = pageIndex.value
-  const sequence = ++textSequence
   try {
     const response = await requestPdf('inspect', currentBytes.value, { pageIndices: [index] }, password.value || undefined)
     if (!alive(epoch) || revision !== documentRevision || sequence !== textSequence) return
-    textBlocks.value = [...textBlocks.value.filter(block => block.pageIndex !== index), ...(response.textBlocks ?? [])]
+    textBlocks.value = response.textBlocks ?? []
+    inspectedPages.clear()
     inspectedPages.add(index)
   } catch (error) { if (alive(epoch) && revision === documentRevision) fail(error) }
 }
@@ -755,6 +814,9 @@ async function restoreHistory(direction: 'undo' | 'redo') {
       if (!alive(epoch)) return
       from.value = from.value.slice(0, -1)
       to.value = appendHistory(to.value, before)
+      const history = trimHistoryBudget(undoStack.value, redoStack.value, direction === 'undo' ? 'redo' : 'undo')
+      undoStack.value = history.undo
+      redoStack.value = history.redo
       announceDirty()
       setStatus(direction === 'undo' ? '已撤销上一步。' : '已重做。')
     } catch (error) { if (alive(epoch)) fail(error) }
@@ -778,12 +840,15 @@ async function searchDocument() {
   try {
     const results: { pageIndex: number; text: string }[] = []
     for (let index = 0; index < source.numPages; index++) {
-      const page = await source.getPage(index + 1)
-      const content = await page.getTextContent()
       if (sequence !== searchSequence || revision !== documentRevision || source !== pdf || disposed) return
-      const text = content.items.map(item => 'str' in item ? item.str : '').join(' ')
-      const position = text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase())
-      if (position >= 0) results.push({ pageIndex: index, text: text.slice(Math.max(0, position - 24), position + query.length + 64) })
+      const page = await source.getPage(index + 1)
+      try {
+        const content = await page.getTextContent()
+        if (sequence !== searchSequence || revision !== documentRevision || source !== pdf || disposed) return
+        const text = content.items.map(item => 'str' in item ? item.str : '').join(' ')
+        const position = text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase())
+        if (position >= 0) results.push({ pageIndex: index, text: text.slice(Math.max(0, position - 24), position + query.length + 64) })
+      } finally { page.cleanup() }
     }
     searchResults.value = results
     setStatus(results.length ? `在 ${results.length} 页找到“${query}”。` : `没有找到“${query}”。扫描图片不会包含可搜索文本。`)
@@ -809,6 +874,7 @@ async function exportFile(options?: { format?: string }): Promise<{ base64: stri
 }
 function markSaved(base64?: string) {
   savedBase64 = base64 ?? (lastExportedBytes || currentBytes.value)
+  lastExportedBytes = ''
   baselineDirty = false
   announceDirty()
 }
@@ -855,6 +921,13 @@ onBeforeUnmount(() => {
   loadingTasks.clear()
   if (pdf) void pdf.loadingTask.destroy().catch(() => {})
   pdf = null
+  releaseCanvas(canvas.value)
+  for (const thumbnail of thumbnails.values()) releaseCanvas(thumbnail)
+  thumbnails.clear()
+  thumbnailRevisions.clear()
+  textBlocks.value = []
+  savedBase64 = ''
+  lastExportedBytes = ''
   password.value = ''
   passwordInput.value = ''
   currentBytes.value = ''
@@ -877,7 +950,7 @@ onBeforeUnmount(() => {
         <button v-for="item in tools" :key="item.id" class="pdf-tool-button" :class="{ active: tool === item.id }" :aria-pressed="tool === item.id" :disabled="isBusy || !toolEnabled(item.id)" :title="!toolEnabled(item.id) ? editBlockedReason : item.label" :data-testid="`pdf-tool-${item.id}`" @click="chooseTool(item.id)"><svg><use :href="`#pdf-icon-${item.icon}`" /></svg><span>{{ item.label }}</span></button>
       </div>
       <div class="pdf-toolbar-group">
-        <button class="pdf-icon-button" title="撤销（最多保留 8 次 / 48 MiB）" aria-label="撤销 PDF 编辑" data-testid="pdf-undo" :disabled="!canUndo" @click="undo"><svg><use href="#pdf-icon-undo" /></svg></button>
+        <button class="pdf-icon-button" title="撤销（最多保留 8 次，大文件至少保留最近一次）" aria-label="撤销 PDF 编辑" data-testid="pdf-undo" :disabled="!canUndo" @click="undo"><svg><use href="#pdf-icon-undo" /></svg></button>
         <button class="pdf-icon-button" title="重做" aria-label="重做 PDF 编辑" data-testid="pdf-redo" :disabled="!canRedo" @click="redo"><svg><use href="#pdf-icon-redo" /></svg></button>
       </div>
       <div class="pdf-toolbar-group">

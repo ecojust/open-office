@@ -1,4 +1,5 @@
 import { callPdfBackend } from './backend'
+export { appendHistory } from './resources'
 
 export type PdfPoint = [number, number]
 export type PdfRect = [number, number, number, number]
@@ -105,16 +106,6 @@ export function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
   if (typeof error === 'string') return error
   return '操作没有完成，请稍后重试。'
-}
-
-/** Entire immutable PDF snapshots: at most 8 entries and 48 MiB of decoded PDF data. */
-export function appendHistory(history: string[], value: string, maxEntries = 8, maxBytes = 48 * 1024 * 1024): string[] {
-  const next = [...history, value]
-  let bytes = next.reduce((sum, item) => sum + Math.ceil(item.length * 0.75), 0)
-  while (next.length > maxEntries || (bytes > maxBytes && next.length)) {
-    bytes -= Math.ceil(next.shift()!.length * 0.75)
-  }
-  return next
 }
 
 /** Move selected pages as a block, preserving relative order and the complete permutation. */

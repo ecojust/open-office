@@ -332,6 +332,13 @@ async function removeTab(tab:Tab, discardConfirmed=false) {
     else {home.value=true;officeDocument.value=undefined;pdfDocument.value=undefined}
   }
   tabs.value=tabs.value.filter(t=>t.key!==tab.key)
+  // Keep a hidden Office model only while its tab can still be resumed. Closing
+  // that tab must also unload its WASM iframe, even when PDF tabs remain open.
+  if(officeDocument.value&&!tabs.value.some(t=>t.key===officeDocument.value?.id)) {
+    officeDocument.value=undefined
+    presentationState.value=null;presentationFeatures.value=null;writerState.value=null;calcState.value=null
+  }
+  if(pdfDocument.value&&!tabs.value.some(t=>t.key===pdfDocument.value?.id))pdfDocument.value=undefined
 }
 function closeTab(tab:Tab) {
   if(busy.value)return

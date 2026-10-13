@@ -25,7 +25,7 @@ function smokeOperation(action, data = {}, kind = activeDocumentKind) {
   return detail;
 }
 if (smokeMode) { allowed.add('smoke-test'); allowed.add('offline-audit'); }
-const send = (message) => { if (!disposed) parent.postMessage({ channel: CHANNEL, session, ...message }, location.origin); };
+const send = (message, transfer = []) => { if (!disposed) parent.postMessage({ channel: CHANNEL, session, ...message }, location.origin, transfer); };
 const progress = (text, percent) => send({ event: 'progress', data: { text, percent } });
 const errorText = error => String(error?.message || error || '未知错误').slice(0, 1500);
 let diagnosticPhase = 'host-created', diagnosticDependencies = null, diagnosticUnoReady = false, diagnosticFailure = null;
@@ -150,11 +150,19 @@ function fromBase64(value) {
   return bytes;
 }
 function toBase64(bytes) {
-  let raw = '';
-  for (let i = 0; i < bytes.length; i += 32768) raw += String.fromCharCode(...bytes.subarray(i, i + 32768));
-  return btoa(raw);
+  if (typeof bytes.toBase64 === 'function') return bytes.toBase64();
+  const parts = [];
+  for (let i = 0; i < bytes.length; i += 24576) parts.push(btoa(String.fromCharCode(...bytes.subarray(i, i + 24576))));
+  return parts.join('');
 }
-function reply(message, ok, data, error) { send({ requestId: message.requestId, ok, data, error }); }
+function inputBytes(data) {
+  if (data.buffer instanceof ArrayBuffer) {
+    if (data.buffer.byteLength > 112500000) throw Error('文档超过编辑器大小限制。');
+    return new Uint8Array(data.buffer);
+  }
+  return fromBase64(data.base64);
+}
+function reply(message, ok, data, error, transfer = []) { send({ requestId: message.requestId, ok, data, error }, transfer); }
 window.addEventListener('message', (event) => {
   if (event.source !== parent || event.origin !== location.origin || !session || disposed) return;
   const message = event.data;
@@ -168,17 +176,18 @@ window.addEventListener('message', (event) => {
       const extensions = { word: ['docx','odt','doc','rtf'], sheet: ['xlsx','ods','xls'], presentation: ['pptx','odp','ppt'] }[data.kind];
       if (!extensions.includes(data.extension)) throw Error('请选择支持的本地 Word、Excel 或 PowerPoint 文档。');
       const path = `/tmp/open-office-${++fileCounter}.${data.extension}`;
-      const bytes = fromBase64(data.base64);
-      if (bytes.length) FS.writeFile(path, bytes);
+      const bytes = inputBytes(data);
+      // Ownership moves into MEMFS; neither caller nor host mutates this input.
+      if (bytes.length) FS.writeFile(path, bytes, { canOwn: true });
       data = { id: data.id, name: String(data.name || '未命名'), kind: data.kind, extension: data.extension, path, isNew: !bytes.length, discard: data.discard === true };
     } else if (message.documentId !== activeDocumentId) throw Error('当前文档已经切换，旧操作已取消。');
     if (message.action === 'insert-image') {
       const extension = String(data.name || '').split('.').pop().toLowerCase();
       if (!['png','jpg','jpeg','webp','gif'].includes(extension)) throw Error('请选择 PNG、JPEG、WebP 或 GIF 图片。');
-      const bytes = fromBase64(data.base64);
+      const bytes = inputBytes(data);
       if (!bytes.length || bytes.length > 25 * 1024 * 1024) throw Error('图片为空或超过 25 MB。');
       const path = `/tmp/open-office-image-${++fileCounter}.${extension}`;
-      FS.writeFile(path, bytes); data = { path };
+      FS.writeFile(path, bytes, { canOwn: true }); data = { path };
     }
     if (smokeMode) smokeDiagnostic('request', { ...smokeOperation(message.action, data, message.action === 'open' ? data.kind : activeDocumentKind), hasDocument: !!activeDocumentId });
     pending.set(message.requestId, { ...message, data });
@@ -223,10 +232,13 @@ function workerMessage(event) {
     }
     if (request.action === 'export') {
       const bytes = FS.readFile(message.data.path);
-      const base64 = toBase64(bytes);
       FS.unlink(message.data.path);
-      reply(request, true, { base64, extension: message.data.extension, name: message.data.name, revision: message.data.revision, dirty: message.data.dirty,
-        ...(message.data.extension === 'pptx' ? { chartProof: validateChartProof(message.data.chartProof) } : {}) });
+      const result = { extension: message.data.extension, name: message.data.name, revision: message.data.revision, dirty: message.data.dirty,
+        ...(message.data.extension === 'pptx' ? { chartProof: validateChartProof(message.data.chartProof) } : {}) };
+      // FS.readFile returns an owned buffer. Transfer it without a second
+      // document-sized base64 string crossing and remaining in the host realm.
+      if (request.data.binary === true) reply(request, true, { ...result, buffer: bytes.buffer }, undefined, [bytes.buffer]);
+      else reply(request, true, { ...result, base64: toBase64(bytes) });
     } else reply(request, true, message.data);
   } catch (error) { reply(request, false, undefined, errorText(error)); }
 }
@@ -259,7 +271,14 @@ window.addEventListener('keydown', event => {
   const type = key === 's' ? (event.shiftKey ? 'save-as' : 'save') : key === 'o' ? 'open' : key === 'p' ? 'print' : '';
   if (type) { event.preventDefault(); event.stopImmediatePropagation(); send({ event: 'native-request', documentId: activeDocumentId, data: { type } }); }
 }, true);
-window.addEventListener('pagehide', () => { disposed = true; pending.clear(); });
+window.addEventListener('pagehide', () => {
+  disposed = true; pending.clear();
+  // The app has already resolved unsaved edits before removing this iframe.
+  // Stop both active and pooled workers now instead of waiting for GC to reap
+  // their WebAssembly instances and shared memory references.
+  port?.close(); port = null;
+  window.PThread?.terminateAllThreads();
+}, { once: true });
 async function start() {
   await diagnoseFeatures();
   if (!session || parent === window) throw Error('请从 Open Office 应用打开编辑器。');
@@ -267,7 +286,7 @@ async function start() {
   progress('正在准备中文字体', 5);
   const fontResponse = await fetch(new URL('NotoSansCJKsc-Regular.otf', runtimeBase));
   if (!fontResponse.ok) throw Error('缺少中文字体资源，请重新下载完整办公组件。');
-  const font = new Uint8Array(await fontResponse.arrayBuffer());
+  let font = new Uint8Array(await fontResponse.arrayBuffer());
   smokeDiagnostic('font-ready', { bytes: font.byteLength });
   window.Module = {
     canvas,
@@ -275,9 +294,13 @@ async function start() {
     locateFile: path => new URL(path, runtimeBase).href,
     mainScriptUrlOrBlob: new Blob([`importScripts(${JSON.stringify(new URL('offline-policy.js', adapterBase).href)});OpenOfficeOfflinePolicy.installLocalTransport(globalThis,${JSON.stringify(location.origin)});importScripts(${JSON.stringify(new URL('soffice.js', runtimeBase).href)});`], { type: 'application/javascript' }),
     preRun: [() => {
+      // This pinned runtime executes its own preRun first (which sets 4).
+      // A two-worker computation limit avoids idle instances on small machines.
+      ENV.MAX_CONCURRENCY = '2';
       // This directory is explicitly listed in the runtime fontconfig.
       FS.mkdirTree('/usr/share/fonts/open-office');
-      FS.writeFile('/usr/share/fonts/open-office/NotoSansCJKsc-Regular.otf', font);
+      FS.writeFile('/usr/share/fonts/open-office/NotoSansCJKsc-Regular.otf', font, { canOwn: true });
+      font = null;
     }],
     setStatus: text => {
       const match = String(text).match(/\((\d+)\/(\d+)\)/);
