@@ -15,10 +15,22 @@ Module.zetajs.then(zetajs => {
     presentation: { factory: 'simpress', service: 'com.sun.star.presentation.PresentationDocument', formats: ['pptx','odp'], pdf: 'impress_pdf_Export' },
   };
   let current = null, outputCounter = 0;
+  const presentationObjects = typeof createPresentationObjects === 'function'
+    ? createPresentationObjects({ zetajs, css, getModel: () => current?.model }) : null;
+  const presentationLayouts = new Set([0, 1, 3, 12, 14, 15, 16, 18, 19, 20, 32, 34]);
 
   function describe(error) {
     try { const exception = zetajs.catchUnoException(error); return exception.Message || String(exception); }
     catch { return String(error?.message || error); }
+  }
+  function recoverOptional(error) {
+    // Catching a raw UNO WASM exception without the SDK helper leaves its native
+    // exception reference alive. Consume only exceptions we intentionally ignore;
+    // errors rethrown to the RPC boundary are consumed once by describe().
+    if (error instanceof WebAssembly.RuntimeError) throw error;
+    if (error instanceof Error) return;
+    try { zetajs.catchUnoException(error); }
+    catch (caught) { if (caught instanceof WebAssembly.RuntimeError) throw caught; }
   }
   // Reject macro confirmations, link updates and password prompts in imported files.
   // Import always uses NEVER_EXECUTE = 0 and NO_UPDATE = 0, even if the user profile changes.
@@ -39,7 +51,7 @@ Module.zetajs.then(zetajs => {
       const number = current.model.getCurrentController().getCurrentPage().getPropertyValue('Number');
       if (Number.isInteger(number)) pageIndex = Math.max(0, Math.min(current.model.getDrawPages().getCount() - 1, number - 1));
     }
-    nativeRequest('presentation-preview', '静态放映预览不播放动画、音频或视频。', { pageIndex });
+    nativeRequest('presentation-preview', '使用内置放映器播放已支持的转场与本地媒体。', { pageIndex });
     return { pageIndex };
   }
   function installInterception(document) {
@@ -52,6 +64,9 @@ Module.zetajs.then(zetajs => {
       '.uno:InsertGraphic': 'insert-image', '.uno:Quit': 'quit',
       '.uno:Presentation': 'presentation-preview', '.uno:PresentationCurrentSlide': 'presentation-preview',
       '.uno:RehearseTimings': 'presentation-preview',
+      ...(document.kind === 'presentation' ? {
+        '.uno:DuplicatePage': 'presentation-duplicate', '.uno:DuplicateSlide': 'presentation-duplicate',
+      } : {}),
     };
     const notices = { '.uno:ExportTo': '通用导出当前仅支持 PDF；原格式副本请使用“另存为”。' };
     // PrintPreview is a local preview view, not a print job. Keep that view native,
@@ -62,7 +77,14 @@ Module.zetajs.then(zetajs => {
       if (!type) return null;
       const notice = notices[url.Complete], fromCurrent = url.Complete === '.uno:PresentationCurrentSlide', key = `${type}:${notice || ''}:${fromCurrent}`;
       if (!delegates.has(key)) delegates.set(key, zetajs.unoObject([css.frame.XDispatch], {
-        dispatch() { if (type === 'presentation-preview') requestPresentationPreview(fromCurrent); else nativeRequest(type, notice); },
+        dispatch() {
+          if (type === 'presentation-preview') requestPresentationPreview(fromCurrent);
+          else if (type === 'presentation-duplicate') {
+            // The shell duplicates both the real UNO page and its preserved
+            // PPTX media/transition metadata as one operation.
+            if (current === document) nativeRequest(type, undefined, { pageIndex: activeSlideIndex() });
+          } else nativeRequest(type, notice);
+        },
         addStatusListener(listener, featureURL) {
           listener.statusChanged(new css.frame.FeatureStateEvent({ FeatureURL: featureURL, IsEnabled: true, Requery: false }));
         },
@@ -82,10 +104,32 @@ Module.zetajs.then(zetajs => {
     document.interceptor = interceptor; document.frame = frame; document.delegates = delegates;
   }
   function reportDirty(document) { send({ event: 'dirty', documentId: document.id, data: { dirty: document.dirty, revision: document.revision } }); }
+  function reportPresentationChanged(document) {
+    if (current === document && document.kind === 'presentation') send({ event: 'presentation-changed', documentId: document.id });
+  }
+  function listenPresentation(document) {
+    if (document.kind !== 'presentation') return;
+    const controller = document.model.getCurrentController();
+    document.controller = controller;
+    try {
+      document.selectionListener = zetajs.unoObject([css.view.XSelectionChangeListener], {
+        selectionChanged() { reportPresentationChanged(document); }, disposing() {},
+      });
+      controller.addSelectionChangeListener(document.selectionListener);
+    } catch (error) { recoverOptional(error); document.selectionListener = null; }
+    try {
+      document.pageListener = zetajs.unoObject([css.beans.XPropertyChangeListener], {
+        propertyChange() { reportPresentationChanged(document); }, disposing() {},
+      });
+      controller.addPropertyChangeListener('CurrentPage', document.pageListener);
+    } catch (error) { recoverOptional(error); document.pageListener = null; }
+  }
   function closeDocument(document) {
     if (!document) return;
-    try { document.model.removeModifyListener(document.listener); } catch {}
-    try { document.frame.releaseDispatchProviderInterceptor(document.interceptor); } catch {}
+    try { document.model.removeModifyListener(document.listener); } catch (error) { recoverOptional(error); }
+    try { if (document.selectionListener) document.controller.removeSelectionChangeListener(document.selectionListener); } catch (error) { recoverOptional(error); }
+    try { if (document.pageListener) document.controller.removePropertyChangeListener('CurrentPage', document.pageListener); } catch (error) { recoverOptional(error); }
+    try { document.frame.releaseDispatchProviderInterceptor(document.interceptor); } catch (error) { recoverOptional(error); }
     document.model.setModified(false); document.model.close(true);
   }
   function open(data) {
@@ -111,7 +155,8 @@ Module.zetajs.then(zetajs => {
       }
       model.setModified(false);
       const document = { id: data.id, name: data.name, kind: data.kind, extension: data.extension, model,
-        dirty: false, revision: 0, suppressed: false, path: data.isNew ? null : data.path };
+        dirty: false, revision: 0, suppressed: false, path: data.isNew ? null : data.path,
+        pageIdentities: [], nextPageIdentity: 0 };
       document.listener = zetajs.unoObject([css.util.XModifyListener], {
         modified() {
           if (current !== document || document.suppressed) return;
@@ -121,6 +166,7 @@ Module.zetajs.then(zetajs => {
       });
       model.addModifyListener(document.listener);
       installInterception(document);
+      listenPresentation(document);
       const previous = current;
       closeDocument(previous);
       current = document;
@@ -128,7 +174,7 @@ Module.zetajs.then(zetajs => {
       const window = document.frame.getContainerWindow(); window.FullScreen = true;
       document.frame.activate(); window.setFocus();
       return { closedPath, id: document.id, dirty: false, revision: 0, language: 'en-US', security: { macros: 'never', externalUpdates: 'never' } };
-    } catch (error) { try { model.setModified(false); model.close(true); } catch {} throw error; }
+    } catch (error) { try { model.setModified(false); model.close(true); } catch (error) { recoverOptional(error); } throw error; }
   }
   function exportFile(data) {
     const format = data.format || current.extension;
@@ -142,8 +188,13 @@ Module.zetajs.then(zetajs => {
     const dirty = current.dirty;
     current.suppressed = true;
     try {
-      current.model.storeToURL(`file://${path}`, [prop('FilterName', filter), prop('Overwrite', true),
-        prop('InteractionHandler', rejectInteraction)]);
+      const args = [prop('FilterName', filter), prop('Overwrite', true), prop('InteractionHandler', rejectInteraction)];
+      if (format === 'pdf' && current.kind === 'presentation') {
+        // Keep PDF page indices aligned with the complete slide list. The player
+        // decides which hidden slides to skip, rather than losing their mapping.
+        args.push(prop('FilterData', new zetajs.Any(zetajs.type.sequence(zetajs.type.struct(css.beans.PropertyValue)), [prop('ExportHiddenSlides', true)])));
+      }
+      current.model.storeToURL(`file://${path}`, args);
       current.model.setModified(current.dirty);
     } finally { current.suppressed = false; }
     return { path, extension: format, name: current.name.replace(/\.[^.]+$/, '') + '.' + format, revision, dirty };
@@ -159,7 +210,7 @@ Module.zetajs.then(zetajs => {
         width = Math.min(12000, Math.max(1000, Math.round(size.Width * 26.4583)));
         height = Math.max(500, Math.round(width * size.Height / size.Width));
       }
-    } catch {}
+    } catch (error) { recoverOptional(error); }
     const controller = current.model.getCurrentController();
     if (current.kind === 'word') {
       const object = current.model.createInstance('com.sun.star.text.TextGraphicObject');
@@ -182,10 +233,178 @@ Module.zetajs.then(zetajs => {
       object.setPropertyValue('Graphic', graphic);
       object.setSize(new css.awt.Size({ Width: width, Height: height }));
       let point = new css.awt.Point({ X: 1000, Y: 1000 });
-      if (current.kind === 'sheet') { try { point = controller.getSelection().getPosition(); } catch {} }
+      if (current.kind === 'sheet') { try { point = controller.getSelection().getPosition(); } catch (error) { recoverOptional(error); } }
       object.setPosition(point);
     }
     return { dirty: current.dirty, revision: current.revision };
+  }
+  function requirePresentation() {
+    if (current?.kind !== 'presentation') throw Error('此操作仅适用于演示文稿。');
+    return current.model;
+  }
+  function slideAt(index) {
+    const pages = requirePresentation().getDrawPages();
+    if (!Number.isInteger(index) || index < 0 || index >= pages.getCount()) throw Error('幻灯片索引无效，请刷新页面列表。');
+    return pages.getByIndex(index);
+  }
+  function activeSlideIndex() {
+    const model = requirePresentation(), page = model.getCurrentController().getCurrentPage();
+    const index = page.getPropertyValue('Number') - 1;
+    if (!Number.isInteger(index) || index < 0 || index >= model.getDrawPages().getCount()) throw Error('未能读取当前幻灯片，请切换到普通视图。');
+    return index;
+  }
+  function slideText(shape) {
+    try { return typeof shape.getText === 'function' ? String(shape.getText().getString() || '') : ''; }
+    catch (error) { recoverOptional(error); return ''; }
+  }
+  function slideTitle(page) {
+    let fallback = '';
+    for (let index = 0; index < page.getCount(); index++) {
+      const shape = page.getByIndex(index), text = slideText(shape).trim();
+      if (!text) continue;
+      if (!fallback) fallback = text;
+      try { if (shape.getShapeType() === 'com.sun.star.presentation.TitleTextShape') return text.slice(0, 160); } catch (error) { recoverOptional(error); }
+      try { if (shape.supportsService('com.sun.star.presentation.TitleTextShape')) return text.slice(0, 160); } catch (error) { recoverOptional(error); }
+    }
+    return fallback.slice(0, 160);
+  }
+  function slideIdentity(page) {
+    for (const item of current.pageIdentities) {
+      try { if (zetajs.sameUnoObject(item.page, page)) return item.id; } catch (error) { recoverOptional(error); }
+    }
+    const id = `${current.id}:slide:${++current.nextPageIdentity}`;
+    current.pageIdentities.push({ page, id }); return id;
+  }
+  function slideSummary(page, index) {
+    return { id: slideIdentity(page), index, name: page.getName(), title: slideTitle(page),
+      hidden: page.getPropertyValue('Visible') === false, layout: page.getPropertyValue('Layout') };
+  }
+  function notesShape(page, create = false) {
+    const notes = page.getNotesPage();
+    let empty = null;
+    for (let index = 0; index < notes.getCount(); index++) {
+      const shape = notes.getByIndex(index);
+      // Impress exposes NotesShape as its shape type but lists only the generic
+      // TextShape service after OOXML import. Checking supportsService alone
+      // misses real notes and creates duplicate body placeholders on every edit.
+      let isNotes = false;
+      try { isNotes = shape.getShapeType() === 'com.sun.star.presentation.NotesShape'; } catch (error) { recoverOptional(error); }
+      if (!isNotes) { try { isNotes = shape.supportsService('com.sun.star.presentation.NotesShape'); } catch (error) { recoverOptional(error); } }
+      if (isNotes) { if (slideText(shape)) return shape; if (!empty) empty = shape; }
+    }
+    if (empty) return empty;
+    if (!create) return null;
+    const shape = current.model.createInstance('com.sun.star.presentation.NotesShape');
+    notes.add(shape);
+    shape.setPosition(new css.awt.Point({ X: 1500, Y: Math.round(notes.getPropertyValue('Height') * .5) }));
+    shape.setSize(new css.awt.Size({ Width: Math.max(1000, notes.getPropertyValue('Width') - 3000), Height: Math.max(1000, Math.round(notes.getPropertyValue('Height') * .4)) }));
+    return shape;
+  }
+  function slideBackground(page) {
+    const background = page.getPropertyValue('Background');
+    if (!background) return { type: 'none' };
+    const style = background.getPropertyValue('FillStyle');
+    if (style === css.drawing.FillStyle.NONE) return { type: 'none' };
+    if (style === css.drawing.FillStyle.SOLID) return { type: 'solid', color: '#' + (background.getPropertyValue('FillColor') >>> 0).toString(16).padStart(6, '0').slice(-6).toUpperCase() };
+    return { type: 'other' };
+  }
+  function presentationState() {
+    const model = requirePresentation(), pages = model.getDrawPages(), currentPageIndex = activeSlideIndex();
+    const page = pages.getByIndex(currentPageIndex), summaries = [];
+    for (let index = 0; index < pages.getCount(); index++) summaries.push(slideSummary(pages.getByIndex(index), index));
+    const shape = notesShape(page), objectState = presentationObjects?.listObjects();
+    current.dirty = model.isModified();
+    return { documentId: current.id, revision: current.revision, dirty: current.dirty,
+      pageCount: pages.getCount(), currentPageIndex,
+      pageSize: { width: page.getPropertyValue('Width') / 100, height: page.getPropertyValue('Height') / 100 },
+      pages: summaries,
+      currentPage: { ...summaries[currentPageIndex], background: slideBackground(page), notes: shape ? slideText(shape) : '' },
+      objects: objectState?.objects || [], selectedObjectIds: objectState?.selectedIds || [] };
+  }
+  function checkedLayout(value) {
+    if (!Number.isInteger(value) || !presentationLayouts.has(value)) throw Error('请选择受支持的普通幻灯片布局。');
+    return value;
+  }
+  function presentationAction(data) {
+    const model = requirePresentation(), pages = model.getDrawPages(), controller = model.getCurrentController();
+    if (!data || typeof data !== 'object') throw Error('演示文稿操作无效。');
+    if (data.expectedRevision !== undefined && data.expectedRevision !== current.revision) throw Error('演示文稿已更新，请刷新后再操作，未应用过期更改。');
+    const pageIndex = data.pageIndex === undefined ? activeSlideIndex() : data.pageIndex;
+    const page = slideAt(pageIndex);
+    switch (data.type) {
+      case 'select-page': controller.setCurrentPage(page); break;
+      case 'add-page': {
+        const layout = checkedLayout(data.layout === undefined ? page.getPropertyValue('Layout') : data.layout);
+        const added = pages.insertNewByIndex(pages.getCount());
+        added.setMasterPage(page.getMasterPage()); added.setPropertyValue('Layout', layout);
+        controller.setCurrentPage(added); break;
+      }
+      case 'duplicate-page': {
+        const copy = model.duplicate(page); controller.setCurrentPage(copy); break;
+      }
+      case 'delete-page': {
+        if (pages.getCount() <= 1) throw Error('演示文稿至少需要保留一张幻灯片。');
+        pages.remove(page); controller.setCurrentPage(pages.getByIndex(Math.min(pageIndex, pages.getCount() - 1))); break;
+      }
+      case 'move-page': {
+        if (!['up', 'down'].includes(data.direction)) throw Error('页面移动方向无效。');
+        const targetIndex = pageIndex + (data.direction === 'up' ? -1 : 1);
+        if (targetIndex < 0 || targetIndex >= pages.getCount()) throw Error('幻灯片已在此方向的边界。');
+        // A real page change clears the embedded sorter's previous multi-page
+        // selection. Selecting the already-current page is a no-op in Impress,
+        // so visit a different slide first and verify both actual view changes.
+        controller.setCurrentPage(pages.getByIndex(pageIndex === 0 ? 1 : 0));
+        if (activeSlideIndex() === pageIndex) throw Error('当前视图未能切换幻灯片，未执行移动。');
+        controller.setCurrentPage(page);
+        if (activeSlideIndex() !== pageIndex) throw Error('当前视图未能选择目标幻灯片，未执行移动。');
+        const before = [];
+        for (let index = 0; index < pages.getCount(); index++) before.push(slideIdentity(pages.getByIndex(index)));
+        const expected = [...before], [moved] = expected.splice(pageIndex, 1); expected.splice(targetIndex, 0, moved);
+        helper.executeDispatch(current.frame, data.direction === 'up' ? '.uno:MovePageUp' : '.uno:MovePageDown', '', 0, []);
+        for (let index = 0; index < pages.getCount(); index++) if (slideIdentity(pages.getByIndex(index)) !== expected[index]) throw Error('当前视图未能按预期移动幻灯片，请刷新后检查页面顺序。');
+        controller.setCurrentPage(pages.getByIndex(targetIndex)); break;
+      }
+      case 'set-hidden':
+        if (typeof data.value !== 'boolean') throw Error('隐藏状态必须为布尔值。');
+        page.setPropertyValue('Visible', !data.value); break;
+      case 'rename-page': {
+        if (typeof data.name !== 'string' || !data.name.trim() || data.name.trim().length > 150) throw Error('幻灯片名称需要为 1–150 个字符。');
+        const name = data.name.trim();
+        for (let index = 0; index < pages.getCount(); index++) if (index !== pageIndex && pages.getByIndex(index).getName() === name) throw Error('已有同名幻灯片，请使用不同名称。');
+        page.setName(name); break;
+      }
+      case 'set-layout': page.setPropertyValue('Layout', checkedLayout(data.layout)); break;
+      case 'set-background': {
+        if (data.color !== null && (typeof data.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(data.color))) throw Error('背景颜色需要为 #RRGGBB 或空值。');
+        const background = model.createInstance('com.sun.star.drawing.Background');
+        background.setPropertyValue('FillStyle', data.color === null ? css.drawing.FillStyle.NONE : css.drawing.FillStyle.SOLID);
+        if (data.color !== null) background.setPropertyValue('FillColor', parseInt(data.color.slice(1), 16));
+        page.setPropertyValue('Background', background); break;
+      }
+      case 'set-notes':
+        if (typeof data.text !== 'string' || data.text.length > 50000) throw Error('备注最多支持 50000 个字符。');
+        notesShape(page, true).getText().setString(data.text); break;
+      case 'set-page-size': {
+        if (![data.width, data.height].every(value => typeof value === 'number' && Number.isFinite(value) && value >= 50 && value <= 1000)) throw Error('幻灯片宽高需要在 50–1000 毫米之间。');
+        // Impress applies standard-page Width/Height to every slide and master.
+        page.setPropertyValue('Width', Math.round(data.width * 100)); page.setPropertyValue('Height', Math.round(data.height * 100)); break;
+      }
+      case 'insert-text': case 'insert-shape': case 'insert-table': case 'update-object':
+      case 'insert-chart': case 'update-chart': case 'update-table':
+      case 'delete-objects': case 'arrange-objects': case 'select-objects': {
+        if (!presentationObjects) throw Error('演示文稿对象工具未载入，请重新启动编辑器。');
+        const { type, pageIndex: ignoredPage, expectedRevision: ignoredRevision, ...input } = data;
+        const method = { 'insert-text': 'insertText', 'insert-shape': 'insertShape', 'insert-table': 'insertTable',
+          'update-object': 'updateObject', 'delete-objects': 'deleteObjects', 'arrange-objects': 'arrange', 'select-objects': 'select',
+          'insert-chart': 'insertChart', 'update-chart': 'updateChart', 'update-table': 'updateTable' }[type];
+        if (type === 'insert-shape') { input.type = input.shapeType; delete input.shapeType; }
+        if (type === 'insert-chart' || type === 'update-chart') { input.type = input.chartType; delete input.chartType; }
+        controller.setCurrentPage(page); presentationObjects[method](input); break;
+      }
+      default: throw Error('不支持的演示文稿操作。');
+    }
+    reportPresentationChanged(current);
+    return presentationState();
   }
   function smokeTest() {
     const report = { ok: false, engine: 'ZetaOffice / LibreOffice 24.2.8.0', writer: {}, calc: {}, impress: {}, artifacts: [] };
@@ -244,7 +463,7 @@ Module.zetajs.then(zetajs => {
       const findText = (page, expected) => {
         for (let i = 0; i < page.getCount(); i++) {
           const shape = page.getByIndex(i);
-          try { if (shape.getText().getString() === expected) return shape; } catch {}
+          try { if (shape.getText().getString() === expected) return shape; } catch (error) { recoverOptional(error); }
         }
         throw Error('Presentation slide text did not round-trip: ' + expected);
       };
@@ -268,7 +487,7 @@ Module.zetajs.then(zetajs => {
         && report.impress.slideCount === 2 && report.impress.originalTextEdited && report.impress.pptxReopened && report.impress.odpReopened;
       return report;
     } finally {
-      for (const model of models) { try { close(model); } catch {} }
+      for (const model of models) { try { close(model); } catch (error) { recoverOptional(error); } }
       current?.frame.activate(); current?.frame.getContainerWindow().setFocus();
     }
   }
@@ -276,8 +495,18 @@ Module.zetajs.then(zetajs => {
     if (message.action === 'open') return open(message.data);
     if (!current || message.documentId !== current.id) throw Error('当前文档已经切换，旧操作已取消。');
     if (message.action === 'smoke-test') return smokeTest();
+    if (message.action === 'presentation-state') return presentationState();
+    if (message.action === 'presentation-action') return presentationAction(message.data);
+    if (message.action === 'presentation-object-data') {
+      requirePresentation();
+      if (!presentationObjects) throw Error('演示文稿对象工具未载入，请重新启动编辑器。');
+      const data = message.data;
+      if (!data || !['table', 'chart'].includes(data.type) || typeof data.id !== 'string'
+        || Object.keys(data).some(key => !['type', 'id'].includes(key))) throw Error('不支持的演示对象读取操作。');
+      return data.type === 'table' ? presentationObjects.getTable({ id: data.id }) : presentationObjects.getChart({ id: data.id });
+    }
     if (message.action === 'preview-presentation') return requestPresentationPreview(message.data.fromCurrent === true);
-    if (['start-presentation','end-presentation'].includes(message.action)) throw Error('请使用应用中的静态放映预览。');
+    if (['start-presentation','end-presentation'].includes(message.action)) throw Error('请使用应用中的内置放映。');
     if (message.action === 'new-slide') {
       if (current.kind !== 'presentation') throw Error('此操作仅适用于演示文稿。');
       const controller = current.model.getCurrentController();
@@ -308,6 +537,7 @@ Module.zetajs.then(zetajs => {
       current.suppressed = true; current.model.setModified(false); current.suppressed = false;
       current.dirty = false; reportDirty(current); return { dirty: false };
     }
+    if (!['undo', 'redo', 'search', 'focus'].includes(message.action)) throw Error('不支持的编辑器操作。');
     if (message.action === 'undo' || message.action === 'redo') helper.executeDispatch(current.frame, message.action === 'undo' ? '.uno:Undo' : '.uno:Redo', '', 0, []);
     if (message.action === 'search') {
       const query = String(message.data.query || '').slice(0, 5000);

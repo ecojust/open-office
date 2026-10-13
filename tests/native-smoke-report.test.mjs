@@ -23,6 +23,7 @@ function completeReport() {
         pptxBytes: 20000, odpBytes: 14000, pdfBytes: 17000, pdfHeader: '%PDF-', pdfPageCount: 2,
       },
     },
+    presentationWorkbench: {ok:true,pageCount:3,hiddenPageIndex:2,slideName:'Native saved page 中文',notes:'Native notes persisted 备注',editableTable:true,editableChart:true,transition:'fade',mediaBytes:3244,mediaDuration:.2,pdfCanvasPages:[0,1]},
     pdf: {
       ok: true, reopened: true, removedOldText: true, newTextPresent: true,
       metadata: { pageCount: 1 }, text: 'NEW_NATIVE_TEXT 新的合同',
@@ -115,3 +116,18 @@ test('successful Impress output cannot bypass earlier Writer, Calc, PDF or isola
     assert.throws(() => validateFrontendReport(report));
   }
 });
+
+
+test('new presentation release requires editable object, media metadata and actual canvas evidence', () => {
+  for (const mutate of [
+    report => {delete report.presentationWorkbench},
+    report => {report.presentationWorkbench.editableChart = false},
+    report => {report.presentationWorkbench.notes = ''},
+    report => {report.presentationWorkbench.mediaDuration = '0.2'},
+    report => {report.presentationWorkbench.mediaBytes = 0},
+    report => {report.presentationWorkbench.pdfCanvasPages = [0,2]},
+  ]) {
+    const report = completeReport(); mutate(report)
+    assert.throws(() => validateFrontendReport(report), /Presentation workbench/)
+  }
+})

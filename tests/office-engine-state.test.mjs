@@ -3,12 +3,21 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
 
-// Exercise the actual worker's protocol with a deterministic UNO model. Real
-// DOCX/XLSX/PPTX/ODP/PDF round trips run in the native WebView smoke test.
+// Exercise the actual worker source and protocol with a deterministic UNO mock.
+// These tests do not prove native UNO or document round-trip compatibility;
+// those require the separate browser/native engine integration tests.
 const source = await readFile(new URL('../public/office/office-worker.js', import.meta.url), 'utf8')
 async function engine(initial = { kind: 'word', extension: 'docx' }) {
-  const messages = [], models = [], imports = [], stores = []
-  const controls = { failNextLoad: false, rejectNextService: false }
+  const messages = [], models = [], imports = [], stores = [], dispatches = []
+  const controls = { failNextLoad: false, rejectNextService: false, ignoreMove: false, refusePageSwitch: false, configureNextModel: null }
+  const nativeExceptions = new Map(), exceptionCalls = []
+  const nativeException = message => {
+    // A token, not an Error: real UNO exceptions cross the boundary as tagged
+    // WebAssembly exceptions and require catchUnoException to release them.
+    const token = Object.freeze({ mockNativeUnoException: message })
+    nativeExceptions.set(token, { message, consumed: 0 })
+    return token
+  }
   class Value { constructor(value) { Object.assign(this, value) } }
   const frame = { registerDispatchProviderInterceptor(value) { this.interceptor = value }, releaseDispatchProviderInterceptor() {}, activate() {}, getContainerWindow: () => ({ setFocus() {} }) }
   const desktop = { loadComponentFromURL(url, target, flags, args) {
@@ -18,39 +27,110 @@ async function engine(initial = { kind: 'word', extension: 'docx' }) {
     if (target === '_default' && models.length) models.at(-1).closed = true
     if (controls.failNextLoad) { controls.failNextLoad = false; throw Error('Document import failed') }
     const serviceAccepted = !controls.rejectNextService; controls.rejectNextService = false
-    const pages = [], shapes = []
-    const makePage = () => ({ add(shape) { shapes.push(shape) }, getMasterPage: () => 'master', setMasterPage(value) { this.master = value },
-      getPropertyValue(name) { return name === 'Number' ? pages.indexOf(this) + 1 : ({ Layout: 1, Width: 28000, Height: 15750 })[name] }, setPropertyValue(name, value) { this[name] = value } })
+    const pages = [], shapes = [], mutations = []
+    let nextPage = 0
+    const changed = (type, target) => { mutations.push({ type, target }); model.edit() }
+    const makeShape = service => {
+      let text = ''
+      const shape = { service, getShapeType: () => service, supportsService: name => name === service,
+        getPropertyValue(name) { return this[name] },
+        setPropertyValue(name, value) { this[name] = value },
+        setSize(value) { this.size = value }, setPosition(value) { this.position = value },
+        setName(value) { this.name = value }, getName() { return this.name || '' },
+        getText: () => ({ getString: () => text, setString(value) { text = value; changed('text', shape) } }),
+      }
+      return shape
+    }
+    const makePage = (notes = false) => {
+      const pageShapes = [], notesPage = notes ? null : makePage(true)
+      const page = { name: notes ? 'Notes' : `Slide ${++nextPage}`, Layout: notes ? 21 : 1,
+        Width: notes ? 21000 : 28000, Height: notes ? 29700 : 15750, Visible: true, Background: null,
+        pageShapes, getCount: () => pageShapes.length, getByIndex: index => pageShapes[index],
+        add(shape) { pageShapes.push(shape); shapes.push(shape); changed('add-shape', page) },
+        getMasterPage() { return this.master || 'master' }, setMasterPage(value) { this.master = value; changed('master', page) },
+        getName() { return this.name }, setName(value) { this.name = value; changed('rename', page) },
+        getNotesPage: () => notesPage,
+        getPropertyValue(name) { return name === 'Number' ? pages.indexOf(this) + 1 : this[name] },
+        setPropertyValue(name, value) {
+          if (name === 'Number') throw Error('Readonly Number')
+          if (!notes && ['Width', 'Height'].includes(name)) for (const other of pages) other[name] = value
+          else this[name] = value
+          changed(name, page)
+        },
+      }
+      return page
+    }
     pages.push(makePage())
     let activePage = pages[0]
     const presentation = { running: false, start() { this.running = true }, end() { this.running = false }, isRunning() { return this.running } }
-    const model = { modified: false, closed: false, listener: null, services: [], shapes, pages,
+    const controller = { getFrame: () => frame, getCurrentPage: () => activePage,
+      setCurrentPage(value) {
+        if (controls.refusePageSwitch || value === activePage) return
+        activePage = value; this.selectedPages = [value]
+        this.pageListener?.propertyChange({ PropertyName: 'CurrentPage', NewValue: value })
+      },
+      selectedPages: [activePage], getActiveSheet: () => ({ getDrawPage: () => pages[0] }),
+      getSelection: () => ({ getPosition: () => ({ X: 2000, Y: 3000 }) }),
+      addSelectionChangeListener(value) { this.selectionListener = value }, removeSelectionChangeListener() {},
+      addPropertyChangeListener(_name, value) { this.pageListener = value }, removePropertyChangeListener() {},
+    }
+    const model = { modified: false, closed: false, listener: null, services: [], shapes, pages, mutations,
       supportsService(name) { this.services.push(name); return serviceAccepted }, getText: () => ({ createTextCursor: () => ({ setPropertyValue() {} }) }),
       setModified(value) { if (this.closed) throw Error('Model already disposed'); this.modified = value }, isModified() { return this.modified },
       addModifyListener(listener) { this.listener = listener }, removeModifyListener() {}, close() { this.closed = true },
-      getCurrentController: () => ({ getFrame: () => frame, getCurrentPage: () => activePage, setCurrentPage(value) { activePage = value },
-        getActiveSheet: () => ({ getDrawPage: () => pages[0] }), getSelection: () => ({ getPosition: () => ({ X: 2000, Y: 3000 }) }) }),
-      getDrawPages: () => ({ getCount: () => pages.length, insertNewByIndex(index) { const page = makePage(); pages.splice(index, 0, page); model.edit(); return page } }),
+      getCurrentController: () => controller,
+      getDrawPages: () => ({ getCount: () => pages.length, getByIndex: index => pages[index],
+        // This fixed engine inserts after the given index, clamped to the end.
+        insertNewByIndex(index) { const page = makePage(); pages.splice(Math.min(index + 1, pages.length), 0, page); changed('insert-page', page); return page },
+        remove(page) { if (pages.length > 1) { pages.splice(pages.indexOf(page), 1); changed('remove-page', page) } },
+      }),
+      duplicate(page) {
+        const copy = makePage(); copy.Layout = page.Layout; copy.Visible = page.Visible; copy.Background = page.Background
+        const copyShapes = (source, target) => {
+          for (const item of source.pageShapes) { const duplicate = makeShape(item.service); target.add(duplicate); duplicate.getText().setString(item.getText().getString()) }
+        }
+        copyShapes(page, copy); copyShapes(page.getNotesPage(), copy.getNotesPage())
+        pages.splice(pages.indexOf(page) + 1, 0, copy); changed('duplicate-page', copy); return copy
+      },
       getPresentation: () => presentation,
-      createInstance: service => ({ service, setPropertyValue(name, value) { this[name] = value }, setSize(value) { this.size = value }, setPosition(value) { this.position = value } }),
+      createInstance: makeShape,
       storeToURL(path, args) { stores.push({ path, args }); this.modified = false },
-      edit(notify = true) { this.modified = true; if (notify) this.listener.modified() },
+      edit(notify = true) { this.modified = true; if (notify) this.listener?.modified() },
     }
-    models.push(model); return model
+    models.push(model)
+    const configure = controls.configureNextModel; controls.configureNextModel = null
+    configure?.(model)
+    return model
   } }
-  const css = { frame: { Desktop: { create: () => desktop }, DispatchHelper: { create: () => ({ executeDispatch() {} }) },
+  const css = { frame: { Desktop: { create: () => desktop }, DispatchHelper: { create: () => ({ executeDispatch(_frame, command) {
+      dispatches.push(command)
+      if (!['.uno:MovePageUp', '.uno:MovePageDown'].includes(command) || controls.ignoreMove) return
+      const model = models.findLast(item => !item.closed), controller = model.getCurrentController()
+      assert.equal(controller.selectedPages.length, 1, 'Worker must clear stale sorter multiselection before moving')
+      const page = controller.selectedPages[0], index = model.pages.indexOf(page)
+      model.pages.splice(index, 1); model.pages.splice(index + (command.endsWith('Up') ? -1 : 1), 0, page)
+      model.edit()
+    } }) },
       XDispatchProviderInterceptor: 'interceptor', XInterceptorInfo: 'info', XDispatch: 'dispatch', FeatureStateEvent: Value },
-    beans: { PropertyValue: Value }, task: { XInteractionHandler: 'handler', XInteractionAbort: 'abort' },
+    beans: { PropertyValue: Value, XPropertyChangeListener: 'property-listener' }, view: { XSelectionChangeListener: 'selection-listener' },
+    drawing: { FillStyle: { NONE: 0, SOLID: 1 } }, task: { XInteractionHandler: 'handler', XInteractionAbort: 'abort' },
     document: { MacroExecMode: { NEVER_EXECUTE: 0 }, UpdateDocMode: { NO_UPDATE: 0 } }, util: { XModifyListener: 'listener' },
     graphic: { GraphicProvider: { create: () => ({ queryGraphic: () => ({ getPropertyValue: () => ({ Width: 1000, Height: 3000 }) }) }) } },
     awt: { Size: Value, Point: Value } }
   const port = { postMessage: message => messages.push(message) }
   const zeta = { uno: { com: { sun: { star: css } } }, getUnoComponentContext: () => ({}),
-    unoObject: (_interfaces, object) => object, type: { short: 'short', interface: value => value },
+    unoObject: (_interfaces, object) => object, sameUnoObject: (left, right) => left === right,
+    type: { short: 'short', interface: value => value, sequence: value => ({ kind: 'sequence', element: value }), struct: value => ({ kind: 'struct', definition: value }) },
     Any: class { constructor(type, value) { this.type = type; this.value = value } }, mainPort: port,
-    catchUnoException(error) { throw error },
+    catchUnoException(error) {
+      exceptionCalls.push(error)
+      const native = nativeExceptions.get(error)
+      if (!native) throw error
+      native.consumed++
+      return { Message: native.message }
+    },
   }
-  vm.runInNewContext(source, { Module: { zetajs: Promise.resolve(zeta) }, console })
+  vm.runInNewContext(source, { Module: { zetajs: Promise.resolve(zeta) }, console, WebAssembly })
   await Promise.resolve()
   let seq = 0
   const request = (action, data = {}, documentId = 'A') => {
@@ -61,7 +141,8 @@ async function engine(initial = { kind: 'word', extension: 'docx' }) {
     return reply
   }
   assert.equal(request('open', { id: 'A', name: `A.${initial.extension}`, ...initial, isNew: true }).ok, true)
-  return { request, imports, stores, model: models[0], models, controls, messages, frame }
+  return { request, imports, stores, model: models[0], models, controls, messages, frame, dispatches,
+    nativeException, nativeExceptions, exceptionCalls }
 }
 
 test('office imports disable macros and external updates independently of profile', async () => {
@@ -168,6 +249,33 @@ test('presentation actions add a themed slide, preserve edits, and route only to
   assert.equal(request('new-slide', {}, 'other-document').ok, false)
 })
 
+test('native duplicate-slide menus route the active slide through the shell without bypassing its media metadata', async () => {
+  const { request, model, frame, messages } = await engine({ kind: 'presentation', extension: 'pptx' })
+  request('new-slide')
+  const snapshot = request('export', { format: 'pptx' }).data
+  request('mark-saved', { revision: snapshot.revision })
+  let previousDelegate
+  for (const command of ['.uno:DuplicatePage', '.uno:DuplicateSlide']) {
+    const url = { Complete: command }
+    const delegate = frame.interceptor.queryDispatch(url, '', 0)
+    assert.ok(delegate)
+    delegate.dispatch(url, [])
+    assert.equal(messages.at(-1).event, 'native-request')
+    assert.equal(messages.at(-1).documentId, 'A')
+    assert.equal(messages.at(-1).data.type, 'presentation-duplicate')
+    assert.equal(messages.at(-1).data.pageIndex, 1)
+    assert.equal(model.pages.length, 2, 'The shell must duplicate the page and media together')
+    assert.equal(model.isModified(), false)
+    previousDelegate = delegate
+  }
+  assert.equal(request('open', { id: 'B', name: 'B.pptx', kind: 'presentation', extension: 'pptx', isNew: true }).ok, true)
+  const before = messages.length
+  previousDelegate.dispatch({ Complete: '.uno:DuplicatePage' }, [])
+  assert.equal(messages.length, before, 'A stale frame cannot duplicate a slide in the next document')
+  const word = await engine()
+  assert.equal(word.frame.interceptor.queryDispatch({ Complete: '.uno:DuplicatePage' }, '', 0), null)
+})
+
 test('Word rejects presentation-only actions without editing the current document', async () => {
   const { request, model } = await engine()
   for (const action of ['new-slide','preview-presentation','start-presentation','end-presentation']) assert.equal(request(action).ok, false)
@@ -245,4 +353,365 @@ test('common File commands use native save/export/print/quit flows without writi
   assert.equal(model.isModified(), true, 'A file command is not a native save acknowledgement')
   assert.equal(interceptor.getInterceptedURLs().includes('.uno:PrintPreview'), false)
   assert.equal(interceptor.queryDispatch({ Complete: '.uno:PrintPreview' }, '', 0), null)
+})
+
+const plain = value => JSON.parse(JSON.stringify(value))
+const presentation = () => engine({ kind: 'presentation', extension: 'pptx' })
+function state(request) {
+  const reply = request('presentation-state')
+  assert.equal(reply.ok, true, reply.error)
+  return plain(reply.data)
+}
+function action(request, data) {
+  const reply = request('presentation-action', data)
+  assert.equal(reply.ok, true, reply.error)
+  return plain(reply.data)
+}
+
+test('presentation-state reads titles and metadata without dirtying, renaming, or creating notes', async () => {
+  const { request, model, messages } = await presentation()
+  const title = model.createInstance('com.sun.star.presentation.TitleTextShape')
+  model.pages[0].add(title); title.getText().setString('季度报告 · Q4')
+  const fallback = model.createInstance('com.sun.star.drawing.TextShape')
+  model.pages[0].add(fallback); fallback.getText().setString('正文不是页名')
+  const saved = request('export', { format: 'pptx' }).data
+  request('mark-saved', { revision: saved.revision })
+  const names = model.pages.map(page => page.getName()), mutations = model.mutations.length
+  const dirtyEvents = messages.filter(message => message.event === 'dirty').length
+  const first = state(request), second = state(request)
+  assert.deepEqual(first, second, 'Repeated reads must retain identities and revision')
+  assert.deepEqual(first.pageSize, { width: 280, height: 157.5 })
+  assert.equal(first.currentPage.title, '季度报告 · Q4')
+  assert.equal(first.currentPage.name, names[0])
+  assert.equal(first.currentPage.notes, '')
+  assert.deepEqual(first.currentPage.background, { type: 'none' })
+  assert.equal(first.currentPage.hidden, false)
+  assert.equal(first.dirty, false)
+  assert.equal(first.revision, saved.revision)
+  assert.deepEqual(model.pages.map(page => page.getName()), names)
+  assert.equal(model.pages[0].getNotesPage().getCount(), 0, 'Reading absent notes must not add a placeholder')
+  assert.equal(model.mutations.length, mutations)
+  assert.equal(messages.filter(message => message.event === 'dirty').length, dirtyEvents)
+  assert.equal(model.isModified(), false)
+})
+
+test('presentation slide IDs survive rename, reorder, and stale sorter multiselection', async () => {
+  const { request, model, dispatches } = await presentation()
+  const originalId = state(request).pages[0].id
+  action(request, { type: 'add-page', layout: 20 })
+  const all = action(request, { type: 'add-page', layout: 19 })
+  const ids = all.pages.map(page => page.id)
+  assert.equal(new Set(ids).size, 3)
+  assert.equal(ids[0], originalId)
+  const renamed = action(request, { type: 'rename-page', pageIndex: 0, name: '  开场总览  ' })
+  assert.equal(renamed.pages[0].name, '开场总览')
+  assert.deepEqual(renamed.pages.map(page => page.id), ids)
+  const controller = model.getCurrentController()
+  controller.setCurrentPage(model.pages[0])
+  controller.selectedPages = [...model.pages]
+  const moved = action(request, { type: 'move-page', pageIndex: 0, direction: 'down' })
+  assert.deepEqual(moved.pages.map(page => page.id), [ids[1], ids[0], ids[2]])
+  assert.equal(moved.currentPage.id, originalId)
+  assert.equal(moved.currentPageIndex, 1)
+  assert.equal(moved.currentPage.name, '开场总览')
+  assert.equal(dispatches.at(-1), '.uno:MovePageDown')
+  const restored = action(request, { type: 'move-page', pageIndex: 1, direction: 'up' })
+  assert.deepEqual(restored.pages.map(page => page.id), ids)
+  assert.equal(restored.currentPageIndex, 0)
+  assert.equal(dispatches.at(-1), '.uno:MovePageUp')
+  const mutationCount = model.mutations.length, revision = restored.revision
+  const selected = action(request, { type: 'select-page', pageIndex: 2 })
+  assert.equal(selected.currentPage.id, ids[2])
+  assert.equal(selected.revision, revision, 'Changing selected slide is not an edit')
+  assert.equal(model.mutations.length, mutationCount)
+})
+
+test('presentation actions persist notes, visibility, background, layout, and document-wide dimensions', async () => {
+  const { request, model } = await presentation()
+  action(request, { type: 'add-page', layout: 3 })
+  const original = model.pages[1], notes = original.getNotesPage()
+  const footer = model.createInstance('com.sun.star.presentation.FooterShape')
+  notes.add(footer); footer.getText().setString('保留页脚')
+  const withNotes = action(request, { type: 'set-notes', text: '开场提醒\n第二段中文备注' })
+  assert.equal(withNotes.currentPage.notes, '开场提醒\n第二段中文备注')
+  action(request, { type: 'set-notes', text: '更新后的备注' })
+  assert.equal(notes.pageShapes.filter(shape => shape.service.endsWith('.NotesShape')).length, 1)
+  assert.equal(footer.getText().getString(), '保留页脚')
+  assert.equal(action(request, { type: 'set-hidden', value: true }).currentPage.hidden, true)
+  assert.equal(original.getPropertyValue('Visible'), false)
+  assert.equal(action(request, { type: 'set-hidden', value: false }).currentPage.hidden, false)
+  assert.deepEqual(action(request, { type: 'set-background', color: '#12abEF' }).currentPage.background, { type: 'solid', color: '#12ABEF' })
+  assert.equal(original.Background.getPropertyValue('FillColor'), 0x12abef)
+  assert.deepEqual(action(request, { type: 'set-background', color: null }).currentPage.background, { type: 'none' })
+  assert.equal(action(request, { type: 'set-layout', layout: 0 }).currentPage.layout, 0, 'Layout zero is a valid title slide')
+  const resized = action(request, { type: 'set-page-size', width: 320.125, height: 180 })
+  assert.deepEqual(resized.pageSize, { width: 320.13, height: 180 })
+  for (const page of model.pages) assert.deepEqual([page.Width, page.Height], [32013, 18000])
+  assert.deepEqual([notes.Width, notes.Height], [21000, 29700], 'Notes page dimensions are a separate page kind')
+  const copy = action(request, { type: 'duplicate-page' })
+  assert.equal(copy.pageCount, 3)
+  assert.equal(copy.currentPage.notes, '更新后的备注')
+  assert.equal(copy.currentPage.layout, 0)
+  assert.notEqual(copy.pages[1].id, copy.pages[2].id, 'Duplicate receives its own runtime identity')
+  assert.equal(copy.dirty, true)
+})
+
+test('presentation refuses deleting the final slide and selects a surviving slide after deletion', async () => {
+  const { request, model } = await presentation()
+  const first = state(request), refused = request('presentation-action', { type: 'delete-page' })
+  assert.equal(refused.ok, false)
+  assert.match(refused.error, /至少.*一张/)
+  assert.deepEqual(state(request), first)
+  assert.equal(model.mutations.length, 0)
+  const added = action(request, { type: 'add-page', layout: 20 })
+  const deleted = action(request, { type: 'delete-page', pageIndex: 1 })
+  assert.equal(deleted.pageCount, 1)
+  assert.equal(deleted.currentPageIndex, 0)
+  assert.equal(deleted.currentPage.id, first.currentPage.id)
+  assert.notEqual(deleted.currentPage.id, added.currentPage.id)
+  assert.equal(request('presentation-action', { type: 'delete-page' }).ok, false)
+  assert.equal(model.pages.length, 1)
+})
+
+test('invalid presentation operations reject before altering content or revision', async () => {
+  const { request, model } = await presentation()
+  const before = state(request)
+  const invalid = [
+    ...[-1, 2, 21, 31, 35, 1.5, '1', null].map(layout => ({ type: 'set-layout', layout })),
+    { type: 'add-page', layout: 21 },
+    ...['red', '#fff', '#12345678', '#GG0000', '', 12, undefined].map(color => ({ type: 'set-background', color })),
+    ...[49, 1001, Infinity, NaN, '280', null].map(width => ({ type: 'set-page-size', width, height: 180 })),
+    { type: 'set-page-size', width: 280, height: 0 },
+    { type: 'set-page-size', width: 280, height: Infinity },
+    ...[null, 12, {}, 'x'.repeat(50001)].map(text => ({ type: 'set-notes', text })),
+    ...[-1, 0.5, 1, '0', null].map(pageIndex => ({ type: 'select-page', pageIndex })),
+    ...[-1, 1, '0', null, NaN].map(expectedRevision => ({ type: 'rename-page', name: '不能应用', expectedRevision })),
+    ...['', '   ', 7, 'x'.repeat(151)].map(name => ({ type: 'rename-page', name })),
+    { type: 'set-hidden', value: 'false' },
+    { type: 'set-hidden', value: 0 },
+    { type: 'move-page', direction: 'left' },
+    { type: 'move-page', direction: 'up' },
+    { type: 'move-page', direction: 'down' },
+    { type: 'unsupported-action' }, {}, null,
+  ]
+  for (const data of invalid) {
+    const result = request('presentation-action', data)
+    assert.equal(result.ok, false, `Invalid input accepted: ${JSON.stringify(data)?.slice(0, 160)}`)
+    assert.ok(result.error)
+    assert.deepEqual(state(request), before, 'Rejected input must preserve page state and revision')
+  }
+  assert.equal(model.mutations.length, 0)
+  assert.equal(model.isModified(), false)
+})
+
+test('presentation stale revisions and cross-document requests cannot edit the active document', async () => {
+  const { request, model } = await presentation()
+  const initial = state(request)
+  const changed = action(request, { type: 'rename-page', name: '已更新', expectedRevision: initial.revision })
+  assert.ok(changed.revision > initial.revision)
+  assert.equal(request('presentation-action', { type: 'set-notes', text: '过期覆盖', expectedRevision: initial.revision }).ok, false)
+  assert.equal(request('presentation-state', {}, 'another-document').ok, false)
+  for (const type of ['rename-page', 'delete-page', 'duplicate-page', 'set-notes', 'move-page']) {
+    assert.equal(request('presentation-action', { type, name: '其它文档', text: '其它文档', direction: 'down' }, 'another-document').ok, false)
+  }
+  assert.deepEqual(state(request), changed)
+  const mutations = model.mutations.length
+  const current = action(request, { type: 'set-notes', text: '当前修订允许编辑', expectedRevision: changed.revision })
+  assert.equal(current.currentPage.notes, '当前修订允许编辑')
+  assert.ok(model.mutations.length > mutations)
+  const added = action(request, { type: 'add-page', layout: 20 })
+  assert.equal(request('presentation-action', { type: 'rename-page', name: '已更新', pageIndex: 1 }).ok, false)
+  assert.deepEqual(state(request), added, 'Duplicate names must not change identities or content')
+})
+
+test('presentation move verifies actual order and refuses a controller that cannot switch pages', async () => {
+  const { request, controls, dispatches } = await presentation()
+  const before = action(request, { type: 'add-page', layout: 20 })
+  controls.refusePageSwitch = true
+  const cannotSwitch = request('presentation-action', { type: 'move-page', pageIndex: 1, direction: 'up' })
+  assert.equal(cannotSwitch.ok, false)
+  assert.match(cannotSwitch.error, /未能切换/)
+  assert.equal(dispatches.length, 0)
+  controls.refusePageSwitch = false; controls.ignoreMove = true
+  const unchangedOrder = request('presentation-action', { type: 'move-page', pageIndex: 1, direction: 'up' })
+  assert.equal(unchangedOrder.ok, false)
+  assert.match(unchangedOrder.error, /未能按预期移动/)
+  assert.deepEqual(state(request).pages, before.pages)
+  assert.equal(state(request).revision, before.revision)
+})
+
+test('Word and Calc reject all presentation metadata requests without dirtying', async () => {
+  for (const initial of [{ kind: 'word', extension: 'docx' }, { kind: 'sheet', extension: 'xlsx' }]) {
+    const { request, model } = await engine(initial)
+    assert.equal(request('presentation-state').ok, false)
+    for (const type of ['select-page', 'rename-page', 'add-page', 'duplicate-page', 'delete-page', 'set-background', 'set-notes', 'set-page-size', 'set-hidden', 'set-layout']) {
+      assert.equal(request('presentation-action', { type }).ok, false, `${initial.kind}: ${type}`)
+    }
+    assert.equal(model.isModified(), false)
+    assert.equal(model.mutations.length, 0)
+  }
+})
+
+test('only presentation PDF exports include typed PropertyValue sequence preserving hidden slides', async () => {
+  for (const initial of [{ kind: 'word', extension: 'docx' }, { kind: 'sheet', extension: 'xlsx' }, { kind: 'presentation', extension: 'pptx' }]) {
+    const { request, stores } = await engine(initial)
+    for (const format of [initial.extension, 'pdf']) {
+      const result = request('export', { format })
+      assert.equal(result.ok, true, result.error)
+      const option = stores.at(-1).args.find(item => item.Name === 'FilterData')
+      if (initial.kind === 'presentation' && format === 'pdf') {
+        assert.ok(option, 'Impress PDF needs FilterData to keep preview indexes aligned')
+        assert.equal(option.Value.type.kind, 'sequence')
+        assert.equal(option.Value.type.element.kind, 'struct')
+        assert.equal(option.Value.type.element.definition, stores.at(-1).args[0].constructor, 'Sequence element is beans.PropertyValue, not Any')
+        assert.equal(option.Value.value.length, 1)
+        assert.equal(option.Value.value[0].Name, 'ExportHiddenSlides')
+        assert.equal(option.Value.value[0].Value, true)
+        assert.equal(option.Value.value[0].constructor, option.Value.type.element.definition)
+      } else assert.equal(option, undefined, `${initial.kind}/${format} must not receive Impress-only PDF options`)
+    }
+  }
+})
+
+test('unknown top-level worker actions reject without dispatching or changing document state', async () => {
+  const { request, model, stores, dispatches, messages } = await presentation()
+  const before = state(request), eventCount = messages.filter(message => message.event).length
+  for (const command of ['unsupported-rpc', 'presentation-acton', '', null, 123]) {
+    const result = request(command, { type: 'delete-page' })
+    assert.equal(result.ok, false, `Unknown worker action accepted: ${JSON.stringify(command)}`)
+    assert.ok(result.error)
+  }
+  assert.deepEqual(state(request), before)
+  assert.equal(model.mutations.length, 0)
+  assert.equal(model.isModified(), false)
+  assert.equal(stores.length, 0)
+  assert.equal(dispatches.length, 0)
+  assert.equal(messages.filter(message => message.event).length, eventCount)
+})
+
+test('imported notes placeholder is reused when its shape type is specific but services are generic', async () => {
+  const { request, model } = await presentation()
+  const notes = model.pages[0].getNotesPage()
+  // Match the observed OOXML import: NotesShape type, drawing.TextShape service.
+  const placeholder = model.createInstance('com.sun.star.drawing.TextShape')
+  placeholder.getShapeType = () => 'com.sun.star.presentation.NotesShape'
+  assert.equal(placeholder.supportsService('com.sun.star.presentation.NotesShape'), false)
+  notes.add(placeholder)
+  const saved = request('export', { format: 'pptx' }).data
+  request('mark-saved', { revision: saved.revision })
+  const before = model.mutations.length
+  assert.equal(state(request).currentPage.notes, '')
+  assert.equal(model.mutations.length, before)
+  assert.equal(model.isModified(), false)
+  for (const text of ['第一份备注', '修改原有备注\n第二段', '', '清空后继续填写']) {
+    const updated = action(request, { type: 'set-notes', text })
+    assert.equal(updated.currentPage.notes, text)
+    assert.equal(placeholder.getText().getString(), text)
+    assert.equal(notes.getCount(), 1, 'Editing imported notes must never append duplicate body placeholders')
+    assert.equal(notes.getByIndex(0), placeholder)
+  }
+  assert.ok(model.mutations.slice(before).every(mutation => mutation.type === 'text'))
+})
+
+test('imported nonempty NotesShape wins over blank placeholder and TitleTextShape wins over body text', async () => {
+  const { request, model } = await presentation()
+  const page = model.pages[0], notes = page.getNotesPage()
+  const importedText = (container, type, text) => {
+    const shape = model.createInstance('com.sun.star.drawing.TextShape')
+    shape.getShapeType = () => type
+    container.add(shape); shape.getText().setString(text)
+    return shape
+  }
+  const body = importedText(page, 'com.sun.star.drawing.TextShape', '正文排在标题前面')
+  const title = importedText(page, 'com.sun.star.presentation.TitleTextShape', '真实导入标题')
+  const empty = importedText(notes, 'com.sun.star.presentation.NotesShape', '')
+  const footer = importedText(notes, 'com.sun.star.presentation.FooterShape', '保留原页脚')
+  const populated = importedText(notes, 'com.sun.star.presentation.NotesShape', '空占位符后面的真实备注')
+  assert.equal(title.supportsService('com.sun.star.presentation.TitleTextShape'), false)
+  assert.equal(populated.supportsService('com.sun.star.presentation.NotesShape'), false)
+  const saved = request('export', { format: 'pptx' }).data
+  request('mark-saved', { revision: saved.revision })
+  const mutations = model.mutations.length, initial = state(request)
+  assert.equal(initial.currentPage.title, '真实导入标题')
+  assert.equal(initial.currentPage.notes, '空占位符后面的真实备注')
+  assert.equal(initial.dirty, false)
+  assert.equal(model.mutations.length, mutations)
+  for (const text of ['更新真实备注', '再次更新，不新增占位符']) {
+    const updated = action(request, { type: 'set-notes', text })
+    assert.equal(updated.currentPage.notes, text)
+    assert.equal(populated.getText().getString(), text)
+    assert.equal(empty.getText().getString(), '')
+    assert.equal(footer.getText().getString(), '保留原页脚')
+    assert.equal(notes.getCount(), 3)
+  }
+  assert.equal(body.getText().getString(), '正文排在标题前面')
+  assert.equal(title.getText().getString(), '真实导入标题')
+  assert.ok(model.mutations.slice(mutations).every(mutation => mutation.type === 'text' && mutation.target === populated))
+})
+
+test('optional presentation reads consume each ignored native UNO exception once and return fallback metadata', async () => {
+  const { request, model, nativeException, nativeExceptions, exceptionCalls } = await presentation()
+  const unreadable = model.createInstance('com.sun.star.drawing.TextShape')
+  unreadable.getText = () => { throw nativeException('getText native UNO failure') }
+  model.pages[0].add(unreadable)
+  const fallback = model.createInstance('com.sun.star.drawing.TextShape')
+  fallback.getText().setString('可读取的备用标题')
+  fallback.getShapeType = () => { throw nativeException('getShapeType native UNO failure') }
+  model.pages[0].add(fallback)
+  const saved = request('export', { format: 'pptx' }).data
+  request('mark-saved', { revision: saved.revision })
+  const mutations = model.mutations.length
+  for (let read = 1; read <= 2; read++) {
+    const metadata = state(request)
+    assert.equal(metadata.currentPage.title, '可读取的备用标题')
+    assert.equal(metadata.currentPage.notes, '')
+    assert.equal(metadata.dirty, false)
+    assert.equal(metadata.revision, saved.revision)
+    assert.equal(nativeExceptions.size, read * 2, 'Each throw represents a distinct native exception')
+  }
+  assert.equal(exceptionCalls.length, 4)
+  for (const native of nativeExceptions.values()) assert.equal(native.consumed, 1, native.message)
+  assert.equal(model.mutations.length, mutations)
+  assert.equal(model.isModified(), false)
+})
+
+test('failed open consumes secondary cleanup exception and primary RPC exception exactly once each', async () => {
+  const { request, model, models, controls, nativeException, nativeExceptions, exceptionCalls } = await presentation()
+  const primary = nativeException('primary: native listener registration failed')
+  const secondary = nativeException('secondary: native cleanup close failed')
+  controls.configureNextModel = replacement => {
+    replacement.addModifyListener = () => { throw primary }
+    replacement.close = () => { replacement.closed = true; throw secondary }
+  }
+  const result = request('open', { id: 'B', name: 'B.pptx', kind: 'presentation', extension: 'pptx', path: '/tmp/b.pptx', isNew: false })
+  assert.equal(result.ok, false)
+  assert.equal(result.error, 'primary: native listener registration failed', 'Cleanup must not replace the original RPC error')
+  assert.deepEqual(exceptionCalls, [secondary, primary], 'Cleanup consumes its error; RPC describe consumes the rethrown original')
+  assert.equal(nativeExceptions.get(primary).consumed, 1)
+  assert.equal(nativeExceptions.get(secondary).consumed, 1)
+  assert.equal(models.at(-1).closed, true)
+  assert.equal(model.closed, false, 'The previous document remains usable after replacement fails')
+  assert.equal(request('export', { format: 'pptx' }).ok, true)
+})
+
+test('optional presentation metadata reads propagate WASM traps instead of reporting fallback success', async () => {
+  for (const failingMethod of ['getText', 'getShapeType']) {
+    const { request, model, exceptionCalls, nativeExceptions } = await presentation()
+    const shape = model.createInstance('com.sun.star.drawing.TextShape')
+    shape.getText().setString('必须保持的内容')
+    const trap = new WebAssembly.RuntimeError(`unaligned memory access in ${failingMethod}`)
+    shape[failingMethod] = () => { throw trap }
+    model.pages[0].add(shape)
+    const saved = request('export', { format: 'pptx' }).data
+    request('mark-saved', { revision: saved.revision })
+    const mutations = model.mutations.length
+    const result = request('presentation-state')
+    assert.equal(result.ok, false, `${failingMethod} trap must not become successful empty metadata`)
+    assert.match(result.error, /unaligned memory access/)
+    assert.equal(result.data, undefined)
+    assert.deepEqual(exceptionCalls, [trap], 'Only RPC describe sees a WASM trap; optional recovery must immediately rethrow it')
+    assert.equal(nativeExceptions.size, 0, 'A WASM trap is not a recoverable UNO exception')
+    assert.equal(model.mutations.length, mutations)
+    assert.equal(model.isModified(), false)
+  }
 })

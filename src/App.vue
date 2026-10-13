@@ -5,6 +5,10 @@ import Icon from './components/Icon.vue'
 import OfficeEditor from './components/OfficeEditor.vue'
 import PdfEditor from './components/PdfEditor.vue'
 import SlidePreview from './components/SlidePreview.vue'
+import PresentationWorkbench from './components/PresentationWorkbench.vue'
+import PresentationEffects from './components/PresentationEffects.vue'
+import type { PresentationState, PresentationAction } from './presentation/types'
+import type { PptxPresentation, patchPptxPackage } from './presentation/pptx-package'
 import * as native from './native'
 import { smokeAwait, smokeFailure, smokeFeatures, smokeRequested, smokeStage } from './smoke'
 import type { NativeDocument, RecentDocument } from './types'
@@ -19,9 +23,20 @@ smokeStage('app-setup', 'Vue setup reached')
 const tabs = ref<Tab[]>([]), activeKey = ref(''), home = ref(true), section = ref('home')
 const active = computed(() => tabs.value.find(t => t.key === activeKey.value))
 const officeDocument = shallowRef<OfficeDocument>(), pdfDocument = shallowRef<NativeDocument>()
-const officeEditor = ref<EditorHandle & { insertImage?(image: {name:string;base64:string}):Promise<void>; newSlide?():Promise<unknown>; smokeTest?():Promise<unknown> }>()
+const officeEditor = ref<EditorHandle & { insertImage?(image: {name:string;base64:string}):Promise<void>; newSlide?():Promise<unknown>; smokeTest?():Promise<unknown>; getPresentationState?():Promise<PresentationState>; presentationObjectData?(query:{type:'table'|'chart';id:string}):Promise<unknown>; presentationAction?(action:PresentationAction):Promise<PresentationState>; presentationEdit?(patch:PresentationPatch):Promise<void> }>()
+type PresentationPatch = Omit<Parameters<typeof patchPptxPackage>[1]['slides'][number], 'slideIndex'>
 const pdfEditor = ref<EditorHandle>()
-const slidePreview = shallowRef<{base64:string;name:string;startPage:number}>()
+const presentationState = shallowRef<PresentationState | null>(null), presentationFeatures = shallowRef<PptxPresentation['slides'][number] | null>(null)
+const presentationWorkbench = ref<{hasPendingEdits():boolean;assertNoPendingEdits():void;discardDrafts():void}>()
+const presentationEffects = ref<{hasPendingEdits():boolean;discardDrafts():void}>()
+function assertPresentationDrafts() {
+  if(active.value?.document.kind!=='presentation')return
+  presentationWorkbench.value?.assertNoPendingEdits()
+  if(presentationEffects.value?.hasPendingEdits())throw Error('切换设置尚未应用，请先应用或还原。')
+}
+function presentationChanged(state:PresentationState) {if(state.documentId===activeKey.value)presentationState.value=state}
+watch(activeKey,()=>{presentationState.value=null;presentationFeatures.value=null})
+const slidePreview = shallowRef<{base64:string;name:string;startPage:number;presentation?:PptxPresentation}>()
 const recents = ref<RecentDocument[]>([]), busy = ref(''), error = ref(''), status = ref('所有文件，仅在你的设备上处理')
 const help = ref(false), search = ref(''), closeTarget = ref<Tab | 'window' | null>(null)
 const fileInput = ref<HTMLInputElement>(), imageInput = ref<HTMLInputElement>()
@@ -75,6 +90,7 @@ async function awaitReady(tab:Tab):Promise<void> {
   })
 }
 async function capture(tab:Tab) {
+  assertPresentationDrafts()
   const handle=requireEditor(tab), exported=await handle.exportFile()
   if(activeKey.value!==tab.key)throw Error('文档已切换，旧的导出结果未被使用。')
   if(exported.dirty)tab.dirty=true
@@ -143,6 +159,7 @@ function download(base64:string,name:string) {
 }
 async function saveActive(saveAs=false, format?:Extension):Promise<boolean> {
   const tab=active.value;if(!tab)return false
+  assertPresentationDrafts()
   const handle=requireEditor(tab)
   const exported=await handle.exportFile(format?{format}:undefined)
   if(activeKey.value!==tab.key)throw Error('文档已切换，本次保存已取消。')
@@ -168,24 +185,49 @@ function save(saveAs=false,format?:Extension) {void task(format?`正在导出 ${
 function newSlide() {
   void task('正在新建幻灯片',async()=>{
     const tab=active.value;if(!tab||tab.document.kind!=='presentation')return
-    requireEditor(tab)
+    requireEditor(tab);assertPresentationDrafts()
     if(!officeEditor.value?.newSlide)throw Error('演示文稿编辑器尚未就绪。')
     await officeEditor.value.newSlide();status.value='已新建幻灯片，沿用当前母版和布局'
+  })
+}
+async function readPresentationObject(query:{type:'table'|'chart';id:string}) {
+  if(!officeEditor.value?.presentationObjectData)throw Error('演示文稿尚未准备好。')
+  return officeEditor.value.presentationObjectData(query)
+}
+function runPresentationAction(action:PresentationAction) {
+  void task('正在更新幻灯片',async()=>{
+    if(presentationEffects.value?.hasPendingEdits())throw Error('切换设置尚未应用，请先应用或还原。')
+    if(!officeEditor.value?.presentationAction)throw Error('演示工作台尚未准备好。')
+    presentationChanged(await officeEditor.value.presentationAction(action))
+  })
+}
+function refreshPresentation() {void task('正在刷新幻灯片',async()=>{if(officeEditor.value?.getPresentationState)presentationChanged(await officeEditor.value.getPresentationState())})}
+function editPresentationFeatures(patch:PresentationPatch) {
+  void task('正在更新放映设置',async()=>{
+    presentationWorkbench.value?.assertNoPendingEdits()
+    if(!officeEditor.value?.presentationEdit)throw Error('演示工作台尚未准备好。')
+    await officeEditor.value.presentationEdit(patch);status.value='已更新放映设置，请保存文稿'
   })
 }
 function previewSlides(startPage=0) {
   void task('正在准备放映预览',async()=>{
     const tab=active.value;if(!tab||tab.document.kind!=='presentation')return
-    const exported=await requireEditor(tab).exportFile({format:'pdf'})
+    assertPresentationDrafts()
+    const handle=requireEditor(tab)
+    const pptx=await handle.exportFile({format:'pptx'})
+    const {parsePptxPackage}=await import('./presentation/pptx-package')
+    const presentation=await parsePptxPackage(base64ToBytes(pptx.base64))
+    const exported=await handle.exportFile({format:'pdf'})
     if(activeKey.value!==tab.key)throw Error('文档已切换，已取消旧演示文稿的预览。')
     if(exported.dirty)tab.dirty=true
-    slidePreview.value={base64:exported.base64,name:tab.document.name,startPage:Number.isSafeInteger(startPage)?Math.max(0,startPage):0}
+    slidePreview.value={base64:exported.base64,name:tab.document.name,startPage:Number.isSafeInteger(startPage)?Math.max(0,startPage):0,presentation}
   })
 }
 function closeSlidePreview() {slidePreview.value=undefined}
 function changeTab(tab:Tab) {void task('正在切换文档',()=>activate(tab))}
 async function removeTab(tab:Tab, discardConfirmed=false) {
   if(tab.key===activeKey.value) {
+    if(discardConfirmed) {presentationWorkbench.value?.discardDrafts();presentationEffects.value?.discardDrafts()}
     if(tab.ready)await editor()?.discardChanges?.({force:discardConfirmed})
     const next=tabs.value.find(t=>t.key!==tab.key)
     // Do not ask stash() to export a tab whose close was already checked/confirmed.
@@ -256,6 +298,13 @@ function officeRequest(request:{type:string;notice?:string;pageIndex?:number}) {
   }
   else if(request.type==='insert-image')insertImage()
   else if(request.type==='presentation-preview')previewSlides(request.pageIndex)
+  else if(request.type==='presentation-duplicate') {
+    void task('正在复制幻灯片',async()=>{
+      assertPresentationDrafts()
+      if(!officeEditor.value?.presentationAction || !Number.isInteger(request.pageIndex))throw Error('请先选择要复制的幻灯片。')
+      presentationChanged(await officeEditor.value.presentationAction({type:'duplicate-page',pageIndex:request.pageIndex!}))
+    })
+  }
   else if(request.type==='close' && active.value)closeTab(active.value)
   else if(request.type==='print')editCommand('print')
   else if(request.type==='quit') {
@@ -320,6 +369,20 @@ onMounted(async()=>{
           if(!removedOldText||!newTextPresent||info.metadata?.pageCount!==1)throw Error('PDF original text replacement did not survive reopening')
           report.pdf={ok:true,reopened:true,removedOldText,newTextPresent,text,metadata:info.metadata};report.ok=true
           smokeStage('pdf-roundtrip','complete')
+          smokeStage('presentation-workbench','starting native editor, PPTX features and player')
+          const {verifyNativePresentation}=await import('./presentation/native-smoke')
+          const loadNativePresentation=async(base64='')=>{
+            await addDocument({id:'',kind:'presentation',extension:'pptx',name:'Native presentation verification.pptx',base64,sha256:'',sizeBytes:Math.floor(base64.length*.75)})
+            await nextTick();const current=active.value;if(!current)throw Error('Native presentation tab missing')
+            await awaitReady(current)
+            return officeEditor.value as unknown as Awaited<ReturnType<Parameters<typeof verifyNativePresentation>[0]['create']>>
+          }
+          report.presentationWorkbench=await verifyNativePresentation({
+            create:()=>loadNativePresentation(),reopen:base64=>loadNativePresentation(base64),
+            show:async(base64,presentation)=>{slidePreview.value={base64,presentation,name:'Native presentation verification',startPage:0};await nextTick()},
+            close:closeSlidePreview,
+          })
+          smokeStage('presentation-workbench','complete')
         }catch(e){report.ok=false;report.error=message(e)}
         await smokeAwait('ipc-smoke-report',()=>invoke('smoke_report',{report}))
       }
@@ -362,17 +425,20 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
     </div>
     <section v-show="!home" class="editor-workspace">
       <div class="tab-bar"><button class="home-tab" @click="home=true" aria-label="工作台"><Icon name="home" :size="18"/></button><div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div><button class="new-tab" @click="home=true" aria-label="新建文档"><Icon name="plus" :size="18"/></button></div>
-      <div class="command-bar"><button @click="openFile"><Icon name="folder" :size="17"/>打开</button><span class="separator"/><button :disabled="!active?.ready" @click="save()"><Icon name="save" :size="17"/>保存</button><button :disabled="!active?.ready" @click="save(true)">另存为</button><button v-if="active?.document.kind!=='pdf'" :disabled="!active?.ready" @click="save(true,'pdf')"><Icon name="download" :size="17"/>导出 PDF</button><span class="separator"/><button :disabled="!active?.ready" @click="editCommand('undo')" title="撤销"><Icon name="undo" :size="17"/></button><button :disabled="!active?.ready" @click="editCommand('redo')" title="重做"><Icon name="redo" :size="17"/></button><template v-if="active?.document.kind==='presentation'"><span class="separator"/><button :disabled="!active?.ready" @click="newSlide" data-testid="presentation-new-slide"><Icon name="plus" :size="17"/>新建幻灯片</button><button :disabled="!active?.ready" @click="insertImage"><Icon name="image" :size="17"/>插入图片</button><button :disabled="!active?.ready" @click="previewSlides()" title="静态逐页放映，不包含动画、音视频 · F5" data-testid="presentation-preview"><Icon name="presentation" :size="17"/>预览放映</button><button :disabled="!active?.ready" @click="save(true,active.document.extension==='odp'?'pptx':'odp')" data-testid="presentation-export-alternate">导出 {{active.document.extension==='odp'?'PPTX':'ODP'}}</button></template><span class="command-spacer"/><span class="save-state"><i :class="{'dirty-dot':active?.dirty}"/>{{active?.dirty?'尚未保存':'已保存'}}</span></div>
+      <div class="command-bar"><button @click="openFile"><Icon name="folder" :size="17"/>打开</button><span class="separator"/><button :disabled="!active?.ready" @click="save()"><Icon name="save" :size="17"/>保存</button><button :disabled="!active?.ready" @click="save(true)">另存为</button><button v-if="active?.document.kind!=='pdf'" :disabled="!active?.ready" @click="save(true,'pdf')"><Icon name="download" :size="17"/>导出 PDF</button><span class="separator"/><button :disabled="!active?.ready" @click="editCommand('undo')" title="撤销"><Icon name="undo" :size="17"/></button><button :disabled="!active?.ready" @click="editCommand('redo')" title="重做"><Icon name="redo" :size="17"/></button><template v-if="active?.document.kind==='presentation'"><span class="separator"/><button :disabled="!active?.ready" @click="newSlide" data-testid="presentation-new-slide"><Icon name="plus" :size="17"/>新建幻灯片</button><button :disabled="!active?.ready" @click="insertImage"><Icon name="image" :size="17"/>插入图片</button><button :disabled="!active?.ready" @click="previewSlides()" title="内置放映、转场与本地音视频 · F5" data-testid="presentation-preview"><Icon name="presentation" :size="17"/>预览放映</button><button :disabled="!active?.ready" @click="save(true,active.document.extension==='odp'?'pptx':'odp')" data-testid="presentation-export-alternate">导出 {{active.document.extension==='odp'?'PPTX':'ODP'}}</button></template><span class="command-spacer"/><span class="save-state"><i :class="{'dirty-dot':active?.dirty}"/>{{active?.dirty?'尚未保存':'已保存'}}</span></div>
       <div class="editor-content" :inert="!!busy">
-        <OfficeEditor v-if="officeDocument" v-show="active?.document.kind!=='pdf'" ref="officeEditor" :document="officeDocument" :smoke-mode="smokeMode" @dirty="dirtyFor(officeDocument?.id,$event)" @ready="readyFor(officeDocument?.id)" @error="editorError(officeDocument?.id,$event)" @status="status=$event" @request="officeRequest"/>
+        <PresentationWorkbench v-if="officeDocument" v-show="active?.document.kind!=='pdf'" ref="presentationWorkbench" :active="active?.document.kind==='presentation'" :state="presentationState" :read-object-data="readPresentationObject" :busy="!!busy" @action="runPresentationAction" @refresh="refreshPresentation" @insert-image="insertImage" @preview="previewSlides" @draft-change="dirtyFor(activeKey,$event)">
+          <OfficeEditor ref="officeEditor" :document="officeDocument" :smoke-mode="smokeMode" @dirty="dirtyFor(officeDocument?.id,$event)" @ready="readyFor(officeDocument?.id)" @error="editorError(officeDocument?.id,$event)" @status="status=$event" @request="officeRequest" @presentation-state="presentationChanged" @presentation-features="presentationFeatures=$event"/>
+          <template #effects><PresentationEffects v-if="presentationState" ref="presentationEffects" :slide="presentationFeatures" :page-id="presentationState.currentPage.id" :enabled="active?.document.extension==='pptx'" :busy="!!busy" @edit="editPresentationFeatures" @draft-change="dirtyFor(activeKey,$event)" @error="error=$event"/></template>
+        </PresentationWorkbench>
         <PdfEditor v-if="pdfDocument && active?.document.kind==='pdf'" :key="pdfDocument.id" ref="pdfEditor" :document="pdfDocument" :initial-dirty="active?.dirty" @dirty="dirtyFor(pdfDocument?.id,$event)" @ready="readyFor(pdfDocument?.id)" @error="editorError(pdfDocument?.id,$event)" @status="status=$event"/>
       </div>
       <footer class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · 本机编辑</span></footer>
     </section>
-    <SlidePreview v-if="slidePreview" :base64="slidePreview.base64" :name="slidePreview.name" :start-page="slidePreview.startPage" @close="closeSlidePreview" @error="error=$event"/>
+    <SlidePreview v-if="slidePreview" :base64="slidePreview.base64" :name="slidePreview.name" :start-page="slidePreview.startPage" :presentation="slidePreview.presentation" @close="closeSlidePreview" @error="error=$event"/>
     <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{error}}</span><button @click="error=''" aria-label="关闭错误提示"><Icon name="close" :size="16"/></button></div>
     <div v-if="busy" class="busy-overlay" role="status"><span class="busy-pill"><i/>{{busy}}</span></div>
     <div v-if="closeTarget" class="modal-backdrop" @keydown.esc="closeTarget=null"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="close-heading"><span class="modal-icon"><Icon name="save" :size="27"/></span><h2 id="close-heading">保存你的修改？</h2><p>{{closeTarget==='window'?'有文档尚未保存。保存后再退出，可以保留所有修改。':`“${closeTarget.document.name}”有尚未保存的修改。`}}</p><div class="modal-actions"><button @click="closeTarget=null">取消</button><button @click="resolveClose('discard')">不保存</button><button class="primary" @click="resolveClose('save')">{{closeTarget==='window'?'全部保存并退出':'保存并关闭'}}</button></div></section></div>
-    <div v-if="help" class="modal-backdrop" @click.self="help=false"><section class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>使用完整办公内核，支持文字排版、表格公式、幻灯片编排、图片与 PDF 导出。高级菜单目前为英文，支持中文输入及本地字体。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持原有文字替换、添加文字和图片、批注、手写签名，以及页面旋转、删除、排序、提取和合并。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件时会另存副本。演示文稿支持静态逐页放映预览，不包含动画、音视频。复杂 Office 排版建议导出后复核；宏不自动执行。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 0.2.0 · 构建 {{buildVersion}} · 使用 LibreOffice / ZetaOffice、PDF.js 与 PyMuPDF。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
+    <div v-if="help" class="modal-backdrop" @click.self="help=false"><section class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>使用完整办公内核，支持文字排版、表格公式、幻灯片编排、图片与 PDF 导出。高级菜单目前为英文，支持中文输入及本地字体。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持原有文字替换、添加文字和图片、批注、手写签名，以及页面旋转、删除、排序、提取和合并。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件时会另存副本。演示文稿提供中文编排、对象与图表编辑、备注、转场和本地媒体放映。SmartArt、逐对象动画、Morph 和微软云端功能尚未完整实现。复杂 Office 排版建议导出后复核；宏不自动执行。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 0.3.0 · 构建 {{buildVersion}} · 使用 LibreOffice / ZetaOffice、PDF.js 与 PyMuPDF。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
   </div>
 </template>

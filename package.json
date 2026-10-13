@@ -1,6 +1,6 @@
 {
   "name": "open-office",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -25,10 +25,16 @@
     "pdf:test": "node scripts/test-pdf-backend.mjs",
     "test:browser": "node tests/browser/pdf-ui.cjs",
     "test:browser:ppt": "node tests/browser/presentation-ui.cjs",
-    "test:browser:impress": "node tests/browser/impress-engine.cjs"
+    "test:browser:impress": "node tests/browser/impress-engine.cjs",
+    "test:browser:ppt-workbench": "node tests/browser/presentation-workbench.cjs",
+    "test:browser:ppt-workbench-ui": "node tests/browser/presentation-workbench-ui.cjs",
+    "test:browser:ppt-player": "node tests/browser/presentation-player.cjs",
+    "test:browser:ppt-package": "node tests/browser/pptx-package.cjs",
+    "test:browser:ppt-native-contract": "node tests/browser/presentation-native-contract.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.3",
+    "fflate": "0.8.2",
     "pdfjs-dist": "6.4.299",
     "vue": "3.5.22"
   },

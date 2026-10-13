@@ -11,7 +11,7 @@ import * as vue from 'vue'
 // LibreOffice/PDF engine or native WebView compatibility tests.
 const app = (await readFile(new URL('../src/App.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
 const utilities = await readFile(new URL('../src/shared/document.ts', import.meta.url), 'utf8')
-const names = 'tabs,activeKey,active,officeDocument,pdfDocument,officeEditor,pdfEditor,slidePreview,busy,error,closeTarget,readyFor,editorError,stash,activate,addDocument,saveActive,closeTab,closeWindow,resolveClose,task'
+const names = 'tabs,activeKey,active,officeDocument,pdfDocument,officeEditor,pdfEditor,presentationWorkbench,presentationEffects,presentationState,slidePreview,busy,error,closeTarget,readyFor,editorError,stash,activate,addDocument,saveActive,closeTab,closeWindow,resolveClose,task,officeRequest'
 
 function compile(source, require, extra = {}) {
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
@@ -210,4 +210,52 @@ test('native window close exits presentation preview before showing unsaved conf
   assert.equal(h.state.closeTarget.value,'window')
   assert.equal(a.dirty,true)
   assert.ok(!h.calls.some(call=>call[0]==='close'))
+})
+
+
+test('pending presentation text or transition drafts prevent saving and tab switching', async () => {
+  for (const panel of ['workbench', 'effects']) {
+    const h = shell(), a = h.tab('A', { kind: 'presentation' }), b = h.tab('B'); h.active(a)
+    let exports = 0
+    h.handle.exportFile = async () => { exports++; return {base64:'NEW',extension:'pptx'} }
+    if (panel === 'workbench') h.state.presentationWorkbench.value = {assertNoPendingEdits(){throw Error('Unapplied notes')},discardDrafts(){}}
+    else h.state.presentationEffects.value = {hasPendingEdits(){return true},discardDrafts(){}}
+    await assert.rejects(h.state.saveActive(), /Unapplied|尚未应用/)
+    await assert.rejects(h.state.activate(b), /Unapplied|尚未应用/)
+    assert.equal(h.state.activeKey.value, 'A')
+    assert.equal(a.document.base64, 'T0xE')
+    assert.equal(exports, 0)
+  }
+})
+
+test('confirmed discard clears presentation drafts before replacing the loaded tab', async () => {
+  const h = shell(), a = h.tab('A', { kind: 'presentation', dirty: true }); h.active(a)
+  let dropped = 0
+  h.state.presentationWorkbench.value = {assertNoPendingEdits(){throw Error('Unapplied notes')},discardDrafts(){dropped++}}
+  h.state.presentationEffects.value = {hasPendingEdits(){return true},discardDrafts(){dropped++}}
+  h.state.closeTarget.value = a
+  await h.state.resolveClose('discard')
+  assert.equal(dropped, 2)
+  assert.equal(h.state.tabs.value.length, 0)
+  assert.ok(h.calls.some(call=>call[0]==='discard' && call[1].force === true))
+})
+
+test('native duplicate-slide request uses the metadata-aware editor and respects unapplied drafts', async () => {
+  const h = shell(), a = h.tab('deck', {kind:'presentation'}); h.active(a)
+  const actions = []
+  h.handle.presentationAction = async action => {
+    actions.push(action)
+    return {documentId:'deck',pageCount:2,currentPageIndex:1,pages:[]}
+  }
+  h.state.officeRequest({type:'presentation-duplicate',pageIndex:0})
+  await h.idle()
+  assert.equal(actions.length,1)
+  assert.equal(actions[0].type,'duplicate-page')
+  assert.equal(actions[0].pageIndex,0)
+  assert.equal(h.state.presentationState.value.pageCount,2)
+  h.state.presentationEffects.value = {hasPendingEdits(){return true}}
+  h.state.officeRequest({type:'presentation-duplicate',pageIndex:0})
+  await h.idle()
+  assert.match(h.state.error.value,/尚未应用/)
+  assert.equal(actions.length,1,'Unapplied effect drafts must not be detached from their page')
 })

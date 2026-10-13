@@ -11,11 +11,11 @@ export interface OfficeDocument {
 }
 export interface OfficeExportRequest { format?: OfficeFormat }
 export interface OfficeExportResult { base64: string; extension: OfficeFormat; name: string; revision: number; dirty: boolean }
-export type OfficeNativeRequest = { type: 'save' | 'save-as' | 'open' | 'new' | 'export-pdf' | 'print' | 'insert-image' | 'close' | 'quit' | 'presentation-preview'; notice?: string; pageIndex?: number }
+export type OfficeNativeRequest = { type: 'save' | 'save-as' | 'open' | 'new' | 'export-pdf' | 'print' | 'insert-image' | 'close' | 'quit' | 'presentation-preview' | 'presentation-duplicate'; notice?: string; pageIndex?: number }
 export interface OfficeEvent {
   channel: 'open-office-engine'
   session: string
-  event?: 'engine-ready' | 'progress' | 'dirty' | 'error' | 'native-request'
+  event?: 'engine-ready' | 'progress' | 'dirty' | 'error' | 'native-request' | 'presentation-changed'
   requestId?: string
   documentId?: string
   ok?: boolean

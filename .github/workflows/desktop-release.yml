@@ -377,9 +377,9 @@ jobs:
 
           安装包：Windows x64、Apple Silicon Mac、Intel Mac。安装后，Word / Excel / PPT 文档编辑和 PDF 工具使用随包本地引擎，不需要用户安装 Python 或 Microsoft Office。
 
-          PPT 放映采用静态逐页预览，支持全屏与翻页；不播放动画、切换特效、音频或视频，也不代表完整的 PowerPoint 演示效果兼容。
+          新增中文 PPT 工作台：页面管理、文本与形状属性、表格单元格、图表数据、备注；内置放映支持淡化、推进、擦除、覆盖、揭开、拆分和本地音视频。逐对象动画、SmartArt、Morph、双屏演讲者视图和微软云功能尚未完整实现，不宣称已全面替代 Microsoft 365。
 
-          三种安装包均通过实际应用内自检：跨源隔离与 SharedArrayBuffer、Writer 文档编辑和 DOCX/PDF 往返、Calc 公式计算和 XLSX/PDF 往返、Impress 两页中英文演示文稿原文修改后 PPTX/ODP 保存重开及 PDF 导出（独立读取确认两页）、PDF 原文删除替换后重新读取。
+          三种安装包均通过实际应用内自检：跨源隔离与 SharedArrayBuffer、Writer 文档编辑和 DOCX/PDF 往返、Calc 公式计算和 XLSX/PDF 往返、Impress 两页中英文演示文稿原文修改后 PPTX/ODP 保存重开及 PDF 导出（独立读取确认两页）、PDF 原文删除替换后重新读取。新版额外验证真实表格与图表编辑、页名/备注/隐藏页保存重开、PPTX 内嵌转场和音频在二次保存后保留、原生 WebView 中的两页 PDF 放映画布和本地音频元数据加载。媒体播放还取决于系统支持的编码。
           Windows x64 在 Windows Server 2022 上验证，Apple Silicon 包在 macOS 15 ARM 上验证。Intel x64 包在 Intel 构建机原生编译并检查 PDF、架构与签名，随后将原封 DMG 转移到 Apple Silicon macOS 15，通过 Rosetta 运行真实 x64 App 与 PDF 进程完成相同自检；校验安装包摘要、App 全部文件、链接与签名一致，无重建或重签。
           Intel 包尚未在真实 Intel GPU 上实测；GitHub 的 Intel 虚拟机未提供可用的原生 WebGL 图形环境。本验证不代表已测试所有系统版本、显卡或复杂 Office 文档。
 

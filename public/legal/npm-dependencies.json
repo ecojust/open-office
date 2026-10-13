@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lockfileSha256": "cff70e866aeda40ebe4b3c06ebf719b7a72ffa5bdddaca01905a62ab43802d3d",
+  "lockfileSha256": "274b92d604979777bb5d23c722eed45a3410e0df67fcfe5f96dee5b4ac0a9fe7",
   "packages": [
     {
       "name": "@babel/helper-string-parser",
@@ -1139,6 +1139,18 @@
         "npm/fdir@6.5.0/LICENSE"
       ],
       "integrity": "sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg=="
+    },
+    {
+      "name": "fflate",
+      "version": "0.8.2",
+      "license": "MIT",
+      "developmentOnly": false,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/fflate@0.8.2/LICENSE"
+      ],
+      "integrity": "sha512-cPJU47OaAoCbg0pBvzsgpTPhmhqI5eJjh/JIu8tPj5q+T7iLvW/JAYUqmE7KOB4R1ZyEhzBaIQpQpardBF5z8A=="
     },
     {
       "name": "fsevents",

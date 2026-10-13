@@ -150,7 +150,16 @@ export function validateFrontendReport(report) {
     && pdf.text.includes('NEW_NATIVE_TEXT') && pdf.text.includes('新的合同')
     && !pdf.text.includes('OLD_NATIVE_TEXT') && !pdf.text.includes('旧合同'), 'PDF reopened text does not match the replacement fixture');
 
+  const workbench = report.presentationWorkbench;
+  requireCheck(workbench?.ok === true, 'Presentation workbench native verification missing or failed');
+  requireCheck(workbench.pageCount === 3 && workbench.hiddenPageIndex === 2, 'Presentation workbench hidden-page round trip failed');
+  requireCheck(workbench.slideName === 'Native saved page 中文' && typeof workbench.notes === 'string' && workbench.notes.includes('Native notes persisted'), 'Presentation workbench name or notes did not reopen');
+  requireCheck(workbench.editableTable === true && workbench.editableChart === true, 'Presentation workbench lost editable embedded objects');
+  requireCheck(workbench.transition === 'fade' && workbench.mediaBytes === 3244 && typeof workbench.mediaDuration === 'number' && Math.abs(workbench.mediaDuration - .2) < .05, 'Presentation workbench transition or native media metadata failed');
+  requireCheck(JSON.stringify(workbench.pdfCanvasPages) === '[0,1]', 'Presentation workbench actual canvas navigation failed');
+
   return {
+    presentationWorkbenchRoundTrip: true, presentationMediaMetadata: true, presentationCanvasNavigation: true,
     crossOriginIsolated: true, sharedArrayBuffer: true, writerOriginalTextRoundTrip: true,
     writerPdfExport: true, calcFormulaRoundTrip: true, calcPdfExport: true,
     impressOriginalTextRoundTrip: true, impressOdpRoundTrip: true,
