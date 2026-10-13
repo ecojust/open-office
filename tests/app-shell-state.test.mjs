@@ -13,7 +13,8 @@ import { reviewOfficeImport } from '../src/office/import-review.ts'
 // LibreOffice/PDF engine or native WebView compatibility tests.
 const app = (await readFile(new URL('../src/App.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
 const utilities = await readFile(new URL('../src/shared/document.ts', import.meta.url), 'utf8')
-const names = 'tabs,activeKey,active,officeDocument,pdfDocument,officeEditor,pdfEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationWorkbench,presentationEffects,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,browserFile,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest'
+const dialogFocus = await readFile(new URL('../src/shared/dialog-focus.ts', import.meta.url), 'utf8')
+const names = 'tabs,activeKey,active,home,tabBar,helpDialog,closeDialog,officeDocument,pdfDocument,officeEditor,pdfEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationWorkbench,presentationEffects,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,browserFile,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest'
 
 function compile(source, require, extra = {}) {
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
@@ -24,7 +25,7 @@ function compile(source, require, extra = {}) {
 }
 
 function shell({nativeEnabled = true, smoke = false} = {}) {
-  const calls = [], mounted = [], reviews = [], native = {
+  const calls = [], mounted = [], beforeUnmount = [], observers = [], reviews = [], native = {
     isTauri: () => nativeEnabled,
     onCloseRequested: async () => () => {},
     bootstrap: async () => ({smokeMode:false}),
@@ -36,17 +37,39 @@ function shell({nativeEnabled = true, smoke = false} = {}) {
         kind: helpers.kindOf(request.extension), extension: request.extension, sha256: 'new-hash', sizeBytes: 3 } }
     },
   }
+  const lifecycle = { ...vue, onMounted(callback) { mounted.push(callback) }, onBeforeUnmount(callback) { beforeUnmount.push(callback) } }
+  // Share DOM identities with the real dialog helper across both VM contexts.
+  // Layout notifications remain controlled because this harness has no renderer.
+  const browser = {
+    window: { addEventListener() {}, removeEventListener() {} },
+    document: { baseURI: 'http://127.0.0.1/', activeElement: null },
+    HTMLElement: class {},
+    ResizeObserver: class {
+      targets = new Set()
+      disconnected = false
+      constructor(callback) { this.callback = callback; observers.push(this) }
+      observe(target) { this.targets.add(target) }
+      disconnect() { this.targets.clear(); this.disconnected = true }
+      notify() { this.callback([...this.targets].map(target => ({ target })), this) }
+    },
+  }
+  const scope = vue.effectScope()
+  const focus = compile(dialogFocus, name => {
+    if (name === 'vue') return lifecycle
+    throw Error(`Unexpected dialog helper import ${name}`)
+  }, browser)
   const helpers = compile(utilities, () => { throw Error('Unexpected helper import') })
-  const state = compile(`${app}\nexport const state={${names}}`, name => {
-    if (name === 'vue') return { ...vue, onMounted(callback) {mounted.push(callback)}, onBeforeUnmount() {} }
+  const state = scope.run(() => compile(`${app}\nexport const state={${names}}`, name => {
+    if (name === 'vue') return lifecycle
     if (name === './native') return native
     if (name === './smoke') return {smokeRequested:()=>smoke,smokeStage(){},smokeFeatures:()=>({}),smokeFailure:async(error,phase)=>{calls.push(['smoke-failure',phase,String(error)])},smokeAwait:async(_phase,action)=>action()}
     if (name === './shared/document') return helpers
+    if (name === './shared/dialog-focus') return focus
     if (name === './office/import-review') return {reviewOfficeImport(document){reviews.push(document);return reviewOfficeImport(document)}}
     if (name === '@tauri-apps/api/core') return { invoke: async () => {} }
     if (name.endsWith('.vue')) return {}
     throw Error(`Unexpected setup import ${name}`)
-  }, {window:{addEventListener(){},removeEventListener(){}}}).state
+  }, browser).state)
   const handle = {
     exportFile: async () => ({ base64: 'TkVX', extension: 'docx', dirty: false }),
     discardChanges: async options => { calls.push(['discard', options]) },
@@ -69,8 +92,76 @@ function shell({nativeEnabled = true, smoke = false} = {}) {
     for (let n = 0; n < 50 && state.busy.value; n++) { await Promise.resolve(); await vue.nextTick() }
     assert.equal(state.busy.value, '', 'The shell task should finish')
   }
-  return { state, native, calls, reviews, handle, tab, active, idle, async mount(){for(const callback of mounted)await callback()} }
+  return { state, native, calls, reviews, handle, tab, active, idle, browser, observers,
+    async mount() { for (const callback of mounted) await callback() },
+    unmount() { for (const callback of beforeUnmount) callback(); scope.stop() },
+  }
 }
+
+test('tab overflow follows the active tab and disconnects its observer on unmount', async () => {
+  const h = shell({nativeEnabled:false})
+  let bounds = { left: 260, right: 360 }
+  const bar = vue.markRaw({ clientWidth: 300, scrollLeft: 0,
+    getBoundingClientRect: () => ({ left: 10, right: 310 }),
+    querySelector(selector) {
+      assert.equal(selector, '.document-tab.active')
+      return { getBoundingClientRect: () => bounds }
+    },
+  })
+  h.state.tabBar.value = bar
+  await h.mount()
+  assert.equal(h.observers.length, 1)
+  assert.equal(h.observers[0].targets.has(bar), true)
+  h.observers[0].notify()
+  assert.equal(bar.scrollLeft, 0, 'Home does not scroll the document tabs')
+  h.state.home.value = false
+  await vue.nextTick()
+  assert.equal(bar.scrollLeft, 50, 'Opening a document reveals its right edge')
+  bounds = { left: -20, right: 80 }
+  h.state.activeKey.value = 'another-tab'
+  await vue.nextTick()
+  assert.equal(bar.scrollLeft, 20, 'Changing tabs reveals its left edge')
+  bounds = { left: 250, right: 350 }
+  h.observers[0].notify()
+  assert.equal(bar.scrollLeft, 60, 'A resize keeps the active tab visible')
+  h.unmount()
+  assert.equal(h.observers[0].disconnected, true)
+  assert.equal(h.observers[0].targets.size, 0)
+})
+
+test('real dialog focus helper cycles keyboard focus and restores its trigger on unmount', async () => {
+  const h = shell(), listeners = new Map()
+  function element(extra = {}) {
+    return vue.markRaw(Object.assign(new h.browser.HTMLElement(), {
+      tabIndex: 0, isConnected: true,
+      focus() { h.browser.document.activeElement = this },
+      matches: () => false, closest: () => null, getClientRects: () => [{}],
+    }, extra))
+  }
+  const trigger = element(), first = element(), last = element()
+  const dialog = element({
+    querySelectorAll: () => [first, last],
+    contains: node => node === dialog || node === first || node === last,
+    addEventListener(type, listener) { listeners.set(type, listener) },
+    removeEventListener(type, listener) { assert.equal(listeners.get(type), listener); listeners.delete(type) },
+  })
+  trigger.focus()
+  h.state.helpDialog.value = dialog
+  await vue.nextTick()
+  assert.equal(h.browser.document.activeElement, first)
+  for (const [shiftKey, target] of [[true, last], [false, first]]) {
+    let prevented = false
+    listeners.get('keydown')({ key: 'Tab', shiftKey, defaultPrevented: false, preventDefault() { prevented = true } })
+    assert.equal(prevented, true)
+    assert.equal(h.browser.document.activeElement, target)
+  }
+  h.unmount()
+  assert.equal(listeners.size, 0)
+  assert.equal(h.browser.document.activeElement, trigger)
+  h.state.closeDialog.value = dialog
+  await vue.nextTick()
+  assert.equal(listeners.size, 0, 'Unmounted dialog watchers no longer attach keyboard handlers')
+})
 
 function riskyWorkbook() {
   const s='http://schemas.openxmlformats.org/spreadsheetml/2006/main',r='http://schemas.openxmlformats.org/officeDocument/2006/relationships',pr='http://schemas.openxmlformats.org/package/2006/relationships'

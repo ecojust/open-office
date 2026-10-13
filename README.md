@@ -1,142 +1,71 @@
 # Open Office
 
-基于 Vue 3、Tauri 2 的本地办公桌面应用。一个窗口打开文字文档、电子表格、演示文稿与 PDF，文件处理在设备内完成，无需账户或远程文档服务。编辑引擎与 PDF 内核随安装包提供，不需要另外安装 Microsoft Office、WPS 或 LibreOffice。
+一个窗口，处理文字文档、电子表格、演示文稿和 PDF。中文工作台、扁平界面、多文档标签；文件在本机打开、编辑和保存，无需账户，安装后可离线使用。
 
-文字、表格和演示提供中文工作台，编辑实际文档对象并保存到 DOCX、XLSX、PPTX；不需要外部 Office 软件。与 Microsoft 365 的逐项差距见 [Word／Excel 功能对照](docs/word-excel-365-parity.md)及 [PowerPoint 功能对照](docs/powerpoint-365-parity.md)。本项目采用独立内置路线，完善范围限于本地文档功能；尚未完成这些功能的全部兼容验证。账户、云盘、云协作和云 AI 永久排除，不列入待补齐功能。具体边界见[本地办公范围](docs/local-only.md)。
+[下载安装包](https://github.com/ecojust/open-office/releases) · [构建记录](https://github.com/ecojust/open-office/actions/workflows/desktop-release.yml) · [开发与构建](docs/development.md)
 
-**版本状态：**[0.4.0 测试版已公开发布](https://github.com/ecojust/open-office/releases/tag/desktop-v0.4.0-38348938454)（prerelease），提供 Windows x64、macOS Apple Silicon 和 Intel 安装包。指定样例通过，不表示任意文档、全部 Office 功能或后续代码版本已通过兼容验证。
+![Open Office 工作台](docs/screenshots/home.png)
 
-**发布后的源码更新：**本次明确永久本地范围，调整帮助说明及第三方引擎的云服务入口策略，并增加旧版文件的导入与现代格式另存保护；尚未生成或发布包含这些调整的新安装包。下文的 0.4.0 测试记录仍仅对应已发布提交，不能作为本次源码调整已经验收的证据。
+## 软件功能
 
-## 当前实现范围
-
-| 工作区 | 文件格式 | 编辑方式 |
+| 工作区 | 常用格式 | 主要功能 |
 | --- | --- | --- |
-| 文字文档 | DOCX、ODT | 中文文字与段落格式、语义标题与大纲、表格单元格、纸张与页边距、页眉页脚和页码、查找替换、批注与修订、脚注和目录；导出 PDF |
-| 电子表格 | XLSX、ODS | 中文公式栏、区域录入、工作表管理、单元格格式、行列调整、排序筛选、冻结、条件格式、数据验证、命名区域、图表和透视表；导出 PDF |
-| 演示文稿 | PPTX、ODP | 中文页面编排、文本与形状属性、图片、表格单元格和图表数据编辑、备注；保存、导出 PDF，以及 PPTX 切换和媒体工具 |
-| PDF 工作室 | PDF | 原有文字删除与替换、新增文字/图片、高亮、手绘签名、搜索、页面整理、页码、透明文字水印、已有书签导航 |
+| 文字文档 | DOCX、ODT | 文字与段落排版、标题大纲、表格、页眉页脚、查找替换、批注与修订、导出 PDF |
+| 电子表格 | XLSX、ODS | 单元格与公式、工作表管理、排序筛选、冻结、条件格式、数据验证、基础图表与透视汇总 |
+| 演示文稿 | PPTX、ODP | 页面编排、文本与图片、可编辑表格和图表、备注、页面切换、本地音视频与放映 |
+| PDF 工作室 | PDF | 原文替换、新增文字与图片、高亮、手绘签名、搜索、合并与页面整理、页码和水印 |
 
-桌面外壳提供多文档标签、最近文件、本地打开、保存、另存为、未保存退出确认。保存前检查原文件摘要，避免静默覆盖外部修改；文件写入使用同目录临时文件及原子替换。
+支持最近文件、撤销重做、保存与另存为；未保存退出确认、未应用草稿检查和外部文件修改检测，帮助保留编辑结果。旧版 DOC、RTF、XLS、PPT 可导入并另存现代格式副本。
 
-演示工作区的具体使用及保存边界见下节。独立放映器使用当前文稿的静态页面作为底图，支持的切换和媒体由本应用处理，不调用此前不稳定的 WASM 原生放映入口。完整对象动画、SmartArt 编辑器、Morph、Zoom、双屏演讲者视图尚未实现；导入后可见或保留原始 XML，不能算作这些功能已经实现。
+## 兼容性测试
 
-当前打印流程先导出 PDF，再由系统 PDF 阅读器执行打印；尚未集成系统打印任务管理。未应用的 PDF 编辑草稿会阻止保存或切换，需先应用或明确放弃。
+- 文档回归使用固定样例，检查“打开 → 编辑 → 保存 → 重开”，并独立读取导出的 PDF；覆盖文字格式、表格、公式重算、图表、备注和页面编排。
+- 复杂文档测试覆盖 23 份原件；PDF 专项完成多轮实际编辑，核对未修改页面、书签、批注和页面信息。详细结果见[兼容测试报告](docs/compatibility-results.md)。
+- 发布前验证 Windows x64、macOS ARM64 和 macOS Intel 安装包。Intel 包原生编译后通过 Rosetta 运行真实应用检查，尚未在真实 Intel 显卡上完整实测。
+- 本轮界面检查覆盖 1360 × 900、900 × 640、640 × 800 三种窗口尺寸，以及标签切换、工具面板和弹窗键盘操作。
 
-这不是 Microsoft Office 或 WPS 的官方产品，不宣称与其所有功能和排版完全一致。办公内核的高级菜单目前为英文，演示侧栏、中文输入与中文字体已集成。Office 宏和自动外部链接更新禁用。已发布的 0.4.0 不支持旧 DOC/XLS/PPT 直接导入；后续源码增加 DOC、RTF、XLS、PPT 导入入口，默认另存为 DOCX、XLSX、PPTX，保留旧格式原件。该新增路径的真实格式兼容与新版安装包仍须单独验证，不能引用下文 0.4.0 的通过记录。复杂母版、特殊字体、动画和图表可能存在差异，交付前请检查原稿与导出结果。PDF 原文编辑针对可提取文字，扫描件需要独立 OCR。手绘签名不等于带证书的数字签名；修改已有数字签名的文件须另存副本。
+测试只证明报告中的样例与检查项。复杂版式、特殊字体、部分公式和嵌入附件仍可能存在差异；完整对象动画、扫描件 OCR 和证书数字签名编辑尚未支持。发现已知导入风险时会提示另存副本，重要文档请保留原件并核对导出结果。[PDF 功能边界](docs/pdf-capabilities.md) · [内存测试记录](docs/memory-optimization.md)
 
-## 文字与表格工作台
+## 界面预览
 
-文字工作台直接修改正文选区和文档样式，表格修改对应的实际单元格，页眉页脚、页码、目录和脚注写入文档对象。标题大纲根据语义级别生成，不通过字号猜测。审阅范围、复杂版式和与 Microsoft 365 的兼容差距见[逐项对照](docs/word-excel-365-parity.md)。
+以下为实际运行的浏览器预览截图，内容为测试文档；桌面版另提供原生文件保存与本地后台处理。应用工作台已采用扁平样式，内置编辑引擎的高级菜单仍保留原有外观。
 
-表格工作台提供地址框、公式栏、工作表管理和数据工具。批量新录入默认使用数值或普通文本；只有明确选择公式模式才解释公式。读取已有选区时按单元格显示原类型，只写回修改过的格子，保留其余公式、文字与格式。合并前检查其他单元格是否有内容，透视表要求空白输出区域，避免静默覆盖已有数据。普通工作表、图表和透视表仍可在本地内核画布中继续编辑。
+<details>
+<summary>文字文档</summary>
 
-**XLSX 导入与原件保护（发布后源码更新）：**复杂文件往返已发现具体差异：布尔常量可能保存为 `TRUE()`／`FALSE()` 公式，影响 `ISFORMULA` 等判断；`veryHidden` 工作表会变成普通隐藏；`UNIQUE` 动态数组公式存在重算差异，ONLYOFFICE 样例的 `COUNTA(_xlfn.UNIQUE(C7:C12))` 在连续往返中从原缓存 3 变为 1。导入时仅对实际存在的这些属性显示提示，默认文件名添加“副本”并要求另存，避免自动覆盖原件；切换标签或取消保存不会解除保护。超限或异常导致预检未完成时，也保留原件并要求副本。这个措施没有修复内核转换差异，副本仍需核对；若在系统另存对话框中明确选择原路径，仍遵循系统的覆盖确认，并非绝对禁止该选择。复杂文件的实际结果与保真边界见[兼容测试报告](docs/compatibility-results.md)。这些新增保护尚未包含在已发布的 0.4.0 安装包中。
+![文字文档编辑](docs/screenshots/document.png)
 
-**DOCX 嵌入附件保护（发布后源码更新）：**WPS 附件样例含 9 项嵌入对象，实际往返中 7 项内容保留，另外 2 项包装的 DOCX／XLSX 被内核转成空文档／空工作表。导入预检仅针对实际 Word 嵌入对象及其内部关系显示内容丢失风险，要求另存副本、保留原件；图表附带的数据工作簿不当作普通附件。不执行或解析附件，不用原始 ZIP 部件回填覆盖用户编辑。另存保护没有修复附件内容损失，副本中的附件仍须检查。
+</details>
 
-这些入口覆盖基础编辑与数据处理：文字查替为普通文本，表格侧栏编辑矩形表格；电子表格提供单列排序、单条件筛选、基础条件格式和数字／列表验证、四种基本图表，以及单个行字段与数据字段的透视汇总。完整分节版式、现代线程批注、全部 Excel 函数及动态数组、本地 Power Query、Power Pivot／DAX 和离线扩展兼容尚未对齐；不能由内核菜单或少量往返样例推定支持。
+<details>
+<summary>电子表格</summary>
 
-侧栏中的文字、单元格、公式等草稿需要点击“应用”才写入文档。保存或切换前会检查未应用输入；操作失败保留草稿，文档版本或选区改变后会拒绝过期提交。三个中文工作台共用一个常驻引擎，切换工作区不会重新启动内核。
+![电子表格编辑](docs/screenshots/spreadsheet.png)
 
-PDF 的页码和水印可以应用到全部页面或指定页面，修改后可撤销、重做和保存；书签用于读取原有目录并导航。页码为添加时的静态标记，后续删页或重排不会自动重新编号。PDF 原文修改仍是固定版式操作，不是 Word 式全文重排。完整范围见 [PDF 能力说明](docs/pdf-capabilities.md)。
+</details>
 
-## 演示工作区
+<details>
+<summary>演示文稿</summary>
 
-1. 新建演示文稿，或打开 PPTX／ODP。在“页面”中新增、复制、删除、移动、重命名或隐藏幻灯片；也可设置普通布局、页面尺寸和背景。新增页面沿用当前布局，不复制原页内容。
-2. 在“对象”中插入文本框、矩形、椭圆、直线、图片、表格或图表。选择对象后修改位置、大小、旋转、填充与边线；文本支持字体、字号、粗斜体、下划线、颜色与段落对齐。多选对象可调整层级、对齐、分布或组合。
-3. 表格编辑的是实际单元格；图表编辑的是类别、系列、数值和标题，支持柱状、条形、折线及饼图，保存后仍是可编辑对象。演讲者备注在对应页面单独编辑。
-4. “切换与计时”“本页音视频”负责本应用支持的 PPTX 页面效果。F5 或放映按钮进入独立放映器；左右键、空格和翻页按钮导航，Esc 退出。支持淡化、推进、擦除、覆盖、揭开、拆分六种转场，以及自动换片、跳过隐藏页、备注、计时、激光笔与黑屏／白屏。媒体是否能播放还取决于系统 WebView 支持的编解码器，不会自动下载外部媒体；Linux Chromium 已实测 WAV 与 WebM。具体平台及验证范围见[功能对照](docs/powerpoint-365-parity.md)，不包含完整的逐对象动画时间轴。
-5. 使用保存或另存为写回文档，PDF 导出提供静态页面副本。保存取消、文件冲突或兼容校验失败会保留未保存状态。
+![演示文稿编辑](docs/screenshots/presentation.png)
 
-**PPTX 的保存依据：**普通页面内容、顺序、隐藏状态、对象与备注以编辑器当前模型为准；切换、播放时序、媒体以该文稿的 OOXML 功能源为准，中文效果侧栏直接修改这一来源。导出时合并到 PPTX 包内，不依赖私有旁文件。请使用中文效果工具修改这部分内容，内核高级菜单的同类设置不是权威保存来源。
+</details>
 
-**图表数据修复（发布后源码更新）：**复杂样例曾发现图表外观保留、内嵌数据工作簿却丢失的问题。现在用原生修改监听和对象身份确认未修改图表，再保留原工作簿与引用；实际修改数据的基础图表生成对应当前数据的可编辑工作簿。有效的当前绑定优先于原件。复制页按当前类别和数值创建独立工作簿，不宣称复制原工作簿内全部隐藏数据和公式；无法确认来源、复杂数据绑定或未知扩展时明确拒绝保存，保留未保存状态。实际图表编辑、转场组合、重排和复制专项记录在[兼容测试报告](docs/compatibility-results.md)。
+<details>
+<summary>PDF 工作室</summary>
 
-已有时序与新对象若无法唯一匹配，保存会明确失败，不会默默丢弃动画。原动画 XML 保留不代表能在此播放或编辑。含转场、媒体或原有对象动画的文稿当前需保留为 PPTX，不允许降级转换成 ODP；PDF 始终不承载这些动态内容。
+![PDF 编辑与页面工具](docs/screenshots/pdf.png)
 
-## 获取安装包
+</details>
 
-在 [0.4.0 测试版发布页](https://github.com/ecojust/open-office/releases/tag/desktop-v0.4.0-38348938454) 下载对应平台：
+## 安装与开发
 
-- Windows x64 安装程序。
-- macOS Apple Silicon（M 系列）DMG。
-- macOS Intel DMG。
+在[发布页](https://github.com/ecojust/open-office/releases)选择 Windows x64 安装程序、Mac M 系列 DMG 或 Mac Intel DMG。安装包自带文档引擎、中文字体与 PDF 后端。当前编辑引擎内存占用较高，建议至少 8 GB 内存。
 
-安装包包含办公引擎、中文字体和 PDF 内核，安装后可以离线运行。办公引擎的 WASM 线性内存容量固定为 1 GiB，这不等于实际驻留内存；实际占用还包括引擎代码、文档与渲染资源，建议至少 8 GiB 内存。文字、表格与演示标签复用同一个内核；本轮源码更新在关闭对应 Office 标签后卸载不再使用的内核，系统物理内存回收可能延迟。PDF 编辑支持不超过 40 MiB、500 页的文件，超过上限时会明确报错并保留原文件。当前内存测量与尚未解决的限制见[内存优化记录](docs/memory-optimization.md)；上方旧版安装包不包含本轮源码更新。
+当前安装包未配置商业代码签名；macOS 包使用本地签名，尚未进行开发者公证。首次打开请按系统安全提示处理，校验文件见发布附件 `SHA256SUMS`。
 
-尚未配置 Apple Developer ID 公证及 Windows 商业代码签名。macOS 包会做本地 ad-hoc 签名验证，但这不等于 Apple 公证。如果系统阻止打开，请先核对发布的 SHA256，再按系统“隐私与安全性”中针对该应用的提示允许打开；不建议关闭系统全局安全保护。
+开发需要 Node.js 24、Python 3.12、Rust stable 和对应系统的原生构建工具，步骤见[开发与构建](docs/development.md)。
 
-## 开发
+## 许可
 
-需要 Node.js 24、Python 3.12、Rust stable，以及 Tauri 对应系统的原生构建依赖。macOS 需要 Xcode Command Line Tools；Windows 需要 Visual Studio C++ Build Tools 与 WebView2。
-
-```bash
-npm ci
-npm run desktop:prepare
-npm run desktop:dev
-```
-
-首次准备会下载已固定 SHA256 的 ZetaOffice WASM 与 Noto 中文字体，并用 PyInstaller 构建本机架构的 PDF 内核。Python 不需要在最终用户设备上额外安装。不要把其他架构的 `pdf-runtime` 复制过来。
-
-仅调试 Vue 界面：
-
-```bash
-npm run runtime:fetch
-npm run pdf:ensure
-npm run dev
-```
-
-开发服务器只在 `127.0.0.1:5198` 提供 PDF 测试桥。生产桌面应用通过 Tauri 的受控命令调用固定的本地 PDF 进程，不开放通用命令执行。直接将 `dist` 放在普通静态站点，不能获得桌面文件保存与 PDF 后端功能。
-
-## 构建与验证
-
-```bash
-npm run typecheck
-npm test
-npm run pdf:test
-npm run desktop:build
-```
-
-通过 GitHub Actions 的 Desktop release 工作流可在 Windows x64、Apple Silicon 和 Intel 三种原生构建机上生成对应安装包。发布前必须实际启动应用，确认隔离环境与 SharedArrayBuffer 可用，再执行 Writer 原文修改后保存重开、Calc 公式往返、Impress 两页幻灯片修改后分别保存重开 PPTX/ODP，以及 PDF 中文原文替换后的重开检查。Impress 还须实际导出 PDF，由独立 PDF 内核回读确认两页；不能只凭文件存在或导出成功标志判定通过。任何一种安装包未通过时不发布。文档往返、PDF 导出与静态预览检查不等于原生动画放映或所有 PowerPoint 特性的兼容验证。
-
-0.4.0 测试版对应提交 `4788fec61d97d45bd8627e7fd7e3a4fa3bbcbe21`，[构建与发布记录 38348938454](https://github.com/ecojust/open-office/actions/runs/38348938454) 全部通过。Word 格式、语义标题、表格和页眉页脚完成两次 DOCX 往返；Calc 数据类型、公式重算、排序／冻结、图表来源、透视配置和筛选完成两次 XLSX 往返；两者导出的 PDF 由独立内核读回。Windows 与 Apple Silicon 最终安装应用的真实 GUI 检查，以及原封 Intel DMG 的 Rosetta GUI 检查均通过。
-
-同一发布提交还通过无探针的 Word／Calc 同 helper 验证、独立 PDF 回读和发布报告校验；最终完整中文 UI 的 10 项检查通过，页面错误与 HTTP 失败均为 0。完整测试通过 242 项 Node 回归和 28 项真实 Python PDF 测试。这些结果验证指定样例，不等于 Microsoft 365 双向互验或完整功能对齐。
-
-Windows 与 Apple Silicon 包在对应架构上运行上述检查。Intel 包保留原生构建、PDF 引擎测试、x86_64 架构与严格签名检查；由于 GitHub Intel 虚拟机的原生 WebGL 图形环境不可用，完整界面检查使用同一次构建的原封 Intel DMG，在 Apple Silicon macOS 15 上通过 Rosetta 运行真实 x64 App 与 PDF 进程。搬运前后校验 DMG 摘要、App 全部文件、符号链接和签名，不重建、不换成 ARM 包。报告分别记录目标架构、宿主架构与执行模式。**这不等同于已在真实 Intel GPU 上实测**，也不保证所有显卡、系统版本或复杂文档均兼容。
-
-构建版本采用北京时间 `YYYY.MMDD.HHmm`，也可通过 `OFFICE_BUILD_VERSION` 固定，用于对应安装包与测试记录。
-
-真实浏览器回归（先在另一终端运行 `npm run dev`）：
-
-```bash
-npx playwright install chromium
-npm run test:browser
-npm run test:browser:word
-npm run test:browser:sheet
-npm run test:browser:office-ui
-npm run test:browser:office-native-contract
-```
-
-这些回归使用随包内核生成测试文档，在真实界面编辑、导出及重新打开，不接触用户自己的文件；最后一项执行与桌面发布相同的 Word／Calc 验证 helper，并由独立 PDF 内核读取导出内容。请顺序运行，避免同时启动多个高内存办公引擎。若使用系统 Chromium，可指定 `PLAYWRIGHT_CHROMIUM_EXECUTABLE`。结果及截图保存在 `test-results/`，默认路径会被后续运行覆盖；历史通过不代表当前文件或候选提交通过。当前完整 UI、无探针 helper 与最终安装包的状态见[验证边界](docs/word-excel-365-parity.md)。
-
-## 目录
-
-```text
-src/                    Vue 外壳、原生文件桥、PDF 工作室
-src/office/             办公内核消息桥与类型
-public/office/          独立办公内核宿主与线程适配
-public/office-runtime/  校验后下载的 WASM、数据与字体（不入 Git）
-public/legal/           随应用分发的许可文本
-pdf-backend/            受控 JSON 协议的本地 PDF 编辑器及真实文件测试
-src-tauri/              Rust 文件保存、隔离静态服务器、窗口与进程管理
-scripts/                资源准备、PDF 冻结、签名及原生冒烟验证
-vendor/                 固定版本与资源摘要
-```
-
-## 许可与源码
-
-原始仓库的 MIT 许可与作者版权声明保留在 `LICENSE`。集成发行包包含 AGPL、GPL、MPL/LGPL、Apache 2.0、MIT 和 OFL 等许可组件，不能仅按 MIT 二进制软件分发。请阅读 `DISTRIBUTION_LICENSE.md`、`THIRD_PARTY_NOTICES.md` 和 `public/legal/` 中的完整许可。源码与构建脚本公开在本仓库；对应第三方源码获取脚本与发布来源说明一并提供。
-
-项目与 Apache OpenOffice、Microsoft Office、WPS 均无隶属关系。
+本仓库保留原始 MIT 许可；集成发行包包含多种许可证组件，不能仅按 MIT 二进制软件分发。完整许可与对应源码说明见 [LICENSE](LICENSE)、[集成分发许可](DISTRIBUTION_LICENSE.md)和[第三方许可清单](THIRD_PARTY_NOTICES.md)。
