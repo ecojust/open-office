@@ -129,6 +129,19 @@ export function validateFrontendReport(report) {
   requireCheck(Number.isSafeInteger(calc.xlsxBytes) && calc.xlsxBytes > 100, 'Calc produced no real XLSX file');
   requireCheck(Number.isSafeInteger(calc.pdfBytes) && calc.pdfBytes > 100 && calc.pdfHeader === '%PDF-', 'Calc PDF export failed');
 
+  const impress = office.impress;
+  requireCheck(impress?.pptxReopened === true && impress.odpReopened === true, 'Impress did not reopen both its edited PPTX and ODP files');
+  requireCheck(impress.originalTextEdited === true, 'Impress did not edit original text from a reopened PPTX');
+  requireCheck(impress.slideCount === 2, 'Impress did not preserve both slides after document reopening');
+  requireCheck(Array.isArray(impress.texts) && impress.texts.length === 2
+    && impress.texts[0] === 'Open Office edited slide · 中文演示测试'
+    && impress.texts[1] === 'Second slide · 第二页内容', 'Impress slide texts or slide order differ from the two-slide fixture');
+  requireCheck(impress.macrosDisabled === true && impress.linkUpdatesDisabled === true, 'Impress safe import settings were not exercised');
+  requireCheck(Number.isSafeInteger(impress.pptxBytes) && impress.pptxBytes > 100, 'Impress produced no real PPTX file');
+  requireCheck(Number.isSafeInteger(impress.odpBytes) && impress.odpBytes > 100, 'Impress produced no real ODP file');
+  requireCheck(Number.isSafeInteger(impress.pdfBytes) && impress.pdfBytes > 100 && impress.pdfHeader === '%PDF-', 'Impress PDF export failed');
+  requireCheck(impress.pdfPageCount === 2, 'The independently reopened Impress PDF did not contain both pages');
+
   const pdf = report.pdf;
   requireCheck(pdf?.ok === true && pdf.reopened === true, 'The bundled PDF engine did not reopen its edited output');
   requireCheck(pdf.removedOldText === true && pdf.newTextPresent === true, 'PDF original-text replacement checks failed');
@@ -140,6 +153,8 @@ export function validateFrontendReport(report) {
   return {
     crossOriginIsolated: true, sharedArrayBuffer: true, writerOriginalTextRoundTrip: true,
     writerPdfExport: true, calcFormulaRoundTrip: true, calcPdfExport: true,
+    impressOriginalTextRoundTrip: true, impressOdpRoundTrip: true,
+    impressPdfExport: true, impressPdfPageCount: true,
     pdfOriginalTextReplacementRoundTrip: true,
   };
 }

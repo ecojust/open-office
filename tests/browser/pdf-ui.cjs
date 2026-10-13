@@ -15,7 +15,7 @@ const ok=(name,extra={})=>{report.checks.push({name,...extra});console.log('PASS
 let browser,page;
 async function idle(){await page.getByTestId('pdf-busy').waitFor({state:'hidden',timeout:45000});await page.waitForFunction(()=>!document.querySelector('.pdf-render-indicator'),null,{timeout:30000});}
 async function operation(name,action){const [raw]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/__pdf-dev')&&r.request().postDataJSON()?.operation===name),action()]);const response=await raw.json();assert.equal(response.ok,true,JSON.stringify(response.error));await idle();return response;}
-async function openFile(file){await page.locator('input[type=file][accept=".docx,.odt,.xlsx,.ods,.pdf"]').setInputFiles(out+'/'+file);await page.getByTestId('pdf-editor').waitFor();await idle();}
+async function openFile(file){await page.getByTestId('document-open-input').setInputFiles(out+'/'+file);await page.getByTestId('pdf-editor').waitFor();await idle();}
 async function drag(x0,y0,x1,y1){const zoom=Number((await page.locator('.pdf-zoom-value').textContent()).replace('%',''))/100;await page.locator('.pdf-stage').evaluate((element,top)=>{element.scrollTop=top},Math.max(0,y0*zoom-100));const box=await page.getByTestId('pdf-page-surface').boundingBox();await page.mouse.move(box.x+x0*zoom,box.y+y0*zoom);await page.mouse.down();await page.mouse.move(box.x+x1*zoom,box.y+y1*zoom,{steps:15});await page.mouse.up();}
 (async()=>{try{
 browser=await chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{}),headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});

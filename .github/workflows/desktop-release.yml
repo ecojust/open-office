@@ -138,7 +138,7 @@ jobs:
           if ($process.ExitCode -notin @(0, 3010)) { throw "NSIS installation failed: $($process.ExitCode)" }
           if (-not (Test-Path (Join-Path $installDirectory 'open-office.exe'))) { throw 'Installed desktop executable is missing' }
           "OPEN_OFFICE_INSTALLED_APP=$installDirectory" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Verify final desktop GUI, office round trips, and real PDF edits
+      - name: Verify final desktop GUI, Writer/Calc/Impress round trips, and real PDF edits
         if: matrix.id != 'macos-x64'
         timeout-minutes: 8
         run: node scripts/native-smoke.mjs
@@ -233,7 +233,7 @@ jobs:
           path: artifacts
       - name: Verify original Intel DMG and copy its unchanged App with signatures intact
         run: node scripts/macos-intel-transfer.mjs verify-and-copy
-      - name: Run actual Intel App and PDF processes under Rosetta for full document round trips
+      - name: Run actual Intel App and PDF processes under Rosetta for Writer/Calc/Impress/PDF round trips
         timeout-minutes: 8
         run: node scripts/native-smoke.mjs --app "$OPEN_OFFICE_VERIFIED_APP"
       - name: Check matching package, signatures, architecture, and successful real edits
@@ -375,9 +375,11 @@ jobs:
           cat > release-notes.md <<EOF
           Open Office ${version} · 离线桌面办公套件
 
-          安装包：Windows x64、Apple Silicon Mac、Intel Mac。安装后，Word / Excel 文档编辑和 PDF 工具使用随包本地引擎，不需要用户安装 Python 或 Microsoft Office。
+          安装包：Windows x64、Apple Silicon Mac、Intel Mac。安装后，Word / Excel / PPT 文档编辑和 PDF 工具使用随包本地引擎，不需要用户安装 Python 或 Microsoft Office。
 
-          三种安装包均通过实际应用内自检：跨源隔离与 SharedArrayBuffer、Writer 文档编辑和 DOCX/PDF 往返、Calc 公式计算和 XLSX/PDF 往返、PDF 原文删除替换后重新读取。
+          PPT 放映采用静态逐页预览，支持全屏与翻页；不播放动画、切换特效、音频或视频，也不代表完整的 PowerPoint 演示效果兼容。
+
+          三种安装包均通过实际应用内自检：跨源隔离与 SharedArrayBuffer、Writer 文档编辑和 DOCX/PDF 往返、Calc 公式计算和 XLSX/PDF 往返、Impress 两页中英文演示文稿原文修改后 PPTX/ODP 保存重开及 PDF 导出（独立读取确认两页）、PDF 原文删除替换后重新读取。
           Windows x64 在 Windows Server 2022 上验证，Apple Silicon 包在 macOS 15 ARM 上验证。Intel x64 包在 Intel 构建机原生编译并检查 PDF、架构与签名，随后将原封 DMG 转移到 Apple Silicon macOS 15，通过 Rosetta 运行真实 x64 App 与 PDF 进程完成相同自检；校验安装包摘要、App 全部文件、链接与签名一致，无重建或重签。
           Intel 包尚未在真实 Intel GPU 上实测；GitHub 的 Intel 虚拟机未提供可用的原生 WebGL 图形环境。本验证不代表已测试所有系统版本、显卡或复杂 Office 文档。
 

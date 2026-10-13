@@ -1,5 +1,5 @@
-export type OfficeKind = 'word' | 'sheet'
-export type OfficeFormat = 'docx' | 'odt' | 'xlsx' | 'ods' | 'pdf'
+export type OfficeKind = 'word' | 'sheet' | 'presentation'
+export type OfficeFormat = 'docx' | 'odt' | 'xlsx' | 'ods' | 'pptx' | 'odp' | 'pdf'
 export interface OfficeDocument {
   id: string
   name: string
@@ -11,7 +11,7 @@ export interface OfficeDocument {
 }
 export interface OfficeExportRequest { format?: OfficeFormat }
 export interface OfficeExportResult { base64: string; extension: OfficeFormat; name: string; revision: number; dirty: boolean }
-export type OfficeNativeRequest = { type: 'save' | 'save-as' | 'open' | 'new' | 'export-pdf' | 'print' | 'insert-image' | 'close' | 'quit'; notice?: string }
+export type OfficeNativeRequest = { type: 'save' | 'save-as' | 'open' | 'new' | 'export-pdf' | 'print' | 'insert-image' | 'close' | 'quit' | 'presentation-preview'; notice?: string; pageIndex?: number }
 export interface OfficeEvent {
   channel: 'open-office-engine'
   session: string

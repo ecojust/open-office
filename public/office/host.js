@@ -5,9 +5,10 @@ const session = new URLSearchParams(location.hash.slice(1)).get('session');
 const canvas = document.getElementById('qtcanvas');
 const runtimeBase = new URL('../office-runtime/', location.href).href;
 const adapterBase = new URL('./', location.href).href;
-let port, activeDocumentId = '', disposed = false, fileCounter = 0;
+let port, activeDocumentId = '', activeDocumentKind = '', disposed = false, fileCounter = 0;
 const pending = new Map();
-const allowed = new Set(['open','export','undo','redo','search','mark-saved','discard','focus','insert-image']);
+const allowed = new Set(['open','export','undo','redo','search','mark-saved','discard','focus','insert-image',
+  'new-slide','preview-presentation']);
 const smokeMode = new URLSearchParams(location.search).get('smoke') === '1';
 if (smokeMode) allowed.add('smoke-test');
 const send = (message) => { if (!disposed) parent.postMessage({ channel: CHANNEL, session, ...message }, location.origin); };
@@ -149,9 +150,9 @@ window.addEventListener('message', (event) => {
   try {
     let data = message.data || {};
     if (message.action === 'open') {
-      if (typeof data.id !== 'string' || !['word','sheet'].includes(data.kind)) throw Error('不支持的文档类型。');
-      const extensions = data.kind === 'word' ? ['docx','odt'] : ['xlsx','ods'];
-      if (!extensions.includes(data.extension)) throw Error('请使用 DOCX、ODT、XLSX 或 ODS 文档。');
+      if (typeof data.id !== 'string' || !['word','sheet','presentation'].includes(data.kind)) throw Error('不支持的文档类型。');
+      const extensions = { word: ['docx','odt'], sheet: ['xlsx','ods'], presentation: ['pptx','odp'] }[data.kind];
+      if (!extensions.includes(data.extension)) throw Error('请使用 DOCX、ODT、XLSX、ODS、PPTX 或 ODP 文档。');
       const path = `/tmp/open-office-${++fileCounter}.${data.extension}`;
       const bytes = fromBase64(data.base64);
       if (bytes.length) FS.writeFile(path, bytes);
@@ -188,16 +189,20 @@ function workerMessage(event) {
       if (request.action === 'open' && !request.data.isNew) { try { FS.unlink(request.data.path); } catch {} }
       throw Error(message.error || '操作失败。');
     }
-    if (request.action === 'open') { if (message.data.closedPath) { try { FS.unlink(message.data.closedPath); } catch {} } activeDocumentId = request.data.id; window.dispatchEvent(new Event('resize')); setTimeout(() => window.dispatchEvent(new Event('resize')), 200); }
+    if (request.action === 'open') { if (message.data.closedPath) { try { FS.unlink(message.data.closedPath); } catch {} } activeDocumentId = request.data.id; activeDocumentKind = request.data.kind; window.dispatchEvent(new Event('resize')); setTimeout(() => window.dispatchEvent(new Event('resize')), 200); }
     if (request.action === 'smoke-test') {
       const report = message.data;
-      for (const [kind, extension] of [['writer','docx'], ['calc','xlsx']]) {
+      for (const [kind, extension] of [['writer','docx'], ['calc','xlsx'], ['impress','pptx']]) {
         const result = report[kind], pdf = FS.readFile(result.pdfPath);
         result[extension + 'Bytes'] = FS.stat(result[extension + 'Path']).size;
         result.pdfBytes = pdf.length; result.pdfHeader = String.fromCharCode(...pdf.subarray(0, 5));
+        if (kind === 'impress') result.pdfBase64 = toBase64(pdf);
         report.ok = report.ok && result.pdfHeader === '%PDF-' && result[extension + 'Bytes'] > 100;
         delete result.pdfPath; delete result[extension + 'Path'];
       }
+      report.impress.odpBytes = FS.stat(report.impress.odpPath).size;
+      report.ok = report.ok && report.impress.odpBytes > 100;
+      delete report.impress.odpPath;
       for (const asset of report.artifacts) { try { FS.unlink(asset.path); } catch {} }
       delete report.artifacts;
     }
@@ -211,6 +216,14 @@ function workerMessage(event) {
 }
 canvas.addEventListener('wheel', event => event.preventDefault(), { passive: false });
 window.addEventListener('keydown', event => {
+  if (event.key === 'F5' && !event.ctrlKey && !event.metaKey && !event.altKey && activeDocumentKind === 'presentation') {
+    // Qt's native slideshow path crashes this pinned WASM runtime. Capture both
+    // F5 variants before Qt sees them and use the app's explicitly static preview.
+    event.preventDefault(); event.stopImmediatePropagation();
+    port?.postMessage({ requestId: `preview-key-${++fileCounter}`, action: 'preview-presentation',
+      documentId: activeDocumentId, data: { fromCurrent: event.shiftKey } });
+    return;
+  }
   if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
   const key = event.key.toLowerCase();
   const type = key === 's' ? (event.shiftKey ? 'save-as' : 'save') : key === 'o' ? 'open' : key === 'p' ? 'print' : '';

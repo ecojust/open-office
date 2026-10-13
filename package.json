@@ -1,6 +1,6 @@
 {
   "name": "open-office",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -23,7 +23,9 @@
     "assets": "node scripts/copy-pdf-assets.mjs",
     "postinstall": "npm run assets",
     "pdf:test": "node scripts/test-pdf-backend.mjs",
-    "test:browser": "node tests/browser/pdf-ui.cjs"
+    "test:browser": "node tests/browser/pdf-ui.cjs",
+    "test:browser:ppt": "node tests/browser/presentation-ui.cjs",
+    "test:browser:impress": "node tests/browser/impress-engine.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.3",

@@ -27,7 +27,7 @@ const IMAGE_LIMIT: u64 = 20 * 1024 * 1024;
 const ENCODED_LIMIT: usize = ((DOCUMENT_LIMIT as usize + 2) / 3) * 4;
 const HISTORY_LIMIT: u64 = 2 * 1024 * 1024;
 const MAX_RECENT: usize = 100;
-const EXTENSIONS: &[&str] = &["docx", "odt", "xlsx", "ods", "pdf"];
+const EXTENSIONS: &[&str] = &["docx", "odt", "xlsx", "ods", "pptx", "odp", "pdf"];
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -36,6 +36,8 @@ pub enum DocExt {
     Odt,
     Xlsx,
     Ods,
+    Pptx,
+    Odp,
     Pdf,
 }
 
@@ -46,6 +48,8 @@ impl DocExt {
             Self::Odt => "odt",
             Self::Xlsx => "xlsx",
             Self::Ods => "ods",
+            Self::Pptx => "pptx",
+            Self::Odp => "odp",
             Self::Pdf => "pdf",
         }
     }
@@ -60,8 +64,10 @@ impl DocExt {
             "odt" => Ok(Self::Odt),
             "xlsx" => Ok(Self::Xlsx),
             "ods" => Ok(Self::Ods),
+            "pptx" => Ok(Self::Pptx),
+            "odp" => Ok(Self::Odp),
             "pdf" => Ok(Self::Pdf),
-            _ => Err("仅支持 DOCX、ODT、XLSX、ODS 和 PDF 文件。".into()),
+            _ => Err("仅支持 DOCX、ODT、XLSX、ODS、PPTX、ODP 和 PDF 文件；不支持旧版 PPT。".into()),
         }
     }
 
@@ -69,6 +75,7 @@ impl DocExt {
         match self {
             Self::Docx | Self::Odt => DocumentKind::Word,
             Self::Xlsx | Self::Ods => DocumentKind::Sheet,
+            Self::Pptx | Self::Odp => DocumentKind::Presentation,
             Self::Pdf => DocumentKind::Pdf,
         }
     }
@@ -79,6 +86,7 @@ impl DocExt {
 pub enum DocumentKind {
     Word,
     Sheet,
+    Presentation,
     Pdf,
 }
 
@@ -806,6 +814,129 @@ pub async fn save_document(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn presentation_formats_serialize_without_enabling_legacy_or_mismatched_files() {
+        for (extension, name) in [(DocExt::Pptx, "pptx"), (DocExt::Odp, "odp")] {
+            assert!(
+                EXTENSIONS.contains(&name),
+                "Native open dialog must expose {name}"
+            );
+            assert_eq!(
+                extension.as_str(),
+                name,
+                "Save dialog must use the exact format"
+            );
+            assert_eq!(serde_json::to_value(extension).unwrap(), name);
+            assert_eq!(
+                serde_json::from_value::<DocExt>(serde_json::json!(name)).unwrap(),
+                extension
+            );
+            assert_eq!(
+                DocExt::from_path(Path::new(&format!(
+                    "项目汇报.{}",
+                    name.to_ascii_uppercase()
+                )))
+                .unwrap(),
+                extension
+            );
+            assert_eq!(
+                serde_json::to_value(extension.kind()).unwrap(),
+                "presentation"
+            );
+            assert!(validate_file_name(&format!("项目汇报.{name}"), extension).is_ok());
+            for wrong in [
+                "项目汇报.ppt",
+                "项目汇报.pptm",
+                "项目汇报.docx",
+                "../slides.pptx",
+                "CON.pptx",
+            ] {
+                assert!(
+                    validate_file_name(wrong, extension).is_err(),
+                    "Accepted {wrong}"
+                );
+            }
+        }
+        assert!(validate_file_name("项目汇报.odp", DocExt::Pptx).is_err());
+        assert!(validate_file_name("项目汇报.pptx", DocExt::Odp).is_err());
+        assert!(serde_json::from_value::<DocExt>(serde_json::json!("ppt")).is_err());
+        assert!(!EXTENSIONS.contains(&"ppt"));
+    }
+
+    #[test]
+    fn presentation_save_and_history_reopen_preserve_bytes_identity_and_kind() {
+        // This tests the native opaque-byte file bridge; Impress parsing and
+        // actual slide edits are exercised by the separate engine round trips.
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("app-data");
+        let store = DocumentStore::new(data.clone()).unwrap();
+        let existing = directory.path().join("已有文档.docx");
+        fs::write(&existing, b"existing word document").unwrap();
+        let word = store.register_open(existing).unwrap();
+        for extension in [DocExt::Pptx, DocExt::Odp] {
+            let path = directory
+                .path()
+                .join(format!("汇报.{}", extension.as_str()));
+            fs::write(&path, b"original slide fixture").unwrap();
+            let opened = store.register_open(path.clone()).unwrap();
+            assert_eq!(opened.kind, DocumentKind::Presentation);
+            assert_eq!(opened.extension, extension);
+            assert_eq!(
+                STANDARD.decode(&opened.base64).unwrap(),
+                b"original slide fixture"
+            );
+            let snapshot = TargetSnapshot::capture(path.clone()).unwrap();
+            let SaveResult::Saved { document } = store
+                .save_to_target(snapshot, extension, b"edited slide fixture".to_vec())
+                .unwrap()
+            else {
+                panic!("Expected saved presentation")
+            };
+            assert_eq!(document.id, opened.id);
+            assert_eq!(document.kind, DocumentKind::Presentation);
+            assert_eq!(document.sha256, hash_bytes(b"edited slide fixture"));
+            assert_eq!(fs::read(&path).unwrap(), b"edited slide fixture");
+            let receipt = serde_json::to_value(&document).unwrap();
+            assert_eq!(receipt["kind"], "presentation");
+            assert_eq!(receipt["extension"], extension.as_str());
+            assert!(receipt.get("path").is_none());
+            let restored = DocumentStore::new(data.clone()).unwrap();
+            let approved = restored.approved_document_path(&document.id).unwrap();
+            let reopened = restored.register_open(approved).unwrap();
+            assert_eq!(reopened.id, opened.id);
+            assert_eq!(reopened.kind, DocumentKind::Presentation);
+            assert_eq!(reopened.sha256, document.sha256);
+            assert_eq!(
+                STANDARD.decode(&reopened.base64).unwrap(),
+                b"edited slide fixture"
+            );
+            assert_eq!(restored.record(&word.id).unwrap().extension, DocExt::Docx);
+        }
+    }
+
+    #[test]
+    fn presentation_conflict_preserves_external_edits_and_original_history() {
+        for extension in [DocExt::Pptx, DocExt::Odp] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory
+                .path()
+                .join(format!("slides.{}", extension.as_str()));
+            fs::write(&path, b"original slides").unwrap();
+            let store = DocumentStore::new(directory.path().join("data")).unwrap();
+            let opened = store.register_open(path.clone()).unwrap();
+            let snapshot = TargetSnapshot::capture(path.clone()).unwrap();
+            fs::write(&path, b"slides edited elsewhere").unwrap();
+            assert!(matches!(
+                store
+                    .save_to_target(snapshot, extension, b"my slides".to_vec())
+                    .unwrap(),
+                SaveResult::Conflict { .. }
+            ));
+            assert_eq!(fs::read(path).unwrap(), b"slides edited elsewhere");
+            assert_eq!(store.record(&opened.id).unwrap().sha256, opened.sha256);
+        }
+    }
 
     #[test]
     fn names_cannot_select_paths_devices_or_different_types() {

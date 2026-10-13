@@ -5,6 +5,7 @@ const paths:Record<string,string>={
  folder:'M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7z',
  file:'M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6 M9 16h6',
  sheet:'M5 3h14v18H5z M5 9h14 M5 15h14 M11 9v12',
+ presentation:'M3 4h18v12H3z M12 16v5 M8 21h8 M10 7l5 3-5 3z',
  pdf:'M6 3h8l4 4v14H6z M14 3v5h4 M9 16l3-6 3 6 M10 14h4',
  plus:'M12 5v14 M5 12h14',close:'M6 6l12 12 M18 6 6 18',
  save:'M5 3h12l4 4v14H3V3h2z M7 3v6h10V3 M7 21v-8h10v8',

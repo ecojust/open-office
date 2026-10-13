@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import Icon from './components/Icon.vue'
 import OfficeEditor from './components/OfficeEditor.vue'
 import PdfEditor from './components/PdfEditor.vue'
+import SlidePreview from './components/SlidePreview.vue'
 import * as native from './native'
 import { smokeAwait, smokeFailure, smokeFeatures, smokeRequested, smokeStage } from './smoke'
 import type { NativeDocument, RecentDocument } from './types'
@@ -18,16 +19,17 @@ smokeStage('app-setup', 'Vue setup reached')
 const tabs = ref<Tab[]>([]), activeKey = ref(''), home = ref(true), section = ref('home')
 const active = computed(() => tabs.value.find(t => t.key === activeKey.value))
 const officeDocument = shallowRef<OfficeDocument>(), pdfDocument = shallowRef<NativeDocument>()
-const officeEditor = ref<EditorHandle & { insertImage?(image: {name:string;base64:string}):Promise<void>; smokeTest?():Promise<unknown> }>()
+const officeEditor = ref<EditorHandle & { insertImage?(image: {name:string;base64:string}):Promise<void>; newSlide?():Promise<unknown>; smokeTest?():Promise<unknown> }>()
 const pdfEditor = ref<EditorHandle>()
+const slidePreview = shallowRef<{base64:string;name:string;startPage:number}>()
 const recents = ref<RecentDocument[]>([]), busy = ref(''), error = ref(''), status = ref('所有文件，仅在你的设备上处理')
 const help = ref(false), search = ref(''), closeTarget = ref<Tab | 'window' | null>(null)
 const fileInput = ref<HTMLInputElement>(), imageInput = ref<HTMLInputElement>()
 let unlisten: (() => void) | undefined
 let pendingWindowClose = false
 const editor = () => active.value?.document.kind === 'pdf' ? pdfEditor.value : officeEditor.value
-const kindNames: Record<Kind,string> = { word:'文字文档', sheet:'电子表格', pdf:'PDF 文档' }
-const icons: Record<Kind,string> = {word:'file',sheet:'sheet',pdf:'pdf'}
+const kindNames: Record<Kind,string> = { word:'文字文档', sheet:'电子表格', presentation:'演示文稿', pdf:'PDF 文档' }
+const icons: Record<Kind,string> = {word:'file',sheet:'sheet',presentation:'presentation',pdf:'pdf'}
 const filteredRecents = computed(() => recents.value.filter(r => r.name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase())))
 const message = (e:unknown) => e instanceof Error ? e.message : String(e)
 async function task(label:string, work:()=>Promise<void>) {
@@ -112,7 +114,7 @@ async function addDocument(doc:NativeDocument, fileId?:string) {
 }
 function newDocument(kind:Kind) {
   void task('正在新建文档',async()=>{
-    const extension:Extension=kind==='word'?'docx':kind==='sheet'?'xlsx':'pdf'
+    const extension:Extension=kind==='word'?'docx':kind==='sheet'?'xlsx':kind==='presentation'?'pptx':'pdf'
     const number=tabs.value.filter(t=>t.document.kind===kind).length+1
     await addDocument({id:'',kind,extension,name:`未命名${kindNames[kind]}${number}.${extension}`,base64:'',sha256:'',sizeBytes:0})
   })
@@ -145,7 +147,7 @@ async function saveActive(saveAs=false, format?:Extension):Promise<boolean> {
   const exported=await handle.exportFile(format?{format}:undefined)
   if(activeKey.value!==tab.key)throw Error('文档已切换，本次保存已取消。')
   if(exported.dirty)tab.dirty=true
-  const isCopy=format==='pdf' && tab.document.kind!=='pdf'
+  const isCopy=!!format && format!==tab.document.extension
   const name=exported.name || withExtension(tab.document.name,exported.extension)
   if(!native.isTauri()) {
     download(exported.base64,name)
@@ -160,9 +162,27 @@ async function saveActive(saveAs=false, format?:Extension):Promise<boolean> {
     tab.document={...result.document,id:tab.key,base64:exported.base64}
     tab.dirty=false;await handle.markSaved?.(exported.base64)
   }
-  await refreshRecents();status.value=isCopy?'PDF 副本已保存':'已保存到本机';return true
+  await refreshRecents();status.value=isCopy?`${exported.extension.toUpperCase()} 副本已保存`:'已保存到本机';return true
 }
-function save(saveAs=false,format?:Extension) {void task(format==='pdf'?'正在导出 PDF':'正在保存文档',async()=>{await saveActive(saveAs,format)})}
+function save(saveAs=false,format?:Extension) {void task(format?`正在导出 ${format.toUpperCase()}`:'正在保存文档',async()=>{await saveActive(saveAs,format)})}
+function newSlide() {
+  void task('正在新建幻灯片',async()=>{
+    const tab=active.value;if(!tab||tab.document.kind!=='presentation')return
+    requireEditor(tab)
+    if(!officeEditor.value?.newSlide)throw Error('演示文稿编辑器尚未就绪。')
+    await officeEditor.value.newSlide();status.value='已新建幻灯片，沿用当前母版和布局'
+  })
+}
+function previewSlides(startPage=0) {
+  void task('正在准备放映预览',async()=>{
+    const tab=active.value;if(!tab||tab.document.kind!=='presentation')return
+    const exported=await requireEditor(tab).exportFile({format:'pdf'})
+    if(activeKey.value!==tab.key)throw Error('文档已切换，已取消旧演示文稿的预览。')
+    if(exported.dirty)tab.dirty=true
+    slidePreview.value={base64:exported.base64,name:tab.document.name,startPage:Number.isSafeInteger(startPage)?Math.max(0,startPage):0}
+  })
+}
+function closeSlidePreview() {slidePreview.value=undefined}
 function changeTab(tab:Tab) {void task('正在切换文档',()=>activate(tab))}
 async function removeTab(tab:Tab, discardConfirmed=false) {
   if(tab.key===activeKey.value) {
@@ -189,6 +209,8 @@ function closeTab(tab:Tab) {
 }
 async function closeWindow() {
   if(busy.value) {pendingWindowClose=true;return}
+  // The native close confirmation must remain visible above a presentation.
+  if(slidePreview.value) {closeSlidePreview();await nextTick()}
   await task('正在检查未保存修改',async()=>{
     const tab=active.value
     if(tab?.ready) {
@@ -220,7 +242,7 @@ async function browserImage(event:Event) {
   const input=event.target as HTMLInputElement,file=input.files?.[0];input.value='';if(!file)return
   await task('正在插入图片',async()=>{if(file.size>10*1024*1024)throw Error('图片不能超过 10 MB');await officeEditor.value?.insertImage?.({name:file.name,base64:bytesToBase64(new Uint8Array(await file.arrayBuffer()))})})
 }
-function officeRequest(request:{type:string;notice?:string}) {
+function officeRequest(request:{type:string;notice?:string;pageIndex?:number}) {
   if(request.type==='open')openFile()
   else if(request.type==='new') {home.value=true;section.value='home'}
   else if(request.type==='save')save()
@@ -233,6 +255,7 @@ function officeRequest(request:{type:string;notice?:string}) {
     })
   }
   else if(request.type==='insert-image')insertImage()
+  else if(request.type==='presentation-preview')previewSlides(request.pageIndex)
   else if(request.type==='close' && active.value)closeTab(active.value)
   else if(request.type==='print')editCommand('print')
   else if(request.type==='quit') {
@@ -241,6 +264,8 @@ function officeRequest(request:{type:string;notice?:string}) {
   }
 }
 function keydown(event:KeyboardEvent) {
+  if(slidePreview.value)return
+  if(event.key==='F5'&&active.value?.document.kind==='presentation'&&!home.value){event.preventDefault();previewSlides();return}
   if(!(event.ctrlKey||event.metaKey)||event.altKey)return
   if(event.key.toLowerCase()==='o'){event.preventDefault();openFile()}
   if(event.key.toLowerCase()==='s'){event.preventDefault();save(event.shiftKey)}
@@ -271,11 +296,18 @@ onMounted(async()=>{
           }
           if(!active.value?.ready)throw Error('Office engine readiness timed out after 240s')
           if(!officeEditor.value?.smokeTest)throw Error('Office smoke test unavailable')
-          smokeStage('office-roundtrip','starting actual Writer and Calc edits')
-          report.office=await officeEditor.value.smokeTest()
+          smokeStage('office-roundtrip','starting actual Writer, Calc and Impress edits')
+          const office=await officeEditor.value.smokeTest() as {impress?:{pdfBase64?:string;pdfPageCount?:number}}
+          const presentationPdf=office.impress?.pdfBase64
+          if(office.impress)delete office.impress.pdfBase64
+          report.office=office
+          if(!presentationPdf||!office.impress)throw Error('Impress smoke test returned no exported PDF')
+          const {requestPdf}=await import('./pdf/protocol')
+          const presentationInfo=await requestPdf('inspect',presentationPdf,{})
+          office.impress.pdfPageCount=presentationInfo.metadata?.pageCount
+          if(office.impress.pdfPageCount!==2)throw Error('Impress exported PDF must contain both slides')
           smokeStage('office-roundtrip','complete')
           smokeStage('pdf-roundtrip','starting actual original text replacement')
-          const {requestPdf}=await import('./pdf/protocol')
           const pdf=await requestPdf('new','',{});if(!pdf.base64)throw Error('PDF new returned no bytes')
           const added=await requestPdf('add_text',pdf.base64,{pageIndex:0,rect:[35,35,500,100],text:'OLD_NATIVE_TEXT 旧合同',fontSize:14})
           if(!added.base64)throw Error('PDF add_text returned no bytes')
@@ -299,7 +331,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 
 <template>
   <div class="app-shell" :class="{'editing':!home}">
-    <input ref="fileInput" class="visually-hidden" type="file" accept=".docx,.odt,.xlsx,.ods,.pdf" @change="browserFile" />
+    <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.odt,.xlsx,.ods,.pptx,.odp,.pdf" @change="browserFile" />
     <input ref="imageInput" class="visually-hidden" type="file" accept="image/png,image/jpeg" @change="browserImage" />
     <header class="titlebar">
       <button class="brand" @click="home=true;section='home'" aria-label="返回工作台"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
@@ -314,31 +346,33 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <div class="sidebar-bottom"><Icon name="shield"/><strong>安心，离线处理</strong><p>你的文档留在本机。<br/>无需账户，也无需上传。</p><button @click="help=true">了解编辑与格式兼容 <Icon name="arrow" :size="15"/></button></div>
       </aside>
       <main class="home-main">
-        <div class="home-heading"><div><span class="eyebrow">YOUR SPACE TO CREATE</span><h1>{{section==='home'?'今天，从一个好想法开始。':'继续上一次的工作。'}}</h1><p>文字、表格与 PDF，在一个安静的工作空间里。</p></div><span class="workspace-mark">OO<span>WORKSPACE</span></span></div>
+        <div class="home-heading"><div><span class="eyebrow">YOUR SPACE TO CREATE</span><h1>{{section==='home'?'今天，从一个好想法开始。':'继续上一次的工作。'}}</h1><p>文字、表格、演示与 PDF，在一个安静的工作空间里。</p></div><span class="workspace-mark">OO<span>WORKSPACE</span></span></div>
         <section v-if="section==='home'" class="create-grid" aria-label="新建文件">
           <button class="create-card word" @click="newDocument('word')"><div class="document-art"><span>W</span><i/><i/><i/></div><span class="card-bottom"><span><strong>文字文档</strong><small>让思考成为清晰的表达</small></span><span class="card-plus"><Icon name="plus"/></span></span><span class="file-kind">DOCX · ODT</span></button>
           <button class="create-card sheet" @click="newDocument('sheet')"><div class="document-art"><span>X</span><i/><i/><i/></div><span class="card-bottom"><span><strong>电子表格</strong><small>把复杂数据，整理得井井有条</small></span><span class="card-plus"><Icon name="plus"/></span></span><span class="file-kind">XLSX · ODS</span></button>
+          <button class="create-card presentation" @click="newDocument('presentation')"><div class="document-art"><span>P</span><i/><i/><i/></div><span class="card-bottom"><span><strong>演示文稿</strong><small>把每一个想法，讲得更精彩</small></span><span class="card-plus"><Icon name="plus"/></span></span><span class="file-kind">PPTX · ODP</span></button>
           <button class="create-card pdf" @click="newDocument('pdf')"><div class="document-art"><span>P</span><i/><i/><i/></div><span class="card-bottom"><span><strong>PDF 工作室</strong><small>编辑原文、批注与整理页面</small></span><span class="card-plus"><Icon name="plus"/></span></span><span class="file-kind">PDF</span></button>
         </section>
         <section class="recent-section"><div class="section-heading"><h2>最近打开 <span>{{recents.length}}</span></h2><label class="search-box"><Icon name="search" :size="17"/><input v-model="search" placeholder="查找最近的文件" aria-label="查找最近的文件"/></label></div>
           <div v-if="!filteredRecents.length" class="empty-files"><div class="empty-icon"><Icon name="folder" :size="29"/></div><strong>{{search?'没有找到匹配的文件':'你的下一份作品，从这里开始'}}</strong><p>{{native.isTauri()?'打开本机文件后，可以在这里快速找到它。':'浏览器预览支持打开和导出文件；桌面版提供原文件保存与完整 PDF 编辑。'}}</p><button class="text-button" @click="openFile">打开一份文件 <Icon name="arrow" :size="16"/></button></div>
           <div v-else class="recent-list"><button v-for="item in filteredRecents" :key="item.id" class="recent-row" @click="openRecent(item)"><span class="file-icon" :class="item.kind"><Icon :name="icons[item.kind]"/></span><span class="recent-name">{{item.name}}<small>{{kindNames[item.kind]}} · {{item.extension.toUpperCase()}}</small></span><time>{{new Date(item.lastOpenedAt* (item.lastOpenedAt<1e12?1000:1)).toLocaleDateString('zh-CN')}}</time><Icon name="arrow" :size="17"/></button></div>
         </section>
-        <footer class="home-footer"><span>一处工作台，三种创造力。</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
+        <footer class="home-footer"><span>一处工作台，四种创造力。</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
       </main>
     </div>
     <section v-show="!home" class="editor-workspace">
       <div class="tab-bar"><button class="home-tab" @click="home=true" aria-label="工作台"><Icon name="home" :size="18"/></button><div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div><button class="new-tab" @click="home=true" aria-label="新建文档"><Icon name="plus" :size="18"/></button></div>
-      <div class="command-bar"><button @click="openFile"><Icon name="folder" :size="17"/>打开</button><span class="separator"/><button :disabled="!active?.ready" @click="save()"><Icon name="save" :size="17"/>保存</button><button :disabled="!active?.ready" @click="save(true)">另存为</button><button v-if="active?.document.kind!=='pdf'" :disabled="!active?.ready" @click="save(true,'pdf')"><Icon name="download" :size="17"/>导出 PDF</button><span class="separator"/><button :disabled="!active?.ready" @click="editCommand('undo')" title="撤销"><Icon name="undo" :size="17"/></button><button :disabled="!active?.ready" @click="editCommand('redo')" title="重做"><Icon name="redo" :size="17"/></button><span class="command-spacer"/><span class="save-state"><i :class="{'dirty-dot':active?.dirty}"/>{{active?.dirty?'尚未保存':'已保存'}}</span></div>
+      <div class="command-bar"><button @click="openFile"><Icon name="folder" :size="17"/>打开</button><span class="separator"/><button :disabled="!active?.ready" @click="save()"><Icon name="save" :size="17"/>保存</button><button :disabled="!active?.ready" @click="save(true)">另存为</button><button v-if="active?.document.kind!=='pdf'" :disabled="!active?.ready" @click="save(true,'pdf')"><Icon name="download" :size="17"/>导出 PDF</button><span class="separator"/><button :disabled="!active?.ready" @click="editCommand('undo')" title="撤销"><Icon name="undo" :size="17"/></button><button :disabled="!active?.ready" @click="editCommand('redo')" title="重做"><Icon name="redo" :size="17"/></button><template v-if="active?.document.kind==='presentation'"><span class="separator"/><button :disabled="!active?.ready" @click="newSlide" data-testid="presentation-new-slide"><Icon name="plus" :size="17"/>新建幻灯片</button><button :disabled="!active?.ready" @click="insertImage"><Icon name="image" :size="17"/>插入图片</button><button :disabled="!active?.ready" @click="previewSlides()" title="静态逐页放映，不包含动画、音视频 · F5" data-testid="presentation-preview"><Icon name="presentation" :size="17"/>预览放映</button><button :disabled="!active?.ready" @click="save(true,active.document.extension==='odp'?'pptx':'odp')" data-testid="presentation-export-alternate">导出 {{active.document.extension==='odp'?'PPTX':'ODP'}}</button></template><span class="command-spacer"/><span class="save-state"><i :class="{'dirty-dot':active?.dirty}"/>{{active?.dirty?'尚未保存':'已保存'}}</span></div>
       <div class="editor-content" :inert="!!busy">
         <OfficeEditor v-if="officeDocument" v-show="active?.document.kind!=='pdf'" ref="officeEditor" :document="officeDocument" :smoke-mode="smokeMode" @dirty="dirtyFor(officeDocument?.id,$event)" @ready="readyFor(officeDocument?.id)" @error="editorError(officeDocument?.id,$event)" @status="status=$event" @request="officeRequest"/>
         <PdfEditor v-if="pdfDocument && active?.document.kind==='pdf'" :key="pdfDocument.id" ref="pdfEditor" :document="pdfDocument" :initial-dirty="active?.dirty" @dirty="dirtyFor(pdfDocument?.id,$event)" @ready="readyFor(pdfDocument?.id)" @error="editorError(pdfDocument?.id,$event)" @status="status=$event"/>
       </div>
       <footer class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · 本机编辑</span></footer>
     </section>
+    <SlidePreview v-if="slidePreview" :base64="slidePreview.base64" :name="slidePreview.name" :start-page="slidePreview.startPage" @close="closeSlidePreview" @error="error=$event"/>
     <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{error}}</span><button @click="error=''" aria-label="关闭错误提示"><Icon name="close" :size="16"/></button></div>
     <div v-if="busy" class="busy-overlay" role="status"><span class="busy-pill"><i/>{{busy}}</span></div>
     <div v-if="closeTarget" class="modal-backdrop" @keydown.esc="closeTarget=null"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="close-heading"><span class="modal-icon"><Icon name="save" :size="27"/></span><h2 id="close-heading">保存你的修改？</h2><p>{{closeTarget==='window'?'有文档尚未保存。保存后再退出，可以保留所有修改。':`“${closeTarget.document.name}”有尚未保存的修改。`}}</p><div class="modal-actions"><button @click="closeTarget=null">取消</button><button @click="resolveClose('discard')">不保存</button><button class="primary" @click="resolveClose('save')">{{closeTarget==='window'?'全部保存并退出':'保存并关闭'}}</button></div></section></div>
-    <div v-if="help" class="modal-backdrop" @click.self="help=false"><section class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字与表格</h3><p>使用完整办公内核，支持文字排版、表格、公式、图表与 PDF 导出。高级菜单目前为英文，支持中文输入及本地字体。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持原有文字替换、添加文字和图片、批注、手写签名，以及页面旋转、删除、排序、提取和合并。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件时会另存副本。复杂 Office 排版建议导出后复核；宏不自动执行。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 0.1.0 · 构建 {{buildVersion}} · 使用 LibreOffice / ZetaOffice、PDF.js 与 PyMuPDF。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
+    <div v-if="help" class="modal-backdrop" @click.self="help=false"><section class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>使用完整办公内核，支持文字排版、表格公式、幻灯片编排、图片与 PDF 导出。高级菜单目前为英文，支持中文输入及本地字体。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持原有文字替换、添加文字和图片、批注、手写签名，以及页面旋转、删除、排序、提取和合并。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件时会另存副本。演示文稿支持静态逐页放映预览，不包含动画、音视频。复杂 Office 排版建议导出后复核；宏不自动执行。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 0.2.0 · 构建 {{buildVersion}} · 使用 LibreOffice / ZetaOffice、PDF.js 与 PyMuPDF。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
   </div>
 </template>

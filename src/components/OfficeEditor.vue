@@ -90,6 +90,7 @@ async function command(action: string, data = {}) {
 const undo = () => command('undo'), redo = () => command('redo')
 const search = (query = '') => command('search', { query })
 const insertImage = (image: { name: string; base64: string }) => command('insert-image', image)
+const newSlide = () => command('new-slide')
 async function smokeTest() {
   if (!props.smokeMode && !import.meta.env.DEV) throw Error('引擎自测仅在开发或原生测试模式可用。')
   return command('smoke-test')
@@ -103,15 +104,15 @@ function retry(force = false) {
 onMounted(() => { startBridge(); queueLoad(props.document) })
 watch(() => props.document.id, () => queueLoad(props.document))
 onBeforeUnmount(() => { disposed = true; generation++; bridge?.dispose(); if (frame.value) frame.value.src = 'about:blank' })
-defineExpose({ exportFile, markSaved, discardChanges, loadDocument, undo, redo, search, insertImage, smokeTest, retry, focus: () => command('focus') })
+defineExpose({ exportFile, markSaved, discardChanges, loadDocument, undo, redo, search, insertImage, newSlide, smokeTest, retry, focus: () => command('focus') })
 </script>
 
 <template>
-  <section class="office-editor" aria-label="Word 与 Excel 完整编辑器">
+  <section class="office-editor" aria-label="Word、Excel 与 PPT 完整编辑器">
     <iframe ref="frame" title="完整办公编辑画布" class="office-frame" :class="{ 'is-loading': loading }" allow="clipboard-read; clipboard-write" />
     <div v-if="loading || problem" class="office-loading" role="status">
       <div class="office-loading-card">
-        <span class="office-loading-emblem">{{ props.document.kind === 'word' ? 'W' : 'X' }}</span>
+        <span class="office-loading-emblem" :class="props.document.kind">{{ {word:'W',sheet:'X',presentation:'P'}[props.document.kind] }}</span>
         <h2>{{ problem ? '编辑器暂时无法继续' : '正在打开你的办公桌' }}</h2>
         <p>{{ problem || status }}</p>
         <template v-if="!problem"><div class="office-loading-track"><i :style="{ width: `${Math.max(7, progress)}%` }" /></div><small>使用本机完整办公引擎 · 文档不会上传到云端</small></template>
@@ -128,4 +129,6 @@ defineExpose({ exportFile, markSaved, discardChanges, loadDocument, undo, redo, 
 
 <style scoped>
 .office-editor{position:relative;display:flex;flex-direction:column;min-width:0;min-height:480px;height:100%;background:#edf0f4;overflow:hidden}.office-frame{border:0;flex:1;width:100%;min-height:0;display:block;background:#edf0f4}.office-frame.is-loading{visibility:hidden}.office-engine-caption{font:11px/1.5 system-ui,sans-serif;color:#7d8797;margin:0;padding:5px 16px;background:#fafbfc;border-top:1px solid #e7eaf0;flex:none}.office-loading{position:absolute;inset:0;display:grid;place-items:center;padding:24px;background:rgba(245,247,251,.98)}.office-loading-card{width:min(440px,90%);text-align:center;color:#24364e;font-family:system-ui,sans-serif}.office-loading-emblem{display:grid;place-items:center;width:62px;height:70px;border-radius:14px;background:linear-gradient(150deg,#2f6cd9,#3655aa);color:white;font-size:31px;font-weight:750;margin:0 auto 22px;box-shadow:0 12px 24px #2f6cd927}.office-loading h2{font-size:21px;font-weight:650;letter-spacing:.02em;margin:0 0 12px}.office-loading p{font-size:13px;line-height:1.8;color:#6b788c;overflow-wrap:anywhere}.office-loading small{color:#8995a5;font-size:11px}.office-loading-track{height:5px;border-radius:4px;overflow:hidden;background:#e1e7f0;margin:24px 0 15px}.office-loading-track i{height:100%;display:block;background:#4778cd;transition:width .35s}.office-loading button{margin-top:14px;padding:10px 18px;border:1px solid #ccd8e8;border-radius:8px;background:white;color:#315a9e;cursor:pointer}.office-retry-warning{color:#a06328!important}.office-retry-actions{display:flex;justify-content:center;gap:10px}
+.office-loading-emblem.presentation{background:linear-gradient(150deg,#c9854b,#b46436);box-shadow:0 12px 24px #b4643627}
+.office-loading-emblem.sheet{background:linear-gradient(150deg,#398f76,#2b715f)}
 </style>

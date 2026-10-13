@@ -11,7 +11,7 @@ import * as vue from 'vue'
 // LibreOffice/PDF engine or native WebView compatibility tests.
 const app = (await readFile(new URL('../src/App.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
 const utilities = await readFile(new URL('../src/shared/document.ts', import.meta.url), 'utf8')
-const names = 'tabs,activeKey,active,officeDocument,pdfDocument,officeEditor,pdfEditor,busy,error,closeTarget,readyFor,editorError,stash,activate,addDocument,saveActive,closeTab,closeWindow,resolveClose,task'
+const names = 'tabs,activeKey,active,officeDocument,pdfDocument,officeEditor,pdfEditor,slidePreview,busy,error,closeTarget,readyFor,editorError,stash,activate,addDocument,saveActive,closeTab,closeWindow,resolveClose,task'
 
 function compile(source, require, extra = {}) {
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
@@ -31,7 +31,7 @@ function shell({nativeEnabled = true, smoke = false} = {}) {
     saveDocument: async request => {
       calls.push(['save', request])
       return { status: 'saved', document: { id: request.documentId || randomUUID(), name: request.name,
-        kind: request.extension === 'pdf' ? 'pdf' : 'word', extension: request.extension, sha256: 'new-hash', sizeBytes: 3 } }
+        kind: helpers.kindOf(request.extension), extension: request.extension, sha256: 'new-hash', sizeBytes: 3 } }
     },
   }
   const helpers = compile(utilities, () => { throw Error('Unexpected helper import') })
@@ -52,7 +52,7 @@ function shell({nativeEnabled = true, smoke = false} = {}) {
   state.officeEditor.value = handle
   state.pdfEditor.value = handle
   function tab(id, { ready = true, dirty = false, fileId = id, kind = 'word' } = {}) {
-    const extension = kind === 'pdf' ? 'pdf' : 'docx'
+    const extension = {word:'docx',sheet:'xlsx',presentation:'pptx',pdf:'pdf'}[kind]
     state.tabs.value.push({ key: id, ready, dirty, fileId, document: { id, kind, extension,
       name: `${id}.${extension}`, base64: 'T0xE', sha256: 'old-hash', sizeBytes: 3 } })
     return state.tabs.value.at(-1)
@@ -171,4 +171,43 @@ test('window close during a task is deferred once, without recursive checks', as
   await h.state.closeWindow(); assert.equal(h.calls.length, 0)
   release(); await task; await h.idle()
   assert.equal(h.calls.filter(call => call[0] === 'close').length, 1)
+})
+
+test('presentation PDF and ODP exports stay copies and never replace the editable PPTX tab', async () => {
+  for(const format of ['pdf','odp']){
+  const h=shell(), a=h.tab('deck',{kind:'presentation',dirty:true});h.active(a)
+  h.handle.exportFile=async({format}={})=>({base64:'UFBUWA==',extension:format||'pptx',dirty:true})
+  await h.state.saveActive(true,format)
+  const request=h.calls.find(call=>call[0]==='save')[1]
+  assert.equal(request.name,`deck.${format}`);assert.equal(request.documentId,undefined)
+  assert.equal(a.document.kind,'presentation');assert.equal(a.document.extension,'pptx')
+  assert.equal(a.fileId,'deck');assert.equal(a.dirty,true)
+  assert.ok(!h.calls.some(call=>call[0]==='marked'))
+  }
+})
+
+test('presentation save and switch retain its PPTX snapshot and presentation identity', async () => {
+  const h=shell(), a=h.tab('deck',{kind:'presentation',dirty:true}), b=h.tab('other',{kind:'pdf'});h.active(a)
+  h.handle.exportFile=async()=>({base64:'UFBUWA==',extension:'pptx',dirty:true})
+  assert.equal(await h.state.saveActive(),true)
+  assert.equal(a.document.kind,'presentation');assert.equal(a.document.extension,'pptx')
+  assert.equal(a.document.base64,'UFBUWA==');assert.equal(a.dirty,false)
+  await h.state.activate(b)
+  h.handle.exportFile=async()=>({base64:'UERGX0VYSVNUSU5H',extension:'pdf'})
+  h.state.readyFor('other')
+  await h.state.activate(a)
+  assert.equal(h.state.officeDocument.value.id,'deck')
+  assert.equal(h.state.officeDocument.value.base64,'UFBUWA==')
+  assert.equal(h.state.officeDocument.value.kind,'presentation')
+})
+
+test('native window close exits presentation preview before showing unsaved confirmation', async()=>{
+  const h=shell(), a=h.tab('deck',{kind:'presentation',dirty:true});h.active(a)
+  h.handle.exportFile=async()=>({base64:'UFBUWA==',extension:'pptx',dirty:true})
+  h.state.slidePreview.value={base64:'JVBERg==',name:'deck.pptx',startPage:0}
+  await h.state.closeWindow()
+  assert.equal(h.state.slidePreview.value,undefined)
+  assert.equal(h.state.closeTarget.value,'window')
+  assert.equal(a.dirty,true)
+  assert.ok(!h.calls.some(call=>call[0]==='close'))
 })

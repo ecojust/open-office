@@ -7,7 +7,13 @@ Module.zetajs.then(zetajs => {
   const prop = (Name, Value) => new css.beans.PropertyValue({ Name, Value });
   const short = value => new zetajs.Any(zetajs.type.short, value);
   const send = message => zetajs.mainPort.postMessage(message);
-  const filters = { docx: 'Office Open XML Text', odt: 'writer8', xlsx: 'Calc MS Excel 2007 XML', ods: 'calc8' };
+  const filters = { docx: 'Office Open XML Text', odt: 'writer8', xlsx: 'Calc MS Excel 2007 XML', ods: 'calc8',
+    pptx: 'Impress MS PowerPoint 2007 XML', odp: 'impress8' };
+  const documentTypes = {
+    word: { factory: 'swriter', service: 'com.sun.star.text.TextDocument', formats: ['docx','odt'], pdf: 'writer_pdf_Export' },
+    sheet: { factory: 'scalc', service: 'com.sun.star.sheet.SpreadsheetDocument', formats: ['xlsx','ods'], pdf: 'calc_pdf_Export' },
+    presentation: { factory: 'simpress', service: 'com.sun.star.presentation.PresentationDocument', formats: ['pptx','odp'], pdf: 'impress_pdf_Export' },
+  };
   let current = null, outputCounter = 0;
 
   function describe(error) {
@@ -23,8 +29,18 @@ Module.zetajs.then(zetajs => {
       }
     },
   });
-  function nativeRequest(type, notice) {
-    if (current) send({ event: 'native-request', documentId: current.id, data: { type, ...(notice ? { notice } : {}) } });
+  function nativeRequest(type, notice, detail = {}) {
+    if (current) send({ event: 'native-request', documentId: current.id, data: { type, ...(notice ? { notice } : {}), ...detail } });
+  }
+  function requestPresentationPreview(fromCurrent = false) {
+    if (current?.kind !== 'presentation') throw Error('此操作仅适用于演示文稿。');
+    let pageIndex = 0;
+    if (fromCurrent) {
+      const number = current.model.getCurrentController().getCurrentPage().getPropertyValue('Number');
+      if (Number.isInteger(number)) pageIndex = Math.max(0, Math.min(current.model.getDrawPages().getCount() - 1, number - 1));
+    }
+    nativeRequest('presentation-preview', '静态放映预览不播放动画、音频或视频。', { pageIndex });
+    return { pageIndex };
   }
   function installInterception(document) {
     let master = null, slave = null;
@@ -34,6 +50,8 @@ Module.zetajs.then(zetajs => {
       '.uno:ExportTo': 'export-pdf', '.uno:ExportToPDF': 'export-pdf', '.uno:ExportDirectToPDF': 'export-pdf',
       '.uno:Print': 'print', '.uno:PrintDefault': 'print', '.uno:PrintPagePreview': 'print',
       '.uno:InsertGraphic': 'insert-image', '.uno:Quit': 'quit',
+      '.uno:Presentation': 'presentation-preview', '.uno:PresentationCurrentSlide': 'presentation-preview',
+      '.uno:RehearseTimings': 'presentation-preview',
     };
     const notices = { '.uno:ExportTo': '通用导出当前仅支持 PDF；原格式副本请使用“另存为”。' };
     // PrintPreview is a local preview view, not a print job. Keep that view native,
@@ -42,9 +60,9 @@ Module.zetajs.then(zetajs => {
     function dispatchFor(url) {
       const type = commands[url.Complete] || (url.Complete.startsWith('private:factory/') ? 'new' : undefined);
       if (!type) return null;
-      const notice = notices[url.Complete], key = `${type}:${notice || ''}`;
+      const notice = notices[url.Complete], fromCurrent = url.Complete === '.uno:PresentationCurrentSlide', key = `${type}:${notice || ''}:${fromCurrent}`;
       if (!delegates.has(key)) delegates.set(key, zetajs.unoObject([css.frame.XDispatch], {
-        dispatch() { nativeRequest(type, notice); },
+        dispatch() { if (type === 'presentation-preview') requestPresentationPreview(fromCurrent); else nativeRequest(type, notice); },
         addStatusListener(listener, featureURL) {
           listener.statusChanged(new css.frame.FeatureStateEvent({ FeatureURL: featureURL, IsEnabled: true, Requery: false }));
         },
@@ -71,15 +89,20 @@ Module.zetajs.then(zetajs => {
     document.model.setModified(false); document.model.close(true);
   }
   function open(data) {
+    const type = documentTypes[data.kind];
+    if (!type || !type.formats.includes(data.extension)) throw Error('不支持的文档类型或格式。');
     if (current?.dirty && !data.discard) throw Error('当前文档有未保存修改。请先保存，或明确放弃修改后再切换。');
     const args = [prop('MacroExecutionMode', short(css.document.MacroExecMode.NEVER_EXECUTE)),
       prop('UpdateDocMode', short(css.document.UpdateDocMode.NO_UPDATE)), prop('InteractionHandler', rejectInteraction),
       prop('ReadOnly', false), prop('Hidden', false)];
-    const url = data.isNew ? `private:factory/${data.kind === 'word' ? 'swriter' : 'scalc'}` : `file://${data.path}`;
-    const model = desktop.loadComponentFromURL(url, '_default', 0, args);
+    const url = data.isNew ? `private:factory/${type.factory}` : `file://${data.path}`;
+    // _default can reuse a clean untitled window and dispose its previous model
+    // during load (notably Impress after saving a new presentation). Load into
+    // an independent frame, validate it, then explicitly close the old model.
+    // A failed import must leave the previous tab's model available for saving.
+    const model = desktop.loadComponentFromURL(url, '_blank', 0, args);
     if (!model) throw Error('无法打开此文档。请确认文件格式；加密文档请先在原应用解密。');
-    const service = data.kind === 'word' ? 'com.sun.star.text.TextDocument' : 'com.sun.star.sheet.SpreadsheetDocument';
-    if (!model.supportsService(service)) { model.close(true); throw Error('文件内容与所选文档类型不一致。'); }
+    if (!model.supportsService(type.service)) { model.close(true); throw Error('文件内容与所选文档类型不一致。'); }
     try {
       if (data.isNew && data.kind === 'word') {
         const cursor = model.getText().createTextCursor();
@@ -109,9 +132,9 @@ Module.zetajs.then(zetajs => {
   }
   function exportFile(data) {
     const format = data.format || current.extension;
-    const supported = current.kind === 'word' ? ['docx','odt','pdf'] : ['xlsx','ods','pdf'];
+    const type = documentTypes[current.kind], supported = [...type.formats, 'pdf'];
     if (!supported.includes(format)) throw Error('当前文档不能导出为此格式。');
-    const filter = format === 'pdf' ? (current.kind === 'word' ? 'writer_pdf_Export' : 'calc_pdf_Export') : filters[format];
+    const filter = format === 'pdf' ? type.pdf : filters[format];
     const path = `/tmp/open-office-export-${++outputCounter}.${format}`;
     const revision = current.revision;
     // UNO isModified is authoritative even if the UI dirty notification is still queued.
@@ -147,17 +170,25 @@ Module.zetajs.then(zetajs => {
       cursor.getText().insertTextContent(cursor, object, false);
     } else {
       const object = current.model.createInstance('com.sun.star.drawing.GraphicObjectShape');
-      controller.getActiveSheet().getDrawPage().add(object);
+      const page = current.kind === 'presentation' ? controller.getCurrentPage() : controller.getActiveSheet().getDrawPage();
+      if (!page) throw Error('请先选中要插入图片的幻灯片。');
+      if (current.kind === 'presentation') {
+        // Preserve aspect ratio and keep large images inside the current slide.
+        const scale = Math.min(1, Math.max(500, page.getPropertyValue('Width') - 2000) / width,
+          Math.max(500, page.getPropertyValue('Height') - 2000) / height);
+        width = Math.round(width * scale); height = Math.round(height * scale);
+      }
+      page.add(object);
       object.setPropertyValue('Graphic', graphic);
       object.setSize(new css.awt.Size({ Width: width, Height: height }));
       let point = new css.awt.Point({ X: 1000, Y: 1000 });
-      try { point = controller.getSelection().getPosition(); } catch {}
+      if (current.kind === 'sheet') { try { point = controller.getSelection().getPosition(); } catch {} }
       object.setPosition(point);
     }
     return { dirty: current.dirty, revision: current.revision };
   }
   function smokeTest() {
-    const report = { ok: false, engine: 'ZetaOffice / LibreOffice 24.2.8.0', writer: {}, calc: {}, artifacts: [] };
+    const report = { ok: false, engine: 'ZetaOffice / LibreOffice 24.2.8.0', writer: {}, calc: {}, impress: {}, artifacts: [] };
     const models = new Set();
     const args = [prop('Hidden', true), prop('MacroExecutionMode', short(css.document.MacroExecMode.NEVER_EXECUTE)),
       prop('UpdateDocMode', short(css.document.UpdateDocMode.NO_UPDATE)), prop('InteractionHandler', rejectInteraction)];
@@ -190,7 +221,51 @@ Module.zetajs.then(zetajs => {
         formula: sheet.getCellRangeByName('A3').getFormula(), value: sheet.getCellRangeByName('A3').getValue(),
         xlsxPath: xlsx.path, pdfPath: calcPdf.path };
       close(calc);
-      report.ok = report.writer.originalTextEdited && report.calc.value === 42 && report.calc.formula === '=SUM(A1:A2)';
+      let impress = load('private:factory/simpress');
+      if (!impress.supportsService(documentTypes.presentation.service)) throw Error('Impress document service is unavailable');
+      let pages = impress.getDrawPages();
+      while (pages.getCount() < 2) pages.insertNewByIndex(pages.getCount());
+      while (pages.getCount() > 2) pages.remove(pages.getByIndex(pages.getCount() - 1));
+      const addText = (model, page, text) => {
+        const shape = model.createInstance('com.sun.star.drawing.TextShape');
+        page.add(shape); shape.setPosition(new css.awt.Point({ X: 1500, Y: 1500 }));
+        shape.setSize(new css.awt.Size({ Width: 20000, Height: 3000 }));
+        shape.getText().setString(text);
+        const cursor = shape.getText().createTextCursor();
+        cursor.gotoStart(false); cursor.gotoEnd(true);
+        cursor.setPropertyValue('CharFontNameAsian', 'Noto Sans CJK SC');
+        return shape;
+      };
+      // Use named real drawing text objects so import verification does not rely
+      // on a particular template's placeholder order or language.
+      addText(impress, pages.getByIndex(0), 'Open Office original slide · 离线演示').setName('OpenOfficeSmokeTitle');
+      addText(impress, pages.getByIndex(1), 'Second slide · 第二页内容').setName('OpenOfficeSmokeSecond');
+      const initialPptx = save(impress, 'pptx', filters.pptx); close(impress);
+      const findText = (page, expected) => {
+        for (let i = 0; i < page.getCount(); i++) {
+          const shape = page.getByIndex(i);
+          try { if (shape.getText().getString() === expected) return shape; } catch {}
+        }
+        throw Error('Presentation slide text did not round-trip: ' + expected);
+      };
+      impress = load(`file://${initialPptx.path}`); pages = impress.getDrawPages();
+      if (pages.getCount() !== 2) throw Error('PPTX slide count did not round-trip');
+      findText(pages.getByIndex(0), 'Open Office original slide · 离线演示').getText().setString('Open Office edited slide · 中文演示测试');
+      findText(pages.getByIndex(1), 'Second slide · 第二页内容');
+      const pptx = save(impress, 'pptx', filters.pptx); close(impress);
+      impress = load(`file://${pptx.path}`); pages = impress.getDrawPages();
+      const texts = [findText(pages.getByIndex(0), 'Open Office edited slide · 中文演示测试').getText().getString(),
+        findText(pages.getByIndex(1), 'Second slide · 第二页内容').getText().getString()];
+      const pptxReopened = pages.getCount() === 2;
+      const odp = save(impress, 'odp', filters.odp); close(impress);
+      impress = load(`file://${odp.path}`); pages = impress.getDrawPages();
+      const odpRoundTrip = pages.getCount() === 2 && texts.every((text, index) => !!findText(pages.getByIndex(index), text));
+      const impressPdf = save(impress, 'pdf', 'impress_pdf_Export');
+      report.impress = { slideCount: pages.getCount(), texts, originalTextEdited: texts[0] === 'Open Office edited slide · 中文演示测试',
+        pptxReopened, odpReopened: odpRoundTrip, odpRoundTrip, pptxPath: pptx.path, odpPath: odp.path, pdfPath: impressPdf.path, macrosDisabled: true, linkUpdatesDisabled: true };
+      close(impress);
+      report.ok = report.writer.originalTextEdited && report.calc.value === 42 && report.calc.formula === '=SUM(A1:A2)'
+        && report.impress.slideCount === 2 && report.impress.originalTextEdited && report.impress.pptxReopened && report.impress.odpReopened;
       return report;
     } finally {
       for (const model of models) { try { close(model); } catch {} }
@@ -201,6 +276,20 @@ Module.zetajs.then(zetajs => {
     if (message.action === 'open') return open(message.data);
     if (!current || message.documentId !== current.id) throw Error('当前文档已经切换，旧操作已取消。');
     if (message.action === 'smoke-test') return smokeTest();
+    if (message.action === 'preview-presentation') return requestPresentationPreview(message.data.fromCurrent === true);
+    if (['start-presentation','end-presentation'].includes(message.action)) throw Error('请使用应用中的静态放映预览。');
+    if (message.action === 'new-slide') {
+      if (current.kind !== 'presentation') throw Error('此操作仅适用于演示文稿。');
+      const controller = current.model.getCurrentController();
+      const pages = current.model.getDrawPages(), sourcePage = controller.getCurrentPage();
+      const page = pages.insertNewByIndex(pages.getCount());
+      if (sourcePage) {
+        page.setMasterPage(sourcePage.getMasterPage());
+        page.setPropertyValue('Layout', sourcePage.getPropertyValue('Layout'));
+      }
+      controller.setCurrentPage(page);
+      return { slideCount: pages.getCount(), dirty: current.model.isModified(), revision: current.revision };
+    }
     if (message.action === 'insert-image') {
       return insertImage(message.data.path);
     }
