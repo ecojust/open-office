@@ -278,7 +278,181 @@ defineExpose({ exportFile, markSaved, discardChanges, loadDocument, undo, redo, 
 </template>
 
 <style scoped>
-.office-editor{position:relative;display:flex;flex-direction:column;min-width:0;min-height:240px;height:100%;background:#edf0f4;overflow:hidden}.office-frame{border:0;flex:1;width:100%;min-height:0;display:block;background:#edf0f4}.office-frame.is-loading{visibility:hidden}.office-engine-caption{font:11px/1.5 system-ui,sans-serif;color:#7d8797;margin:0;padding:5px 16px;background:#fafbfc;border-top:1px solid #e7eaf0;flex:none}.office-loading{position:absolute;inset:0;display:grid;place-items:center;padding:24px;background:rgba(245,247,251,.98)}.office-loading-card{width:min(440px,90%);text-align:center;color:#24364e;font-family:system-ui,sans-serif}.office-loading-emblem{display:grid;place-items:center;width:62px;height:70px;border-radius:14px;background:linear-gradient(150deg,#2f6cd9,#3655aa);color:white;font-size:31px;font-weight:750;margin:0 auto 22px;box-shadow:0 12px 24px #2f6cd927}.office-loading h2{font-size:21px;font-weight:650;letter-spacing:.02em;margin:0 0 12px}.office-loading p{font-size:13px;line-height:1.8;color:#6b788c;overflow-wrap:anywhere}.office-loading small{color:#8995a5;font-size:11px}.office-loading-track{height:5px;border-radius:4px;overflow:hidden;background:#e1e7f0;margin:24px 0 15px}.office-loading-track i{height:100%;display:block;background:#4778cd;transition:width .35s}.office-loading button{margin-top:14px;padding:10px 18px;border:1px solid #ccd8e8;border-radius:8px;background:white;color:#315a9e;cursor:pointer}.office-retry-warning{color:#a06328!important}.office-retry-actions{display:flex;justify-content:center;gap:10px}
-.office-loading-emblem.presentation{background:linear-gradient(150deg,#c9854b,#b46436);box-shadow:0 12px 24px #b4643627}
-.office-loading-emblem.sheet{background:linear-gradient(150deg,#398f76,#2b715f)}
+.office-editor {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ui-bg, #f5f6f8);
+}
+
+.office-frame {
+  display: block;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  background: var(--ui-bg, #f5f6f8);
+}
+
+.office-frame.is-loading {
+  visibility: hidden;
+}
+
+.office-engine-caption {
+  flex: none;
+  margin: 0;
+  padding: 5px 16px;
+  border-top: 1px solid var(--ui-line, #e3e6eb);
+  background: var(--ui-surface-muted, #f7f8fa);
+  color: var(--ui-muted, #647287);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.office-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: auto;
+  background: var(--ui-bg, #f5f6f8);
+}
+
+.office-loading-card {
+  width: min(440px, 100%);
+  padding: 28px;
+  border: 1px solid var(--ui-line, #e3e6eb);
+  border-radius: 8px;
+  background: var(--ui-surface, #fff);
+  color: var(--ui-text, #202b3b);
+  text-align: center;
+}
+
+.office-loading-emblem {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 20px;
+  border: 1px solid var(--ui-accent, #315fd6);
+  border-radius: var(--ui-radius, 6px);
+  background: var(--ui-accent-soft, #edf2fd);
+  color: var(--ui-accent, #315fd6);
+  font-size: 23px;
+  font-weight: 650;
+}
+
+.office-loading-emblem.presentation {
+  border-color: #bd6b35;
+  background: #fff3e9;
+  color: #bd6b35;
+}
+
+.office-loading-emblem.sheet {
+  border-color: var(--ui-success, #25835d);
+  background: #edf7f1;
+  color: var(--ui-success, #25835d);
+}
+
+.office-loading h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.office-loading p {
+  color: var(--ui-muted, #647287);
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.office-loading small {
+  color: var(--ui-muted, #647287);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.office-loading-track {
+  height: 4px;
+  margin: 22px 0 15px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--ui-line, #e3e6eb);
+}
+
+.office-loading-track i {
+  display: block;
+  height: 100%;
+  background: var(--ui-accent, #315fd6);
+  transition: width .2s;
+}
+
+.office-loading button {
+  min-height: var(--ui-control-height, 32px);
+  margin-top: 14px;
+  padding: 8px 14px;
+  border: 1px solid var(--ui-line-strong, #cbd2dc);
+  border-radius: var(--ui-radius, 6px);
+  background: var(--ui-surface, #fff);
+  color: var(--ui-accent, #315fd6);
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.office-loading button:hover {
+  border-color: var(--ui-accent, #315fd6);
+  background: var(--ui-accent-soft, #edf2fd);
+}
+
+.office-loading button:focus-visible {
+  outline: 2px solid var(--ui-accent, #315fd6);
+  outline-offset: 2px;
+}
+
+.office-loading .office-retry-warning {
+  padding: 10px;
+  border: 1px solid #ebdfc4;
+  border-radius: var(--ui-radius, 6px);
+  background: #fff9ec;
+  color: var(--ui-warning, #906313);
+  font-size: 12px;
+}
+
+.office-retry-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.office-retry-actions button:first-child {
+  border-color: #e3c7c7;
+  color: var(--ui-danger, #b54746);
+}
+
+@media (max-width: 640px), (max-height: 600px) {
+  .office-loading {
+    padding: 16px;
+  }
+  .office-loading-card {
+    padding: 20px;
+  }
+  .office-loading-emblem {
+    margin-bottom: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .office-loading-track i {
+    transition: none;
+  }
+}
 </style>

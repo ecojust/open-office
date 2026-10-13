@@ -11,6 +11,7 @@ import {
 import '../pdf/pdf.css'
 import { hasPdfEditingEngine, pickPdfDocument, pickPdfImage, saveExtractedPdf } from '../pdf/backend'
 import { canvasOutputScale, releaseCanvas, trimHistoryBudget } from '../pdf/resources'
+import { useDialogFocus } from '../shared/dialog-focus'
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
 
@@ -101,6 +102,8 @@ const pendingRect = ref<PdfRect | null>(null)
 const inkPaths = ref<PdfPoint[][]>([])
 const image = ref<{ name: string; base64: string } | null>(null)
 const mergeCandidate = ref<NativeDocument | null>(null)
+const mergeDialog = ref<HTMLElement>()
+useDialogFocus(mergeDialog)
 const mergePassword = ref('')
 const allowUnencryptedMerge = ref(false)
 const allowSignedMerge = ref(false)
@@ -947,7 +950,7 @@ onBeforeUnmount(() => {
         <button class="pdf-icon-button" :class="{ active: showSearch }" title="搜索 PDF" aria-label="搜索 PDF" data-testid="pdf-search-toggle" :aria-pressed="showSearch" :disabled="!pageCount" @click="showSearch = !showSearch"><svg><use href="#pdf-icon-search" /></svg></button>
       </div>
       <div class="pdf-toolbar-group pdf-edit-tools">
-        <button v-for="item in tools" :key="item.id" class="pdf-tool-button" :class="{ active: tool === item.id }" :aria-pressed="tool === item.id" :disabled="isBusy || !toolEnabled(item.id)" :title="!toolEnabled(item.id) ? editBlockedReason : item.label" :data-testid="`pdf-tool-${item.id}`" @click="chooseTool(item.id)"><svg><use :href="`#pdf-icon-${item.icon}`" /></svg><span>{{ item.label }}</span></button>
+        <button v-for="item in tools" :key="item.id" class="pdf-tool-button" :class="{ active: tool === item.id }" :aria-pressed="tool === item.id" :aria-label="item.label" :disabled="isBusy || !toolEnabled(item.id)" :title="!toolEnabled(item.id) ? editBlockedReason : item.label" :data-testid="`pdf-tool-${item.id}`" @click="chooseTool(item.id)"><svg><use :href="`#pdf-icon-${item.icon}`" /></svg><span>{{ item.label }}</span></button>
       </div>
       <div class="pdf-toolbar-group">
         <button class="pdf-icon-button" title="撤销（最多保留 8 次，大文件至少保留最近一次）" aria-label="撤销 PDF 编辑" data-testid="pdf-undo" :disabled="!canUndo" @click="undo"><svg><use href="#pdf-icon-undo" /></svg></button>
@@ -1058,7 +1061,7 @@ onBeforeUnmount(() => {
         </form>
       </div>
       <div v-if="mergeCandidate" class="pdf-dialog-backdrop" @keydown.esc="!isBusy && (mergeCandidate = null)">
-        <form class="pdf-merge-dialog" role="dialog" aria-modal="true" aria-labelledby="pdf-merge-title" data-testid="pdf-merge-dialog" @submit.prevent="confirmMerge">
+        <form ref="mergeDialog" class="pdf-merge-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="pdf-merge-title" data-testid="pdf-merge-dialog" @submit.prevent="confirmMerge">
           <div class="pdf-panel-heading"><strong id="pdf-merge-title">追加 PDF 页面</strong><button type="button" class="pdf-icon-button" aria-label="取消合并" :disabled="isBusy" @click="mergeCandidate = null"><svg><use href="#pdf-icon-close" /></svg></button></div>
           <p>将 <strong>{{ mergeCandidate.name }}</strong> 的页面追加到当前文档末尾。应用后可以撤销。</p>
           <label class="pdf-field">待合并文件的密码（如有）<input v-model="mergePassword" type="password" autocomplete="off" data-testid="pdf-merge-password" :disabled="isBusy" /></label>

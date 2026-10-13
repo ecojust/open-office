@@ -82,5 +82,94 @@ defineExpose({hasPendingEdits: () => pending.value, discardDrafts: reset})
 </template>
 
 <style scoped>
-.presentation-effects{font:12px/1.5 system-ui;color:#46536a;border-top:1px solid #e5e9ef;padding-top:8px}.presentation-effects details{padding:8px 0;border-bottom:1px solid #e9edf2}.presentation-effects summary{font-weight:650;cursor:pointer;color:#26364e;min-height:24px}.presentation-effects fieldset{border:0;margin:8px 0 0;padding:0;display:grid;gap:9px;min-width:0}.presentation-effects label{display:grid;gap:4px}.presentation-effects input,.presentation-effects select,.presentation-effects button{font:inherit;border:1px solid #d2d9e4;border-radius:6px;background:#fff;padding:6px;min-width:0;width:100%;color:inherit;box-sizing:border-box}.presentation-effects button{cursor:pointer;background:#f2f5fb}.presentation-effects button:disabled,.presentation-effects fieldset:disabled{opacity:.5}.pair,.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}.presentation-effects .check{display:flex;align-items:center;gap:7px}.check input{width:auto}.note{font-size:11px;color:#8190a3;line-height:1.7;margin:7px 0}.warning{color:#9a7135}.presentation-effects ul{padding:0;list-style:none}.presentation-effects li{padding:7px;background:#f1f4f8;border-radius:6px;margin:5px 0;overflow-wrap:anywhere}.presentation-effects strong,.presentation-effects small{display:block;font-size:11px}.presentation-effects .file-input{display:none}
+.presentation-effects {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ui-text, #202b3b);
+  border-top: 1px solid var(--ui-line, #e3e6eb);
+  padding-top: 8px;
+}
+.presentation-effects details {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ui-line, #e3e6eb);
+}
+.presentation-effects summary {
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 28px;
+  line-height: 28px;
+}
+.presentation-effects summary span {
+  color: var(--ui-muted, #647287);
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.presentation-effects fieldset {
+  border: 0;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.presentation-effects label { display: grid; gap: 5px; min-width: 0; }
+.presentation-effects input,
+.presentation-effects select,
+.presentation-effects button {
+  font: inherit;
+  border: 1px solid var(--ui-line-strong, #cbd2dc);
+  border-radius: 4px;
+  background: var(--ui-surface, #fff);
+  padding: 6px 8px;
+  min-width: 0;
+  min-height: 32px;
+  width: 100%;
+  color: inherit;
+  box-sizing: border-box;
+}
+.presentation-effects select {
+  appearance: none;
+  padding-right: 25px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4 3 3 3-3' fill='none' stroke='%23647287' stroke-width='1.2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+.presentation-effects button {
+  cursor: pointer;
+  background: var(--ui-surface-muted, #f7f8fa);
+}
+.presentation-effects button:hover:not(:disabled) {
+  background: var(--pw-accent-soft, #fbefe6);
+  border-color: #d1a384;
+}
+.presentation-effects :is(input, select, button, summary):focus-visible {
+  outline: 2px solid var(--pw-accent, #b95d21);
+  outline-offset: 2px;
+}
+.presentation-effects button:disabled { opacity: .45; cursor: default; }
+.presentation-effects fieldset:disabled { opacity: .6; }
+.pair, .actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 7px; }
+.actions button:first-child {
+  background: var(--pw-accent, #b95d21);
+  border-color: var(--pw-accent, #b95d21);
+  color: #fff;
+}
+.actions button:first-child:hover:not(:disabled) { background: #a24e18; border-color: #a24e18; }
+.presentation-effects .check { display: flex; align-items: center; gap: 7px; min-height: 30px; }
+.check input { width: 15px; height: 15px; min-height: 0; margin: 0; accent-color: var(--pw-accent, #b95d21); }
+.note { font-size: 11px; color: var(--ui-muted, #647287); line-height: 1.7; margin: 8px 0; }
+.warning { color: var(--ui-warning, #906313); }
+.presentation-effects ul { padding: 0; list-style: none; }
+.presentation-effects li {
+  padding: 10px;
+  background: var(--ui-surface-muted, #f7f8fa);
+  border: 1px solid var(--ui-line, #e3e6eb);
+  border-radius: 4px;
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+.presentation-effects strong { display: block; font-size: 12px; font-weight: 600; }
+.presentation-effects small { display: block; font-size: 11px; color: var(--ui-muted, #647287); margin: 4px 0 8px; }
+.presentation-effects .file-input { display: none; }
 </style>
