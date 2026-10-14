@@ -300,6 +300,59 @@ test('failed imports and wrong services leave the original presentation availabl
   assert.equal(request('export', { format: 'pptx' }).data.dirty, true)
 })
 
+test('Calc prepares the loaded window before closing the previous frame, then activates and focuses it', async () => {
+  const h = await engine(), events = []
+  h.model.close = () => { events.push('old-close'); h.model.closed = true }
+  h.controls.configureNextModel = replacement => {
+    const window = {
+      set FullScreen(value) {
+        assert.equal(value, true)
+        assert.equal(h.model.closed, false, 'Window setup must precede disposal of the previous document')
+        events.push('fullscreen')
+      },
+      setFocus() { events.push('focus') },
+    }
+    const frame = { ...h.frame,
+      getContainerWindow() { events.push('window'); return window },
+      activate() { events.push('activate') },
+    }
+    replacement.getCurrentController().getFrame = () => frame
+  }
+  const result = h.request('open', { id: 'B', name: 'B.xlsx', kind: 'sheet', extension: 'xlsx', path: '/tmp/b.xlsx', isNew: false })
+  assert.equal(result.ok, true)
+  assert.deepEqual(events, ['window', 'fullscreen', 'old-close', 'activate', 'focus'])
+  assert.equal(h.models.at(-1).closed, false)
+  assert.equal(h.request('export', { format: 'xlsx' }, 'B').ok, true)
+})
+
+for (const failure of ['getContainerWindow', 'FullScreen', 'null window']) {
+  test(`Calc ${failure} failure closes only the replacement and leaves the previous document exportable`, async () => {
+    const h = await engine()
+    const error = h.nativeException(`Calc ${failure} failed`)
+    h.controls.configureNextModel = replacement => {
+      const frame = { ...h.frame,
+        getContainerWindow() {
+          if (failure === 'getContainerWindow') throw error
+          if (failure === 'null window') return null
+          return { set FullScreen(_value) { throw error }, setFocus() { assert.fail('Failed replacement must not receive focus') } }
+        },
+        activate() { assert.fail('Failed replacement must not be activated') },
+      }
+      replacement.getCurrentController().getFrame = () => frame
+    }
+    const result = h.request('open', { id: 'B', name: 'B.xlsx', kind: 'sheet', extension: 'xlsx', path: '/tmp/b.xlsx', isNew: false })
+    assert.equal(result.ok, false)
+    assert.equal(result.error, failure === 'null window' ? '无法准备新表格窗口。' : `Calc ${failure} failed`)
+    assert.equal(h.nativeExceptions.get(error).consumed, failure === 'null window' ? 0 : 1, 'Only thrown native exceptions are consumed, exactly once')
+    assert.equal(h.models.at(-1).closed, true, 'Failed candidate must be disposed')
+    assert.equal(h.model.closed, false, 'Previous model must not be disposed before window setup succeeds')
+    h.model.edit()
+    const saved = h.request('export', { format: 'docx' })
+    assert.equal(saved.ok, true)
+    assert.equal(saved.data.dirty, true, 'The surviving previous document remains editable and exportable')
+  })
+}
+
 test('Impress image insertion targets the active slide and fits tall images without distortion', async () => {
   const { request, model } = await engine({ kind: 'presentation', extension: 'pptx' })
   assert.equal(request('insert-image', { path: '/tmp/image.png' }).ok, true)

@@ -370,10 +370,17 @@ Module.zetajs.then(zetajs => {
       listenWorkbench(document);
       installChartMonitor(document);
       const previous = current;
+      // Closing the old frame can activate and resize Calc. Prepare its loaded
+      // window first so that activation does not use the default small size.
+      // If window setup fails, the old document is still available for saving.
+      const preparedWindow = data.kind === 'sheet' ? document.frame.getContainerWindow() : null;
+      if (data.kind === 'sheet' && !preparedWindow) throw Error('无法准备新表格窗口。');
+      if (preparedWindow) preparedWindow.FullScreen = true;
       closeDocument(previous);
       current = document;
       const closedPath = previous?.path || null;
-      const window = document.frame.getContainerWindow(); window.FullScreen = true;
+      const window = preparedWindow || document.frame.getContainerWindow();
+      if (!preparedWindow) window.FullScreen = true;
       document.frame.activate(); window.setFocus();
       return { closedPath, id: document.id, dirty: false, revision: 0, language: 'en-US', security: { macros: 'never', externalUpdates: 'never' } };
     } catch (error) { if (openingDocument) removeChartMonitor(openingDocument); try { model.setModified(false); model.close(true); } catch (error) { recoverOptional(error); } throw error; }
