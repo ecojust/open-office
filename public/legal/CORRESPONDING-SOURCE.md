@@ -32,6 +32,10 @@ ZetaOffice 上游 README 明确公开以下源分支：
 
 Qt GitHub supermodule 归档不会自动包含 submodule 内容。组装时把独立 QtBase 归档的内容放入 Qt supermodule 源码根目录的 `qtbase/`，并按上游说明仅构建所需模块。zeta.js 的本地变化在 `zetajs-local-change.patch`，应用源码中已包含修复后的 `public/office/zeta.js`。
 
+本地鼠标时间戳修复另外记录在 `localRuntimeDerivations`：上游 WASM 的 SHA-256 与实际分发的派生 SHA-256 分别固定。`scripts/office-mouse-time-patch.mjs` 只对已验证鼠标回调的一处整数转换做可重复的修改，修复 epoch 毫秒转 32 位时被清零的问题；不改变系统时钟或其他回调。应用源码包含该转换脚本、测试，以及 `vendor/patches/` 中的说明和 Qt 源码等价补丁。源码获取脚本也会校验并复制这些修改材料到归档目录。
+
+该派生 WASM 由原二进制加精确补丁生成，不能描述为 Qt 源码重新编译的结果。Qt 源码等价补丁针对已固定的公开快照提供；其与 CDN 编译输入的关系仍受下面的来源限制约束。
+
 LibreOffice Git 归档也不包含所有外部依赖 tarball。固定提交的 `download.lst` 另存为 `LIBREOFFICE-EXTERNAL-SOURCES.lst`。构建者应按实际配置执行上游获取外部依赖的步骤、核对列出的摘要，并把适用许可要求的对应源码及构建修改纳入最终源码发行。该文件同时列出可选组件，不能据此推断全部组件都在当前 WASM 中。
 
 ## PDF 运行时

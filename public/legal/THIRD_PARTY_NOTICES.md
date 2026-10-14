@@ -55,5 +55,6 @@ node scripts/fetch-corresponding-sources.mjs --offline --out-dir /path/to/source
 - Qt、QtBase、Emscripten 的快照来自 ZetaOffice 官方列出的分支，Qt supermodule 指向的 QtBase gitlink 也已核对；上游未随 CDN 公布逐组件构建 SBOM，因此未宣称这些快照已逐字节重建 CDN 二进制。
 - LibreOffice 核心 Git 归档不含 `make fetch` 获取的外部依赖源码。`LIBREOFFICE-EXTERNAL-SOURCES.lst` 保留该核心提交规定的名称与校验值；完整源码发行还须包括实际配置选择的外部依赖、必要修改与构建材料。
 - 本应用源码、锁文件、构建脚本和本地 zeta.js 补丁必须随对应源码交付。仅下载这 8 个归档，不等于已经证明整个发行物的对应源码完整性。
+- 本地鼠标时间戳修改分别记录原始与派生 WASM 摘要。获取源码时会校验并复制精确转换脚本、Qt 源码等价补丁和修改说明；专项测试随完整应用源码提供。该二进制补丁不代表整个 WASM 已从源码重编译。
 
 更详细的源码组装说明见 [`public/legal/CORRESPONDING-SOURCE.md`](public/legal/CORRESPONDING-SOURCE.md)。

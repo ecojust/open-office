@@ -1,0 +1,33 @@
+From: Open Office maintainers
+Subject: [source-equivalent change] Bound only native mouse timestamps via uint64
+
+Target source snapshot: allotropia/qtbase
+Commit: a320678c85ec8029d5394bcd673d4c208af1de3a
+Original file SHA256:
+  9c883d88031e6baf13cf45fe703963aa14f162895648c34992c59fb33e5a76e9
+
+This source change describes the semantics of the separately pinned WASM
+transformation. It is NOT a claim that this snapshot was the exact CDN compiler
+input, or that the supplied binary was rebuilt from this patch. See
+office-mouse-time.md and scripts/office-mouse-time-patch.mjs for the actual
+binary input/output hashes, instruction binding and reproducible transformation.
+
+The source file's existing Qt copyright and license notices remain applicable.
+
+--- a/src/plugins/platforms/wasm/qwasmeventtranslator.cpp
++++ b/src/plugins/platforms/wasm/qwasmeventtranslator.cpp
+@@ -575,7 +575,13 @@
+ 
+ void QWasmEventTranslator::processMouse(int eventType, const EmscriptenMouseEvent *mouseEvent)
+ {
+-    auto timestamp = emscripten_date_now();
++    const double epochMilliseconds = emscripten_date_now();
++    // The WASM ABI stores the native event timestamp in 32 bits. Convert via
++    // uint64 before wrapping; a direct out-of-range double -> uint32 loses time.
++    const quint32 timestamp =
++        epochMilliseconds >= 0.0 && epochMilliseconds < 18446744073709551616.0
++            ? static_cast<quint32>(static_cast<quint64>(epochMilliseconds))
++            : 0;
+     QPoint targetPoint(mouseEvent->targetX, mouseEvent->targetY);
+     QPoint globalPoint = screen()->geometry().topLeft() + targetPoint;
+ 

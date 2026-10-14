@@ -125,6 +125,16 @@ async function main() {
   if (createHash('sha256').update(zeta).digest('hex') !== manifest.zetaJsShippedSha256) {
     throw Error('Local zeta.js changed: update the recorded source patch before release')
   }
+  const localMaterials = []
+  for (const material of manifest.localModificationMaterials || []) {
+    if (!/^(?:scripts|vendor\/patches)\/[A-Za-z0-9._-]+$/.test(material.path)
+        || !/^[a-f0-9]{64}$/.test(material.sha256)) throw Error('Invalid local runtime source material')
+    const bytes = await readFile(path.join(projectRoot, material.path))
+    if (bytes.length !== material.bytes || createHash('sha256').update(bytes).digest('hex') !== material.sha256) {
+      throw Error(`Local runtime change differs from its source record: ${material.path}`)
+    }
+    localMaterials.push(material)
+  }
   if (listOnly) {
     console.log(JSON.stringify(manifest, null, 2))
     return
@@ -133,6 +143,7 @@ async function main() {
   await copyFile(path.join(projectRoot, 'public/legal/CORRESPONDING-SOURCE.md'), path.join(directory, 'README.md'))
   await copyFile(path.join(projectRoot, 'public/legal/zetajs-local-change.patch'), path.join(directory, 'zetajs-local-change.patch'))
   await copyFile(path.join(projectRoot, 'public/legal/LIBREOFFICE-EXTERNAL-SOURCES.lst'), path.join(directory, 'LIBREOFFICE-EXTERNAL-SOURCES.lst'))
+  for (const material of localMaterials) await copyFile(path.join(projectRoot, material.path), path.join(directory, path.basename(material.path)))
   console.log(`Verified ${result.archiveCount} upstream source archives (${result.totalBytes} bytes): ${directory}`)
   console.log('Read README.md: application source and selected LibreOffice external dependency sources are additional release materials.')
 }

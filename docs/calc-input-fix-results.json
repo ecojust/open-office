@@ -1,0 +1,580 @@
+{
+  "date": "2026-10-14",
+  "status": "Partial verification: A-D, F and G passed; E failed during initial native layout before editing. Overall run remains false.",
+  "ok": false,
+  "matrixCompleted": false,
+  "passedCases": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "F",
+    "G"
+  ],
+  "failedCase": "E",
+  "build": {
+    "label": "2026.1014.1807",
+    "versionLabel": "0.5.0",
+    "publication": "At the time of this validation, this local follow-up build was not a released installer, and the separate 0.5.0 release candidate was still blocked by its macOS freeze-pane check.",
+    "viewport": {
+      "width": 1560,
+      "height": 1000,
+      "deviceScaleFactor": 1
+    },
+    "timezone": "UTC",
+    "runtimeFilesAtRunStart": [
+      {
+        "file": "public/office-runtime/soffice.wasm",
+        "bytes": 161667500,
+        "sha256": "56a2f4f43d0c5dbe45937054833d1946383bd07f1017d359d0efe7f4c9d85dd0"
+      },
+      {
+        "file": "dist/office-runtime/soffice.wasm",
+        "bytes": 161667500,
+        "sha256": "56a2f4f43d0c5dbe45937054833d1946383bd07f1017d359d0efe7f4c9d85dd0"
+      }
+    ],
+    "servedRuntime": {
+      "url": "http://127.0.0.1:4299/office-runtime/soffice.wasm",
+      "bytes": 161667500,
+      "sha256": "56a2f4f43d0c5dbe45937054833d1946383bd07f1017d359d0efe7f4c9d85dd0"
+    }
+  },
+  "baseline": {
+    "reports": [
+      "test-results/calc-input-followup/2026-10-14T09-42-11-502Z-555514/matrix-report.json",
+      "test-results/calc-input-followup/2026-10-14T09-46-28-079Z-556182/matrix-report.json"
+    ],
+    "summary": "test-results/calc-input-followup/2026-10-14T09-46-28-079Z-556182/causal-summary.json",
+    "build": "2026.1014.1736",
+    "servedRuntimeFingerprintCaptured": false,
+    "observed": "A/C remained at B3 after direct B2 click; B/D remained at A1 after Ctrl+Home. E clicked distant A4 then returned successfully to B2. All five exports retained numeric B2=314 and sentinels.",
+    "preserved": true
+  },
+  "patchedReport": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/matrix-report.json",
+  "cases": [
+    {
+      "id": "A",
+      "name": "direct-click",
+      "status": "passed",
+      "completed": true,
+      "selectionPassed": true,
+      "exportPassed": true,
+      "baseline": {
+        "selectionPassed": false,
+        "exportPassed": true,
+        "afterProbeSelection": "B3"
+      },
+      "afterProbeSelection": "B2",
+      "finalSelection": "B2",
+      "exportFile": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/A-edited.xlsx",
+      "exportB2": {
+        "type": "n",
+        "value": "314",
+        "formula": ""
+      }
+    },
+    {
+      "id": "B",
+      "name": "home-only",
+      "status": "passed",
+      "completed": true,
+      "selectionPassed": true,
+      "exportPassed": true,
+      "baseline": {
+        "selectionPassed": false,
+        "exportPassed": true,
+        "afterProbeSelection": "A1"
+      },
+      "afterProbeSelection": "B2",
+      "finalSelection": "B2",
+      "exportFile": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/B-edited.xlsx",
+      "exportB2": {
+        "type": "n",
+        "value": "314",
+        "formula": ""
+      }
+    },
+    {
+      "id": "C",
+      "name": "dom-focus-only",
+      "status": "passed",
+      "completed": true,
+      "selectionPassed": true,
+      "exportPassed": true,
+      "baseline": {
+        "selectionPassed": false,
+        "exportPassed": true,
+        "afterProbeSelection": "B3"
+      },
+      "afterProbeSelection": "B2",
+      "finalSelection": "B2",
+      "exportFile": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/C-edited.xlsx",
+      "exportB2": {
+        "type": "n",
+        "value": "314",
+        "formula": ""
+      }
+    },
+    {
+      "id": "D",
+      "name": "dom-focus-and-home",
+      "status": "passed",
+      "completed": true,
+      "selectionPassed": true,
+      "exportPassed": true,
+      "baseline": {
+        "selectionPassed": false,
+        "exportPassed": true,
+        "afterProbeSelection": "A1"
+      },
+      "afterProbeSelection": "B2",
+      "finalSelection": "B2",
+      "exportFile": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/D-edited.xlsx",
+      "exportB2": {
+        "type": "n",
+        "value": "314",
+        "formula": ""
+      }
+    },
+    {
+      "id": "E",
+      "name": "distant-cell-before-original-cell",
+      "status": "failed-before-edit",
+      "completed": false,
+      "selectionPassed": false,
+      "exportPassed": false,
+      "baseline": {
+        "selectionPassed": true,
+        "exportPassed": true,
+        "afterProbeSelection": "B2"
+      },
+      "afterProbeSelection": null,
+      "finalSelection": "A1",
+      "error": {
+        "phase": "E initial visible B2 click",
+        "message": "Error: Visible B2 at(159,382.5) must be selected: {\"selection\":{\"sheetIndex\":0,\"startColumn\":0,\"startRow\":0,\"endColumn\":0,\"endRow\":0,\"address\":\"A1\",\"multiple\":false,\"available\":true},\"cell\":{\"address\":\"A1\",\"column\":0,\"row\":0,\"formula\":\"ORIGIN\",\"text\":\"ORIGIN\",\"value\":0,\"type\":\"text\",\"error\":0},\"revision\":0}\n    at waitState (/workspace/open-office/tests/browser/calc-input-focus.cjs:81:9)\n    at async run (/workspace/open-office/tests/browser/calc-input-focus.cjs:313:22)\n    at async /workspace/open-office/tests/browser/calc-input-focus.cjs:390:47"
+      }
+    },
+    {
+      "id": "F",
+      "name": "double-click-append",
+      "status": "passed",
+      "completed": true,
+      "selectionPassed": true,
+      "exportPassed": true,
+      "baseline": null,
+      "afterProbeSelection": "B2",
+      "finalSelection": "B2",
+      "exportFile": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/F-edited.xlsx",
+      "exportB2": {
+        "type": "n",
+        "value": "3149",
+        "formula": ""
+      },
+      "clickTiming": {
+        "gapMs": 6041.419999957085,
+        "doubleClickGapMs": 256.7950000166893,
+        "empiricalMinimumGapMs": 1200,
+        "nativeDoubleClickThresholdMeasured": false
+      }
+    },
+    {
+      "id": "G",
+      "name": "delayed-single-click-replace-and-now",
+      "status": "passed",
+      "completed": true,
+      "selectionPassed": true,
+      "exportPassed": true,
+      "baseline": null,
+      "afterProbeSelection": "B2",
+      "finalSelection": "C2",
+      "exportFile": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/G-edited.xlsx",
+      "exportB2": {
+        "type": "n",
+        "value": "9",
+        "formula": ""
+      },
+      "clickTiming": {
+        "gapMs": 5167.789999961853,
+        "empiricalMinimumGapMs": 1200,
+        "nativeDoubleClickThresholdMeasured": false
+      },
+      "nowCheck": {
+        "browserClock": {
+          "now": 1791972764497,
+          "timezone": "UTC",
+          "offsetMinutes": 0
+        },
+        "hostClockBeforeMs": 1791972764495,
+        "hostClockAfterMs": 1791972764520,
+        "enteredAfterMs": 1791972764520,
+        "exportedBeforeMs": 1791972769222,
+        "exportAudit": {
+          "formula": "NOW()",
+          "serial": 46309.4255318866,
+          "date1904": false,
+          "utc": "2026-10-14T10:12:45.955002+00:00",
+          "unixMs": 1791972765955.002,
+          "lowerMs": 1791972764520,
+          "upperMs": 1791972769222,
+          "toleranceMs": 5000,
+          "passed": true
+        }
+      }
+    }
+  ],
+  "unchanged": {
+    "sourceFixture": true,
+    "frozenViewportScript": true
+  },
+  "pageErrors": [],
+  "independentReview": {
+    "reviewer": "table_layout_review",
+    "method": "Read-only review of raw XLSX ZIP/XML, screenshot files, ordinary DOM input audits and recorded SHA-256 fingerprints; no new browser or native mutation hooks.",
+    "exportsPassed": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "F",
+      "G"
+    ],
+    "findings": [
+      "A-D B2 numeric314; F numeric3149; G numeric9; each has no B2 formula.",
+      "All six exports preserve A1=ORIGIN, A4=KEEP and C5=SHEET_SENTINEL.",
+      "All six export fingerprints and fixture/test/frozen-script fingerprints match the report.",
+      "F trusted double-click down interval is 256.795ms; G same-position single-click interval is 5167.790ms.",
+      "G C2 formula is NOW(), cached serial46309.4255318866 independently converts to 2026-10-14T10:12:45.955002+00:00, strictly inside input/export interval without tolerance.",
+      "E before-edit/final screenshots show three native toolbar rows appearing late and moving B2 down115px; no typing or export occurred."
+    ]
+  },
+  "initialLayoutFailure": {
+    "case": "E",
+    "beforeScreenshot": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/E-before-edit.png",
+    "finalScreenshot": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/E-final.png",
+    "beforeB2Center": {
+      "x": 159,
+      "y": 382.5
+    },
+    "finalB2Center": {
+      "x": 159,
+      "y": 497.5
+    },
+    "verticalShiftPx": 115,
+    "observed": "Native standard/format/formula toolbars appeared after a 1500ms marker-stability window. The old B2 coordinate landed in the native name box; selection remained A1, revision0.",
+    "rerunPerformed": false,
+    "productReadinessFixEstablished": false
+  },
+  "visualEvidence": {
+    "selectionProof": [
+      "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/A-final.png",
+      "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/B-final.png",
+      "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/C-final.png",
+      "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/D-final.png",
+      "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/F-final.png"
+    ],
+    "delayedReplacement": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/G-final.png",
+    "warning": "Immediate after-probe/after-anchor screenshots can precede native repaint. Final screenshots, read-only native state and independent exports carry the selection/content conclusion."
+  },
+  "limits": [
+    "Six successful cases are not a 7/7 matrix pass; E initial-layout failure remains recorded.",
+    "This patched run uses Chromium,1560x1000,DPR1; it does not repeat the earlier viewport/DPR2/Word coverage.",
+    "The actual native double-click threshold was not independently measured; the test records observed real DOM intervals and verifies append versus replacement.",
+    "NOW validates the current date in UTC, not historical1900 leap-day behavior or all timezones.",
+    "Exports were independently read as ZIP/XML, not reopened through this UI test.",
+    "No native event ABI,49.7day wrap-boundary behavior or wall-clock-adjustment behavior is established by these UI cases."
+  ],
+  "artifacts": [
+    {
+      "path": "docs/calc-input-fix.md",
+      "bytes": 5558,
+      "sha256": "06504e44ee59ecac8e08930bff2b4989b58c7aec3f9bc4c448fb308137d686ae"
+    },
+    {
+      "path": "scripts/office-mouse-time-patch.mjs",
+      "bytes": 11407,
+      "sha256": "50e0346617d7475b284a573a6f83039dca0428f1a944e29376a16972a186726a"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T09-42-11-502Z-555514/A-edited.xlsx",
+      "bytes": 6463,
+      "sha256": "e318e610d5ecbb236c5f5ed25de5a2be7489fb38ec86325c0be437197e979e81"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T09-42-11-502Z-555514/B-edited.xlsx",
+      "bytes": 6460,
+      "sha256": "b38356dfdc3eed552148eb8bd8ea0720453013d4a36132c61da56b3ec48aefd0"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T09-42-11-502Z-555514/C-edited.xlsx",
+      "bytes": 6464,
+      "sha256": "eb691cb2083ded4034797ba96d58ac470ca5933a83cd5a5595de7d72bbef62bb"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T09-42-11-502Z-555514/D-edited.xlsx",
+      "bytes": 6461,
+      "sha256": "56d0b890a94bbe2b1571fc6ee3ba59d743dcc3f77418137edea8c5a076ac2859"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T09-42-11-502Z-555514/matrix-report.json",
+      "bytes": 228561,
+      "sha256": "0154002309747bb7d11e90ce190bfc6377b7e77a4def66e0c5d50da2679fa048"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T09-46-28-079Z-556182/E-edited.xlsx",
+      "bytes": 6464,
+      "sha256": "0a782dd971cfa8a8e41840f6a77e92b3b4f57b3a060fcea8e7880b8feab31cf9"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T09-46-28-079Z-556182/causal-summary.json",
+      "bytes": 7859,
+      "sha256": "341f09486f402ffbd386bed9aefc2fb575c57420567ac300cb3172817b83166b"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T09-46-28-079Z-556182/matrix-report.json",
+      "bytes": 60868,
+      "sha256": "f13c195aa88f7f74628cfd33f8b3ccdadbf4a533e1736ec14da0b94dbfdedc46"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/A-after-probe.png",
+      "bytes": 106386,
+      "sha256": "e93b3be357f3ae91d6558e2c4180312db55e6dc014c1429d5be9b1adfe5ad3b4"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/A-before-edit.png",
+      "bytes": 103932,
+      "sha256": "59fe404277e131d501e8f54657f4e872c275f8130cd62741c5b0e17b0a376856"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/A-before-probe-click.png",
+      "bytes": 106386,
+      "sha256": "e93b3be357f3ae91d6558e2c4180312db55e6dc014c1429d5be9b1adfe5ad3b4"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/A-edited.xlsx",
+      "bytes": 6461,
+      "sha256": "5abd054ff3e04c1cf861b7562a533a050b775c00aa0a633be11418d37c136e0d"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/A-final.png",
+      "bytes": 102283,
+      "sha256": "8550ee6c73b8232ce9140a8ce27bd6abab9669734e043a6932bf83dd1c07ff60"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/B-after-probe.png",
+      "bytes": 104377,
+      "sha256": "2ebca53660cb353777ad39eadcf67d68270c27399948bc14af4106772cb957eb"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/B-before-edit.png",
+      "bytes": 103932,
+      "sha256": "59fe404277e131d501e8f54657f4e872c275f8130cd62741c5b0e17b0a376856"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/B-before-probe-click.png",
+      "bytes": 104377,
+      "sha256": "2ebca53660cb353777ad39eadcf67d68270c27399948bc14af4106772cb957eb"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/B-edited.xlsx",
+      "bytes": 6464,
+      "sha256": "6c8444264a5ffeb406ab52f91944f968ef671e2253acc5f875e1da32b4b2a2cf"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/B-final.png",
+      "bytes": 102262,
+      "sha256": "b444023d7142756c962a0cd424ba3289974c73e805a30017c6559d9ca034f0e6"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/C-after-probe.png",
+      "bytes": 106386,
+      "sha256": "e93b3be357f3ae91d6558e2c4180312db55e6dc014c1429d5be9b1adfe5ad3b4"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/C-before-edit.png",
+      "bytes": 103932,
+      "sha256": "59fe404277e131d501e8f54657f4e872c275f8130cd62741c5b0e17b0a376856"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/C-before-probe-click.png",
+      "bytes": 106386,
+      "sha256": "e93b3be357f3ae91d6558e2c4180312db55e6dc014c1429d5be9b1adfe5ad3b4"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/C-edited.xlsx",
+      "bytes": 6463,
+      "sha256": "447331866271cc039d577ec421b77ade21ac2abb0f2dc6863bd1483fc1b59d12"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/C-final.png",
+      "bytes": 102281,
+      "sha256": "8499a312e6cee41aa8845de4478a25e74f8504adac83b4f4b00f63d9a629f2d6"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/D-after-probe.png",
+      "bytes": 104377,
+      "sha256": "2ebca53660cb353777ad39eadcf67d68270c27399948bc14af4106772cb957eb"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/D-before-edit.png",
+      "bytes": 103932,
+      "sha256": "59fe404277e131d501e8f54657f4e872c275f8130cd62741c5b0e17b0a376856"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/D-before-probe-click.png",
+      "bytes": 104377,
+      "sha256": "2ebca53660cb353777ad39eadcf67d68270c27399948bc14af4106772cb957eb"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/D-edited.xlsx",
+      "bytes": 6463,
+      "sha256": "42e0c16c5ed9f564542df4e6edc2097042d5a38249b0e418b794f7d4782ceb68"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/D-final.png",
+      "bytes": 102262,
+      "sha256": "b444023d7142756c962a0cd424ba3289974c73e805a30017c6559d9ca034f0e6"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/E-before-edit.png",
+      "bytes": 73314,
+      "sha256": "767bfc77d1d42313a73d7c83bea724213b1a281c1ddf2f0806a35daf51211039"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/E-final.png",
+      "bytes": 104010,
+      "sha256": "5311eb81db27031b53a6f2532057f7c953ba50937d970992e54882c90adb25d7"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/F-after-probe.png",
+      "bytes": 104859,
+      "sha256": "a4c7c7c00e934c55b19ad8710aa16b3e5e1b9bbdcf8b4f17a532f00a7af59e4b"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/F-before-edit-anchor-probe.png",
+      "bytes": 104712,
+      "sha256": "a9eb8465680d8edd4879e8bcf3c2a8fd10bd9e8289c5537232df3d66e8f7af77"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/F-before-edit-value-probe.png",
+      "bytes": 103952,
+      "sha256": "89c361e6c00b158da310340a13985ddb5242f8d56a0b347b1f14bd31ff0c7e55"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/F-before-edit.png",
+      "bytes": 103932,
+      "sha256": "59fe404277e131d501e8f54657f4e872c275f8130cd62741c5b0e17b0a376856"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/F-before-probe-click.png",
+      "bytes": 106384,
+      "sha256": "d40897dc8ec38c39aefec448fd176d489177853d8ab4c7e3d158ace44cea33cb"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/F-edit-mode-probe.png",
+      "bytes": 106976,
+      "sha256": "7473545df2bdf10a1f2a84ecca73c7262b78479cf69be2740fbb38ec9f644160"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/F-edited.xlsx",
+      "bytes": 6462,
+      "sha256": "f23792c93752f42c5f8588f57946c388bb9aa310ca420ac6d0eb3b05adf8e913"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/F-final.png",
+      "bytes": 103258,
+      "sha256": "ba383e76752cb68de57fb61f8533cf9a4d9d96282bafe8be577211fc18a3f852"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/G-after-probe.png",
+      "bytes": 105564,
+      "sha256": "93051d9c274be24f9a1704ef75a6d4ceb8caab2ed6489410112ad05bb792bd66"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/G-before-edit-anchor-probe.png",
+      "bytes": 104090,
+      "sha256": "08667e855e855dd0ecc3b0d377065a5636c12f0bdfa354d16aed38bf0483bcce"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/G-before-edit-value-probe.png",
+      "bytes": 103333,
+      "sha256": "2f1600644638a549ab8ccb8d434701dfc25836054096fe751a5de664ef79a360"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/G-before-edit.png",
+      "bytes": 103932,
+      "sha256": "59fe404277e131d501e8f54657f4e872c275f8130cd62741c5b0e17b0a376856"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/G-before-probe-click.png",
+      "bytes": 106386,
+      "sha256": "e93b3be357f3ae91d6558e2c4180312db55e6dc014c1429d5be9b1adfe5ad3b4"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/G-edit-mode-probe.png",
+      "bytes": 102471,
+      "sha256": "ab3803cb3efedb83ad967221fd2ab34bc27b81117de54caca0c0d5be1e582cd5"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/G-edited.xlsx",
+      "bytes": 6537,
+      "sha256": "eeb42b49426bb10630802b631a828a8f2507d871d2327573b7b9f85da5ca98dc"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/G-final.png",
+      "bytes": 104800,
+      "sha256": "3c8c2bbed725e7cc5bc588af434fcfde6501ed134d86daf29b07afc79ff1db85"
+    },
+    {
+      "path": "test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/matrix-report.json",
+      "bytes": 489874,
+      "sha256": "3fe525f361c12f8fc118efb256546855ee7b5396db45343d3e69a35b9d05024c"
+    },
+    {
+      "path": "tests/browser/calc-input-focus.cjs",
+      "bytes": 25321,
+      "sha256": "acac08b2431f53fbc59776b0ea069c85b23708752aee62d48ad2464e925120e3"
+    },
+    {
+      "path": "tests/browser/office-state-reader.cjs",
+      "bytes": 4371,
+      "sha256": "e1bcf487fb473f270f6ec8c6946e6e0cfc94aa26691437469883c4088e9f0b0c"
+    },
+    {
+      "path": "tests/browser/office-viewport-ui.cjs",
+      "bytes": 20395,
+      "sha256": "5d5b496f5151f15ee161431616452455eb464de67f7307727ded26ea1a2bcb73"
+    },
+    {
+      "path": "tests/browser/office-viewport.cjs",
+      "bytes": 4644,
+      "sha256": "e9be2dff6c5bde0d526cc9393fe33f62c93eb731ea9008b7b22c189a0d843639"
+    },
+    {
+      "path": "tests/compatibility/office-viewport/audit-viewport.py",
+      "bytes": 3291,
+      "sha256": "afba287b269c3a6d66c5dcec3da0c8be4e43637ab5b7dcdca8cbd2c5fac2fe40"
+    },
+    {
+      "path": "tests/compatibility/office-viewport/manifest.json",
+      "bytes": 653,
+      "sha256": "8ed28611838d0bc1f879cdc5978d963e82d957fcd531f0152ee9e11a6145a44e"
+    },
+    {
+      "path": "tests/compatibility/office-viewport/viewport-source.xlsx",
+      "bytes": 5093,
+      "sha256": "873c7ca7ce278b76529505bf50a810d305132397b79e5e3752fd6227e2acc0e5"
+    },
+    {
+      "path": "vendor/patches/office-mouse-time.md",
+      "bytes": 7880,
+      "sha256": "78964a7fa6450d817382c0e04b9f25819ea798da92baf246e49555e1ab01c21d"
+    },
+    {
+      "path": "vendor/patches/qt-wasm-mouse-time-source-equivalent.patch",
+      "bytes": 1606,
+      "sha256": "25ce16e1b92ed52426348bfa727d251f4f30eef098b0e4f28c021d4a22697b65"
+    }
+  ]
+}

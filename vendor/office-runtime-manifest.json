@@ -16,7 +16,14 @@
       "file": "soffice.wasm",
       "url": "https://cdn.zetaoffice.net/zetaoffice_latest/soffice.wasm",
       "bytes": 161667499,
-      "sha256": "9ebd9a487e849a24b9c69f843ebdb451709c27b7722c010e36846433474a5bd4"
+      "sha256": "9ebd9a487e849a24b9c69f843ebdb451709c27b7722c010e36846433474a5bd4",
+      "derived": {
+        "id": "qt-wasm-mouse-time-u64-wrap-v1",
+        "bytes": 161667500,
+        "sha256": "56a2f4f43d0c5dbe45937054833d1946383bd07f1017d359d0efe7f4c9d85dd0",
+        "script": "scripts/office-mouse-time-patch.mjs",
+        "sourcePatch": "vendor/patches/qt-wasm-mouse-time-source-equivalent.patch"
+      }
     },
     {
       "file": "soffice.data",
