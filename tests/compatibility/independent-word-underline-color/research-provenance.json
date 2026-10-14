@@ -1,0 +1,19 @@
+{
+  "root": "/workspace/open-office-research/libreoffice/underline-color-compatibility",
+  "files": {
+    "report.json": "da645e79b9d37676792b9a5a9d8e1675227e0f9a31cb475ccf4a6170d26c76d0",
+    "sha256.json": "ceab089844e210d7162b1f18ecf8f816aa0aad16f089f954ede28bc44b0a0d0e",
+    "supported-report.json": "03e3b9a6dc2d9d044facb55f9272df68baaa7745e520777f0db349af157c3d8c",
+    "expected-contract.json": "a325a4562ba0fd88d54f6f2b027e93db901ce0d2a0135033b6f85080985a72f1",
+    "editing/report.json": "cf2ea8b91a6f2578adc9d6eaf9280ea9d9b8dd97136b0d5e6ee72eee75a4b1b6",
+    "editing/sha256.json": "2eee5618e05e47b462cc5c2ce848258fae524ac32b3f09ceb0f3c374e709e922",
+    "product-import-verification.json": "6ed545328f7b11b55b377c6c372f34b01a43c7244a6e278ad4eb1efac64a9b10",
+    "selection-dispatch/sha256.json": "f148294c7d0de795fee61f5a327ba16eeb457fce28bb872cca0b730160c6c348",
+    "expected-contract.pre-selection.json": "a8332a19a96beac7acc65f0924b2aecbc0c50bac0bc86f852a544fea7b35adf2",
+    "product-import-verification.pre-marker-fix.json": "f57a21517d0065195aa79f4e2ddc688136cfb706516fdb4e3ce38cc0d2233e0a",
+    "selection-import-verification.json": "5a08590813c89b101adce4a7e21706fb7478c9922ad929a4d75ac2b6676350aa",
+    "verification-sha256.json": "5268af8f847b3e57a09f46464ff66d1f93748f8d7ccf7ca8461a5c0d3cc677f6",
+    "source/manifest.json": "607bda7cd536a8170163b7226395595faa107ebcbeed7058f0edb0f1c3e57247"
+  },
+  "note": "Final research index synchronized after the whole-selection marker fix. Exact pre-selection contract and pre-marker-fix import snapshots remain separately indexed. Product and immutable native DOCX packages were not changed."
+}

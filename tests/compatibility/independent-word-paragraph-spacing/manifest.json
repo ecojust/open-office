@@ -1,0 +1,762 @@
+{
+  "formatVersion": 1,
+  "fixtures": [
+    {
+      "name": "supported-cases",
+      "source": "source/supported-cases.docx",
+      "pdf": {
+        "path": "libreoffice/supported-cases.pdf",
+        "sha256": "77c9847367f4d4e189389faff44894442f1d6ba71522eb23cad48535b4b4f92e"
+      },
+      "expected": [
+        {
+          "text": "C000 first\nC000 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C001 first\nC001 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C002 first\nC002 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C003 first\nC003 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C004 first\nC004 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C005 first\nC005 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.01,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C006 first\nC006 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.01,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C007 first\nC007 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.16,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C008 first\nC008 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C009 first\nC009 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "C010 first\nC010 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 8.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "C011 first\nC011 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C012 first\nC012 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "C013 first\nC013 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C014 first\nC014 second",
+          "spaceBefore": 6.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C015 first\nC015 second",
+          "spaceBefore": 6.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "PAIR-A",
+          "spaceBefore": 0.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "PAIR-B",
+          "spaceBefore": 18.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        }
+      ],
+      "sourceExpected": [
+        {
+          "text": "C000 first\nC000 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C001 first\nC001 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C002 first\nC002 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C003 first\nC003 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C004 first\nC004 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C005 first\nC005 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.01,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C006 first\nC006 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.01,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C007 first\nC007 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.16,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C008 first\nC008 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C009 first\nC009 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "C010 first\nC010 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 8.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "C011 first\nC011 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C012 first\nC012 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "C013 first\nC013 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C014 first\nC014 second",
+          "spaceBefore": 6.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C015 first\nC015 second",
+          "spaceBefore": 6.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "PAIR-A",
+          "spaceBefore": 0,
+          "spaceAfter": 12.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "PAIR-B",
+          "spaceBefore": 18.0,
+          "spaceAfter": 0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        }
+      ],
+      "sourceSha256": "748b874c9c1295bb85bc38545f73e386076e90f0124fb49767bec1b749b798be",
+      "docx": "libreoffice/supported-cases.docx",
+      "docxSha256": "f47758bfcc5803f331fdbfb50972400e05826aeaf7606fa6d6bcf82b82b05357"
+    },
+    {
+      "name": "document-default",
+      "source": "source/document-default.docx",
+      "pdf": {
+        "path": "libreoffice/document-default.pdf",
+        "sha256": "67614da485d79315b6156ef2eed20a3cf4ce5582534c65c09c1f616f9b1adba9"
+      },
+      "expected": [
+        {
+          "text": "C000 first\nC000 second",
+          "spaceBefore": 6.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 24.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C001 first\nC001 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 24.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C002 first\nC002 second",
+          "spaceBefore": 6.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        }
+      ],
+      "sourceExpected": [
+        {
+          "text": "C000 first\nC000 second",
+          "spaceBefore": 6.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 24.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C001 first\nC001 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 24.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C002 first\nC002 second",
+          "spaceBefore": 6.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        }
+      ],
+      "sourceSha256": "26a2ead7ce555115c91e74827ce38561d49de128f013918c030d255a158a444e",
+      "docx": "libreoffice/document-default.docx",
+      "docxSha256": "7519439ff9425a7a2853be596883c5c48fa5a915df64c45d679f33794a619373"
+    },
+    {
+      "name": "geometry",
+      "source": "source/geometry.docx",
+      "pdf": {
+        "path": "libreoffice/geometry.pdf",
+        "sha256": "fc6b6d0e7f574ca389362038bfde93e23d889bdf115afb30f7939387a38c1553"
+      },
+      "expected": [
+        {
+          "text": "G00-A\nG00-B\nG00-C",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "G01-A\nG01-B\nG01-C",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "G02-A\nG02-B\nG02-C",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "G03-A\nG03-B\nG03-C",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "G04-A\nG04-B\nG04-C",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "G05-ASUPER\nG05-BSUB\nG05-COFFSET",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "G06-ASUPER\nG06-BSUB\nG06-COFFSET",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "G07-ASUPER\nG07-BSUB\nG07-COFFSET",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "BEFORE",
+          "spaceBefore": 0.0,
+          "spaceAfter": 6.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "",
+          "spaceBefore": 12.0,
+          "spaceAfter": 9.0,
+          "lineHeight": 1,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "AFTER",
+          "spaceBefore": 3.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        }
+      ],
+      "sourceExpected": [
+        {
+          "text": "G00-A\nG00-B\nG00-C",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "G01-A\nG01-B\nG01-C",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "G02-A\nG02-B\nG02-C",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "G03-A\nG03-B\nG03-C",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "G04-A\nG04-B\nG04-C",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "G05-ASUPER\nG05-BSUB\nG05-COFFSET",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "G06-ASUPER\nG06-BSUB\nG06-COFFSET",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "G07-ASUPER\nG07-BSUB\nG07-COFFSET",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "BEFORE",
+          "spaceBefore": 0,
+          "spaceAfter": 6.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "",
+          "spaceBefore": 12.0,
+          "spaceAfter": 9.0,
+          "lineHeight": 1,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "AFTER",
+          "spaceBefore": 3.0,
+          "spaceAfter": 0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        }
+      ],
+      "sourceSha256": "cb77f02185cb0169279abaa3d2b21d3be9b0c1611942359c3c93be0ae7efdf17",
+      "docx": "libreoffice/geometry.docx",
+      "docxSha256": "acb854e66353466c1ce9f6cb067f4f91ce3958f2960a8f862cf75664ccdc8571"
+    },
+    {
+      "name": "enter-start",
+      "source": "source/enter-start.docx",
+      "pdf": {
+        "path": "libreoffice/enter-start.pdf",
+        "sha256": "cf897cc8bb2843864979533ef9df4246c409d15d309f976374ae3723c43dd0f0"
+      },
+      "expected": [
+        {
+          "text": "",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "ABC",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "XYZ",
+          "spaceBefore": 8.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        }
+      ],
+      "sourceExpected": [
+        {
+          "text": "ABC",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "XYZ",
+          "spaceBefore": 8.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        }
+      ],
+      "action": {
+        "paragraph": 0,
+        "offset": 0,
+        "key": "Enter"
+      },
+      "sourceSha256": "c338f45c21181ba74b0f7be49b2d707564d23caea6287d596501b897dfc47a6c",
+      "docx": "libreoffice/enter-start.docx",
+      "docxSha256": "4213404a13121aceabad01d672d728d24a3119e3f595b95037dd568bea218e4a"
+    },
+    {
+      "name": "enter-middle",
+      "source": "source/enter-middle.docx",
+      "pdf": {
+        "path": "libreoffice/enter-middle.pdf",
+        "sha256": "b6a1a335079e2005e2d0fee0c309839997a8c7ca42a813aa861d3fcdbcf9d879"
+      },
+      "expected": [
+        {
+          "text": "A",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "BC",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "XYZ",
+          "spaceBefore": 8.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        }
+      ],
+      "sourceExpected": [
+        {
+          "text": "ABC",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "XYZ",
+          "spaceBefore": 8.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        }
+      ],
+      "action": {
+        "paragraph": 0,
+        "offset": 1,
+        "key": "Enter"
+      },
+      "sourceSha256": "c338f45c21181ba74b0f7be49b2d707564d23caea6287d596501b897dfc47a6c",
+      "docx": "libreoffice/enter-middle.docx",
+      "docxSha256": "35673f221c6f961d62a28269240dce225a566cfc691267a6b566cbd3b97b06e6"
+    },
+    {
+      "name": "enter-end",
+      "source": "source/enter-end.docx",
+      "pdf": {
+        "path": "libreoffice/enter-end.pdf",
+        "sha256": "e1cbe4934a7698727e51a90c5140cbb02f9eb19b0f49270aaf31e99803e71f50"
+      },
+      "expected": [
+        {
+          "text": "ABC",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "",
+          "spaceBefore": 3.0,
+          "spaceAfter": 5.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "XYZ",
+          "spaceBefore": 8.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        }
+      ],
+      "sourceExpected": [
+        {
+          "text": "ABC",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "XYZ",
+          "spaceBefore": 8.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        }
+      ],
+      "action": {
+        "paragraph": 0,
+        "offset": 3,
+        "key": "Enter"
+      },
+      "sourceSha256": "c338f45c21181ba74b0f7be49b2d707564d23caea6287d596501b897dfc47a6c",
+      "docx": "libreoffice/enter-end.docx",
+      "docxSha256": "deddf9ad8823d376ce39c51c1242c968a08836f6c2ad5c120338c089d8a33984"
+    },
+    {
+      "name": "merge-nonempty",
+      "source": "source/merge-nonempty.docx",
+      "pdf": {
+        "path": "libreoffice/merge-nonempty.pdf",
+        "sha256": "cb967763b6c17333227492c3db392751b65037be9f5c90b27e94c1d1ff2211a3"
+      },
+      "expected": [
+        {
+          "text": "ABCXYZ",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        }
+      ],
+      "sourceExpected": [
+        {
+          "text": "ABC",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "XYZ",
+          "spaceBefore": 8.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        }
+      ],
+      "action": {
+        "paragraph": 1,
+        "offset": 0,
+        "key": "Backspace"
+      },
+      "sourceSha256": "c338f45c21181ba74b0f7be49b2d707564d23caea6287d596501b897dfc47a6c",
+      "docx": "libreoffice/merge-nonempty.docx",
+      "docxSha256": "246c808f8b1262b14a4e39d19a66f0c9fe530d7e880fe6dff57c6dd523bf0279"
+    },
+    {
+      "name": "merge-empty-first",
+      "source": "source/merge-empty-first.docx",
+      "pdf": {
+        "path": "libreoffice/merge-empty-first.pdf",
+        "sha256": "36c1e94ac6aa5fa5f2103a49a2a1eb2f711a04c241089dc1258a25e0a1b69e8d"
+      },
+      "expected": [
+        {
+          "text": "XYZ",
+          "spaceBefore": 8.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        }
+      ],
+      "sourceExpected": [
+        {
+          "text": "",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "XYZ",
+          "spaceBefore": 8.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        }
+      ],
+      "action": {
+        "paragraph": 1,
+        "offset": 0,
+        "key": "Backspace"
+      },
+      "sourceSha256": "ee99a4b77952119e7003b126318a20f6a84b5edb7c72a2ee68e64749e03dfa18",
+      "docx": "libreoffice/merge-empty-first.docx",
+      "docxSha256": "1da842f0a99333531a577ae76257629666571e668b79e09b0e2fa40f054c302d"
+    },
+    {
+      "name": "rule-only",
+      "source": "source/rule-only.docx",
+      "expectUnsupported": true,
+      "sourceSha256": "69fafc2bba065d4eaef9fe318fe47c3b115b7e91c519c6e7f18363fe6fe4f496",
+      "docx": "source/rule-only.docx",
+      "docxSha256": "69fafc2bba065d4eaef9fe318fe47c3b115b7e91c519c6e7f18363fe6fe4f496"
+    },
+    {
+      "name": "automatic-color-native",
+      "source": "source/automatic-color.docx",
+      "expectUnsupported": true,
+      "reason": "Original independently authored editing control omitted explicit color; native output uses automatic color, outside the existing color subset.",
+      "sourceSha256": "d650e9f6518f7616aaf2f9221dbf69a433013136f7b8b87f64f7eee84de4cd83",
+      "docx": "libreoffice/automatic-color.docx",
+      "docxSha256": "ed09213e42a37b4d43999983d2169a222e05ca19050c2aa16459f797893af868"
+    }
+  ]
+}

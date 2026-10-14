@@ -1,0 +1,90 @@
+[
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/PageSet.java",
+    "sha256": "6a174321448f05e97587e982218b790b66015a7f83209b31f6376c0b308bf9ba"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/README.md",
+    "sha256": "fcbe36298730854878c2d5ad5da86bf6c74ab0b1a6d320e0ba156d08689356ac"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/check.py",
+    "sha256": "818fcc17cf0454104ff01b175e66f718349b216269dacaad6402707a8e8a857a"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/custom-session-report.json",
+    "sha256": "3e85ea3cda97cb045db2cb90ab10c010b69aa39d680ddf57be1e4857f0500e7b"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/custom-session-sha256.json",
+    "sha256": "0d49a79adca53430e4802c12ee1b60c737fc9cca9204ff1a1421e0917cd08ac7"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/drift-report.json",
+    "sha256": "e8b27661c3f534510aad88ae43209ea1ce06433549819369b72976679ab3a403"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/drift-sha256.json",
+    "sha256": "9edef49ed078c055c989d6f68f75656a161b1507b653e863f727cd1b42da21bd"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/extract-paper-dimensions.py",
+    "sha256": "d69194809b2be06f63e70ddd0f81eb4fd1428b22429b462ae0ed5526b2b04aba"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/inventory.json",
+    "sha256": "5844ef3a6d55906db884a143ec2ffab1791e807d794ecfec521174ebad519eca"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/paper-dimensions.json",
+    "sha256": "b261984a2a3f21bd822692b3a44cbf6aa2b5d52211ca25c4c0aa36c7dcd64d18"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/paper-table-report.json",
+    "sha256": "59c26789ef59165532b6505611a17b9d67b5abeb35f9d7046c2fd83389d028ac"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/paper-table-sha256.json",
+    "sha256": "4900f1cc1d8285cf27edb5cfe7e3d799b6ed0f729502ad6121d52a83e17565a6"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/presets-report.json",
+    "sha256": "c1c3d16d483e445220c5d669fa8c483855240e5fa22b2e1499c7e8f50266238a"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/presets-sha256.json",
+    "sha256": "77159283a9e070c9f871a574cd56617564cb12a9a5f154d2aab41e65366ef096"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/probe-custom-session.py",
+    "sha256": "73abec0bbc92bb87da249c994a05a1caa494182f94e9b8efe69be3b45401b57c"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/probe-drift.py",
+    "sha256": "1c935723661c94660d30dca62d9c5bf279cce844ae80b58a9730c82a1501d0bd"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/probe-native.py",
+    "sha256": "a58e48e0873ecf852358a2519acc1dc8fe5295839df0ae66def8dbd6cf207963"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/probe-paper-table.py",
+    "sha256": "b555cee7edb20a9594a8734c97f5828b50cd36e625793766a4217b2eb9a315e6"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/probe-presets.py",
+    "sha256": "998572a34ce9bde07904345bf391d84707293ae9ef09e88c4aadabb18e4ddf04"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/report.json",
+    "sha256": "6288bdfff6db2578557e4eae2d2a77db2abdc90d29ae714c8321fb2c88a3aa80"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/sha256.json",
+    "sha256": "ec80349c6e2e376bfaa296eea7f9281ffe441d585ec5bcca5728fef20ba4fa29"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/page-settings/verification.json",
+    "sha256": "17c0e89fcf73a94d00fbf44b23cb57c36b198c0cb5bd9cf39fe38b7b9b1e416b"
+  }
+]

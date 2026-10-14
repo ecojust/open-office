@@ -1,0 +1,1249 @@
+{
+  "formatVersion": 1,
+  "generatedAtUtc": "2026-10-14T17:56:27.838843+00:00",
+  "generator": "generate.py",
+  "libreoffice": {
+    "executable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+    "version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5"
+  },
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "provenance": "Original controlled ODT sources authored for Open Office; DOCX files produced by native LibreOffice headless conversion and preserved byte-for-byte without stripping or rewriting package parts.",
+  "fixtures": [
+    {
+      "name": "character-format",
+      "purpose": "Standard automatic super/subscript, inherited paragraph script and strike, explicit reset, single/double strike, underline combination and logical font sizes with CJK/emoji.",
+      "source": "source/character-format.odt",
+      "sourceSha256": "4a01b776386c4d2dfc4ca205c0a42c04c5f1f7f765641ce1a6fb5b82b7d0b302",
+      "docx": "libreoffice/character-format.docx",
+      "docxSha256": "6e3ac4f7922e606b8bb9712b82719804c99672e357c33e1c9e2555bf68b0d70e",
+      "docxBytes": 6037,
+      "inventory": "inventory/character-format.json",
+      "expectedParagraphs": [
+        "Normal SUP中😀 SUB文🚀 single double end.",
+        "Inherited superscript reset baseline inherited again.",
+        "Inherited subscript reset none tail.",
+        "Underline double 中文😀 size24 size9",
+        "Edit target"
+      ],
+      "expectedSemantics": {
+        "characters": [
+          [
+            {
+              "character": "N",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "o",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "r",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "m",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "a",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "l",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "S",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "U",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "P",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "中",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "😀",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "S",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "U",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "B",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "文",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "🚀",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "s",
+              "fontSize": 12,
+              "strike": "single",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 12,
+              "strike": "single",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "n",
+              "fontSize": 12,
+              "strike": "single",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "g",
+              "fontSize": 12,
+              "strike": "single",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "l",
+              "fontSize": 12,
+              "strike": "single",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 12,
+              "strike": "single",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "d",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "o",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "u",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "b",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "l",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "n",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "d",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": ".",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            }
+          ],
+          [
+            {
+              "character": "I",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "n",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "h",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "r",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "t",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "d",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "s",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "u",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "p",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "r",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "s",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "c",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "r",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "p",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "t",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "r",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "s",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "t",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "b",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "a",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "s",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "l",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "n",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 18,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "n",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "h",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "r",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "t",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "d",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "a",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "g",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "a",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "n",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": ".",
+              "fontSize": 18,
+              "strike": "single",
+              "verticalAlign": "superscript",
+              "underline": false
+            }
+          ],
+          [
+            {
+              "character": "I",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "n",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "h",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "r",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "t",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "d",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "s",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "u",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "b",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "s",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "c",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "r",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "p",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "t",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "r",
+              "fontSize": 16,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 16,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "s",
+              "fontSize": 16,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 16,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "t",
+              "fontSize": 16,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 16,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "n",
+              "fontSize": 16,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "o",
+              "fontSize": 16,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "n",
+              "fontSize": 16,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 16,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "t",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "a",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "l",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": ".",
+              "fontSize": 16,
+              "strike": "double",
+              "verticalAlign": "subscript",
+              "underline": false
+            }
+          ],
+          [
+            {
+              "character": "U",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "n",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "d",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "e",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "r",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "l",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "i",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "n",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "e",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": " ",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "d",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "o",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "u",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "b",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "l",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "e",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": " ",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "中",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "文",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": "😀",
+              "fontSize": 12,
+              "strike": "double",
+              "verticalAlign": "superscript",
+              "underline": true
+            },
+            {
+              "character": " ",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "s",
+              "fontSize": 24,
+              "strike": "none",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 24,
+              "strike": "none",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "z",
+              "fontSize": 24,
+              "strike": "none",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 24,
+              "strike": "none",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "2",
+              "fontSize": 24,
+              "strike": "none",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": "4",
+              "fontSize": 24,
+              "strike": "none",
+              "verticalAlign": "superscript",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "s",
+              "fontSize": 9,
+              "strike": "none",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 9,
+              "strike": "none",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "z",
+              "fontSize": 9,
+              "strike": "none",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 9,
+              "strike": "none",
+              "verticalAlign": "subscript",
+              "underline": false
+            },
+            {
+              "character": "9",
+              "fontSize": 9,
+              "strike": "none",
+              "verticalAlign": "subscript",
+              "underline": false
+            }
+          ],
+          [
+            {
+              "character": "E",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "d",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "i",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "t",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": " ",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "t",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "a",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "r",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "g",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "e",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            },
+            {
+              "character": "t",
+              "fontSize": 12,
+              "strike": "none",
+              "verticalAlign": "baseline",
+              "underline": false
+            }
+          ]
+        ]
+      }
+    }
+  ],
+  "conversion": {
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+      "--headless",
+      "-env:UserInstallation=file:///tmp/open-office-lo-corpus-oiln5zsa/profile",
+      "--convert-to",
+      "docx:Office Open XML Text",
+      "--outdir",
+      "/tmp/open-office-lo-corpus-oiln5zsa",
+      "/workspace/open-office/tests/compatibility/independent-word-character-format/source/character-format.odt"
+    ],
+    "stdout": "convert /workspace/open-office/tests/compatibility/independent-word-character-format/source/character-format.odt as a Writer document -> /tmp/open-office-lo-corpus-oiln5zsa/character-format.docx using filter : Office Open XML Text\n",
+    "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n",
+    "exitCode": 0
+  }
+}

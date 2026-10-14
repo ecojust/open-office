@@ -1,0 +1,3209 @@
+{
+  "libreoffice": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "sourceTemplate": "tests/compatibility/independent-word/libreoffice/plain-text.docx",
+  "sourceTemplateSha256": "2c7f633cfde79053d36c3b05972786356ba7eb565565eb92f1d4a3bc654940e7",
+  "scope": "Independent paragraph marker / body formatting, empty insertion, RGB underline color and trailing-break font size",
+  "conversion": {
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+      "-env:UserInstallation=file:///tmp/word-marker-corpus-b75zcrsj",
+      "--headless",
+      "--convert-to",
+      "docx:Office Open XML Text",
+      "--outdir",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/libreoffice",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/empty-rich-marker.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/empty-style-rich-marker-clear.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/empty-marker-super.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/empty-marker-rich-run-clear.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/empty-marker-clear-run-rich.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/empty-marker-double-multiple-runs.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/text-rich-marker.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/text-rich-marker-run-clear.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/text-48pt-marker-trailing-break.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/empty-48pt-marker.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/text-48pt-marker.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/marker-character-style.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/unsupported-marker-wave.docx",
+      "/workspace/open-office/tests/compatibility/independent-word-marker/source/unsupported-marker-color.docx"
+    ],
+    "stdout": "convert /workspace/open-office/tests/compatibility/independent-word-marker/source/empty-rich-marker.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-rich-marker.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-rich-marker.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/empty-style-rich-marker-clear.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-style-rich-marker-clear.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-style-rich-marker-clear.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/empty-marker-super.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-marker-super.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-marker-super.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/empty-marker-rich-run-clear.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-marker-rich-run-clear.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-marker-rich-run-clear.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/empty-marker-clear-run-rich.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-marker-clear-run-rich.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-marker-clear-run-rich.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/empty-marker-double-multiple-runs.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-marker-double-multiple-runs.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-marker-double-multiple-runs.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/text-rich-marker.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/text-rich-marker.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/text-rich-marker.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/text-rich-marker-run-clear.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/text-rich-marker-run-clear.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/text-rich-marker-run-clear.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/text-48pt-marker-trailing-break.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/text-48pt-marker-trailing-break.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/text-48pt-marker-trailing-break.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/empty-48pt-marker.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-48pt-marker.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/empty-48pt-marker.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/text-48pt-marker.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/text-48pt-marker.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/text-48pt-marker.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/marker-character-style.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/marker-character-style.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/marker-character-style.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/unsupported-marker-wave.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/unsupported-marker-wave.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/unsupported-marker-wave.docx\nconvert /workspace/open-office/tests/compatibility/independent-word-marker/source/unsupported-marker-color.docx as a Writer document -> /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/unsupported-marker-color.docx using filter : Office Open XML Text\nOverwriting: /workspace/open-office/tests/compatibility/independent-word-marker/libreoffice/unsupported-marker-color.docx\n",
+    "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+  },
+  "fixtures": [
+    {
+      "name": "empty-rich-marker",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/empty-rich-marker.docx",
+      "docx": "libreoffice/empty-rich-marker.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [],
+          "markerStyle": {
+            "bold": true,
+            "italic": true,
+            "fontSize": 18.0,
+            "color": "#CC0000",
+            "verticalAlign": "baseline",
+            "strike": "double",
+            "underline": "double",
+            "underlineColor": "auto",
+            "highlight": "yellow",
+            "backgroundColor": "#13579B"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "863a1b15877153fca83dc17e8e22ef39b50c2034a1e93c3c05bda6fcb2642a85",
+      "docxSha256": "15d12b3c3bb2eb8eb25107eae57fa7571100d423760aec25e7fc6ae00003b90e"
+    },
+    {
+      "name": "empty-style-rich-marker-clear",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/empty-style-rich-marker-clear.docx",
+      "docx": "libreoffice/empty-style-rich-marker-clear.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "73dc8f2458ed38a07cba08643d4abd1bb2f9fcbe1b82b25b87fb34cca355ed18",
+      "docxSha256": "6b64e8ac0e67deebabd9b2dfb9eb93afae48733f9088d0dbac3ac751f5580784"
+    },
+    {
+      "name": "empty-marker-super",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/empty-marker-super.docx",
+      "docx": "libreoffice/empty-marker-super.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [],
+          "markerStyle": {
+            "bold": true,
+            "italic": true,
+            "fontSize": 18.0,
+            "color": "#CC0000",
+            "verticalAlign": "superscript",
+            "strike": "double",
+            "underline": "double",
+            "underlineColor": "auto",
+            "highlight": "yellow",
+            "backgroundColor": "#13579B"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "539f1705ba7ad1b0ba50a721338774fa6b36a5d94bd63f72a17c6d3a52e49760",
+      "docxSha256": "f082d5d82462f86f1ee7b4faf8b4b5af772ce563e2fc9490620dc4936c033489"
+    },
+    {
+      "name": "empty-marker-rich-run-clear",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/empty-marker-rich-run-clear.docx",
+      "docx": "libreoffice/empty-marker-rich-run-clear.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [],
+          "markerStyle": {
+            "bold": true,
+            "italic": true,
+            "fontSize": 18.0,
+            "color": "#CC0000",
+            "verticalAlign": "baseline",
+            "strike": "double",
+            "underline": "double",
+            "underlineColor": "auto",
+            "highlight": "yellow",
+            "backgroundColor": "#13579B"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "5abd7299b0d98b5e19dc3d40c55f31d965a0d3113011546f37b4288f9aa6c7c9",
+      "docxSha256": "15d12b3c3bb2eb8eb25107eae57fa7571100d423760aec25e7fc6ae00003b90e"
+    },
+    {
+      "name": "empty-marker-clear-run-rich",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/empty-marker-clear-run-rich.docx",
+      "docx": "libreoffice/empty-marker-clear-run-rich.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "7d8ee5d2db630d697b39082f8ada351a3383a26d55c60625d28074d8ad17752d",
+      "docxSha256": "51fcc4476c8477da6ec9ce7b0a4c7c4d9329e7b95f35595677edd3fd1f72328c"
+    },
+    {
+      "name": "empty-marker-double-multiple-runs",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/empty-marker-double-multiple-runs.docx",
+      "docx": "libreoffice/empty-marker-double-multiple-runs.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": "double",
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "56d0246da0de7d9345b06012dadadb3b3c5573c1ecb8546a9b7c7f633b96e51c",
+      "docxSha256": "a7751e43748a4180f4ca2f2b405b7ae38b143ced4540137f7676a07f3d10388f"
+    },
+    {
+      "name": "text-rich-marker",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/text-rich-marker.docx",
+      "docx": "libreoffice/text-rich-marker.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "BODY",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "D",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "Y",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": true,
+            "italic": true,
+            "fontSize": 18.0,
+            "color": "#CC0000",
+            "verticalAlign": "baseline",
+            "strike": "double",
+            "underline": "double",
+            "underlineColor": "auto",
+            "highlight": "yellow",
+            "backgroundColor": "#13579B"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "0ef135200b1b37bb1210ab957074aad21282de4cffea5af1366edb6ca8351de8",
+      "docxSha256": "f9698dbdc7b997877b97e4a6ba7529761c6106d19f346cfdeee610753b8e79ed"
+    },
+    {
+      "name": "text-rich-marker-run-clear",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/text-rich-marker-run-clear.docx",
+      "docx": "libreoffice/text-rich-marker-run-clear.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "BODY",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "D",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "Y",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": true,
+            "italic": true,
+            "fontSize": 18.0,
+            "color": "#CC0000",
+            "verticalAlign": "baseline",
+            "strike": "double",
+            "underline": "double",
+            "underlineColor": "auto",
+            "highlight": "yellow",
+            "backgroundColor": "#13579B"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "abe4c3a2ad8421d0b869ff58d16076e7b80b1feba12afb94fac7e9da640402f2",
+      "docxSha256": "cb2ba97cdefb2980ee51d980a13dec2ba11d0bb8e4b699d71e043e6a4d411317"
+    },
+    {
+      "name": "text-48pt-marker-trailing-break",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/text-48pt-marker-trailing-break.docx",
+      "docx": "libreoffice/text-48pt-marker-trailing-break.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "BODY\n",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "D",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "Y",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "\n",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 48.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "8fbe23a1129ce83bbc5b448e57907f9038048e5c1046b9d62da8e27544cae1ec",
+      "docxSha256": "059a14e8a02d37ca18c75e3704a9126dcd981ca869b70049a0255c2e478f68f1"
+    },
+    {
+      "name": "empty-48pt-marker",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/empty-48pt-marker.docx",
+      "docx": "libreoffice/empty-48pt-marker.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 48.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "e987be7b170421aaf8d2f91624fa629df74b4b0d0e253cf8208922f2cec7dade",
+      "docxSha256": "d377152ef4ee7679756ad5ef829fd3b8f228a73ea3d1b2413880501ba5683061"
+    },
+    {
+      "name": "text-48pt-marker",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/text-48pt-marker.docx",
+      "docx": "libreoffice/text-48pt-marker.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "BODY",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "D",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "Y",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 48.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "eff7c5b0f7a9c3fabb417acb5b1ced6ed8db262357d575d44beafef6a3bb329c",
+      "docxSha256": "d840ea9dc80f5812c5cd75befc197f31b7cc591504be4a3df6fbd2bdd74993da"
+    },
+    {
+      "name": "marker-character-style",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/marker-character-style.docx",
+      "docx": "libreoffice/marker-character-style.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [],
+          "markerStyle": {
+            "bold": true,
+            "italic": true,
+            "fontSize": 18.0,
+            "color": "#CC0000",
+            "verticalAlign": "baseline",
+            "strike": "double",
+            "underline": "double",
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "#13579B"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "5c6389b0a33d132bebb1730a5a02775f89855144502c530a85d4bcd85a5636f1",
+      "docxSha256": "31e126b29179ec0a6d873c61979c317bdc63473a3ea38dec2fd9223667023d46"
+    },
+    {
+      "name": "unsupported-marker-wave",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/unsupported-marker-wave.docx",
+      "docx": "libreoffice/unsupported-marker-wave.docx",
+      "expectUnsupported": "Paragraph marker wave underline",
+      "sourceSha256": "da8ee75aba9923957e0f0a9fba7c84bbfb3ebe60617a08c89819ca8d507c4a0f",
+      "docxSha256": "36bae0a11e56ad86568db09280aaa50c3cc6fca0aaf49d7a63d67e9ab7bfae68"
+    },
+    {
+      "name": "unsupported-marker-color",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/unsupported-marker-color.docx",
+      "docx": "libreoffice/unsupported-marker-color.docx",
+      "sourceSha256": "30be114f828cb84abe36d3587b7274c7251a4bd0963b5e3ac622d10203ea0b1f",
+      "docxSha256": "406f0f43239179f80ca65c24254f0f804d064fec6d08ce748c9425cd9d42f9db",
+      "historicalName": "Originally an unsupported-color negative control; promoted without changing source or native DOCX bytes.",
+      "expectedParagraphs": [
+        "BEFORE",
+        "",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": "double",
+            "underlineColor": "#FF0000",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ]
+    },
+    {
+      "name": "text-rich-body-sparse-marker",
+      "sourceKind": "Explicitly synthetic DOCX in native plain-text OPC container; explicit RGB defaults and automatic hyphenation disabled",
+      "source": "source/text-rich-body-sparse-marker.docx",
+      "docx": "libreoffice/text-rich-body-sparse-marker.docx",
+      "expectedParagraphs": [
+        "BEFORE",
+        "BODY",
+        "AFTER"
+      ],
+      "expectedSemantics": [
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "B",
+              "bold": false,
+              "italic": true,
+              "fontSize": 24.0,
+              "color": "#0000FF",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "O",
+              "bold": false,
+              "italic": true,
+              "fontSize": 24.0,
+              "color": "#0000FF",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "D",
+              "bold": false,
+              "italic": true,
+              "fontSize": 24.0,
+              "color": "#0000FF",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "Y",
+              "bold": false,
+              "italic": true,
+              "fontSize": 24.0,
+              "color": "#0000FF",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": true,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "characters": [
+            {
+              "character": "A",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "F",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "T",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "E",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            },
+            {
+              "character": "R",
+              "bold": false,
+              "italic": false,
+              "fontSize": 12.0,
+              "color": "#000000",
+              "verticalAlign": "baseline",
+              "strike": "none",
+              "underline": false,
+              "underlineColor": "auto",
+              "highlight": "none",
+              "backgroundColor": "none"
+            }
+          ],
+          "markerStyle": {
+            "bold": false,
+            "italic": false,
+            "fontSize": 12.0,
+            "color": "#000000",
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "underlineColor": "auto",
+            "highlight": "none",
+            "backgroundColor": "none"
+          }
+        }
+      ],
+      "sourceSha256": "e8f8399aff4b02c5653a8938c544738374429f23a8c92adaef799041ebbe024a",
+      "docxSha256": "23016944f4123eba60b47b9492667d3dbc82dde39e220f24030cc50ced619ca6"
+    }
+  ],
+  "supplementalConversions": [
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+        "-env:UserInstallation=file:///tmp/word-marker-corpus-fya4aqzy",
+        "--headless",
+        "--convert-to",
+        "docx:Office Open XML Text",
+        "--outdir",
+        "/tmp/marker-sparse-native/libreoffice",
+        "/tmp/marker-sparse-native/source/text-rich-body-sparse-marker.docx"
+      ],
+      "stdout": "convert /tmp/marker-sparse-native/source/text-rich-body-sparse-marker.docx as a Writer document -> /tmp/marker-sparse-native/libreoffice/text-rich-body-sparse-marker.docx using filter : Office Open XML Text\n",
+      "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+[
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-compatibility/inventory.json",
+    "sha256": "8d4898c1a3b6bbec36ac1619fbcc8d9921bbe8e4bde535cea66bba0be0dcdf87"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-compatibility/verification.json",
+    "sha256": "66cb61a220d73e48aa008fed719955b6be0fb1a4d21cc5701a4115bdd25c8797"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-compatibility/check.py",
+    "sha256": "19cf2dd5e04a3dc6c1af2f005b46abea39016c9a5ccd2249ab2f330d384a602d"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-compatibility/report.json",
+    "sha256": "780ef017e6a84638973b47db0a054f2ddf5dd735a95c61f7c1a88b710159f816"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-compatibility/supported-report.json",
+    "sha256": "5cee4239c020b35aa8e9553e91fc6ee2f44a449cbe554ff09310793937544ab5"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-compatibility/sha256.json",
+    "sha256": "23b0d6308f9916102d83fe0d7ad29211b15c5041cb037f75b2dd61caf6b8e123"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-compatibility/supported-sha256.json",
+    "sha256": "af2eece87a7a6a7c09a996f1db1a41657f2416650b2d1331556dcbebbff39c5c"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-compatibility/probe-native.py",
+    "sha256": "3dfd3acde9c74f2d22258463d251d3d459f93fd0bd91d29449081802c3b519bc"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-compatibility/probe-supported.py",
+    "sha256": "1910618135d97083d6b706a7abe0417e22de0d47cd5c2828d5bf4980878762c0"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-editing-explicit-color/paragraph-spacing-report.json",
+    "sha256": "2618d74f36f61792a3a5a416453fa394933bd3a5de251e4ad022912f2703c077"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-editing-explicit-color/paragraph-spacing-driver.log",
+    "sha256": "391c3a10021b0df83783324f14d21edf06d8cfaa565bd69da4337dd3c9785e74"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-editing-explicit-color/paragraph-spacing-NativeEdit.java",
+    "sha256": "eac41156213a2560a6bf2aaa1a0ac494f7c3f1da83b09eef64de6d481a2391e9"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-editing-explicit-color/probe.py",
+    "sha256": "feba3f274699e9ebd1014576777acefd98aeb9203e9905e55bf6d90a41128ea8"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-editing-explicit-color/sha256.json",
+    "sha256": "3870c08810033b499e60c2cc4824710c8295d09c3f9df7fd6d7893968faa7591"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-editing/paragraph-spacing-report.json",
+    "sha256": "f681dd54966184045c34c3b47ff899a29263d009004077970a234a2acc6c3726"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-editing/paragraph-spacing-driver.log",
+    "sha256": "a8a08087b95be5b38b5637b7a3f16ef9afc312dcea57ed90b6ce3493d0daf72f"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-editing/paragraph-spacing-NativeEdit.java",
+    "sha256": "9e5f0605ecffa89a709e75d0d8f6f409586228e32a7dcc7991243ed928221a63"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-editing/probe.py",
+    "sha256": "48cb067e138445604a9ea1768b1fba3977ed7cab17ca2155c356427c6e50be61"
+  },
+  {
+    "path": "/workspace/open-office-research/libreoffice/paragraph-spacing-editing/sha256.json",
+    "sha256": "a21945cbfe058e4e0b81f17b88d7dfcb008940904980aca2045df8b1cca269d3"
+  }
+]

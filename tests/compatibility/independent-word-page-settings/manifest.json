@@ -1,0 +1,1155 @@
+{
+  "formatVersion": 1,
+  "contractFrozen": true,
+  "nativeContract": "LibreOfficeDev 26.8.0.0.alpha0 (2c87e51eeaa2b413ff4ae097b2705eea1995d8e5) single-section DOCX import and two native saves",
+  "uiConvention": "Page edits normalize standard paper sizes at Apply time for stable save/reopen; native property edits can retain custom dimensions until DOCX reopening.",
+  "fixtures": [
+    {
+      "name": "no-section",
+      "source": "source/no-section.docx",
+      "sourceSha256": "e104435199275612ca5147e90128a58b0935bc3589f9fc2c35c733e815da2fe9",
+      "docx": "libreoffice/no-section.docx",
+      "docxSha256": "92d1191ee09ca41b7217672b6ded0289cbf9394736062d7e61bf9846ffcbf6d9",
+      "pdf": {
+        "path": "libreoffice/no-section.pdf",
+        "sha256": "2683423aab72f71f378085ce45864cc495959d0221e9eb4433d6ad2fca4254d2"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/no-section.docx",
+        "sha256": "ce8afbf907b92320ff58659a67dfced1c0e8ba8c0a48a8bf021560edf2447594"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/no-section.pdf",
+        "sha256": "081003892122afb7269d17415f635765f987b12d23ca11c386c01748bc2fb0a4"
+      },
+      "sourceInspection": {
+        "sections": [],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 612.0,
+        "height": 792.0,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 612.0,
+        "height": 792.0,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "roundtrip": true
+    },
+    {
+      "name": "width-only",
+      "source": "source/width-only.docx",
+      "sourceSha256": "d7c81ab229078188f3cd4f083c7d3b1483b25369785232f7d06757ff5a017bd5",
+      "docx": "libreoffice/width-only.docx",
+      "docxSha256": "937efcbc8f67110921d2aaf6f230a33f6b898deeaf08cf9e407c7f354da39a10",
+      "pdf": {
+        "path": "libreoffice/width-only.pdf",
+        "sha256": "cc3fa1fc30524d55c659fa7e521d50ce61b6e32db4ef740a134940157ec0485c"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/width-only.docx",
+        "sha256": "1364bc37c27e7248a23ddc823021d5f69985c070a4051fba5b2194722f00bd15"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/width-only.pdf",
+        "sha256": "becdf1992e8c539224901fafd58079df6a7ff42452e9181d487a731214b5aa3f"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "11906"
+            },
+            "margins": {
+              "top": "1440",
+              "right": "1440",
+              "bottom": "1440",
+              "left": "1440",
+              "header": "720",
+              "footer": "720",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "width": 595.3,
+              "marginTop": 72.0,
+              "marginRight": 72.0,
+              "marginBottom": 72.0,
+              "marginLeft": 72.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 595.3,
+        "height": 792.0,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 595.3,
+        "height": 792.0,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "roundtrip": false
+    },
+    {
+      "name": "height-only",
+      "source": "source/height-only.docx",
+      "sourceSha256": "5eaae2e495a1899a21819784fc902c1eb847364ac417943e9a2b4ce4ed81e84a",
+      "docx": "libreoffice/height-only.docx",
+      "docxSha256": "b8b7fbc23b54c2db7b78fcb9be3ba16b69393560f811c90f487ee5dc24af145e",
+      "pdf": {
+        "path": "libreoffice/height-only.pdf",
+        "sha256": "b2257401fdbadb6095d0504f02ee448c9a1d01f6b84fe30c6899d9efc62e02d8"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/height-only.docx",
+        "sha256": "3bbd7bfe4385f641c3dce2747e0e47d4469e843067586ee49d6d30dee39bfb8b"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/height-only.pdf",
+        "sha256": "20061c4bb803e119cb2fa4746f0a3adf1b555b95fd2eb410f56736f9867f853c"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "h": "16838"
+            },
+            "margins": {
+              "top": "1440",
+              "right": "1440",
+              "bottom": "1440",
+              "left": "1440",
+              "header": "720",
+              "footer": "720",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "height": 841.9,
+              "marginTop": 72.0,
+              "marginRight": 72.0,
+              "marginBottom": 72.0,
+              "marginLeft": 72.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 612.0,
+        "height": 841.9,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 612.0,
+        "height": 841.9,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "roundtrip": false
+    },
+    {
+      "name": "partial-margins",
+      "source": "source/partial-margins.docx",
+      "sourceSha256": "3b3e687fbe7795dd3beefd76c6526d7dc39df88e3259147cc611fb6e036bb061",
+      "docx": "libreoffice/partial-margins.docx",
+      "docxSha256": "008c8bf397ed86a8ed332c61ec7e07a80f723b1cb32490f71643930c957a08d4",
+      "pdf": {
+        "path": "libreoffice/partial-margins.pdf",
+        "sha256": "6fefac664339caf2b4ac9abadcac6435af58dead99849f4f58cdd9323f6b342a"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/partial-margins.docx",
+        "sha256": "71595b7029d053f271dcb51aa0d9921511e982655bbe75cc03e5e3bc219e9ded"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/partial-margins.pdf",
+        "sha256": "79d37cb49eb99cb153b81fb3e53e41401d8aeb59b2c69d4024352c6e6a9db77f"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "11906",
+              "h": "16838"
+            },
+            "margins": {
+              "left": "720"
+            },
+            "explicitPoints": {
+              "width": 595.3,
+              "height": 841.9,
+              "marginLeft": 36.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 595.3,
+        "height": 841.9,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 36.0,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 595.3,
+        "height": 841.9,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 36.0,
+        "orientation": "portrait"
+      },
+      "roundtrip": false
+    },
+    {
+      "name": "a4-portrait",
+      "source": "source/a4-portrait.docx",
+      "sourceSha256": "21bfbf08c047c4b2318ad102d5ae7399de8659a641aaed7db4f2f7811495309d",
+      "docx": "libreoffice/a4-portrait.docx",
+      "docxSha256": "5310d99a6772bf31b0748a2e80be3fc4d8511715e6389416b49db2aaa3455c04",
+      "pdf": {
+        "path": "libreoffice/a4-portrait.pdf",
+        "sha256": "709a546dd61c241c51e1c4f3ef651ea96b4adb615b5d1f3494661ebf150d0faf"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/a4-portrait.docx",
+        "sha256": "7aca2a39345e98e331158f78d669fb4727f27cb536079bada5f59b2f9c7ea379"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/a4-portrait.pdf",
+        "sha256": "7f510787d34c29c29ba0d76b0515adb3331febfc7a7a7e0581118a60f7c25c54"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "11906",
+              "h": "16838",
+              "orient": "portrait"
+            },
+            "margins": {
+              "top": "1440",
+              "right": "1440",
+              "bottom": "1440",
+              "left": "1440",
+              "header": "720",
+              "footer": "720",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "width": 595.3,
+              "height": 841.9,
+              "marginTop": 72.0,
+              "marginRight": 72.0,
+              "marginBottom": 72.0,
+              "marginLeft": 72.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 595.3,
+        "height": 841.9,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 595.3,
+        "height": 841.9,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "roundtrip": false
+    },
+    {
+      "name": "a4-near",
+      "source": "source/a4-near.docx",
+      "sourceSha256": "6031018ac9e28a79f1b6d0327ee4cb6f26477d1260425dd2c871b325752209f5",
+      "docx": "libreoffice/a4-near.docx",
+      "docxSha256": "5310d99a6772bf31b0748a2e80be3fc4d8511715e6389416b49db2aaa3455c04",
+      "pdf": {
+        "path": "libreoffice/a4-near.pdf",
+        "sha256": "c93069eb49771f692f2ed2b006d836ffd08f46bc6e1f90e6b77828b7b3c10bb4"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/a4-near.docx",
+        "sha256": "7aca2a39345e98e331158f78d669fb4727f27cb536079bada5f59b2f9c7ea379"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/a4-near.pdf",
+        "sha256": "b1c5a6dc47862463ada09c5c6029e38fcc71e8f494cacc624f4a450de2dee64a"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "11900",
+              "h": "16830"
+            },
+            "margins": {
+              "top": "1440",
+              "right": "1440",
+              "bottom": "1440",
+              "left": "1440",
+              "header": "720",
+              "footer": "720",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "width": 595.0,
+              "height": 841.5,
+              "marginTop": 72.0,
+              "marginRight": 72.0,
+              "marginBottom": 72.0,
+              "marginLeft": 72.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 595.3,
+        "height": 841.9,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 595.3,
+        "height": 841.9,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "roundtrip": true
+    },
+    {
+      "name": "a4-landscape",
+      "source": "source/a4-landscape.docx",
+      "sourceSha256": "4229c56f13602f7fd75ddc11b144126a2899212bcbaee2db15746bc5d57e74f9",
+      "docx": "libreoffice/a4-landscape.docx",
+      "docxSha256": "7d545504f5e2350cf39cbaa18e14fcdb0730858a4a13ceebd6c2a91ee54f5849",
+      "pdf": {
+        "path": "libreoffice/a4-landscape.pdf",
+        "sha256": "2ec28fd6357e375a56bcf646c8e74a4e550298f26a914cf9107b227f676d864e"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/a4-landscape.docx",
+        "sha256": "0c0255568d3c2947328a20e027c52accf448a82428820109b7bd673ed715bdeb"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/a4-landscape.pdf",
+        "sha256": "c84fa61ffee44cd33f83e1d61e6d6e7dd7777851a9e48476ef5600d4f03f4b19"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "16838",
+              "h": "11906",
+              "orient": "landscape"
+            },
+            "margins": {
+              "top": "1440",
+              "right": "1440",
+              "bottom": "1440",
+              "left": "1440",
+              "header": "720",
+              "footer": "720",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "width": 841.9,
+              "height": 595.3,
+              "marginTop": 72.0,
+              "marginRight": 72.0,
+              "marginBottom": 72.0,
+              "marginLeft": 72.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 841.9,
+        "height": 595.3,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "landscape"
+      },
+      "expected": {
+        "width": 841.9,
+        "height": 595.3,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "landscape"
+      },
+      "roundtrip": false
+    },
+    {
+      "name": "tall-landscape-flag",
+      "source": "source/tall-landscape-flag.docx",
+      "sourceSha256": "bf07027729f25fd8dd71ba2eb6a56f086f0c6c72fee997e53cc7b0095a10f767",
+      "docx": "libreoffice/tall-landscape-flag.docx",
+      "docxSha256": "d075e7b524a278e35628aa264f94a773a9ba9b60dfb6d424bc644bb3990058ce",
+      "pdf": {
+        "path": "libreoffice/tall-landscape-flag.pdf",
+        "sha256": "4eb141e5e7e80e05dd795ee51b08111005aefd821a3b6661157fb8d4644a81bf"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/tall-landscape-flag.docx",
+        "sha256": "4521ce761e4ca2242b1c670021c83d586e95f61246fe2703fd22c3cdaba226de"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/tall-landscape-flag.pdf",
+        "sha256": "d8037b141ef7709921846d70b471b837bcca35b40a1af20068b69a82fbd0ba77"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "11906",
+              "h": "16838",
+              "orient": "landscape"
+            },
+            "margins": {
+              "top": "1440",
+              "right": "1440",
+              "bottom": "1440",
+              "left": "1440",
+              "header": "720",
+              "footer": "720",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "width": 595.3,
+              "height": 841.9,
+              "marginTop": 72.0,
+              "marginRight": 72.0,
+              "marginBottom": 72.0,
+              "marginLeft": 72.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 595.3,
+        "height": 841.9,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "landscape"
+      },
+      "expected": {
+        "width": 595.3,
+        "height": 841.9,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "landscape"
+      },
+      "roundtrip": true
+    },
+    {
+      "name": "wide-portrait-flag",
+      "source": "source/wide-portrait-flag.docx",
+      "sourceSha256": "57d6c8bc848f7bb084574fcafff1df62d78975b4ed5bd1622be2963995aa81cd",
+      "docx": "libreoffice/wide-portrait-flag.docx",
+      "docxSha256": "63167ba5083815d87556e8287a0ed3bf9f86332bb20c8d14975eb10df9948f4f",
+      "pdf": {
+        "path": "libreoffice/wide-portrait-flag.pdf",
+        "sha256": "849a1834acfc4027fb4972b3d58467c3e1b74143b4bea94e3a0f7b65dae0efae"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/wide-portrait-flag.docx",
+        "sha256": "472c5eeea6888e8e97ab3e9cb7ef18783fe31cd26a8be48b1e6dfbb117addc64"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/wide-portrait-flag.pdf",
+        "sha256": "59ed1c6a934feb9539fdcd7e559a64ec195d8ea0fb223f00b59c11dbd410d04e"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "16838",
+              "h": "11906",
+              "orient": "portrait"
+            },
+            "margins": {
+              "top": "1440",
+              "right": "1440",
+              "bottom": "1440",
+              "left": "1440",
+              "header": "720",
+              "footer": "720",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "width": 841.9,
+              "height": 595.3,
+              "marginTop": 72.0,
+              "marginRight": 72.0,
+              "marginBottom": 72.0,
+              "marginLeft": 72.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 841.9,
+        "height": 595.3,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 841.9,
+        "height": 595.3,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "roundtrip": false
+    },
+    {
+      "name": "custom-odd",
+      "source": "source/custom-odd.docx",
+      "sourceSha256": "f2b6d8223af5c55df0d6583f57c7fb6d4d4e903b09b2444a76a2f5c059eb31bd",
+      "docx": "libreoffice/custom-odd.docx",
+      "docxSha256": "d3f3a60ad7200fe341f18b22d8688e661017a931af689d70c4921ecc93330f6f",
+      "pdf": {
+        "path": "libreoffice/custom-odd.pdf",
+        "sha256": "eaa35ea15d40f542ffd96a8ce0ce4e78b3742fa104a2081f8396f306cc303262"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/custom-odd.docx",
+        "sha256": "4ca53695ec5266065d77eaedc1f52a9bc2bc4a55f257f5251d25a0bd0a126c9b"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/custom-odd.pdf",
+        "sha256": "3175422da25d548ffac81bdfdf750cfa929e49b49b2ce082d0dd7d75f45d89a5"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "14001",
+              "h": "18003"
+            },
+            "margins": {
+              "top": "721",
+              "right": "722",
+              "bottom": "723",
+              "left": "724",
+              "header": "0",
+              "footer": "0",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "width": 700.05,
+              "height": 900.15,
+              "marginTop": 36.05,
+              "marginRight": 36.1,
+              "marginBottom": 36.15,
+              "marginLeft": 36.2
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 700.05,
+        "height": 900.15,
+        "marginTop": 36.05,
+        "marginRight": 36.1,
+        "marginBottom": 36.15,
+        "marginLeft": 36.2,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 700.05,
+        "height": 900.15,
+        "marginTop": 36.05,
+        "marginRight": 36.1,
+        "marginBottom": 36.15,
+        "marginLeft": 36.2,
+        "orientation": "portrait"
+      },
+      "roundtrip": true
+    },
+    {
+      "name": "zero-margins",
+      "source": "source/zero-margins.docx",
+      "sourceSha256": "78c657017fe1dc16f742c7c5137ba189be7b5f316bdfdb925b249f5da4126466",
+      "docx": "libreoffice/zero-margins.docx",
+      "docxSha256": "f5e5eb46846e61c16cdd3f5dca7e718adf027f40935a3f89082a8f7fbe5fbcdc",
+      "pdf": {
+        "path": "libreoffice/zero-margins.pdf",
+        "sha256": "bbc643b0b5caaf7511328417cf3ea85b6f5e400f104a030f0506eceb82b7f6d9"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/zero-margins.docx",
+        "sha256": "abaefe5f58ce8eecc8813b703a3880bdad9731839c4be3c59a4ceb59f2bc9c45"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/zero-margins.pdf",
+        "sha256": "37b39d70666d9ee2b4e6d2f5ca18e2f2e2a0e3c0738b3755528ab43f722f4c55"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "11906",
+              "h": "16838"
+            },
+            "margins": {
+              "top": "0",
+              "right": "0",
+              "bottom": "0",
+              "left": "0",
+              "header": "0",
+              "footer": "0",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "width": 595.3,
+              "height": 841.9,
+              "marginTop": 0.0,
+              "marginRight": 0.0,
+              "marginBottom": 0.0,
+              "marginLeft": 0.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 595.3,
+        "height": 841.9,
+        "marginTop": 0.0,
+        "marginRight": 0.0,
+        "marginBottom": 0.0,
+        "marginLeft": 0.0,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 595.3,
+        "height": 841.9,
+        "marginTop": 0.0,
+        "marginRight": 0.0,
+        "marginBottom": 0.0,
+        "marginLeft": 0.0,
+        "orientation": "portrait"
+      },
+      "roundtrip": false
+    },
+    {
+      "name": "header-footer-distances",
+      "source": "source/header-footer-distances.docx",
+      "sourceSha256": "af94af0df07c24c906a67f9a3fed76fa604e185c9b8aa8fe66e13ef4ffc43856",
+      "docx": "libreoffice/header-footer-distances.docx",
+      "docxSha256": "5310d99a6772bf31b0748a2e80be3fc4d8511715e6389416b49db2aaa3455c04",
+      "pdf": {
+        "path": "libreoffice/header-footer-distances.pdf",
+        "sha256": "504c02dbd0c1b0f4174caee074371be8183b2dd5f924a58f8f98b2231f9348ce"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/header-footer-distances.docx",
+        "sha256": "7aca2a39345e98e331158f78d669fb4727f27cb536079bada5f59b2f9c7ea379"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/header-footer-distances.pdf",
+        "sha256": "f0b49cdac87ca58f2ad4b70e698fbd01c7b7e0d712a8027faa885c433a401c6f"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "11906",
+              "h": "16838"
+            },
+            "margins": {
+              "top": "1440",
+              "right": "1440",
+              "bottom": "1440",
+              "left": "1440",
+              "header": "5000",
+              "footer": "4000",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "width": 595.3,
+              "height": 841.9,
+              "marginTop": 72.0,
+              "marginRight": 72.0,
+              "marginBottom": 72.0,
+              "marginLeft": 72.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 595.3,
+        "height": 841.9,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 595.3,
+        "height": 841.9,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "roundtrip": false
+    },
+    {
+      "name": "a5",
+      "source": "source/a5.docx",
+      "sourceSha256": "c49638e30c43addd4dff2935190cb8f58a5400949ca067f9a631d9e577b8e8f4",
+      "docx": "libreoffice/a5.docx",
+      "docxSha256": "00c48b1e6203f70ea826ccf694a8d34ba0ffc13cb2081d926869a61dc253fedf",
+      "pdf": {
+        "path": "libreoffice/a5.pdf",
+        "sha256": "176a3dbdf75df3ee29d1120dbc8578fc3b100197854f9d5cae3fd9d7eb3c9616"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/a5.docx",
+        "sha256": "196062068662f642ab67ee6252a027471dfda600ce744f9e0bada29e8a9d155e"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/a5.pdf",
+        "sha256": "00fe308a3b32bb63bcd55bc9ef24851d7b36e0652c72cea10dee532c1f88a349"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "8391",
+              "h": "11906"
+            },
+            "margins": {
+              "top": "1440",
+              "right": "1440",
+              "bottom": "1440",
+              "left": "1440",
+              "header": "720",
+              "footer": "720",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "width": 419.55,
+              "height": 595.3,
+              "marginTop": 72.0,
+              "marginRight": 72.0,
+              "marginBottom": 72.0,
+              "marginLeft": 72.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 419.55,
+        "height": 595.3,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 419.55,
+        "height": 595.3,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "roundtrip": false
+    },
+    {
+      "name": "letter",
+      "source": "source/letter.docx",
+      "sourceSha256": "a66d686bef9fee8881ff3614322c9230d4e7204a2d88df2e3f0a2238a7a0ceaa",
+      "docx": "libreoffice/letter.docx",
+      "docxSha256": "4606f453dcf22c276c680a62b88f3ad2a921e171f9a73a9b810d93049010225f",
+      "pdf": {
+        "path": "libreoffice/letter.pdf",
+        "sha256": "ddbffba741f0fd4224c49d880993b0b92e8c60ecd6b82085f3eec5ecd7255290"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/letter.docx",
+        "sha256": "7125e0614ecccb465dc6da32177218319e80970d0d3721be5fdb7074db12c2a7"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/letter.pdf",
+        "sha256": "d4fc87cbd81d0a302f7fa9a2957d7289adeff9f173e70bea7ab54654a7fd0372"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "12240",
+              "h": "15840"
+            },
+            "margins": {
+              "top": "1440",
+              "right": "1440",
+              "bottom": "1440",
+              "left": "1440",
+              "header": "720",
+              "footer": "720",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "width": 612.0,
+              "height": 792.0,
+              "marginTop": 72.0,
+              "marginRight": 72.0,
+              "marginBottom": 72.0,
+              "marginLeft": 72.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 612.0,
+        "height": 792.0,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 612.0,
+        "height": 792.0,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "roundtrip": false
+    },
+    {
+      "name": "legal",
+      "source": "source/legal.docx",
+      "sourceSha256": "b889e0afd4789cc27c137930b31f73896c8077ad630629caa4ab1b1acf156415",
+      "docx": "libreoffice/legal.docx",
+      "docxSha256": "01a5efc67e56fbb340fd5543544d3499222827f45c0abe0a08780a9bfee33037",
+      "pdf": {
+        "path": "libreoffice/legal.pdf",
+        "sha256": "d3a0f2338476d6814af7c2d2344d5aecc3ebc53a5915eb6b57ae2fc060463d38"
+      },
+      "secondDocx": {
+        "path": "libreoffice-second/legal.docx",
+        "sha256": "af1d18815c9a2bcbf81ebb3c23df4cebbfd4f9d11838e8b47e6881fc861f34d4"
+      },
+      "secondPdf": {
+        "path": "libreoffice-second/legal.pdf",
+        "sha256": "9fba92c53936d78f4d5ccead21558fa9c22329ea13656740c2a35604ad50f029"
+      },
+      "sourceInspection": {
+        "sections": [
+          {
+            "location": "body",
+            "size": {
+              "w": "12240",
+              "h": "20160"
+            },
+            "margins": {
+              "top": "1440",
+              "right": "1440",
+              "bottom": "1440",
+              "left": "1440",
+              "header": "720",
+              "footer": "720",
+              "gutter": "0"
+            },
+            "explicitPoints": {
+              "width": 612.0,
+              "height": 1008.0,
+              "marginTop": 72.0,
+              "marginRight": 72.0,
+              "marginBottom": 72.0,
+              "marginLeft": 72.0
+            },
+            "otherProperties": []
+          }
+        ],
+        "paragraphs": [
+          "PAGE"
+        ],
+        "zipEntries": 11
+      },
+      "sourceExpected": {
+        "width": 612.0,
+        "height": 1008.0,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "expected": {
+        "width": 612.0,
+        "height": 1008.0,
+        "marginTop": 72.0,
+        "marginRight": 72.0,
+        "marginBottom": 72.0,
+        "marginLeft": 72.0,
+        "orientation": "portrait"
+      },
+      "roundtrip": false
+    },
+    {
+      "name": "gutter-positive",
+      "source": "source/gutter-positive.docx",
+      "sourceSha256": "5d15f94586417f7957d594e4a58ef0373982f891a10d784508ba9b4c01086a3e",
+      "docx": "source/gutter-positive.docx",
+      "docxSha256": "5d15f94586417f7957d594e4a58ef0373982f891a10d784508ba9b4c01086a3e",
+      "expectUnsupported": true,
+      "reason": "Nonzero gutter is outside the supported page subset."
+    },
+    {
+      "name": "negative-top",
+      "source": "source/negative-top.docx",
+      "sourceSha256": "6159a7bff2c5cd29ed1ea745aa6db56a5aeed422465069b403f0384494d57aaa",
+      "docx": "source/negative-top.docx",
+      "docxSha256": "6159a7bff2c5cd29ed1ea745aa6db56a5aeed422465069b403f0384494d57aaa",
+      "expectUnsupported": true,
+      "reason": "Negative margins are outside the supported page subset; the native-repaired output is retained in research."
+    },
+    {
+      "name": "occupied-margins",
+      "source": "source/occupied-margins.docx",
+      "sourceSha256": "f8f0ae5177632262158fffe167ca05f569678a72d366b8dac481f0a561cb87d9",
+      "docx": "source/occupied-margins.docx",
+      "docxSha256": "f8f0ae5177632262158fffe167ca05f569678a72d366b8dac481f0a561cb87d9",
+      "expectUnsupported": true,
+      "reason": "Margins must leave positive body width and height."
+    },
+    {
+      "name": "paper-drift-5965",
+      "source": "source/paper-drift-5965.docx",
+      "sourceSha256": "fd0144652580467aab2def4bbfa958bb1efb702197c3e6e076ad84ce5d78939c",
+      "docx": "source/paper-drift-5965.docx",
+      "docxSha256": "fd0144652580467aab2def4bbfa958bb1efb702197c3e6e076ad84ce5d78939c",
+      "expectUnsupported": true,
+      "reason": "The original raw dimension changes again after native DOCX reopening; the stable import/edit subset rejects it atomically."
+    },
+    {
+      "name": "paper-drift-6488",
+      "source": "source/paper-drift-6488.docx",
+      "sourceSha256": "9a5803a7d45aef95e7ea11fe177514d791b93ace31ca9ca904fbfa9637698744",
+      "docx": "source/paper-drift-6488.docx",
+      "docxSha256": "9a5803a7d45aef95e7ea11fe177514d791b93ace31ca9ca904fbfa9637698744",
+      "expectUnsupported": true,
+      "reason": "The original raw dimension changes again after native DOCX reopening; the stable import/edit subset rejects it atomically."
+    },
+    {
+      "name": "paper-drift-7896",
+      "source": "source/paper-drift-7896.docx",
+      "sourceSha256": "4df9188a698735343802c79c56c60ac96a3eb9f1e242e9adf02c3ad0bcd7e180",
+      "docx": "source/paper-drift-7896.docx",
+      "docxSha256": "4df9188a698735343802c79c56c60ac96a3eb9f1e242e9adf02c3ad0bcd7e180",
+      "expectUnsupported": true,
+      "reason": "The original raw dimension changes again after native DOCX reopening; the stable import/edit subset rejects it atomically."
+    },
+    {
+      "name": "paper-drift-10407",
+      "source": "source/paper-drift-10407.docx",
+      "sourceSha256": "4778b700d78b9a28c68746e3012e67bb0f364fe318500522e56760147ecafe2b",
+      "docx": "source/paper-drift-10407.docx",
+      "docxSha256": "4778b700d78b9a28c68746e3012e67bb0f364fe318500522e56760147ecafe2b",
+      "expectUnsupported": true,
+      "reason": "The original raw dimension changes again after native DOCX reopening; the stable import/edit subset rejects it atomically."
+    },
+    {
+      "name": "paper-drift-12936",
+      "source": "source/paper-drift-12936.docx",
+      "sourceSha256": "8878d9fcde3c173bd68e2e27af07434d5bb7f238dcdfc140a8cfe8fa1c0c8506",
+      "docx": "source/paper-drift-12936.docx",
+      "docxSha256": "8878d9fcde3c173bd68e2e27af07434d5bb7f238dcdfc140a8cfe8fa1c0c8506",
+      "expectUnsupported": true,
+      "reason": "The original raw dimension changes again after native DOCX reopening; the stable import/edit subset rejects it atomically."
+    },
+    {
+      "name": "paper-drift-17256",
+      "source": "source/paper-drift-17256.docx",
+      "sourceSha256": "2ffe8f3eb3173cc2a400925547258729aed2da551694b3a73762a80b20faaa60",
+      "docx": "source/paper-drift-17256.docx",
+      "docxSha256": "2ffe8f3eb3173cc2a400925547258729aed2da551694b3a73762a80b20faaa60",
+      "expectUnsupported": true,
+      "reason": "The original raw dimension changes again after native DOCX reopening; the stable import/edit subset rejects it atomically."
+    },
+    {
+      "name": "paper-drift-18684",
+      "source": "source/paper-drift-18684.docx",
+      "sourceSha256": "0951a7ff15ffef51312a2d395b6d684ac5fc4bd1810c07f624385d4310ec2be4",
+      "docx": "source/paper-drift-18684.docx",
+      "docxSha256": "0951a7ff15ffef51312a2d395b6d684ac5fc4bd1810c07f624385d4310ec2be4",
+      "expectUnsupported": true,
+      "reason": "The original raw dimension changes again after native DOCX reopening; the stable import/edit subset rejects it atomically."
+    },
+    {
+      "name": "paper-drift-20185",
+      "source": "source/paper-drift-20185.docx",
+      "sourceSha256": "d85a62a0d68bb5ff5d1e38373b18d36a6ba3f7193756f7c21d775dcebdeac9a6",
+      "docx": "source/paper-drift-20185.docx",
+      "docxSha256": "d85a62a0d68bb5ff5d1e38373b18d36a6ba3f7193756f7c21d775dcebdeac9a6",
+      "expectUnsupported": true,
+      "reason": "The original raw dimension changes again after native DOCX reopening; the stable import/edit subset rejects it atomically."
+    }
+  ],
+  "presets": {
+    "a4": {
+      "width": 595.3,
+      "height": 841.9
+    },
+    "a5": {
+      "width": 419.55,
+      "height": 595.3
+    },
+    "letter": {
+      "width": 612.0,
+      "height": 792.0
+    },
+    "legal": {
+      "width": 612.0,
+      "height": 1008.0
+    }
+  }
+}

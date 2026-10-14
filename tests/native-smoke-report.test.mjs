@@ -1,13 +1,42 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { validateFrontendReport } from '../scripts/native-smoke.mjs';
+import { REQUIRED_CHECKS } from '../scripts/word-package-native-smoke.mjs';
 
 // These fixtures test the release report contract, not Office functionality.
 // The native CI separately runs the actual packaged GUI and real file round trips.
+function wordPackageReport() {
+  const suffix = '\n上标中文😀下标中文😀\n明确取消中文😀取消高亮保留背景';
+  return {
+    schemaVersion: 1, kind: 'word-package-ipc', ok: true,
+    userAgent: 'Native WebView contract test', elapsedMs: 125,
+    checks: [...REQUIRED_CHECKS],
+    roundTrips: [
+      { docxBytes: 5000, text: '原文中文😀' + suffix },
+      { docxBytes: 5100, text: '第二次保存中文😀 SECOND_SAVE_TOKEN' + suffix },
+    ],
+    formats: [
+      { text: '上标中文😀', style: { fontSize: 18, underline: true, strike: 'double', verticalAlign: 'superscript', highlight: 'yellow', backgroundColor: '#13579B' } },
+      { text: '下标中文😀', style: { fontSize: 14, strike: 'single', verticalAlign: 'subscript', highlight: 'cyan', backgroundColor: '#ABCDEF' } },
+      { text: '明确取消中文😀', style: { fontSize: 18, strike: 'none', verticalAlign: 'baseline', highlight: 'none', backgroundColor: 'none' },
+        directStyle: { strike: 'none', verticalAlign: 'baseline', highlight: 'none', backgroundColor: 'none' } },
+      { text: '取消高亮保留背景', style: { fontSize: 18, strike: 'double', verticalAlign: 'superscript', highlight: 'none', backgroundColor: '#FEDCBA' } },
+    ],
+    rejections: [
+      ['native-read-invalid-base64-rejected', 'DOCX ZIP Base64 编码无效。'],
+      ['native-read-invalid-zip-rejected', 'DOCX 文件为空、损坏或超过 16 MiB。'],
+      ['native-write-invalid-base64-rejected', 'DOCX ZIP 内容 Base64 编码无效。'],
+      ['native-write-unsafe-name-rejected', 'DOCX 包含越界或保留的 ZIP 路径。'],
+      ['native-write-duplicate-name-rejected', 'DOCX ZIP 包含重复或大小写歧义的文件。'],
+    ].map(([check, error]) => ({ check, error })),
+    resources: { observed: 7, forbidden: [], observation: 'Resource Timing entries since navigation; before Office mounting.' },
+  };
+}
 function completeReport() {
   return {
     ok: true, crossOriginIsolated: true, sharedArrayBuffer: true,
     userAgent: 'Native WebView contract test',
+    independentWordPackage: wordPackageReport(),
     office: {
       ok: true, engine: 'ZetaOffice / LibreOffice 24.2.8.0',
       writer: {
@@ -54,10 +83,43 @@ function completeReport() {
 test('a complete four-workspace report preserves old checks and requires Impress round trips', () => {
   const checks = validateFrontendReport(completeReport());
   for (const required of [
+    'independentWordPackageIpc',
     'writerOriginalTextRoundTrip', 'writerPdfExport', 'calcFormulaRoundTrip', 'calcPdfExport',
     'pdfOriginalTextReplacementRoundTrip', 'impressOriginalTextRoundTrip', 'impressOdpRoundTrip',
     'impressPdfExport', 'impressPdfPageCount',
   ]) assert.equal(checks[required], true);
+});
+
+test('full release smoke cannot pass without the independent Word native package report', () => {
+  for (const value of [undefined, null, {}, { ok: true }, { ...wordPackageReport(), ok: false, error: 'Rust package failed' }]) {
+    const report = completeReport(); report.independentWordPackage = value;
+    assert.throws(() => validateFrontendReport(report));
+  }
+  const report = completeReport(); delete report.independentWordPackage;
+  assert.throws(() => validateFrontendReport(report), /Independent Word native IPC report is missing/);
+});
+
+test('native IPC success flags cannot substitute for both reopenings, semantic readback and Rust validation errors', () => {
+  for (const mutate of [
+    word => { word.schemaVersion = 0; }, word => { word.kind = 'browser-word'; },
+    word => { word.checks.pop(); }, word => { word.checks.push(word.checks[0]); },
+    word => { word.checks.reverse(); }, word => { word.userAgent = ''; }, word => { word.elapsedMs = -1; },
+    word => { word.roundTrips.pop(); }, word => { word.roundTrips[1].text = word.roundTrips[0].text; },
+    word => { word.roundTrips[0].text = word.roundTrips[0].text.replace('😀', ''); },
+    word => { word.roundTrips[1].docxBytes = 100; }, word => { word.roundTrips[1].docxBytes = '5100'; },
+    word => { word.formats.pop(); }, word => { word.formats[0].style.verticalAlign = 'baseline'; },
+    word => { word.formats[1].style.backgroundColor = '#000000'; },
+    word => { delete word.formats[2].directStyle.highlight; }, word => { word.formats[3].style.highlight = 'yellow'; },
+    word => { word.rejections.pop(); }, word => { word.rejections[0].error = 'command not allowed'; },
+    word => { word.rejections[4].check = word.rejections[0].check; },
+    word => { word.resources.observed = 0; }, word => { word.resources.observed = '7'; },
+    word => { word.resources.forbidden = ['/office/host.html']; },
+    word => { word.resources.forbidden = ['/office-runtime/soffice.wasm']; },
+    word => { delete word.resources.observation; },
+  ]) {
+    const report = completeReport(); mutate(report.independentWordPackage);
+    assert.throws(() => validateFrontendReport(report));
+  }
 });
 
 test('an old Word/Excel/PDF-only success report cannot publish the PPT-capable app', () => {

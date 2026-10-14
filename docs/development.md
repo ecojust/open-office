@@ -46,9 +46,77 @@ npm run test:browser:ppt-independent
 
 `test:browser:ppt-independent` 使用完整 Vue 应用验证新的独立演示工作区，检查真实 PPTX/PDF 下载、重新打开与界面操作，并确认没有加载旧办公引擎。`ppt-workbench`、`impress` 等旧测试保留为历史引擎的回归入口，不作为当前 PPT 路由的验收证据。
 
+独立文字编辑器的验证入口：
+
+```bash
+cargo test --locked --manifest-path crates/word-package/Cargo.toml
+cargo build --locked --manifest-path crates/word-package/Cargo.toml --bin word-package-cli
+npm run test:browser:word-codec
+npm run test:browser:word-rust
+npm run test:browser:word-independent
+npm run test:browser:word-libreoffice
+npm run test:browser:word-indentation
+npm run test:browser:word-character-format
+npm run test:browser:word-highlight
+npm run test:browser:word-background
+npm run test:browser:word-underline
+npm run test:browser:word-underline-color
+npm run test:browser:word-baseline-offset
+npm run test:browser:word-paragraph-spacing
+npm run test:browser:word-page-settings
+npm run test:browser:word-marker
+npm run test:browser:word-spacing
+npm run test:browser:word-case
+npm run test:browser:word-kerning
+npm run test:browser:word-import-performance
+```
+
+`word-codec`、`word-rust`、`word-indentation`、`word-character-format`、`word-highlight`、`word-background`、`word-underline`、`word-marker`、`word-spacing` 和 `word-import-performance` 自行启动临时 Vite；`word-independent`、`word-libreoffice` 需要已运行的 `npm run dev`。`word-libreoffice`、`word-indentation`、`word-character-format`、`word-highlight`、`word-background`、`word-underline`、`word-marker` 和 `word-spacing` 还需要原生 `soffice`，可用 `SOFFICE` 指定路径。`word-rust` 使用真实 Rust CLI 与浏览器中的 OOXML 编解码器，通过受控传输验证桌面分支，不替代打包后的 Tauri IPC 测试；若使用自定义 Cargo 输出目录，设置 `WORD_PACKAGE_CLI`。段落标记专项分别校验 `w:pPr/w:rPr` 与正文格式，覆盖空段格式、显式取消和受支持的字符样式引用；旧版仅含空文字片段格式的文档兼容读入，导出时写入真实段落标记。样式定义及 `docDefaults` 内的非空 `pPr/rPr` 继续拒绝。详细范围见[独立文字编辑器](independent-word.md)。
+
+`word-spacing` 校验 ±20 磅字符间距的继承、显式零、空段、换段及负值显示下限，并使用完整原生语料和独立 Python XML 检查器核对产品导出与 LibreOffice 重存。原生输出中的其他不支持布局继续作为负例保留，不为通过测试删改输出 XML。可用 `WORD_SPACING_OUTPUT` 指定报告目录。
+
+`word-case` 验证全部大写、小型大写与显式取消的 DOCX 往返、样式来源、原文及 UTF-16 选区、工具栏和原生 LibreOffice 对照。它自行启动临时 Vite 与 Chromium，需要原生 `soffice`；原生包保留完整字节，以独立检查器核对格式与文字。小型大写的视觉回退检查还需要 DejaVu Sans、`fc-match` 和 Python FontTools。可用 `WORD_CASE_OUTPUT` 指定独立结果目录，保留不同版本的报告。
+
+`word-kerning` 对照 Writer 的字偶距开关行为，分别检查原始 OOXML 数值与显示效果；原生重存会将非零值统一为 2。专项覆盖真实字距面板、独立草稿、一次撤销、字号变化、正文与段落标记及原生按键语料。它自行启动 Vite 与 Chromium，需要原生 `soffice`；视觉检查还需要 Liberation Serif、`fc-match` 和 Python FontTools。用 `WORD_KERNING_OUTPUT` 指定结果目录。
+
+`word-underline-color` 检查独立 RGB 下划线和跟随文字颜色，覆盖完整原生文件、样式继承、正文／空段标记、真实按键、菜单草稿、撤销重做及截图中的线条颜色。它自行启动 Vite 与 Chromium，需要原生 `soffice`；像素检查使用 Python Pillow。用 `WORD_UNDERLINE_COLOR_OUTPUT` 指定结果目录。显式 OOXML `color="auto"` 与内部跟随文字状态分别处理，前者仍作为不支持的输入拒绝。
+
+`word-baseline-offset` 对照 Writer 的自定义基线偏移，检查半磅导入、整数百分比、改变字号后的保存取整、空段和实际格式命令的继续输入行为。它自行启动 Vite 与 Chromium，需要原生 `soffice`；测试使用完整 DOCX 原件和独立 XML 检查器，字体度量检查限于已验证的字体与当前环境，不代表原生分页一致。报告路径及运行参数见[专项语料说明](../tests/compatibility/independent-word-baseline-offset/README.md)。
+
+`word-paragraph-spacing` 检查倍数／固定值／最小值行距、段前／段后间距、默认与样式继承、真实编辑控件和换段／合段。它自行启动 Vite 与 Chromium，并调用原生 `soffice` 重存应用输出；独立 Python 检查器读取完整 ZIP/XML 与 PDF。倍数范围采用已验证的连续稳定子集，拒绝规则缺少数值及范围外输入。可用 `WORD_PARAGRAPH_SPACING_OUTPUT` 指定结果目录，详细来源与限制见[段落间距语料](../tests/compatibility/independent-word-paragraph-spacing/README.md)。
+
+`word-page-settings` 检查单节纸张尺寸、独立方向标记、四边页边距与逐字段缺省值，覆盖实际页面面板、选区和撤销恢复、完整文件保存与原生重存。测试自行启动 Vite、Chromium 和独立配置目录下的 `soffice`，Python ZIP/XML 与 PDF 检查器分别核对文件属性和页面尺寸；不将连续正文预览当作分页验证。用 `WORD_PAGE_SETTINGS_OUTPUT` 指定结果目录，见[页面设置语料](../tests/compatibility/independent-word-page-settings/README.md)。
+
+`word-import-performance` 在真实 Chromium 中统计每次导入的 XML／关系解析次数，验证 App 将预检通过的模型一次性交给编辑器，并检查 CRC、损坏输入和跨次导入数据修改。它是减少重复工作的正确性检查，解析次数不代表完整打开耗时。独立的前后耗时测量与复现命令见[DOCX 导入性能对照](word-import-performance.md)；运行正式测量时应暂停其他浏览器测试和编译。
+
+Linux 开发环境可单独验证真实 Tauri/WebKitGTK 的 Word 包读写：
+
+```bash
+npm exec vite -- build
+cargo build --locked --manifest-path src-tauri/Cargo.toml
+npm run test:native:word-package -- --executable "$PWD/src-tauri/target/debug/open-office"
+```
+
+需要 GTK/WebKitGTK 与可用的显示会话（无桌面时使用 Xvfb）。脚本自行开启 `OPEN_OFFICE_SMOKE=1` 和 `OPEN_OFFICE_SMOKE_SCOPE=word-package-ipc`，隔离应用数据目录，并校验本次进程的结果及退出状态。此范围使用内存中的 DOCX，覆盖真实 IPC 的两轮保存重开、文字格式和无效包拒绝；不打开文件对话框或 Office 引擎。缺省 smoke scope 仍是完整原生验证。Linux 开发测试不替代 Windows/macOS 安装包的 `scripts/native-smoke.mjs` 验证，也不是端到端性能基准。
+
+仅将 WebKit 动态库加入 `LD_LIBRARY_PATH` 可能仍无法启动：发行版 WebKitGTK 会从固定系统路径寻找 `WebKitNetworkProcess` 和 `WebKitWebProcess`，需要完整运行依赖。本次环境即因缺少该路径下的进程文件而在窗口创建前退出，尚未通过此原生 IPC 检查。
+
+后续只读诊断确认：现有 WebKitGTK 2.52.6 release 仅在开发模式构建中支持 `WEBKIT_EXEC_PATH`（[对应源码](https://github.com/WebKit/WebKit/blob/webkitgtk-2.52.6/Source/WebKit/Shared/glib/ProcessExecutablePathGLib.cpp)）。工具链目录已有 helper 与依赖，但当前环境的 `bwrap` 路径映射探针因 uid-map 只读失败，且遗留 X11 socket 没有对应显示服务。此次没有重新启动实际 IPC 测试，也未修改系统文件或应用二进制；诊断记录位于 `test-results/word-package-native-followup/diagnostic.json`。
+
+DOCX 包处理性能诊断使用优化构建，并分别记录核心、base64、JSON 与子进程传输成本：
+
+```bash
+cargo build --release --locked --manifest-path crates/word-package/Cargo.toml --bins
+node scripts/benchmark-word-package.cjs
+```
+
+脚本自行启动临时服务，使用原始 LibreOffice 小文件及 100／1,000／4,000 段合成正文；运行时应暂停其他浏览器测试和编译。此项不测真实 Tauri IPC 或整份文稿的打开、保存时间。参见[测量范围和结果](word-package-performance.md)。
+
 桌面发布工作流仅由 `workflow_dispatch` 触发。选择 `platform=all` 与 `publish=true`，三种安装包通过构建及应用内自检后，才发布测试版；源码推送本身不会自动发布。
 
 发布检查包括实际启动、文档编辑、保存重开与 PDF 独立回读。Windows x64 与 macOS ARM64 使用对应平台的真实应用；Intel 安装包原生编译后，将原封 DMG 转移到 ARM Mac，通过 Rosetta 验证 x64 应用和 PDF 进程。搬运前后校验安装包、应用文件、链接与签名，不重新构建或签名。该检查不等同于真实 Intel 显卡测试。
+
+从 0.6.0 起，完整安装包自检在加载 Office 引擎前，先执行独立 Word 的真实 Rust IPC 两轮读写、格式保留及无效输入拒绝检查，并将结果保存到 `frontend.independentWordPackage`。报告缺失、失败或内容不完整均阻止发布；随后继续执行原有工作区检查。该模块验证不包含轻量编辑器的原生文件对话框或全部 UI 操作。独立 `word-package` crate 的单元测试也在各构建平台单独运行。
 
 构建版本采用北京时间 `YYYY.MMDD.HHmm`，可通过 `OFFICE_BUILD_VERSION` 固定。每份安装包以对应 Actions 记录和提交为准。
 
@@ -59,6 +127,8 @@ npm run test:browser:ppt-independent
 src/                    Vue 外壳、原生文件桥、PDF 工作室
 src/office/             办公内核消息桥与类型
 src/presentation/core/  独立 PPT 文档模型、SVG/PDF 绘制、PPTX 导入导出
+src/word/core/          独立正文模型、输入适配、OOXML 编解码与运行时桥
+crates/word-package/    独立 Rust ZIP/CRC 核心及互通测试 CLI
 public/office/          独立办公内核宿主与线程适配
 public/office-runtime/  校验后下载的 WASM、数据与字体（不入 Git）
 public/legal/           随应用分发的许可文本

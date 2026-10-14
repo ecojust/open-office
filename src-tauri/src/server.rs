@@ -28,6 +28,8 @@ pub struct Bootstrap {
     pub runtime_base_url: String,
     pub platform: String,
     pub smoke_mode: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub smoke_scope: Option<&'static str>,
 }
 
 pub struct AssetServer {
@@ -74,6 +76,7 @@ impl AssetServer {
             base_path,
             platform: std::env::consts::OS.into(),
             smoke_mode: smoke.is_some(),
+            smoke_scope: smoke.as_ref().map(Smoke::scope),
         };
         let assets = Assets {
             root,
@@ -867,6 +870,7 @@ mod tests {
             runtime_base_url: String::new(),
             platform: "test".into(),
             smoke_mode: false,
+            smoke_scope: None,
         };
         assert!(AssetServer::allows_navigation(
             &info,

@@ -12,6 +12,7 @@ pub const REPORT_LIMIT: usize = 1024 * 1024;
 #[derive(Clone)]
 pub struct Smoke {
     output: PathBuf,
+    scope: &'static str,
     started: Instant,
     events: Arc<Mutex<Vec<Value>>>,
     failure: Arc<dyn Fn() + Send + Sync>,
@@ -31,16 +32,24 @@ impl Smoke {
         if !output.is_absolute() {
             return Err("Smoke output must be an absolute path.".into());
         }
-        Ok(Some(Self::new(output, failure)))
+        let scope = parse_scope(std::env::var("OPEN_OFFICE_SMOKE_SCOPE").ok().as_deref())?;
+        let mut smoke = Self::new(output, failure);
+        smoke.scope = scope;
+        Ok(Some(smoke))
     }
 
     pub(crate) fn new(output: PathBuf, failure: impl Fn() + Send + Sync + 'static) -> Self {
         Self {
             output,
+            scope: "full",
             started: Instant::now(),
             events: Arc::new(Mutex::new(vec![])),
             failure: Arc::new(failure),
         }
+    }
+
+    pub fn scope(&self) -> &'static str {
+        self.scope
     }
 
     pub fn note(&self, phase: &str, detail: &str) {
@@ -96,6 +105,14 @@ impl Smoke {
     }
 }
 
+fn parse_scope(value: Option<&str>) -> Result<&'static str, String> {
+    match value {
+        None | Some("full") => Ok("full"),
+        Some("word-package-ipc") => Ok("word-package-ipc"),
+        _ => Err("Unknown OPEN_OFFICE_SMOKE_SCOPE.".into()),
+    }
+}
+
 fn atomic_write(output: &Path, data: &[u8]) -> Result<(), String> {
     let parent = output.parent().ok_or("Invalid smoke output directory.")?;
     std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -128,6 +145,17 @@ pub fn initialization_script(base_url: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn smoke_scope_defaults_to_full_and_rejects_unknown_values() {
+        assert_eq!(parse_scope(None).unwrap(), "full");
+        assert_eq!(parse_scope(Some("full")).unwrap(), "full");
+        assert_eq!(
+            parse_scope(Some("word-package-ipc")).unwrap(),
+            "word-package-ipc"
+        );
+        assert!(parse_scope(Some("")).is_err());
+        assert!(parse_scope(Some("word")).is_err());
+    }
     #[test]
     fn http_fallback_cannot_turn_a_failed_ipc_check_into_a_pass() {
         let directory = tempfile::tempdir().unwrap();

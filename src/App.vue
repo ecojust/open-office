@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { invoke } from '@tauri-apps/api/core'
 import Icon from './components/Icon.vue'
 import OfficeEditor from './components/OfficeEditor.vue'
+import StandaloneWordEditor from './components/StandaloneWordEditor.vue'
 import PdfEditor from './components/PdfEditor.vue'
 import SlidePreview from './components/SlidePreview.vue'
 import StandalonePresentationEditor from './components/StandalonePresentationEditor.vue'
@@ -18,9 +19,10 @@ import type { NativeDocument, RecentDocument } from './types'
 import type { OfficeDocument } from './office/types'
 import { reviewOfficeImport } from './office/import-review'
 import { useDialogFocus } from './shared/dialog-focus'
+import { prepareWordDocument, type PreparedWordDocument } from './word/core/prepared'
 import { bytesToBase64, base64ToBytes, extensionOf, kindOf, withExtension, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFormats, saveFileName, type SaveExtension, type Kind, type Extension, type EditorHandle } from './shared/document'
 
-interface Tab { key: string; document: NativeDocument; fileId?: string; requiresSaveAs?: boolean; importWarnings?:string[]; dirty: boolean; ready: boolean; loadError?: string }
+interface Tab { key: string; document: NativeDocument; wordEngine?: 'independent'; fileId?: string; requiresSaveAs?: boolean; importWarnings?:string[]; dirty: boolean; ready: boolean; loadError?: string }
 const appVersion = __APP_VERSION__
 const buildVersion = __BUILD_VERSION__
 const brandIcon = new URL('./favicon.svg', document.baseURI).href
@@ -43,6 +45,17 @@ onMounted(() => {
 })
 onBeforeUnmount(() => tabBarObserver?.disconnect())
 const active = computed(() => tabs.value.find(t => t.key === activeKey.value))
+const activeIndependentWord = computed(() => active.value?.document.kind === 'word' && active.value.wordEngine === 'independent')
+const independentWordDocument = shallowRef<NativeDocument>()
+const independentWordPrepared = shallowRef<PreparedWordDocument>()
+let appDisposed = false
+function setIndependentWordDocument(document?: NativeDocument, prepared?: PreparedWordDocument) {
+  independentWordPrepared.value?.discard()
+  independentWordPrepared.value = prepared
+  independentWordDocument.value = document
+}
+onBeforeUnmount(() => { appDisposed = true; setIndependentWordDocument() })
+const independentWordEditor = ref<EditorHandle>()
 const officeDocument = shallowRef<OfficeDocument>(), pdfDocument = shallowRef<NativeDocument>(), presentationDocument = shallowRef<NativeDocument>()
 const officeEditor = ref<EditorHandle & { insertImage?(image: {name:string;base64:string}):Promise<void>; newSlide?():Promise<unknown>; smokeTest?():Promise<unknown>; getPresentationState?():Promise<PresentationState>; presentationObjectData?(query:{type:'table'|'chart';id:string}):Promise<unknown>; presentationAction?(action:PresentationAction):Promise<PresentationState>; presentationEdit?(patch:PresentationPatch):Promise<void>; getWriterState?():Promise<WriterState>; writerAction?(action:WriterAction):Promise<WriterState>; writerCommand?(command:WriterCommand):Promise<WriterState>; writerData?(query:WriterQuery):Promise<unknown>; getCalcState?():Promise<CalcState>; calcAction?(action:CalcAction):Promise<CalcState>; calcData?(query:CalcDataQuery):Promise<unknown> }>()
 type PresentationPatch = Omit<Parameters<typeof patchPptxPackage>[1]['slides'][number], 'slideIndex'>
@@ -62,7 +75,7 @@ type WorkbenchDrafts<T> = {hasPendingEdits():boolean;assertNoPendingEdits():void
 const wordWorkbench = ref<WorkbenchDrafts<WriterState>>(), sheetWorkbench = ref<WorkbenchDrafts<CalcState>>()
 const writerState = shallowRef<WriterState | null>(null), calcState = shallowRef<CalcState | null>(null)
 function assertWorkbenchDrafts() {
-  if(active.value?.document.kind==='word')wordWorkbench.value?.assertNoPendingEdits()
+  if(active.value?.document.kind==='word'&&!activeIndependentWord.value)wordWorkbench.value?.assertNoPendingEdits()
   if(active.value?.document.kind==='sheet')sheetWorkbench.value?.assertNoPendingEdits()
   if(active.value?.document.kind!=='presentation')return
   presentationEditor.value?.assertNoPendingEdits()
@@ -76,17 +89,22 @@ const recents = ref<RecentDocument[]>([]), busy = ref(''), error = ref(''), stat
 const help = ref(false), search = ref(''), closeTarget = ref<Tab | 'window' | null>(null)
 const saveAsDraft = ref<{ key:string; kind:Kind; format:SaveExtension; name:string; error:string } | null>(null)
 const saveAsDialog = ref<HTMLElement>()
-const saveAsOptions = computed(() => saveAsDraft.value ? saveFormats(saveAsDraft.value.kind) : [])
+function formatsFor(tab:Tab | undefined) {
+  return !tab ? [] : tab.wordEngine==='independent'
+    ? [{extension:'docx' as const,title:'DOCX 文档',description:'保存当前正文和已支持的文字、段落格式'}]
+    : saveFormats(tab.document.kind)
+}
+const saveAsOptions = computed(() => formatsFor(tabs.value.find(tab=>tab.key===saveAsDraft.value?.key)))
 const saveAsCopy = computed(() => !!saveAsDraft.value&&!!active.value&&saveAsDraft.value.format!==defaultSaveExtension(active.value.document.extension))
 useDialogFocus(saveAsDialog)
 const helpDialog = ref<HTMLElement>(), closeDialog = ref<HTMLElement>()
 useDialogFocus(helpDialog)
 useDialogFocus(closeDialog)
-const fileInput = ref<HTMLInputElement>(), imageInput = ref<HTMLInputElement>()
+const fileInput = ref<HTMLInputElement>(), independentWordInput = ref<HTMLInputElement>(), imageInput = ref<HTMLInputElement>()
 let unlisten: (() => void) | undefined
 let pendingWindowClose = false
-const editor = () => active.value?.document.kind === 'pdf' ? pdfEditor.value : active.value?.document.kind === 'presentation' ? presentationEditor.value : officeEditor.value
-const imageEditor = () => active.value?.document.kind === 'presentation' ? presentationEditor.value : officeEditor.value
+const editor = () => activeIndependentWord.value ? independentWordEditor.value : active.value?.document.kind === 'pdf' ? pdfEditor.value : active.value?.document.kind === 'presentation' ? presentationEditor.value : officeEditor.value
+const imageEditor = () => activeIndependentWord.value ? undefined : active.value?.document.kind === 'presentation' ? presentationEditor.value : officeEditor.value
 const kindNames: Record<Kind,string> = { word:'文字文档', sheet:'电子表格', presentation:'演示文稿', pdf:'PDF 文档' }
 const icons: Record<Kind,string> = {word:'file',sheet:'sheet',presentation:'presentation',pdf:'pdf'}
 const filteredRecents = computed(() => recents.value.filter(r => r.name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase())))
@@ -174,11 +192,16 @@ async function stash() {
 }
 async function activate(tab:Tab) {
   if(activeKey.value!==tab.key) {
-    const reuseOffice=['word','sheet'].includes(tab.document.kind)&&officeDocument.value?.id===tab.key
+    const reuseOffice=!tab.wordEngine&&['word','sheet'].includes(tab.document.kind)&&officeDocument.value?.id===tab.key
+    const reuseIndependentWord=tab.wordEngine==='independent'&&independentWordDocument.value?.id===tab.key
     const reusePresentation=tab.document.kind==='presentation'&&presentationDocument.value?.id===tab.key
     await stash()
     activeKey.value=tab.key
-    if(tab.document.kind==='pdf') {tab.ready=false;tab.loadError=undefined;pdfDocument.value=tab.document}
+    if(tab.wordEngine==='independent') {
+      if(!reuseIndependentWord){tab.ready=false;tab.loadError=undefined}
+      setIndependentWordDocument(tab.document)
+    }
+    else if(tab.document.kind==='pdf') {tab.ready=false;tab.loadError=undefined;pdfDocument.value=tab.document}
     else if(tab.document.kind==='presentation') {
       if(!reusePresentation){tab.ready=false;tab.loadError=undefined}
       presentationDocument.value=tab.document
@@ -198,24 +221,45 @@ async function activate(tab:Tab) {
   }
   home.value=false
 }
-async function addDocument(doc:NativeDocument, fileId?:string) {
+async function addDocument(doc:NativeDocument, fileId?:string, wordEngine?:'independent') {
+  // Capture the exact source before asynchronous preflight or snapshot work.
+  doc={...doc}
   if(doc.kind==='presentation'&&doc.extension!=='pptx')throw Error('独立演示编辑器目前支持 PPTX。请先将旧 PPT 或 ODP 转换为 PPTX；原文件未修改。')
-  const existing=fileId && tabs.value.find(t=>t.fileId===fileId)
+  const existing=fileId && tabs.value.find(t=>t.fileId===fileId&&t.wordEngine===wordEngine)
   if(existing) { await activate(existing); return }
   const key=crypto.randomUUID()
-  const review=reviewOfficeImport(doc)
-  const tab:Tab={key,document:{...doc,id:key},fileId,requiresSaveAs:isImportOnly(doc.extension)||review.requiresSaveAs,importWarnings:review.warnings,dirty:!fileId,ready:false}
-  await stash()
-  tabs.value.push(tab); activeKey.value=key; home.value=false
-  if(doc.kind==='pdf') pdfDocument.value=tab.document
-  else if(doc.kind==='presentation')presentationDocument.value=tab.document
-  else officeDocument.value=tab.document as OfficeDocument
+  let prepared:PreparedWordDocument|undefined
+  try {
+    if(wordEngine==='independent') {
+      if(doc.kind!=='word'||doc.extension!=='docx')throw Error('轻量文字文档目前只支持 DOCX。请从“打开文件”使用原有文字编辑器打开其他格式。')
+      if(doc.base64) {
+        // Validate the entire supported subset before creating a tab or replacing
+        // a currently editable model. Rejected documents remain untouched.
+        const {importWordDocument}=await import('./word/core/runtime')
+        prepared=prepareWordDocument({id:key,base64:doc.base64},await importWordDocument(base64ToBytes(doc.base64)))
+      }
+    }
+    if(appDisposed)return
+    const review=reviewOfficeImport(doc)
+    const protectedWordImport=wordEngine==='independent'&&!!doc.base64
+    const tab:Tab={key,document:{...doc,id:key},wordEngine,fileId,requiresSaveAs:protectedWordImport||isImportOnly(doc.extension)||review.requiresSaveAs,importWarnings:protectedWordImport?['此 DOCX 已通过轻量文字文档的支持范围检查，首次保存将生成副本。',...review.warnings]:review.warnings,dirty:!fileId,ready:false}
+    await stash()
+    if(appDisposed)return
+    tabs.value.push(tab); activeKey.value=key; home.value=false
+    if(wordEngine==='independent') {setIndependentWordDocument(tab.document,prepared);prepared=undefined}
+    else if(doc.kind==='pdf') pdfDocument.value=tab.document
+    else if(doc.kind==='presentation')presentationDocument.value=tab.document
+    else officeDocument.value=tab.document as OfficeDocument
+  } finally {
+    // Failed preflight/stash or disposal must not retain an undelivered model.
+    prepared?.discard()
+  }
 }
-function newDocument(kind:Kind) {
+function newDocument(kind:Kind,wordEngine?:'independent') {
   void task('正在新建文档',async()=>{
     const extension:Extension=kind==='word'?'docx':kind==='sheet'?'xlsx':kind==='presentation'?'pptx':'pdf'
     const number=tabs.value.filter(t=>t.document.kind===kind).length+1
-    await addDocument({id:'',kind,extension,name:`未命名${kindNames[kind]}${number}.${extension}`,base64:'',sha256:'',sizeBytes:0})
+    await addDocument({id:'',kind,extension,name:`未命名${kindNames[kind]}${number}.${extension}`,base64:'',sha256:'',sizeBytes:0},undefined,wordEngine)
   })
 }
 async function refreshRecents() { if(native.isTauri()) recents.value=await native.listRecentDocuments() }
@@ -225,6 +269,25 @@ function openFile() {
     await refreshRecents()
   })
   else fileInput.value?.click()
+}
+function openIndependentWord() {
+  if(native.isTauri())void task('正在打开轻量文字文档',async()=>{
+    const document=await native.openDocument()
+    if(document)await addDocument(document,document.id,'independent')
+    await refreshRecents()
+  })
+  else independentWordInput.value?.click()
+}
+async function browserIndependentWord(event:Event) {
+  const input=event.target as HTMLInputElement,file=input.files?.[0];input.value=''
+  if(!file)return
+  await task('正在读取轻量文字文档',async()=>{
+    if(extensionOf(file.name)!=='docx')throw Error('轻量文字文档目前只支持 DOCX。')
+    if(file.size>40*1024*1024)throw Error('请选择不超过 40 MB 的文档。')
+    const bytes=new Uint8Array(await file.arrayBuffer())
+    validateDocumentSignature(bytes,'docx')
+    await addDocument({id:'',name:file.name,extension:'docx',kind:'word',base64:bytesToBase64(bytes),sha256:'',sizeBytes:file.size},undefined,'independent')
+  })
 }
 async function browserFile(event:Event) {
   const input=event.target as HTMLInputElement, file=input.files?.[0]; input.value=''
@@ -248,7 +311,7 @@ async function saveActive(saveAs=false, format?:Extension, chosenName?:string):P
   if(format&&isImportOnly(format))throw Error('旧版格式仅支持导入，请选择 DOCX、XLSX 或 PPTX 保存副本。')
   if(tab.document.kind==='presentation'&&format&&format!=='pptx'&&format!=='pdf')throw Error('独立演示编辑器支持保存 PPTX 和导出 PDF，暂不支持 ODP 转换。')
   const requestedFormat=format||defaultSaveExtension(tab.document.extension)
-  if(!saveFormats(tab.document.kind).some(option=>option.extension===requestedFormat))throw Error('当前编辑器不支持此保存格式。')
+  if(!formatsFor(tab).some(option=>option.extension===requestedFormat))throw Error(tab.wordEngine==='independent'?'轻量文字文档目前只支持保存 DOCX。':'当前编辑器不支持此保存格式。')
   const handle=requireEditor(tab)
   const exported=await handle.exportFile({format:requestedFormat})
   if(activeKey.value!==tab.key)throw Error('文档已切换，本次保存已取消。')
@@ -281,7 +344,7 @@ async function saveActive(saveAs=false, format?:Extension, chosenName?:string):P
 function openSaveAs() {
   const tab=active.value
   if(!tab?.ready||busy.value||closeTarget.value)return
-  const formats=saveFormats(tab.document.kind), preferred=defaultSaveExtension(tab.document.extension)
+  const formats=formatsFor(tab), preferred=defaultSaveExtension(tab.document.extension)
   saveAsDraft.value={key:tab.key,kind:tab.document.kind,format:formats.find(option=>option.extension===preferred)?.extension||formats[0]!.extension,
     name:tab.document.name.replace(/\.[^.]+$/,'')+(tab.requiresSaveAs||isImportOnly(tab.document.extension)?' - 副本':''),error:''}
 }
@@ -290,7 +353,7 @@ async function confirmSaveAs() {
   if(!draft||busy.value)return
   try {
     if(activeKey.value!==draft.key||active.value?.document.kind!==draft.kind)throw Error('文档已经切换，请关闭此窗口后重新选择另存为。')
-    if(!saveFormats(draft.kind).some(option=>option.extension===draft.format))throw Error('请选择当前文档支持的格式。')
+    if(!formatsFor(active.value).some(option=>option.extension===draft.format))throw Error('请选择当前文档支持的格式。')
     const name=saveFileName(draft.name,draft.format)
     draft.error=''
     await editorTransaction('正在另存文档',async()=>{
@@ -315,7 +378,7 @@ function newSlide() {
 }
 function runWriterAction(action:WriterAction) {
   void task('正在更新文档',async()=>{
-    if(active.value?.document.kind!=='word'||!officeEditor.value?.writerAction)throw Error('文字工作台尚未就绪。')
+    if(active.value?.document.kind!=='word'||activeIndependentWord.value||!officeEditor.value?.writerAction)throw Error('文字工作台尚未就绪。')
     try {
       const state=await officeEditor.value.writerAction(action)
       writerChanged(state);wordWorkbench.value?.actionSucceeded?.(state)
@@ -325,7 +388,7 @@ function runWriterAction(action:WriterAction) {
 function runWriterCommand(command:WriterCommand) {
   void task('正在更新文档',async()=>{
     assertWorkbenchDrafts()
-    if(active.value?.document.kind!=='word'||!officeEditor.value?.writerCommand)throw Error('文字工作台尚未就绪。')
+    if(active.value?.document.kind!=='word'||activeIndependentWord.value||!officeEditor.value?.writerCommand)throw Error('文字工作台尚未就绪。')
     writerChanged(await officeEditor.value.writerCommand(command))
   })
 }
@@ -342,7 +405,7 @@ function refreshWriter() {void task('正在刷新文档属性',async()=>{if(offi
 function refreshCalc() {void task('正在刷新工作表属性',async()=>{if(officeEditor.value?.getCalcState)calcChanged(await officeEditor.value.getCalcState())})}
 async function readFreshWriterState():Promise<WriterState> {
   const tab=active.value, handle=officeEditor.value
-  if(!tab?.ready||tab.document.kind!=='word'||!handle?.getWriterState)throw Error('文字文档尚未准备好，输入已保留。')
+  if(!tab?.ready||tab.document.kind!=='word'||tab.wordEngine==='independent'||!handle?.getWriterState)throw Error('文字文档尚未准备好，输入已保留。')
   const state=await handle.getWriterState()
   if(activeKey.value!==tab.key||officeEditor.value!==handle||state.documentId!==tab.key)throw Error('文档已切换，本次核对已取消，输入已保留。')
   writerChanged(state)
@@ -373,7 +436,7 @@ async function removeTab(tab:Tab, discardConfirmed=false) {
     // Do not ask stash() to export a tab whose close was already checked/confirmed.
     activeKey.value=''
     if(next) await activate(next)
-    else {home.value=true;officeDocument.value=undefined;pdfDocument.value=undefined;presentationDocument.value=undefined}
+    else {home.value=true;officeDocument.value=undefined;pdfDocument.value=undefined;presentationDocument.value=undefined;setIndependentWordDocument()}
   }
   tabs.value=tabs.value.filter(t=>t.key!==tab.key)
   // Keep a hidden Office model only while its tab can still be resumed. Closing
@@ -384,6 +447,7 @@ async function removeTab(tab:Tab, discardConfirmed=false) {
   }
   if(pdfDocument.value&&!tabs.value.some(t=>t.key===pdfDocument.value?.id))pdfDocument.value=undefined
   if(presentationDocument.value&&!tabs.value.some(t=>t.key===presentationDocument.value?.id))presentationDocument.value=undefined
+  if(independentWordDocument.value&&!tabs.value.some(t=>t.key===independentWordDocument.value?.id))setIndependentWordDocument()
 }
 function closeTab(tab:Tab) {
   if(busy.value)return
@@ -425,8 +489,9 @@ async function resolveClose(action:'save'|'discard') {
     }
   })
 }
-function editCommand(command:'undo'|'redo'|'print') {void task('正在处理',async()=>{const fn=editor()?.[command];if(fn)await fn();else if(command==='print'&&await saveActive(true,'pdf'))status.value='已导出 PDF；请在系统 PDF 阅读器中打开并打印。'})}
+function editCommand(command:'undo'|'redo'|'print') {void task('正在处理',async()=>{if(activeIndependentWord.value&&command==='print')throw Error('轻量文字文档暂不支持打印或 PDF 导出。');const fn=editor()?.[command];if(fn)await fn();else if(command==='print'&&await saveActive(true,'pdf'))status.value='已导出 PDF；请在系统 PDF 阅读器中打开并打印。'})}
 function insertImage() {
+  if(activeIndependentWord.value)return
   if(native.isTauri()) void task('正在插入图片',async()=>{const image=await native.pickImage();if(image)await imageEditor()?.insertImage?.(image)})
   else imageInput.value?.click()
 }
@@ -467,7 +532,7 @@ function keydown(event:KeyboardEvent) {
   if(saveAsDraft.value){if((event.ctrlKey||event.metaKey)&&['o','s'].includes(event.key.toLowerCase()))event.preventDefault();return}
   if(event.key==='F5'&&active.value?.document.kind==='presentation'&&!home.value){event.preventDefault();previewSlides();return}
   if(!(event.ctrlKey||event.metaKey)||event.altKey)return
-  if(event.key.toLowerCase()==='o'){event.preventDefault();openFile()}
+  if(event.key.toLowerCase()==='o'){event.preventDefault();if(activeIndependentWord.value&&!home.value)openIndependentWord();else openFile()}
   if(event.key.toLowerCase()==='s'){event.preventDefault();save(event.shiftKey)}
 }
 function beforeUnload(event:BeforeUnloadEvent){if(tabs.value.some(t=>t.dirty)){event.preventDefault();event.returnValue=''}}
@@ -483,9 +548,24 @@ onMounted(async()=>{
       if(smokeMode.value&&!config.smokeMode)throw Error('Native smoke URL was not enabled by the process')
       if(config.smokeMode) {
         smokeMode.value=true
+        if(config.smokeScope==='word-package-ipc') {
+          smokeStage('word-package-ipc','starting independent Word native round trips')
+          const {runNativeWordPackageSmoke}=await import('./word/core/native-package-smoke')
+          const report=await runNativeWordPackageSmoke()
+          await smokeAwait('ipc-smoke-report',()=>invoke('smoke_report',{report}))
+          return
+        }
         const report:Record<string,unknown>={...smokeFeatures()}
         try {
           if(!crossOriginIsolated)throw Error('Native WebView is not cross-origin isolated')
+          // Capture independent Word IPC evidence before mounting any Office
+          // host: its Resource Timing check observes requests since navigation.
+          smokeStage('word-package-ipc','starting independent Word native round trips')
+          const {runNativeWordPackageSmoke}=await import('./word/core/native-package-smoke')
+          const independentWordPackage=await runNativeWordPackageSmoke()
+          report.independentWordPackage=independentWordPackage
+          if(!independentWordPackage.ok)throw Error(independentWordPackage.error||'Independent Word native package verification failed')
+          smokeStage('word-package-ipc','complete')
           smokeStage('office-start','creating Writer document')
           await editorTransaction('正在准备本机文档验证',()=>addDocument({id:'',kind:'word',extension:'docx',name:'Smoke.docx',base64:'',sha256:'',sizeBytes:0}))
           await nextTick()
@@ -573,6 +653,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 <template>
   <div class="app-shell" :class="{'editing':!home}">
     <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.odt,.doc,.rtf,.xlsx,.ods,.xls,.pptx,.odp,.ppt,.pdf" @change="browserFile" />
+    <input ref="independentWordInput" data-testid="independent-word-open-input" class="visually-hidden" type="file" accept=".docx" @change="browserIndependentWord" />
     <input ref="imageInput" class="visually-hidden" type="file" accept="image/png,image/jpeg" @change="browserImage" />
     <header class="titlebar" :inert="!!saveAsDraft">
       <button class="brand" @click="home=true;section='home'" aria-label="返回工作台"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
@@ -594,6 +675,10 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
           <button class="create-card presentation" @click="newDocument('presentation')"><span class="document-art"><Icon name="presentation" :size="27"/></span><span class="card-bottom"><span><strong>演示文稿</strong><small>幻灯片设计与演示</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">PPTX · 独立编辑器</span></button>
           <button class="create-card pdf" @click="newDocument('pdf')"><span class="document-art"><Icon name="pdf" :size="27"/></span><span class="card-bottom"><span><strong>PDF 工作室</strong><small>文字编辑、批注与页面整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">PDF</span></button>
         </section>
+        <section v-if="section==='home'" class="independent-word-entry" aria-labelledby="independent-word-heading">
+          <div><h2 id="independent-word-heading">轻量文字文档 <span>预览</span></h2><p>用于基础正文与段落编辑，保存为 DOCX。复杂文档请使用上方“文字文档”。</p></div>
+          <div class="independent-word-entry-actions"><button data-testid="independent-word-new" @click="newDocument('word','independent')"><Icon name="plus" :size="16"/>新建轻量文档</button><button data-testid="independent-word-open" @click="openIndependentWord"><Icon name="folder" :size="16"/>打开 DOCX</button></div>
+        </section>
         <section class="recent-section"><div class="section-heading"><h2>最近打开 <span>{{recents.length}}</span></h2><label class="search-box"><Icon name="search" :size="17"/><input v-model="search" placeholder="查找最近的文件" aria-label="查找最近的文件"/></label></div>
           <div v-if="!filteredRecents.length" class="empty-files"><div class="empty-icon"><Icon name="folder" :size="29"/></div><strong>{{search?'没有找到匹配的文件':'你的下一份作品，从这里开始'}}</strong><p>{{native.isTauri()?'打开本机文件后，可以在这里快速找到它。':'浏览器预览支持打开和导出文件；桌面版提供原文件保存与完整 PDF 编辑。'}}</p><button class="text-button" @click="openFile">打开一份文件 <Icon name="arrow" :size="16"/></button></div>
           <div v-else class="recent-list"><button v-for="item in filteredRecents" :key="item.id" class="recent-row" @click="openRecent(item)"><span class="file-icon" :class="item.kind"><Icon :name="icons[item.kind]"/></span><span class="recent-name">{{item.name}}<small>{{kindNames[item.kind]}} · {{item.extension.toUpperCase()}}</small></span><time>{{new Date(item.lastOpenedAt* (item.lastOpenedAt<1e12?1000:1)).toLocaleDateString('zh-CN')}}</time><Icon name="arrow" :size="17"/></button></div>
@@ -603,19 +688,20 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
     </div>
     <section v-show="!home" class="editor-workspace" :inert="!!saveAsDraft">
       <div ref="tabBar" class="tab-bar"><button class="home-tab" @click="home=true" aria-label="工作台"><Icon name="home" :size="18"/></button><div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div><button class="new-tab" @click="home=true" aria-label="新建文档"><Icon name="plus" :size="18"/></button></div>
-      <div class="command-bar"><button @click="openFile"><Icon name="folder" :size="17"/>打开</button><span class="separator"/><button :disabled="!active?.ready" @click="save()"><Icon name="save" :size="17"/>保存</button><button :disabled="!active?.ready" @click="save(true)">另存为</button><button v-if="active?.document.kind!=='pdf'" :disabled="!active?.ready" @click="save(true,'pdf')"><Icon name="download" :size="17"/>导出 PDF</button><span class="separator"/><button :disabled="!active?.ready" @click="editCommand('undo')" title="撤销"><Icon name="undo" :size="17"/></button><button :disabled="!active?.ready" @click="editCommand('redo')" title="重做"><Icon name="redo" :size="17"/></button><span class="command-spacer"/><span class="save-state"><i :class="{'dirty-dot':active?.dirty}"/>{{active?.dirty?'尚未保存':'已保存'}}</span></div>
+      <div class="command-bar"><button @click="activeIndependentWord?openIndependentWord():openFile()"><Icon name="folder" :size="17"/>打开</button><span class="separator"/><button :disabled="!active?.ready" @click="save()"><Icon name="save" :size="17"/>保存</button><button :disabled="!active?.ready" @click="save(true)">另存为</button><button v-if="active?.document.kind!=='pdf'&&!activeIndependentWord" :disabled="!active?.ready" @click="save(true,'pdf')"><Icon name="download" :size="17"/>导出 PDF</button><span class="separator"/><button :disabled="!active?.ready" @click="editCommand('undo')" title="撤销"><Icon name="undo" :size="17"/></button><button :disabled="!active?.ready" @click="editCommand('redo')" title="重做"><Icon name="redo" :size="17"/></button><span class="command-spacer"/><span class="save-state"><i :class="{'dirty-dot':active?.dirty}"/>{{active?.dirty?'尚未保存':'已保存'}}</span></div>
       <div v-if="active?.importWarnings?.length" class="import-review-notice" role="note" data-testid="import-review-notice"><Icon name="info" :size="16"/><div><p v-for="warning in active.importWarnings" :key="warning">{{warning}}</p><strong>保存需另存副本，避免自动覆盖原件。</strong></div></div>
       <div class="editor-content" :inert="!!busy">
-        <WordWorkbench v-if="officeDocument" v-show="active?.document.kind==='word'||active?.document.kind==='sheet'" ref="wordWorkbench" :active="active?.document.kind==='word'" :state="writerState" :read-data="readWriterData" :refresh-state="readFreshWriterState" :busy="!!busy" :disabled="!active?.ready" @action="runWriterAction" @command="runWriterCommand" @refresh="refreshWriter" @insert-image="insertImage" @draft-change="dirtyFor(activeKey,$event)">
+        <WordWorkbench v-if="officeDocument" v-show="!activeIndependentWord&&(active?.document.kind==='word'||active?.document.kind==='sheet')" ref="wordWorkbench" :active="active?.document.kind==='word'&&!activeIndependentWord" :state="writerState" :read-data="readWriterData" :refresh-state="readFreshWriterState" :busy="!!busy" :disabled="!active?.ready" @action="runWriterAction" @command="runWriterCommand" @refresh="refreshWriter" @insert-image="insertImage" @draft-change="dirtyFor(activeKey,$event)">
         <SheetWorkbench ref="sheetWorkbench" :active="active?.document.kind==='sheet'" :state="calcState" :read-data="readCalcData" :busy="!!busy" :disabled="!active?.ready" @action="runCalcAction" @refresh="refreshCalc" @insert-image="insertImage" @draft-change="dirtyFor(activeKey,$event)">
           <OfficeEditor ref="officeEditor" :document="officeDocument" :smoke-mode="smokeMode" @dirty="dirtyFor(officeDocument?.id,$event)" @ready="readyFor(officeDocument?.id)" @error="editorError(officeDocument?.id,$event)" @status="status=$event" @request="officeRequest" @word-state="writerChanged" @sheet-state="calcChanged"/>
 
         </SheetWorkbench>
         </WordWorkbench>
+        <StandaloneWordEditor v-if="independentWordDocument" v-show="activeIndependentWord" ref="independentWordEditor" :document="independentWordDocument" :prepared="independentWordPrepared" :active="!home&&activeIndependentWord" :disabled="!!busy" @dirty="dirtyFor(independentWordDocument?.id,$event)" @ready="readyFor(independentWordDocument?.id)" @error="editorError(independentWordDocument?.id,$event)" @status="status=$event"/>
         <StandalonePresentationEditor v-if="presentationDocument" v-show="active?.document.kind==='presentation'" ref="presentationEditor" :document="presentationDocument" :active="!home&&active?.document.kind==='presentation'" :disabled="!!busy" @dirty="dirtyFor(presentationDocument?.id,$event)" @ready="readyFor(presentationDocument?.id)" @error="editorError(presentationDocument?.id,$event)" @status="status=$event"/>
         <PdfEditor v-if="pdfDocument && active?.document.kind==='pdf'" :key="pdfDocument.id" ref="pdfEditor" :document="pdfDocument" :initial-dirty="active?.dirty" @dirty="dirtyFor(pdfDocument?.id,$event)" @ready="readyFor(pdfDocument?.id)" @error="editorError(pdfDocument?.id,$event)" @status="status=$event"/>
       </div>
-      <footer class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · 本机编辑</span></footer>
+      <footer class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · {{activeIndependentWord?'轻量文字预览':'本机编辑'}}</span></footer>
     </section>
     <SlidePreview v-if="slidePreview" :base64="slidePreview.base64" :name="slidePreview.name" :start-page="slidePreview.startPage" :presentation="slidePreview.presentation" @close="closeSlidePreview" @error="error=$event"/>
     <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{error}}</span><button @click="error=''" aria-label="关闭错误提示"><Icon name="close" :size="16"/></button></div>
@@ -642,6 +728,14 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 </template>
 
 <style scoped>
+.independent-word-entry { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 20px 0 28px; padding: 18px 20px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius); background: var(--ui-surface); }
+.independent-word-entry h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.independent-word-entry h2 span { margin-left: 8px; padding: 2px 6px; border-radius: 3px; background: var(--ui-accent-soft); color: var(--ui-accent); font-size: 11px; font-weight: 500; }
+.independent-word-entry p { margin: 7px 0 0; font-size: 12px; line-height: 1.6; color: var(--ui-muted); }
+.independent-word-entry-actions { display: flex; flex: none; flex-wrap: wrap; gap: 8px; }
+.independent-word-entry-actions button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius); background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
+.independent-word-entry-actions button:hover { background: var(--ui-accent-soft); }
+@media (max-width: 900px) { .independent-word-entry { align-items: flex-start; flex-direction: column; gap: 12px; } }
 .save-format-dialog { width: min(480px, 100%); }
 .save-name-label { display: grid; gap: 8px; margin: 20px 0; font-size: 13px; font-weight: 500; }
 .save-name-input { display: flex; align-items: center; border: 1px solid var(--ui-line-strong); border-radius: var(--ui-radius); overflow: hidden; }

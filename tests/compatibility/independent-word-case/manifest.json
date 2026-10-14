@@ -1,0 +1,6415 @@
+{
+  "schemaVersion": 1,
+  "engine": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "fixturePolicy": "Complete native output packages copied byte-for-byte. Expected text and mode vectors come from independent authored inputs and native XML/PDF/ODT observations, not product output.",
+  "fixtures": [
+    {
+      "name": "positive",
+      "source": "source/positive.docx",
+      "sourceSha256": "02f52b9a5fee6e057186d2650565704965227f588dd7b0495d5e63befba69b39",
+      "docx": "libreoffice/positive.docx",
+      "docxSha256": "15f7860d83654ca37a36d36429eaa01b8a962d9ab211af65b82e69259afd48b1",
+      "expectUnsupported": false,
+      "expectedMarkers": {
+        "16": "upper",
+        "17": "upper",
+        "26": "smallCaps",
+        "27": "smallCaps",
+        "32": "smallCaps"
+      },
+      "sourceMarkers": {
+        "16": "upper",
+        "17": "upper",
+        "26": "smallCaps",
+        "27": "smallCaps",
+        "32": "smallCaps"
+      },
+      "oracle": "Independent native PDF/XML case vector; basedOn override plus 3x3 paragraph/character toggle matrix",
+      "expectedCharacters": [
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "3",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "4",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "5",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "6",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "7",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "8",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "9",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "3",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "4",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "5",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "6",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [],
+        [
+          {
+            "character": "C",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "8",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "9",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "3",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "4",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "5",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "6",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [],
+        [
+          {
+            "character": "C",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "8",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "9",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "3",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "3",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [],
+        [
+          {
+            "character": "C",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "3",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "3",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ]
+    },
+    {
+      "name": "cross-style",
+      "source": "source/cross-style.docx",
+      "sourceSha256": "fa83cc04244fa8b29646e869836c73e51e13792aeb6851a6d8f905cf05f94518",
+      "docx": "libreoffice/cross-style.docx",
+      "docxSha256": "684a61c3cd3482757595eb079a8106f8a29c935e3e67d9bd5811b6d1a4e80ade",
+      "expectUnsupported": false,
+      "expectedMarkers": {
+        "14": "none",
+        "15": "none"
+      },
+      "sourceMarkers": {
+        "14": "none",
+        "15": "none"
+      },
+      "oracle": "Independent native PDF/XML case vector; basedOn override plus 3x3 paragraph/character toggle matrix",
+      "expectedCharacters": [
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "3",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "4",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "5",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "6",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "7",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "8",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "9",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "3",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [],
+        [
+          {
+            "character": "C",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "5",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ]
+    },
+    {
+      "name": "default-character",
+      "source": "source/default-character.docx",
+      "sourceSha256": "5c33a6bb9efbb08d32ede8ea1e2770425b1774a72055d595ef579a2a4510af3a",
+      "docx": "libreoffice/default-character.docx",
+      "docxSha256": "e19fd76767760a81a246d26fea160c233490a4ed758c8aa8916894ef07c526ed",
+      "expectUnsupported": false,
+      "expectedMarkers": {
+        "3": "upper"
+      },
+      "sourceMarkers": {
+        "3": "upper"
+      },
+      "oracle": "Independent native PDF/XML case vector; basedOn override plus 3x3 paragraph/character toggle matrix",
+      "expectedCharacters": [
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        []
+      ]
+    },
+    {
+      "name": "document-default",
+      "source": "source/document-default.docx",
+      "sourceSha256": "bb394314c0ca879dde3aacc628cf2ed546f4cc2b16f0e430413d7bf61ee04f89",
+      "docx": "libreoffice/document-default.docx",
+      "docxSha256": "9eea0063bdca8b5d11fa5bbcf841cd1ad97b3c71be314d6b5859213f0e1b972b",
+      "expectUnsupported": false,
+      "expectedMarkers": {},
+      "sourceMarkers": {},
+      "oracle": "Independent native PDF/XML case vector; basedOn override plus 3x3 paragraph/character toggle matrix",
+      "expectedCharacters": [
+        [
+          {
+            "character": "C",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "C",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "0",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "3",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ]
+    },
+    {
+      "name": "odt-authored",
+      "source": "source/odt-authored.odt",
+      "sourceSha256": "822f678c5d6ead1df4be6668ce3029f2b90b5bc2dd005e6a3f2040b53ef49ca2",
+      "docx": "libreoffice/odt-authored.docx",
+      "docxSha256": "074df53a62712ce74f579afb0897447effba0ab16201f299b92826d4b391e5a9",
+      "expectUnsupported": false,
+      "expectedMarkers": {
+        "6": "smallCaps"
+      },
+      "oracle": "Independently authored ODT fo:text-transform/font-variant styles; native DOCX output unmodified",
+      "expectedCharacters": [
+        [
+          {
+            "character": "P",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "l",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "i",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "1",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "2",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "3",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "中",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "文",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "😀",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": ".",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "U",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "中",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "文",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "😀",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": ".",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "S",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "m",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "l",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "l",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "中",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "文",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "😀",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": ".",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "I",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "h",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "i",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "t",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "R",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "s",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "t",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": ".",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "O",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "v",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "i",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": ".",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "I",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "h",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "i",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "t",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "s",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "m",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "l",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "l",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": ".",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [],
+        [
+          {
+            "character": "S",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "o",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "u",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "k",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "s",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "l",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "o",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "w",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "s",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": ".",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ]
+    },
+    {
+      "name": "named-upper-equal-next",
+      "source": "source/named-upper-equal-next.docx",
+      "sourceSha256": "28fd77e5524a71d03f5fb787e04f1c99431070ddba1f1ad09e6df4dfeeed69b4",
+      "docx": "libreoffice/named-upper-equal-next.docx",
+      "docxSha256": "3def9982dc0391ecd776d2479738775db283901a084b720e51928db4e1b43bff",
+      "expectUnsupported": false,
+      "sourceCharacters": [
+        [
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "sourceMarkers": {
+        "0": "upper"
+      },
+      "expectedMarkers": {
+        "0": "upper",
+        "1": "none"
+      },
+      "edit": {
+        "paragraph": 0,
+        "offset": 3,
+        "enter": true,
+        "text": "x"
+      },
+      "oracle": "Native XToolkitRobot Enter then x (empty marker: x only); original and saved complete packages retained",
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ]
+    },
+    {
+      "name": "default-upper-equal-next",
+      "source": "source/default-upper-equal-next.docx",
+      "sourceSha256": "e28754de952c568d08aba58d8bcc1ed9179cb11c92640c9f20a0adcba887099e",
+      "docx": "libreoffice/default-upper-equal-next.docx",
+      "docxSha256": "3a0e734e56e52c66d7d14dbd671f7eaa647de2a786ded558e7e4007bb2d30fed",
+      "expectUnsupported": false,
+      "sourceCharacters": [
+        [
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "sourceMarkers": {
+        "0": "upper"
+      },
+      "expectedMarkers": {
+        "0": "upper",
+        "1": "none"
+      },
+      "edit": {
+        "paragraph": 0,
+        "offset": 3,
+        "enter": true,
+        "text": "x"
+      },
+      "oracle": "Native XToolkitRobot Enter then x (empty marker: x only); original and saved complete packages retained",
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "x",
+            "caseMap": "none",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ]
+    },
+    {
+      "name": "no-character-next",
+      "source": "source/no-character-next.docx",
+      "sourceSha256": "ae4d7621eed2c26bf5316ada08909c9619d7ecd7681f29d271fd28810c2ca1a1",
+      "docx": "libreoffice/no-character-next.docx",
+      "docxSha256": "a8aaa46554075e4b3078194da8e272f512735625fdad0b39c8e61ebbbc404e16",
+      "expectUnsupported": false,
+      "sourceCharacters": [
+        [
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "sourceMarkers": {
+        "0": "upper"
+      },
+      "expectedMarkers": {
+        "0": "upper",
+        "1": "smallCaps"
+      },
+      "edit": {
+        "paragraph": 0,
+        "offset": 3,
+        "enter": true,
+        "text": "x"
+      },
+      "oracle": "Native XToolkitRobot Enter then x (empty marker: x only); original and saved complete packages retained",
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "b",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "caseMap": "upper",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ]
+    },
+    {
+      "name": "marker-character-empty",
+      "source": "source/marker-character-empty.docx",
+      "sourceSha256": "23ca882a70f56ac690bd3084ac20fe3b1ebd5793a6d580a79ce76d59617438b4",
+      "docx": "libreoffice/marker-character-empty.docx",
+      "docxSha256": "c990546374cbe0e587ed206dbf5b79cd8ce5dc2db1735c8d28de5f79154d3137",
+      "expectUnsupported": false,
+      "sourceCharacters": [
+        []
+      ],
+      "sourceMarkers": {
+        "0": "smallCaps"
+      },
+      "expectedMarkers": {
+        "0": "smallCaps"
+      },
+      "edit": {
+        "paragraph": 0,
+        "offset": 0,
+        "enter": false,
+        "text": "x"
+      },
+      "oracle": "Native XToolkitRobot Enter then x (empty marker: x only); original and saved complete packages retained",
+      "expectedCharacters": [
+        [
+          {
+            "character": "x",
+            "caseMap": "smallCaps",
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ]
+    },
+    {
+      "name": "locale-native-boundary",
+      "source": "source/locale.docx",
+      "sourceSha256": "0c531cee2f0d0885bbd4d6dda1873746b677a6fb27ee0976c3a7a2adeeeb99c1",
+      "docx": "libreoffice/locale-native-boundary.docx",
+      "docxSha256": "523112ebd7325dd24e6a1bd9dad7e0e229188534d812952073640c06f738f9e8",
+      "expectUnsupported": true,
+      "reason": "Active Unicode case mappings and locale-sensitive upper/small caps lie outside supported display subset; immutable native output remains rejected"
+    },
+    {
+      "name": "conflicting-property-source",
+      "source": "source/conflicts.docx",
+      "sourceSha256": "7363e225b6d5e9b10ba5f4404429cfd790a31c98f6cb70d037c586c6a0540d43",
+      "docx": "libreoffice/conflicting-property-source.docx",
+      "docxSha256": "7363e225b6d5e9b10ba5f4404429cfd790a31c98f6cb70d037c586c6a0540d43",
+      "expectUnsupported": true,
+      "origin": "authored DOCX source, not native export",
+      "reason": "Same-rPr caps with smallCaps=true is XML-order-sensitive; input rejects rather than guessing native resolution"
+    }
+  ],
+  "researchEvidence": {
+    "report.json": "19ea98f198def25d476d34e094404a58ea01d8beb65eb2eb3d07ab24b0cd19c9",
+    "cross-report.json": "b7d9da1e0824bdd3fba2c54c20c9ad1d51418ca0ca81fad723bda06f37402cba",
+    "editing/report.json": "626de99672e2b8869567270ad50b0837d66d9f46044e7810563ec128f1266933",
+    "editing/driver.log": "96188535c657010fbbd7bf2530dc0e475698d5d86e3644f828f67c727c7d5b29",
+    "product-import-verification.json": "fd1938330eb707493198fc633ceeba231d8aeed7a990a2a16fd0afc0a9f43780",
+    "source/manifest.json": "0a3f50cee0d581d510ae3594b777e685cc3763a914716e4f25da632e3eee8c9e",
+    "source/mapping-manifest.json": "005e9b6e20c8cf43505a00a95f60d138237280768007f82a2569c1fd21ad9f7a"
+  }
+}

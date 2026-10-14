@@ -1,0 +1,1783 @@
+{
+  "paragraphs": [
+    {
+      "text": "Normal SUP中😀 SUB文🚀 single double end.",
+      "characters": [
+        {
+          "character": "N",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "o",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "r",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "m",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "a",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "l",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "S",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "U",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "P",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "中",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "😀",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "S",
+          "fontSize": 12.0,
+          "verticalAlign": "subscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "U",
+          "fontSize": 12.0,
+          "verticalAlign": "subscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "B",
+          "fontSize": 12.0,
+          "verticalAlign": "subscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "文",
+          "fontSize": 12.0,
+          "verticalAlign": "subscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "🚀",
+          "fontSize": 12.0,
+          "verticalAlign": "subscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "s",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "n",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "g",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "l",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "d",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "o",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "u",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "b",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "l",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "n",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "d",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": ".",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        }
+      ],
+      "runs": [
+        {
+          "text": "Normal ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "SUP",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "superscript",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "中😀",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "superscript",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": " ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "SUB",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "subscript",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "文🚀",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "subscript",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": " ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "single",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "single",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": " ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "double",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "double",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": " end.",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        }
+      ],
+      "sourceStyle": {
+        "fontSize": 12.0,
+        "verticalAlign": "baseline",
+        "strike": "none",
+        "underline": false,
+        "fontSizeCs": 12.0,
+        "color": "000000",
+        "rFonts:ascii": "Liberation Serif",
+        "rFonts:hAnsi": "Liberation Serif",
+        "rFonts:eastAsia": "DejaVu Sans",
+        "rFonts:cs": "Noto Sans",
+        "lang:val": "en-US",
+        "lang:eastAsia": "zh-CN",
+        "lang:bidi": "hi-IN"
+      }
+    },
+    {
+      "text": "Inherited superscript reset baseline inherited again.",
+      "characters": [
+        {
+          "character": "I",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "n",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "h",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "r",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "t",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "d",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "s",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "u",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "p",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "r",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "s",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "c",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "r",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "p",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "t",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "r",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "s",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "t",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "b",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "a",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "s",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "l",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "n",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 18.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "n",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "h",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "r",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "t",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "d",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "a",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "g",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "a",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": "n",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        },
+        {
+          "character": ".",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "single",
+          "underline": false
+        }
+      ],
+      "runs": [
+        {
+          "text": "Inherited superscript ",
+          "style": {
+            "fontSize": 18.0,
+            "verticalAlign": "superscript",
+            "strike": "single",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "reset baseline",
+          "style": {
+            "fontSize": 18.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {
+            "strike": "none",
+            "verticalAlign": "baseline",
+            "fontSize": 18.0
+          }
+        },
+        {
+          "text": " inherited again.",
+          "style": {
+            "fontSize": 18.0,
+            "verticalAlign": "superscript",
+            "strike": "single",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        }
+      ],
+      "sourceStyle": {
+        "fontSize": 18.0,
+        "verticalAlign": "superscript",
+        "strike": "single",
+        "underline": false,
+        "fontSizeCs": 12.0,
+        "color": "000000",
+        "rFonts:ascii": "Liberation Serif",
+        "rFonts:hAnsi": "Liberation Serif",
+        "rFonts:eastAsia": "DejaVu Sans",
+        "rFonts:cs": "Noto Sans",
+        "lang:val": "en-US",
+        "lang:eastAsia": "zh-CN",
+        "lang:bidi": "hi-IN"
+      }
+    },
+    {
+      "text": "Inherited subscript reset none tail.",
+      "characters": [
+        {
+          "character": "I",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "n",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "h",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "r",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "t",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "d",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "s",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "u",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "b",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "s",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "c",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "r",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "p",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "t",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "r",
+          "fontSize": 16.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 16.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "s",
+          "fontSize": 16.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 16.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "t",
+          "fontSize": 16.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 16.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "n",
+          "fontSize": 16.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "o",
+          "fontSize": 16.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "n",
+          "fontSize": 16.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 16.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "t",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "a",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": "l",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        },
+        {
+          "character": ".",
+          "fontSize": 16.0,
+          "verticalAlign": "subscript",
+          "strike": "double",
+          "underline": false
+        }
+      ],
+      "runs": [
+        {
+          "text": "Inherited subscript ",
+          "style": {
+            "fontSize": 16.0,
+            "verticalAlign": "subscript",
+            "strike": "double",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "reset none",
+          "style": {
+            "fontSize": 16.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {
+            "strike": "none",
+            "verticalAlign": "baseline",
+            "fontSize": 16.0
+          }
+        },
+        {
+          "text": " tail.",
+          "style": {
+            "fontSize": 16.0,
+            "verticalAlign": "subscript",
+            "strike": "double",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        }
+      ],
+      "sourceStyle": {
+        "fontSize": 16.0,
+        "verticalAlign": "subscript",
+        "strike": "double",
+        "underline": false,
+        "fontSizeCs": 12.0,
+        "color": "000000",
+        "rFonts:ascii": "Liberation Serif",
+        "rFonts:hAnsi": "Liberation Serif",
+        "rFonts:eastAsia": "DejaVu Sans",
+        "rFonts:cs": "Noto Sans",
+        "lang:val": "en-US",
+        "lang:eastAsia": "zh-CN",
+        "lang:bidi": "hi-IN"
+      }
+    },
+    {
+      "text": "Underline double 中文😀 size24 size9",
+      "characters": [
+        {
+          "character": "U",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "n",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "d",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "r",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "l",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "i",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "n",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "d",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "o",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "u",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "b",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "l",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "中",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "文",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": "😀",
+          "fontSize": 12.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "s",
+          "fontSize": 24.0,
+          "verticalAlign": "superscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 24.0,
+          "verticalAlign": "superscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "z",
+          "fontSize": 24.0,
+          "verticalAlign": "superscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 24.0,
+          "verticalAlign": "superscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "2",
+          "fontSize": 24.0,
+          "verticalAlign": "superscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "4",
+          "fontSize": 24.0,
+          "verticalAlign": "superscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "s",
+          "fontSize": 9.0,
+          "verticalAlign": "subscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 9.0,
+          "verticalAlign": "subscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "z",
+          "fontSize": 9.0,
+          "verticalAlign": "subscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 9.0,
+          "verticalAlign": "subscript",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "9",
+          "fontSize": 9.0,
+          "verticalAlign": "subscript",
+          "strike": "none",
+          "underline": false
+        }
+      ],
+      "runs": [
+        {
+          "text": "Underline double ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "superscript",
+            "strike": "double",
+            "underline": true,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {
+            "underline": true,
+            "strike": "double",
+            "verticalAlign": "superscript"
+          }
+        },
+        {
+          "text": "中文😀",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "superscript",
+            "strike": "double",
+            "underline": true,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {
+            "underline": true,
+            "strike": "double",
+            "verticalAlign": "superscript"
+          }
+        },
+        {
+          "text": " ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "size24",
+          "style": {
+            "fontSize": 24.0,
+            "verticalAlign": "superscript",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {
+            "verticalAlign": "superscript",
+            "fontSize": 24.0
+          }
+        },
+        {
+          "text": " ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "size9",
+          "style": {
+            "fontSize": 9.0,
+            "verticalAlign": "subscript",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {
+            "verticalAlign": "subscript",
+            "fontSize": 9.0
+          }
+        }
+      ],
+      "sourceStyle": {
+        "fontSize": 12.0,
+        "verticalAlign": "baseline",
+        "strike": "none",
+        "underline": false,
+        "fontSizeCs": 12.0,
+        "color": "000000",
+        "rFonts:ascii": "Liberation Serif",
+        "rFonts:hAnsi": "Liberation Serif",
+        "rFonts:eastAsia": "DejaVu Sans",
+        "rFonts:cs": "Noto Sans",
+        "lang:val": "en-US",
+        "lang:eastAsia": "zh-CN",
+        "lang:bidi": "hi-IN"
+      }
+    },
+    {
+      "text": "Edit target",
+      "characters": [
+        {
+          "character": "E",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "d",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "i",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "t",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "t",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "a",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "r",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "g",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        },
+        {
+          "character": "t",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false
+        }
+      ],
+      "runs": [
+        {
+          "text": "Edit target",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        }
+      ],
+      "sourceStyle": {
+        "fontSize": 12.0,
+        "verticalAlign": "baseline",
+        "strike": "none",
+        "underline": false,
+        "fontSizeCs": 12.0,
+        "color": "000000",
+        "rFonts:ascii": "Liberation Serif",
+        "rFonts:hAnsi": "Liberation Serif",
+        "rFonts:eastAsia": "DejaVu Sans",
+        "rFonts:cs": "Noto Sans",
+        "lang:val": "en-US",
+        "lang:eastAsia": "zh-CN",
+        "lang:bidi": "hi-IN"
+      }
+    }
+  ],
+  "zipEntries": 11
+}

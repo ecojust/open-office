@@ -2,6 +2,7 @@ node_modules/
 dist/
 public/office-runtime/
 src-tauri/target/
+crates/*/target/
 src-tauri/pdf-runtime/
 src-tauri/binaries/
 pdf-backend/.venv/
@@ -9,6 +10,7 @@ pdf-backend/build/
 __pycache__/
 *.pyc
 .DS_Store
+.~lock.*#
 .env
 .env.*
 !.env.example

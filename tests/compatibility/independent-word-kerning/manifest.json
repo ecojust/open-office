@@ -1,0 +1,2700 @@
+{
+  "schemaVersion": 1,
+  "engine": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "rawUnit": "OOXML w:kern half-points; model stores points. Raw 1 is 0.5pt and is enabled.",
+  "effectiveRule": "Absent or zero disabled; all supported nonzero values enabled, independent of font size. Native save normalizes enabled to raw 2.",
+  "fixtures": [
+    {
+      "name": "kerning-thresholds",
+      "source": "source/kerning-thresholds.docx",
+      "sourceSha256": "e0938fadbcee7aada2920559fe16d484bb871472c76b3b4cbdab8a7819c08ef9",
+      "docx": "libreoffice/kerning-thresholds.docx",
+      "docxSha256": "10a19ad6dcfad4f8c4d15b27ddeccd47fff4f0a7660f2bd11a54e9da37530577",
+      "expectUnsupported": false,
+      "sourceCharacters": [
+        [
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 8,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "R",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "T",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "o",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "W",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": " ",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "V",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          },
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 8,
+            "letterSpacing": 0
+          }
+        ]
+      ],
+      "sourceRaw": [
+        0,
+        1,
+        2,
+        24,
+        28,
+        800,
+        0,
+        1,
+        2,
+        24,
+        28,
+        800
+      ],
+      "nativeRaw": [
+        0,
+        2,
+        2,
+        2,
+        2,
+        2,
+        0,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "oracle": "12 independently authored cases: actual native PDF widths show 0=off and all nonzero values=on regardless of font size. Native DOCX normalizes on to 2 half-points."
+    },
+    {
+      "name": "named-positive-equal-next",
+      "source": "source/named-positive-equal-next.docx",
+      "sourceSha256": "791efc891d8e959cb7321d6cafaf0f9aa6d6ec10353d086b822fe7712d9cbecc",
+      "docx": "libreoffice/named-positive-equal-next.docx",
+      "docxSha256": "44a71aff7809cc70ee36251d3a15c432583324cc6900d5c7f20b1d1ce7ec46a1",
+      "expectUnsupported": false,
+      "sourceCharacters": [
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "B",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "C",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "B",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "C",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "x",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ]
+      ],
+      "sourceRaw": [
+        28
+      ],
+      "nativeRaw": [
+        2,
+        2
+      ],
+      "sourceMarkers": {
+        "0": 28
+      },
+      "editedRaw": [
+        28,
+        28
+      ],
+      "editedMarkers": {
+        "0": 28,
+        "1": 0
+      },
+      "nativeMarkers": {
+        "0": 2,
+        "1": 0
+      },
+      "edit": {
+        "offset": 3,
+        "enter": true
+      },
+      "oracle": "Real native XToolkitRobot Enter/x or empty-marker x; original and native output packages are preserved separately. Own save preserves raw source values; native output canonicalizes nonzero values."
+    },
+    {
+      "name": "default-positive-equal-next",
+      "source": "source/default-positive-equal-next.docx",
+      "sourceSha256": "2208af8d01492198c0d2baa1b41f224614bd75cd6f4a8b1015a1a51de421a268",
+      "docx": "libreoffice/default-positive-equal-next.docx",
+      "docxSha256": "f90119ed97cd2411a8b697cae5976cc0680f3e96b99af1da0d0e79690143a9a7",
+      "expectUnsupported": false,
+      "sourceCharacters": [
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "B",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "C",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "B",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "C",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "x",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ]
+      ],
+      "sourceRaw": [
+        28
+      ],
+      "nativeRaw": [
+        2,
+        2
+      ],
+      "sourceMarkers": {
+        "0": 28
+      },
+      "editedRaw": [
+        28,
+        28
+      ],
+      "editedMarkers": {
+        "0": 28,
+        "1": 0
+      },
+      "nativeMarkers": {
+        "0": 2,
+        "1": 0
+      },
+      "edit": {
+        "offset": 3,
+        "enter": true
+      },
+      "oracle": "Real native XToolkitRobot Enter/x or empty-marker x; original and native output packages are preserved separately. Own save preserves raw source values; native output canonicalizes nonzero values."
+    },
+    {
+      "name": "named-zero-equal-next",
+      "source": "source/named-zero-equal-next.docx",
+      "sourceSha256": "22e7cf6602b77d07a56416331520723a2d03cfa1598309f34f036cb95ddecba4",
+      "docx": "libreoffice/named-zero-equal-next.docx",
+      "docxSha256": "735034181de1dad6ce27efb92cd89e06ff14143e7daafd82d2587d9f06534b42",
+      "expectUnsupported": false,
+      "sourceCharacters": [
+        [
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "B",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "C",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "B",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "C",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "x",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ]
+      ],
+      "sourceRaw": [
+        0
+      ],
+      "nativeRaw": [
+        0,
+        0
+      ],
+      "sourceMarkers": {
+        "0": 0
+      },
+      "editedRaw": [
+        0,
+        0
+      ],
+      "editedMarkers": {
+        "0": 0,
+        "1": 28
+      },
+      "nativeMarkers": {
+        "0": 0,
+        "1": 2
+      },
+      "edit": {
+        "offset": 3,
+        "enter": true
+      },
+      "oracle": "Real native XToolkitRobot Enter/x or empty-marker x; original and native output packages are preserved separately. Own save preserves raw source values; native output canonicalizes nonzero values."
+    },
+    {
+      "name": "no-character-next",
+      "source": "source/no-character-next.docx",
+      "sourceSha256": "0ce1e59d82f0e7b93394ffa5c92646c360822a0a4c72ca9e3e2b2aed11fd4d02",
+      "docx": "libreoffice/no-character-next.docx",
+      "docxSha256": "3884c67c182f70f353f06f94a6d506b17d5237f627c6eb577671c41f0b8f4edb",
+      "expectUnsupported": false,
+      "sourceCharacters": [
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "B",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "C",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "B",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          },
+          {
+            "character": "C",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ],
+        [
+          {
+            "character": "x",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ]
+      ],
+      "sourceRaw": [
+        28
+      ],
+      "nativeRaw": [
+        2,
+        0
+      ],
+      "sourceMarkers": {
+        "0": 28
+      },
+      "editedRaw": [
+        28,
+        0
+      ],
+      "editedMarkers": {
+        "0": 28,
+        "1": 0
+      },
+      "nativeMarkers": {
+        "0": 2,
+        "1": 0
+      },
+      "edit": {
+        "offset": 3,
+        "enter": true
+      },
+      "oracle": "Real native XToolkitRobot Enter/x or empty-marker x; original and native output packages are preserved separately. Own save preserves raw source values; native output canonicalizes nonzero values."
+    },
+    {
+      "name": "marker-character-empty",
+      "source": "source/marker-character-empty.docx",
+      "sourceSha256": "c97f3ca771618c8a3d747a256110e34146d54ea5e98b0eae9a198df749f7b360",
+      "docx": "libreoffice/marker-character-empty.docx",
+      "docxSha256": "e5d4050279f0cf187ff12cf94b64771e7e2fc658249b46d995e689316a3b8892",
+      "expectUnsupported": false,
+      "sourceCharacters": [
+        []
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "x",
+            "kerningEnabled": true,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ]
+      ],
+      "sourceRaw": [
+        28
+      ],
+      "nativeRaw": [
+        2
+      ],
+      "sourceMarkers": {
+        "0": 28
+      },
+      "editedRaw": [
+        28
+      ],
+      "editedMarkers": {
+        "0": 28
+      },
+      "nativeMarkers": {
+        "0": 2
+      },
+      "edit": {
+        "offset": 0,
+        "enter": false
+      },
+      "oracle": "Real native XToolkitRobot Enter/x or empty-marker x; original and native output packages are preserved separately. Own save preserves raw source values; native output canonicalizes nonzero values."
+    },
+    {
+      "name": "marker-direct-empty",
+      "source": "source/marker-direct-empty.docx",
+      "sourceSha256": "70374baa20d82b21b4c69d1cc53c91576843987a618755c1d803756b54ccc85c",
+      "docx": "libreoffice/marker-direct-empty.docx",
+      "docxSha256": "033fd55db113045191f9a29319ea0f0c664fe672f8d7a29521b7cc477c6a293c",
+      "expectUnsupported": false,
+      "sourceCharacters": [
+        []
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "x",
+            "kerningEnabled": false,
+            "fontSize": 12,
+            "letterSpacing": 0
+          }
+        ]
+      ],
+      "sourceRaw": [
+        0
+      ],
+      "nativeRaw": [
+        0
+      ],
+      "sourceMarkers": {
+        "0": 0
+      },
+      "editedRaw": [
+        0
+      ],
+      "editedMarkers": {
+        "0": 0
+      },
+      "nativeMarkers": {
+        "0": 0
+      },
+      "edit": {
+        "offset": 0,
+        "enter": false
+      },
+      "oracle": "Real native XToolkitRobot Enter/x or empty-marker x; original and native output packages are preserved separately. Own save preserves raw source values; native output canonicalizes nonzero values."
+    }
+  ],
+  "researchEvidence": {
+    "kerning-report.json": "12edc10d8b8ee64a78c2bd118dc0a429610f7b9eabbe11f487c8b8d290eb7ba1",
+    "kerning-sha256.json": "37ac94edf7e59ab89df398949745def707e3f88fe8588b87668cbf5dd70b246a",
+    "kerning-editing/report.json": "dbb38bc20d069879278e8dda69833aa97cd43063f39325aac91eced319d15b9f",
+    "kerning-editing/driver.log": "9db376f00fa1141f246046e81b23177d8b1bacabde8939d096b109fb23eb946e",
+    "product-import-verification.json": "db5a4a257533e33452883cc9834e0b31a491712d4435aff32af81dafba9fc77e"
+  }
+}

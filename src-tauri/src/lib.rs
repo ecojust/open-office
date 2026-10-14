@@ -2,6 +2,7 @@ mod files;
 mod pdf;
 mod server;
 mod smoke;
+mod word;
 
 use std::{
     path::PathBuf,
@@ -82,6 +83,8 @@ pub fn run() {
             files::pick_image,
             pdf::pdf_request,
             pdf::cancel_pdf,
+            word::word_read_package,
+            word::word_write_package,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -123,7 +126,9 @@ pub fn run() {
                     .permission("allow-save-document")
                     .permission("allow-pick-image")
                     .permission("allow-pdf-request")
-                    .permission("allow-cancel-pdf"),
+                    .permission("allow-cancel-pdf")
+                    .permission("allow-word-read-package")
+                    .permission("allow-word-write-package"),
             )?;
             app.manage(server);
             if let Some(smoke) = &diagnostic {

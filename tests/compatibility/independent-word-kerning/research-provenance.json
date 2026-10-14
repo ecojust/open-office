@@ -1,0 +1,66 @@
+{
+  "researchRoot": "/workspace/open-office-research/libreoffice/character-scale-compatibility",
+  "hashes": {
+    "kerning-report.json": "12edc10d8b8ee64a78c2bd118dc0a429610f7b9eabbe11f487c8b8d290eb7ba1",
+    "kerning-sha256.json": "37ac94edf7e59ab89df398949745def707e3f88fe8588b87668cbf5dd70b246a",
+    "kerning-editing/report.json": "dbb38bc20d069879278e8dda69833aa97cd43063f39325aac91eced319d15b9f",
+    "kerning-editing/driver.log": "9db376f00fa1141f246046e81b23177d8b1bacabde8939d096b109fb23eb946e",
+    "product-import-verification.json": "db5a4a257533e33452883cc9834e0b31a491712d4435aff32af81dafba9fc77e"
+  },
+  "rawThresholds": [
+    0,
+    1,
+    2,
+    24,
+    28,
+    800,
+    0,
+    1,
+    2,
+    24,
+    28,
+    800
+  ],
+  "fontSizes": [
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8
+  ],
+  "effective": [
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "nativeRaw": [
+    0,
+    2,
+    2,
+    2,
+    2,
+    2,
+    0,
+    2,
+    2,
+    2,
+    2,
+    2
+  ]
+}

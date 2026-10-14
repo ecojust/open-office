@@ -1,0 +1,195 @@
+{
+  "capturedAt": "2026-10-14T17:34:09.695Z",
+  "method": "Chromium direct real TS modules; synthetic 50-char paragraphs; 7 measured keystroke-path iterations after 2 warmups; 4 measured codec iterations after 1 warmup; not a complete Vue editor or native Rust comparison.",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+  "results": [
+    {
+      "paragraphs": 10,
+      "characters": 518,
+      "zipBytes": 4319,
+      "inputPipeline": {
+        "selection": {
+          "medianMs": 0,
+          "p95Ms": 0.1
+        },
+        "cloneAndReadDom": {
+          "medianMs": 0.2,
+          "p95Ms": 0.4
+        },
+        "commitModel": {
+          "medianMs": 0.2,
+          "p95Ms": 0.5
+        },
+        "dirty": {
+          "medianMs": 0,
+          "p95Ms": 0
+        },
+        "render": {
+          "medianMs": 0.3,
+          "p95Ms": 0.8
+        },
+        "layout": {
+          "medianMs": 0,
+          "p95Ms": 0
+        },
+        "uiCloneAndCount": {
+          "medianMs": 0.1,
+          "p95Ms": 0.1
+        },
+        "total": {
+          "medianMs": 0.8,
+          "p95Ms": 1.7
+        }
+      },
+      "docxExport": {
+        "medianMs": 2.7,
+        "p95Ms": 3.8
+      },
+      "docxImport": {
+        "medianMs": 7.1,
+        "p95Ms": 21.8
+      }
+    },
+    {
+      "paragraphs": 100,
+      "characters": 5108,
+      "zipBytes": 15119,
+      "inputPipeline": {
+        "selection": {
+          "medianMs": 0.1,
+          "p95Ms": 0.7
+        },
+        "cloneAndReadDom": {
+          "medianMs": 1.6,
+          "p95Ms": 3.8
+        },
+        "commitModel": {
+          "medianMs": 0.8,
+          "p95Ms": 2.5
+        },
+        "dirty": {
+          "medianMs": 0,
+          "p95Ms": 0.1
+        },
+        "render": {
+          "medianMs": 1,
+          "p95Ms": 1.5
+        },
+        "layout": {
+          "medianMs": 0,
+          "p95Ms": 0
+        },
+        "uiCloneAndCount": {
+          "medianMs": 0.4,
+          "p95Ms": 1.5
+        },
+        "total": {
+          "medianMs": 4.9,
+          "p95Ms": 6.5
+        }
+      },
+      "docxExport": {
+        "medianMs": 4.1,
+        "p95Ms": 6.5
+      },
+      "docxImport": {
+        "medianMs": 7.4,
+        "p95Ms": 8.8
+      }
+    },
+    {
+      "paragraphs": 1000,
+      "characters": 51008,
+      "zipBytes": 123119,
+      "inputPipeline": {
+        "selection": {
+          "medianMs": 0.3,
+          "p95Ms": 0.4
+        },
+        "cloneAndReadDom": {
+          "medianMs": 10.5,
+          "p95Ms": 12
+        },
+        "commitModel": {
+          "medianMs": 5.4,
+          "p95Ms": 7.9
+        },
+        "dirty": {
+          "medianMs": 0.4,
+          "p95Ms": 0.7
+        },
+        "render": {
+          "medianMs": 5.2,
+          "p95Ms": 7.1
+        },
+        "layout": {
+          "medianMs": 0,
+          "p95Ms": 0.1
+        },
+        "uiCloneAndCount": {
+          "medianMs": 3.1,
+          "p95Ms": 5
+        },
+        "total": {
+          "medianMs": 26.2,
+          "p95Ms": 30.8
+        }
+      },
+      "docxExport": {
+        "medianMs": 26.2,
+        "p95Ms": 47.4
+      },
+      "docxImport": {
+        "medianMs": 72,
+        "p95Ms": 133.1
+      }
+    },
+    {
+      "paragraphs": 4000,
+      "characters": 204008,
+      "zipBytes": 483119,
+      "inputPipeline": {
+        "selection": {
+          "medianMs": 1.6,
+          "p95Ms": 3.3
+        },
+        "cloneAndReadDom": {
+          "medianMs": 50.5,
+          "p95Ms": 66.2
+        },
+        "commitModel": {
+          "medianMs": 26.1,
+          "p95Ms": 43.3
+        },
+        "dirty": {
+          "medianMs": 1.5,
+          "p95Ms": 3.8
+        },
+        "render": {
+          "medianMs": 27,
+          "p95Ms": 31.9
+        },
+        "layout": {
+          "medianMs": 0,
+          "p95Ms": 0.1
+        },
+        "uiCloneAndCount": {
+          "medianMs": 12.9,
+          "p95Ms": 44
+        },
+        "total": {
+          "medianMs": 136.6,
+          "p95Ms": 156.5
+        }
+      },
+      "docxExport": {
+        "medianMs": 82.4,
+        "p95Ms": 97.7
+      },
+      "docxImport": {
+        "medianMs": 189.5,
+        "p95Ms": 202.4
+      }
+    }
+  ]
+}

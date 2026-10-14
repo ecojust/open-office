@@ -1,0 +1,146 @@
+{
+  "formatVersion": 1,
+  "generatedAtUtc": "2026-10-14T17:14:36.648606+00:00",
+  "generator": "generate.py",
+  "libreoffice": {
+    "executable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+    "version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5"
+  },
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "provenance": "Original controlled ODT sources authored for Open Office; DOCX files produced by native LibreOffice headless conversion and preserved byte-for-byte without stripping or rewriting package parts.",
+  "fixtures": [
+    {
+      "name": "plain-text",
+      "purpose": "Ordinary paragraphs, including an empty paragraph.",
+      "source": "source/plain-text.odt",
+      "sourceSha256": "0960b7d376b4b8c1fe8348e217b1dd6af3efa9a4052beaf39771dc518698446a",
+      "docx": "libreoffice/plain-text.docx",
+      "docxSha256": "2c7f633cfde79053d36c3b05972786356ba7eb565565eb92f1d4a3bc654940e7",
+      "docxBytes": 5660,
+      "inventory": "inventory/plain-text.json",
+      "expectedParagraphs": [
+        "Plain LibreOffice document.",
+        "Second paragraph with 123 and punctuation.",
+        "",
+        "Final paragraph."
+      ]
+    },
+    {
+      "name": "explicit-styles",
+      "purpose": "Basic run formatting plus alignment and paragraph spacing.",
+      "source": "source/explicit-styles.odt",
+      "sourceSha256": "dec22f0298be2b8394d27501ba23de6a84515e8008bdefacba51d1ffeff60a9f",
+      "docx": "libreoffice/explicit-styles.docx",
+      "docxSha256": "b5f79808cfcdc39ac72cc9a658ecf9228a2fb83f1a46d4f16a6bcde3798b4c96",
+      "docxBytes": 5762,
+      "inventory": "inventory/explicit-styles.json",
+      "expectedParagraphs": [
+        "Normal bold italic underline red sixteen.",
+        "Centered paragraph.",
+        "Right aligned paragraph."
+      ],
+      "expectedSemantics": {
+        "bold": "bold",
+        "italic": "italic",
+        "underline": "underline",
+        "colorSize": {
+          "text": "red sixteen",
+          "color": "#C00000",
+          "fontSizePt": 16
+        },
+        "alignment": [
+          "left",
+          "center",
+          "right"
+        ],
+        "centeredSpacingCm": {
+          "before": 0.25,
+          "after": 0.5
+        }
+      }
+    },
+    {
+      "name": "headings",
+      "purpose": "Heading outline levels, inherited sizes/weight, and keep-with-next.",
+      "source": "source/headings.odt",
+      "sourceSha256": "184285c2b4aa963e944731749c258183b194e730fcb978a8f110a8ed468ebd21",
+      "docx": "libreoffice/headings.docx",
+      "docxSha256": "28f3fba1d8788972f44d316d7e310e9053c5bdffc6760ce7b2109d55379e31ba",
+      "docxBytes": 5703,
+      "inventory": "inventory/headings.json",
+      "expectedParagraphs": [
+        "A heading",
+        "Body below heading.",
+        "A subheading",
+        "Another body paragraph."
+      ],
+      "expectedSemantics": {
+        "outlineLevels": [
+          1,
+          null,
+          2,
+          null
+        ],
+        "headingSizesPt": [
+          20,
+          16
+        ],
+        "keepWithNext": [
+          true,
+          false,
+          true,
+          false
+        ]
+      }
+    },
+    {
+      "name": "unicode-breaks",
+      "purpose": "Chinese, supplementary Unicode, tabs, soft breaks and preserved spaces.",
+      "source": "source/unicode-breaks.odt",
+      "sourceSha256": "c6dd42a5e24c6f3c18b02fdb618b43c3e7ea70e4e9d7c53c90df9d92bcd39e47",
+      "docx": "libreoffice/unicode-breaks.docx",
+      "docxSha256": "52693f590fffc664b5b850f65625169c456f3d5f715fe406c028b3d18aaa03ab",
+      "docxBytes": 5734,
+      "inventory": "inventory/unicode-breaks.json",
+      "expectedParagraphs": [
+        "中文排班与文档 😀🚀",
+        "Line one\n第二行\tTab stop",
+        "  leading   middle  "
+      ]
+    },
+    {
+      "name": "unsupported-table",
+      "purpose": "Negative control: real table structure must remain unsupported until implemented.",
+      "source": "source/unsupported-table.odt",
+      "sourceSha256": "01f8dd376b82048e76862ad6f6fee36340435559bf7097ab89ed828d5cc9d2b4",
+      "docx": "libreoffice/unsupported-table.docx",
+      "docxSha256": "86b5b06572c5542e025d987d374b83e534f5c941cf209480efea5e92fc6ffe51",
+      "docxBytes": 5803,
+      "inventory": "inventory/unsupported-table.json",
+      "expectedParagraphs": [
+        "A table follows.",
+        ""
+      ],
+      "expectUnsupported": "table"
+    }
+  ],
+  "conversion": {
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+      "--headless",
+      "-env:UserInstallation=file:///tmp/open-office-lo-corpus-i7l_nmpa/profile",
+      "--convert-to",
+      "docx:Office Open XML Text",
+      "--outdir",
+      "/tmp/open-office-lo-corpus-i7l_nmpa",
+      "/workspace/open-office/tests/compatibility/independent-word/source/plain-text.odt",
+      "/workspace/open-office/tests/compatibility/independent-word/source/explicit-styles.odt",
+      "/workspace/open-office/tests/compatibility/independent-word/source/headings.odt",
+      "/workspace/open-office/tests/compatibility/independent-word/source/unicode-breaks.odt",
+      "/workspace/open-office/tests/compatibility/independent-word/source/unsupported-table.odt"
+    ],
+    "stdout": "convert /workspace/open-office/tests/compatibility/independent-word/source/plain-text.odt as a Writer document -> /tmp/open-office-lo-corpus-i7l_nmpa/plain-text.docx using filter : Office Open XML Text\nconvert /workspace/open-office/tests/compatibility/independent-word/source/explicit-styles.odt as a Writer document -> /tmp/open-office-lo-corpus-i7l_nmpa/explicit-styles.docx using filter : Office Open XML Text\nconvert /workspace/open-office/tests/compatibility/independent-word/source/headings.odt as a Writer document -> /tmp/open-office-lo-corpus-i7l_nmpa/headings.docx using filter : Office Open XML Text\nconvert /workspace/open-office/tests/compatibility/independent-word/source/unicode-breaks.odt as a Writer document -> /tmp/open-office-lo-corpus-i7l_nmpa/unicode-breaks.docx using filter : Office Open XML Text\nconvert /workspace/open-office/tests/compatibility/independent-word/source/unsupported-table.odt as a Writer document -> /tmp/open-office-lo-corpus-i7l_nmpa/unsupported-table.docx using filter : Office Open XML Text\n",
+    "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n",
+    "exitCode": 0
+  }
+}

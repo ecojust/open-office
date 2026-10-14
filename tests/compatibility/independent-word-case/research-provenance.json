@@ -1,0 +1,126 @@
+{
+  "researchRoot": "/workspace/open-office-research/libreoffice/character-case-compatibility",
+  "hashes": {
+    "report.json": "19ea98f198def25d476d34e094404a58ea01d8beb65eb2eb3d07ab24b0cd19c9",
+    "cross-report.json": "b7d9da1e0824bdd3fba2c54c20c9ad1d51418ca0ca81fad723bda06f37402cba",
+    "editing/report.json": "626de99672e2b8869567270ad50b0837d66d9f46044e7810563ec128f1266933",
+    "editing/driver.log": "96188535c657010fbbd7bf2530dc0e475698d5d86e3644f828f67c727c7d5b29",
+    "product-import-verification.json": "fd1938330eb707493198fc633ceeba231d8aeed7a990a2a16fd0afc0a9f43780",
+    "source/manifest.json": "0a3f50cee0d581d510ae3594b777e685cc3763a914716e4f25da632e3eee8c9e",
+    "source/mapping-manifest.json": "005e9b6e20c8cf43505a00a95f60d138237280768007f82a2569c1fd21ad9f7a"
+  },
+  "nativeVersion": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "independentModes": {
+    "positive": [
+      "none",
+      "upper",
+      "smallCaps",
+      "none",
+      "none",
+      "none",
+      "upper",
+      "upper",
+      "upper",
+      "upper",
+      "upper",
+      "none",
+      "upper",
+      "none",
+      "none",
+      "none",
+      "none",
+      "upper",
+      "smallCaps",
+      "smallCaps",
+      "smallCaps",
+      "none",
+      "smallCaps",
+      "none",
+      "none",
+      "none",
+      "none",
+      "smallCaps",
+      "smallCaps",
+      "upper",
+      "none",
+      "none",
+      "smallCaps",
+      "smallCaps"
+    ],
+    "cross-style": [
+      "none",
+      "upper",
+      "smallCaps",
+      "none",
+      "none",
+      "smallCaps",
+      "none",
+      "upper",
+      "none",
+      "none",
+      "none",
+      "upper",
+      "smallCaps",
+      "none",
+      "none",
+      "smallCaps"
+    ],
+    "default-character": [
+      "none",
+      "upper",
+      "none",
+      "upper"
+    ],
+    "document-default": [
+      "upper",
+      "none",
+      "none",
+      "none"
+    ]
+  },
+  "editingCommands": "XToolkitRobot Enter (key 1280), then x; empty markers receive only x",
+  "sourceCpp": {
+    "commit": "2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+    "files": [
+      {
+        "path": "sw/source/core/txtnode/fntcap.cxx",
+        "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/core/txtnode/fntcap.cxx",
+        "sha256": "6b4d1de38838b344b5ce4ebfb7a33498b2eb97dc9638c632fc626bec5fb94735",
+        "bytes": 26711
+      },
+      {
+        "path": "sw/source/core/doc/DocumentSettingManager.cxx",
+        "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/core/doc/DocumentSettingManager.cxx",
+        "sha256": "a737a8cdb6e967bd81389cc45f5e563bb9624fbf74deb52ca78f9bfd68d2b1ba",
+        "bytes": 61335
+      },
+      {
+        "path": "sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx",
+        "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx",
+        "sha256": "6afbe8574c5f4cb71bd277cf467544a57c851673484e59069c24c2039c7cde0b",
+        "bytes": 448673
+      }
+    ]
+  },
+  "mappingCpp": {
+    "commit": "2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+    "sources": [
+      {
+        "path": "unotools/source/i18n/charclass.cxx",
+        "sha256": "9d65715d3ed48a773cd7a273a3e40c219d8f69f82d6d239cf9e173c3dae0bffc"
+      },
+      {
+        "path": "i18npool/source/characterclassification/cclass_unicode.cxx",
+        "sha256": "032d408fd191094d426ecc30278eea0d097ab6c7f4d12efa36911591725fe871"
+      },
+      {
+        "path": "i18nutil/source/utility/casefolding.cxx",
+        "sha256": "58ea74db0c32a9d14f0cdd2fcb75b5d99dd60c104c4deac758e790e38d0806c5"
+      },
+      {
+        "path": "i18nutil/source/utility/casefolding_data.h",
+        "sha256": "a582254255d69b5a524624e3e9672fdd6caa89d4958a796a333f59280376553f"
+      }
+    ]
+  }
+}

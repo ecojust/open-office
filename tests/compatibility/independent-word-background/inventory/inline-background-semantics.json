@@ -1,0 +1,1157 @@
+{
+  "paragraphs": [
+    {
+      "text": "Before RGB 中文😀 after",
+      "characters": [
+        {
+          "character": "B",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "f",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "o",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "r",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "R",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#ABCDEF"
+        },
+        {
+          "character": "G",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#ABCDEF"
+        },
+        {
+          "character": "B",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#ABCDEF"
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#ABCDEF"
+        },
+        {
+          "character": "中",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#ABCDEF"
+        },
+        {
+          "character": "文",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#ABCDEF"
+        },
+        {
+          "character": "😀",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#ABCDEF"
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "a",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "f",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "t",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "r",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        }
+      ],
+      "runs": [
+        {
+          "text": "Before ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "none",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "RGB ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "#ABCDEF",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {
+            "backgroundColor": "#ABCDEF"
+          }
+        },
+        {
+          "text": "中文😀",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "#ABCDEF",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {
+            "backgroundColor": "#ABCDEF"
+          }
+        },
+        {
+          "text": " ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "none",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "after",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "none",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        }
+      ],
+      "sourceStyle": {
+        "fontSize": 12.0,
+        "verticalAlign": "baseline",
+        "strike": "none",
+        "underline": false,
+        "highlight": "none",
+        "backgroundColor": "none",
+        "fontSizeCs": 12.0,
+        "color": "000000",
+        "rFonts:ascii": "Liberation Serif",
+        "rFonts:hAnsi": "Liberation Serif",
+        "rFonts:eastAsia": "DejaVu Sans",
+        "rFonts:cs": "Noto Sans",
+        "lang:val": "en-US",
+        "lang:eastAsia": "zh-CN",
+        "lang:bidi": "hi-IN"
+      },
+      "paragraphMarkStyle": {}
+    },
+    {
+      "text": "Before Combo 中文😀 after",
+      "characters": [
+        {
+          "character": "B",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "f",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "o",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "r",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "C",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true,
+          "highlight": "none",
+          "backgroundColor": "#13579B"
+        },
+        {
+          "character": "o",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true,
+          "highlight": "none",
+          "backgroundColor": "#13579B"
+        },
+        {
+          "character": "m",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true,
+          "highlight": "none",
+          "backgroundColor": "#13579B"
+        },
+        {
+          "character": "b",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true,
+          "highlight": "none",
+          "backgroundColor": "#13579B"
+        },
+        {
+          "character": "o",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true,
+          "highlight": "none",
+          "backgroundColor": "#13579B"
+        },
+        {
+          "character": " ",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true,
+          "highlight": "none",
+          "backgroundColor": "#13579B"
+        },
+        {
+          "character": "中",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true,
+          "highlight": "none",
+          "backgroundColor": "#13579B"
+        },
+        {
+          "character": "文",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true,
+          "highlight": "none",
+          "backgroundColor": "#13579B"
+        },
+        {
+          "character": "😀",
+          "fontSize": 18.0,
+          "verticalAlign": "superscript",
+          "strike": "double",
+          "underline": true,
+          "highlight": "none",
+          "backgroundColor": "#13579B"
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "a",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "f",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "t",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "r",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        }
+      ],
+      "runs": [
+        {
+          "text": "Before ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "none",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "Combo ",
+          "style": {
+            "fontSize": 18.0,
+            "verticalAlign": "superscript",
+            "strike": "double",
+            "underline": true,
+            "highlight": "none",
+            "backgroundColor": "#13579B",
+            "fontSizeCs": 18.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {
+            "underline": true,
+            "strike": "double",
+            "backgroundColor": "#13579B",
+            "verticalAlign": "superscript",
+            "fontSize": 18.0,
+            "fontSizeCs": 18.0
+          }
+        },
+        {
+          "text": "中文😀",
+          "style": {
+            "fontSize": 18.0,
+            "verticalAlign": "superscript",
+            "strike": "double",
+            "underline": true,
+            "highlight": "none",
+            "backgroundColor": "#13579B",
+            "fontSizeCs": 18.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {
+            "underline": true,
+            "strike": "double",
+            "backgroundColor": "#13579B",
+            "verticalAlign": "superscript",
+            "fontSize": 18.0,
+            "fontSizeCs": 18.0
+          }
+        },
+        {
+          "text": " ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "none",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "after",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "none",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        }
+      ],
+      "sourceStyle": {
+        "fontSize": 12.0,
+        "verticalAlign": "baseline",
+        "strike": "none",
+        "underline": false,
+        "highlight": "none",
+        "backgroundColor": "none",
+        "fontSizeCs": 12.0,
+        "color": "000000",
+        "rFonts:ascii": "Liberation Serif",
+        "rFonts:hAnsi": "Liberation Serif",
+        "rFonts:eastAsia": "DejaVu Sans",
+        "rFonts:cs": "Noto Sans",
+        "lang:val": "en-US",
+        "lang:eastAsia": "zh-CN",
+        "lang:bidi": "hi-IN"
+      },
+      "paragraphMarkStyle": {}
+    },
+    {
+      "text": "Inherited clear tail",
+      "characters": [
+        {
+          "character": "I",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "n",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "h",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "r",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "i",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "t",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "d",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "c",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "l",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "a",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "r",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "t",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "a",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "i",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        },
+        {
+          "character": "l",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#FEDCBA"
+        }
+      ],
+      "runs": [
+        {
+          "text": "Inherited ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "#FEDCBA",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "clear",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "none",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {
+            "backgroundColor": "none"
+          }
+        },
+        {
+          "text": " tail",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "#FEDCBA",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        }
+      ],
+      "sourceStyle": {
+        "fontSize": 12.0,
+        "verticalAlign": "baseline",
+        "strike": "none",
+        "underline": false,
+        "highlight": "none",
+        "backgroundColor": "#FEDCBA",
+        "fontSizeCs": 12.0,
+        "color": "000000",
+        "rFonts:ascii": "Liberation Serif",
+        "rFonts:hAnsi": "Liberation Serif",
+        "rFonts:eastAsia": "DejaVu Sans",
+        "rFonts:cs": "Noto Sans",
+        "lang:val": "en-US",
+        "lang:eastAsia": "zh-CN",
+        "lang:bidi": "hi-IN"
+      },
+      "paragraphMarkStyle": {}
+    },
+    {
+      "text": "Named 蓝😀 tail",
+      "characters": [
+        {
+          "character": "N",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "a",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "m",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "e",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "d",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "蓝",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#123456"
+        },
+        {
+          "character": "😀",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "#123456"
+        },
+        {
+          "character": " ",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "t",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "a",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "i",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        },
+        {
+          "character": "l",
+          "fontSize": 12.0,
+          "verticalAlign": "baseline",
+          "strike": "none",
+          "underline": false,
+          "highlight": "none",
+          "backgroundColor": "none"
+        }
+      ],
+      "runs": [
+        {
+          "text": "Named ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "none",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "蓝😀",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "#123456",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": " ",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "none",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        },
+        {
+          "text": "tail",
+          "style": {
+            "fontSize": 12.0,
+            "verticalAlign": "baseline",
+            "strike": "none",
+            "underline": false,
+            "highlight": "none",
+            "backgroundColor": "none",
+            "fontSizeCs": 12.0,
+            "color": "000000",
+            "rFonts:ascii": "Liberation Serif",
+            "rFonts:hAnsi": "Liberation Serif",
+            "rFonts:eastAsia": "DejaVu Sans",
+            "rFonts:cs": "Noto Sans",
+            "lang:val": "en-US",
+            "lang:eastAsia": "zh-CN",
+            "lang:bidi": "hi-IN"
+          },
+          "directStyle": {}
+        }
+      ],
+      "sourceStyle": {
+        "fontSize": 12.0,
+        "verticalAlign": "baseline",
+        "strike": "none",
+        "underline": false,
+        "highlight": "none",
+        "backgroundColor": "none",
+        "fontSizeCs": 12.0,
+        "color": "000000",
+        "rFonts:ascii": "Liberation Serif",
+        "rFonts:hAnsi": "Liberation Serif",
+        "rFonts:eastAsia": "DejaVu Sans",
+        "rFonts:cs": "Noto Sans",
+        "lang:val": "en-US",
+        "lang:eastAsia": "zh-CN",
+        "lang:bidi": "hi-IN"
+      },
+      "paragraphMarkStyle": {}
+    }
+  ],
+  "zipEntries": 11
+}

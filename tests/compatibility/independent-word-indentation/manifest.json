@@ -1,0 +1,93 @@
+{
+  "formatVersion": 1,
+  "generatedAtUtc": "2026-10-14T17:39:50.102749+00:00",
+  "generator": "generate.py",
+  "libreoffice": {
+    "executable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+    "version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5"
+  },
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "provenance": "Original controlled ODT sources authored for Open Office; DOCX files produced by native LibreOffice headless conversion and preserved byte-for-byte without stripping or rewriting package parts.",
+  "fixtures": [
+    {
+      "name": "paragraph-indentation",
+      "purpose": "Named inherited left/right, first-line and hanging indents, explicit zero resets, and an indented heading with a differently indented follow style.",
+      "source": "source/paragraph-indentation.odt",
+      "sourceSha256": "6d90cb57cc6a1174c60aef9b9a5ad1aabbc3c2d79b91c1c3b4750f98b519d72d",
+      "docx": "libreoffice/paragraph-indentation.docx",
+      "docxSha256": "5dd741ce0c6d536937fa9273100d47dc450fbf1d2ce565eba01f58e20e8487f2",
+      "docxBytes": 6101,
+      "inventory": "inventory/paragraph-indentation.json",
+      "expectedParagraphs": [
+        "Plain baseline paragraph.",
+        "Inherited left and right indentation. 中文段落。",
+        "First line indentation only. This sentence is deliberately long enough to wrap when the document is viewed at a narrow width.",
+        "Hanging indentation. The first line starts before subsequent lines, with the left and right paragraph margins retained.",
+        "Explicit zero cancels inherited indentation.",
+        "Indented heading",
+        "Final plain paragraph."
+      ],
+      "expectedSemantics": {
+        "indentPoints": [
+          {
+            "left": 0,
+            "right": 0,
+            "firstLine": 0
+          },
+          {
+            "left": 36,
+            "right": 18,
+            "firstLine": 0
+          },
+          {
+            "left": 0,
+            "right": 0,
+            "firstLine": 18
+          },
+          {
+            "left": 36,
+            "right": 18,
+            "firstLine": -18
+          },
+          {
+            "left": 0,
+            "right": 0,
+            "firstLine": 0
+          },
+          {
+            "left": 24,
+            "right": 12,
+            "firstLine": 12
+          },
+          {
+            "left": 0,
+            "right": 0,
+            "firstLine": 0
+          }
+        ],
+        "zeroResetParagraph": 4,
+        "headingParagraph": 5,
+        "headingFollowIndentPoints": {
+          "left": 36,
+          "right": 18,
+          "firstLine": 0
+        }
+      }
+    }
+  ],
+  "conversion": {
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+      "--headless",
+      "-env:UserInstallation=file:///tmp/open-office-lo-corpus-9h0m1v1g/profile",
+      "--convert-to",
+      "docx:Office Open XML Text",
+      "--outdir",
+      "/tmp/open-office-lo-corpus-9h0m1v1g",
+      "/workspace/open-office/tests/compatibility/independent-word-indentation/source/paragraph-indentation.odt"
+    ],
+    "stdout": "convert /workspace/open-office/tests/compatibility/independent-word-indentation/source/paragraph-indentation.odt as a Writer document -> /tmp/open-office-lo-corpus-9h0m1v1g/paragraph-indentation.docx using filter : Office Open XML Text\n",
+    "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n",
+    "exitCode": 0
+  }
+}

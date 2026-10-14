@@ -1,0 +1,3541 @@
+{
+  "formatVersion": 1,
+  "libreoffice": {
+    "version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5"
+  },
+  "provenance": "Native DOCX packages copied byte-for-byte from research output. ODT expectations are specified from authored FODT, exhaustive signed-twip expectations from Q-number inputs; Enter expectations from real XToolkitRobot editing evidence. No native packages were rewritten.",
+  "flatSource": {
+    "path": "source/odt-authored.fodt",
+    "sha256": "f9140669128c1a872e9bff99ac5a14727e4137eefdc94e9d843a9670f8d3c35a"
+  },
+  "researchDirectory": "/workspace/open-office-research/libreoffice/character-spacing-compatibility",
+  "researchHashes": {
+    "boundaries-odt-report.json": "15e3e83c0bcc4de5b0f3a6dc94aee2704f8d3bab83fe4aadeefe2826ad62634c",
+    "boundaries-odt-sha256.json": "3f96105fef5b9699013b5f2214f457dec5feca843739b053ae1eb429858d828f",
+    "editing/report.json": "4e0ff8d6e75df889f6f6baf712310bbcb3f1d4272fb0960c8e54fd6891a70079",
+    "editing/driver.log": "d29732760be572e3503ae11cbebed32d47dcdb7254ff9268895cf2b7e2495cfa",
+    "editing/sha256.json": "b19e3af52cdfafedfd6b2100ee0338b886bdf5a1434b643f1362f17e8e224115",
+    "supported-odt-report.json": "5853a20aa0df5da3e020419862cd1204607aa6d1771e0f7a8b65553d676b0733",
+    "supported-odt-sha256.json": "251669832003db6caba742e7200401c6c026a1d2c769f7dd65ddfc705510b5f9",
+    "editing-supported/report.json": "6cfac9e7946b0fa50586bcec52869d6b7bf3074a97d5b60eea39f3cf1ad68fb0",
+    "editing-supported/driver.log": "e5627c9ab7ed54ef7dbc3352502aebdc27ee7a6e989f03974295271951ac316c",
+    "editing-supported/sha256.json": "7574126af6cc2c2bfb2c1e980872b0203809ae95264ddefdd1717c7e71cd660f",
+    "editing-supported-explicit-color/report.json": "55de2da82763b91a45ded9b86c569d2087f606b00f8b04b156aaaff262e00a56",
+    "editing-supported-explicit-color/driver.log": "5def085157d1acc23bf84398dd972422d2558c68a399d0e2818aa989f4724e98",
+    "editing-supported-explicit-color/sha256.json": "899d8ec7d16b3fec353d48eff4dc7d83cbda11fc3e09b98a49fa9cee5617fb41",
+    "product-import-verification.json": "9ebd005c2e0effe199e2382b0d0ee002fee67648ea825b6fbf80dc407143c052"
+  },
+  "fixtures": [
+    {
+      "name": "odt-authored",
+      "source": "source/odt-authored.odt",
+      "sourceKind": "independently-authored-fodt-to-native-odt",
+      "docx": "libreoffice/odt-authored.docx",
+      "expectedCharacters": [
+        [
+          {
+            "character": "N",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "l",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "i",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "g",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "h",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "l",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "i",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "i",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "t",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "o",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "h",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "t",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "o",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "s",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "l",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "m",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "T",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "I",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "V",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "E",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "s",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "u",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "s",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "c",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "i",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "t",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "A",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "T",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "I",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "V",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "E",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "s",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "u",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "b",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "s",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "c",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "r",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "i",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "p",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "t",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "c",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "l",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "a",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "m",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "p",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          }
+        ],
+        [],
+        [
+          {
+            "character": "N",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "f",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "t",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "m",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "t",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "sourceSha256": "354a6ea11ce3f4b74eb17f959b00f751927a06f21211467e97567a55bb9e7a21",
+      "docxSha256": "2ee2092bec5401e3b41cdd79079a1600366848eddbe2b438ea726a99a23a7359",
+      "expectUnsupported": true,
+      "unsupportedReason": "Native ODT default CJK paragraph layout emits kinsoku/overflowPunct/autoSpaceDE, outside current layout subset. The complete native package is retained unchanged as a rejection control."
+    },
+    {
+      "name": "all-supported-twips",
+      "source": "source/all-supported-twips.docx",
+      "sourceKind": "explicitly-synthetic-docx-resaved-by-native",
+      "docx": "libreoffice/all-supported-twips.docx",
+      "expectedTwips": {
+        "min": -400,
+        "max": 400,
+        "prefix": "Q"
+      },
+      "sourceSha256": "d9981e4110c44a4939b31d9f97e9ed9c9588f1a9df91c8479cdf547c85994c5d",
+      "docxSha256": "52263c6acbcddca56870d47f9ced12aba85f982854a8f2add5a79d3ff5396d6e"
+    },
+    {
+      "name": "odt-supported-authored",
+      "source": "source/odt-supported-authored.odt",
+      "sourceKind": "independently-authored-odt-with-supported-layout",
+      "docx": "libreoffice/odt-supported-authored.docx",
+      "expectedCharacters": [
+        [
+          {
+            "character": "N",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "l",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "i",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "g",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "h",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "l",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "i",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "i",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "t",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "z",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "o",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "h",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "t",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "x",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "o",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "n",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "s",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "d",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "c",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "l",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "m",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "T",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "I",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "V",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "E",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "s",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "u",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "s",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "c",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "i",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "t",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "superscript"
+          }
+        ],
+        [
+          {
+            "character": "N",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "A",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "T",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "I",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "V",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "E",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "s",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "u",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "b",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "s",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "c",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "r",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "i",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "p",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "t",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "c",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "l",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "a",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "m",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "p",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": " ",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          },
+          {
+            "character": "M",
+            "letterSpacing": -5,
+            "fontSize": 12,
+            "verticalAlign": "subscript"
+          }
+        ],
+        [],
+        [
+          {
+            "character": "N",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "A",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "T",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "I",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "V",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "E",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "a",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "f",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "t",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "r",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": " ",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "e",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "m",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "p",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "t",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "y",
+            "letterSpacing": 0,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "sourceSha256": "b9d0abce473ee896c57e2eda1d12dde172df5cdfa93d98a356b034a60ab7e95e",
+      "docxSha256": "694d8d27117792deb30be2e70a4d07a0c3b1d701cbf986216729edcbf62811e3"
+    }
+  ],
+  "editingFixtures": [
+    {
+      "name": "named-equal-next",
+      "source": "source/named-equal-next.docx",
+      "sourceKind": "explicitly-synthetic-docx-native-XToolkitRobot-Enter-and-X",
+      "docx": "libreoffice/named-equal-next-edited.docx",
+      "initialCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "X",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "sourceSha256": "a30f65c51728b2962f16b984719df5fb40419afc1f0fe4d214dba502b7481fcc",
+      "docxSha256": "611a68ec265cda35f652680d910ac9019a029080297ed873feb38176d595471f",
+      "expectUnsupported": true,
+      "unsupportedReason": "Native control source enables automatic hyphenation in its Normal style; preserved without modifying input or output."
+    },
+    {
+      "name": "default-equal-next",
+      "source": "source/default-equal-next.docx",
+      "sourceKind": "explicitly-synthetic-docx-native-XToolkitRobot-Enter-and-X",
+      "docx": "libreoffice/default-equal-next-edited.docx",
+      "initialCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "X",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "sourceSha256": "d3a72dca96e7f6ef18cbce9a25690b28144e3bcff106321242b3fa9ad74e0338",
+      "docxSha256": "2a22d17864b55d245249e13c0757c7bf9105f52d6aee67d765665d5ba5f486c1",
+      "expectUnsupported": true,
+      "unsupportedReason": "Native control source enables automatic hyphenation in its Normal style; preserved without modifying input or output."
+    },
+    {
+      "name": "named-unequal-next",
+      "source": "source/named-unequal-next.docx",
+      "sourceKind": "explicitly-synthetic-docx-native-XToolkitRobot-Enter-and-X",
+      "docx": "libreoffice/named-unequal-next-edited.docx",
+      "initialCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "X",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "sourceSha256": "9f0eaf3248e8accb15c231149cd43fc6e3d1c0288c5d674af46593edc7288989",
+      "docxSha256": "2a4643535c3fd9b467ea84dd651206c3625474c87eed348a29c3bba322d6bde3",
+      "expectUnsupported": true,
+      "unsupportedReason": "Native control source enables automatic hyphenation in its Normal style; preserved without modifying input or output."
+    },
+    {
+      "name": "no-character-next",
+      "source": "source/no-character-next.docx",
+      "sourceKind": "explicitly-synthetic-docx-native-XToolkitRobot-Enter-and-X",
+      "docx": "libreoffice/no-character-next-edited.docx",
+      "initialCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "X",
+            "letterSpacing": -0.5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "sourceSha256": "8525409052ebd3eef05a7e19fe77fbb7535b888ede5821d4fe1d3f96e6c2c9be",
+      "docxSha256": "dd1b3028b046ec1479eba1636063869194e1ec82ffaac76a4885efe37977aba5",
+      "expectUnsupported": true,
+      "unsupportedReason": "Native control source enables automatic hyphenation in its Normal style; preserved without modifying input or output."
+    },
+    {
+      "name": "supported-named-equal-next",
+      "source": "source/supported-named-equal-next.docx",
+      "sourceKind": "explicitly-synthetic-docx-supported-layout-native-XToolkitRobot-Enter-and-X",
+      "docx": "libreoffice/supported-named-equal-next-edited.docx",
+      "initialCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "X",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "variant": "named-equal-next",
+      "sourceSha256": "1afa9aeafa7f0285b7b5c3fb5596b2fdbffc62c73abc704b36a0569673c24ea0",
+      "docxSha256": "c2ba712ce5c6921884de0e78e663a6afea9780fb4e5dabb1274f8c224122be0f",
+      "expectUnsupported": true,
+      "sourceSupported": true,
+      "unsupportedReason": "Author input is in current subset, but complete native edited output introduces automatic font color; preserved unchanged as a native output rejection control."
+    },
+    {
+      "name": "supported-default-equal-next",
+      "source": "source/supported-default-equal-next.docx",
+      "sourceKind": "explicitly-synthetic-docx-supported-layout-native-XToolkitRobot-Enter-and-X",
+      "docx": "libreoffice/supported-default-equal-next-edited.docx",
+      "initialCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "X",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "variant": "default-equal-next",
+      "sourceSha256": "04de3f169b67687d0367f7bfbbc183d224a964482bd94747caf944b0a89d7e58",
+      "docxSha256": "30a13935202fedbb263f2a54a1cc47d53af9a8cd1701cbda22c2ad9ead6f1544",
+      "expectUnsupported": true,
+      "sourceSupported": true,
+      "unsupportedReason": "Author input is in current subset, but complete native edited output introduces automatic font color; preserved unchanged as a native output rejection control."
+    },
+    {
+      "name": "supported-named-unequal-next",
+      "source": "source/supported-named-unequal-next.docx",
+      "sourceKind": "explicitly-synthetic-docx-supported-layout-native-XToolkitRobot-Enter-and-X",
+      "docx": "libreoffice/supported-named-unequal-next-edited.docx",
+      "initialCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "X",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "variant": "named-unequal-next",
+      "sourceSha256": "7ade56a4889acf2b643d185395a81b6f0d793939ce8b1b1097138be95489b9e5",
+      "docxSha256": "070026ebe36c194569a13dea5a70a8369f82fd2f3481eaa3c915f118d4c5377a",
+      "expectUnsupported": true,
+      "sourceSupported": true,
+      "unsupportedReason": "Author input is in current subset, but complete native edited output introduces automatic font color; preserved unchanged as a native output rejection control."
+    },
+    {
+      "name": "supported-no-character-next",
+      "source": "source/supported-no-character-next.docx",
+      "sourceKind": "explicitly-synthetic-docx-supported-layout-native-XToolkitRobot-Enter-and-X",
+      "docx": "libreoffice/supported-no-character-next-edited.docx",
+      "initialCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "X",
+            "letterSpacing": -0.5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "variant": "no-character-next",
+      "sourceSha256": "ebc8af2afb3e2b299055dc74f433611abb490e75ed18ab66554068e23632e853",
+      "docxSha256": "9ada50c9e2f0cdda7432181ab506d626390df58ed084d8d019135bc084f8d021",
+      "expectUnsupported": true,
+      "sourceSupported": true,
+      "unsupportedReason": "Author input is in current subset, but complete native edited output introduces automatic font color; preserved unchanged as a native output rejection control."
+    },
+    {
+      "name": "explicit-color-named-equal-next",
+      "source": "source/explicit-color-named-equal-next.docx",
+      "sourceKind": "explicitly-synthetic-docx-supported-layout-and-explicit-color-native-XToolkitRobot-Enter-and-X",
+      "docx": "libreoffice/explicit-color-named-equal-next-edited.docx",
+      "initialCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "X",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "variant": "named-equal-next",
+      "sourceSha256": "9cceb0aea95f988f88c2049ea2cd928f90d1c89def0bb3ad42dbc319d3df8c58",
+      "docxSha256": "ffd64f183eb91198a1db3b3effcfbfb1b83426e451de7f6c4f32ad83122a7a6f"
+    },
+    {
+      "name": "explicit-color-default-equal-next",
+      "source": "source/explicit-color-default-equal-next.docx",
+      "sourceKind": "explicitly-synthetic-docx-supported-layout-and-explicit-color-native-XToolkitRobot-Enter-and-X",
+      "docx": "libreoffice/explicit-color-default-equal-next-edited.docx",
+      "initialCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "X",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "variant": "default-equal-next",
+      "sourceSha256": "d34fb9f7115bdb7614bc8c824b1f6bfb67b33351ed64992dc4140a0c98247741",
+      "docxSha256": "e3392c5174d821e2dc70316b350b37bb19cef79712764787f5a391fea538d68f"
+    },
+    {
+      "name": "explicit-color-named-unequal-next",
+      "source": "source/explicit-color-named-unequal-next.docx",
+      "sourceKind": "explicitly-synthetic-docx-supported-layout-and-explicit-color-native-XToolkitRobot-Enter-and-X",
+      "docx": "libreoffice/explicit-color-named-unequal-next-edited.docx",
+      "initialCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "X",
+            "letterSpacing": 2,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "variant": "named-unequal-next",
+      "sourceSha256": "13cc5d2dba3a1ec32fd4c135849b567cb3f6400d550b43d0f4cc028151363e22",
+      "docxSha256": "2367fdc0859068897c47994c1ec655a6cbde770c5875852497a374e53b7b56ce"
+    },
+    {
+      "name": "explicit-color-no-character-next",
+      "source": "source/explicit-color-no-character-next.docx",
+      "sourceKind": "explicitly-synthetic-docx-supported-layout-and-explicit-color-native-XToolkitRobot-Enter-and-X",
+      "docx": "libreoffice/explicit-color-no-character-next-edited.docx",
+      "initialCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "expectedCharacters": [
+        [
+          {
+            "character": "A",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "B",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          },
+          {
+            "character": "C",
+            "letterSpacing": 1,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ],
+        [
+          {
+            "character": "X",
+            "letterSpacing": -0.5,
+            "fontSize": 12,
+            "verticalAlign": "baseline"
+          }
+        ]
+      ],
+      "variant": "no-character-next",
+      "sourceSha256": "84685c7f7c3688cceb99658d77b5a2d769078d9be6a8667d0bc7e7a33622359d",
+      "docxSha256": "ebd40be3c98ecf43aec2beb5fddd6af344c8a0d3a2cbccc4f0771032fbb408bd"
+    }
+  ]
+}

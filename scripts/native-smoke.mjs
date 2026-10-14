@@ -8,6 +8,7 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { validateWordPackageReport } from './word-package-native-smoke.mjs';
 
 // This launches the final packaged GUI, not a source executable or an isolated
 // engine substitute. A native desktop session is required on the CI runner.
@@ -153,6 +154,9 @@ export function validateFrontendReport(report) {
   requireCheck(report.sharedArrayBuffer === true, 'SharedArrayBuffer is unavailable in the native WebView');
   requireCheck(typeof report.userAgent === 'string' && report.userAgent.length > 10, 'Missing native WebView user agent');
 
+  requireCheck(report.independentWordPackage && typeof report.independentWordPackage === 'object', 'Independent Word native IPC report is missing');
+  validateWordPackageReport(report.independentWordPackage);
+
   const office = report.office;
   requireCheck(office?.ok === true, 'Office engine did not pass its document round trips');
   requireCheck(typeof office.engine === 'string' && office.engine.includes('LibreOffice'), 'Missing actual Office engine identity');
@@ -200,6 +204,7 @@ export function validateFrontendReport(report) {
 
   return {
     ...officeWorkbenchChecks,
+    independentWordPackageIpc: true,
     presentationWorkbenchRoundTrip: true, presentationMediaMetadata: true, presentationCanvasNavigation: true,
     crossOriginIsolated: true, sharedArrayBuffer: true, writerOriginalTextRoundTrip: true,
     writerPdfExport: true, calcFormulaRoundTrip: true, calcPdfExport: true,

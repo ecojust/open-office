@@ -1,0 +1,18 @@
+[package]
+name = "word-package"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.90"
+license = "MIT"
+description = "Bounded independent ZIP package processing for Word documents"
+
+[dependencies]
+base64 = "0.22.1"
+crc32fast = "1.5.2"
+flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[bin]]
+name = "word-package-cli"
+path = "src/bin/word-package-cli.rs"

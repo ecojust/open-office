@@ -119,6 +119,8 @@ jobs:
         run: npm run build
       - name: Run Rust file bridge and process tests
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml -- --include-ignored
+      - name: Verify independent DOCX package core
+        run: cargo test --locked --manifest-path crates/word-package/Cargo.toml
       - name: Build native installation package
         run: npm run desktop:build -- --bundles ${{ matrix.bundles }}
       - name: Install Windows package to verify the delivered resource layout
@@ -399,7 +401,7 @@ jobs:
           NODE
           else
             mapfile -t assets < <(node -e 'for (const file of require("./release-assets.json")) console.log(`artifacts/${file}`)')
-            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --title "Open Office ${version} · 四工作区更新 · Windows / macOS" --notes-file release-notes.md "${assets[@]}"
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --title "Open Office ${version} · Windows / macOS" --notes-file release-notes.md "${assets[@]}"
           fi
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,targetCommitish,assets > release-ready.json
           node --input-type=module <<'NODE'

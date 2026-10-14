@@ -39,6 +39,7 @@ export interface AppBootstrap {
   runtimeBaseUrl: string
   platform: string
   smokeMode: boolean
+  smokeScope?: 'full' | 'word-package-ipc'
 }
 
 export interface NativeImage { name: string; base64: string; mimeType: 'image/png' | 'image/jpeg' }
