@@ -1,0 +1,604 @@
+{
+  "date": "2026-10-14",
+  "status": "Toolbar CSS fixed and build passed; native input verification is partial with a reproduced focus/navigation/click failure.",
+  "productChange": "Prevent all direct toolbar children except flexible spacers from shrinking; preserve one-row horizontal scrolling. Native engine and document protocol unchanged in this follow-up.",
+  "correction": "Early screenshots captured transient resize/layout frames, not established persistent canvas compression. Historical pre-correction report is retained separately.",
+  "priorFullRegression": {
+    "node": 680,
+    "python": 68,
+    "failures": 0,
+    "scope": "Previous final Word list/Calc formatting code; not a fresh full-suite run for this CSS-only follow-up."
+  },
+  "finalBuild": {
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "elapsedSeconds": 20.69,
+    "path": "test-results/viewport-iteration/build.log"
+  },
+  "preCssWaitOnlyReruns": [
+    {
+      "path": "test-results/viewport-iteration/word-ui/ui-report.json",
+      "ok": true,
+      "checks": 12,
+      "failures": [],
+      "errors": []
+    },
+    {
+      "path": "test-results/viewport-iteration/calc-ui/ui-report.json",
+      "ok": true,
+      "checks": 9,
+      "failures": [],
+      "errors": []
+    },
+    {
+      "path": "test-results/viewport-iteration/word-audit/independent-xml-report.json",
+      "ok": true,
+      "checks": 350,
+      "failures": [],
+      "errors": []
+    },
+    {
+      "path": "test-results/viewport-iteration/calc-audit.json",
+      "ok": true,
+      "checks": 300,
+      "failures": [],
+      "errors": []
+    }
+  ],
+  "finalCssNativeStages": [
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-09-56-949Z-552406/ui-report.json",
+      "ok": false,
+      "flow": "full",
+      "phase": "calc-dpr1 wide-1560",
+      "pageErrors": 0,
+      "checks": [
+        "word-dpr1 wide-1560: both visible targets select expected content in the same document",
+        "word-dpr1 narrow-820: both visible targets select expected content in the same document",
+        "word-dpr1 narrow-820-panel-open: both visible targets select expected content in the same document",
+        "word-dpr1 narrow-820-panel-closed: both visible targets select expected content in the same document",
+        "word-dpr1 small-390: both visible targets select expected content in the same document",
+        "word-dpr1 small-390-edited: both visible targets select expected content in the same document",
+        "word-dpr1 restored-1560-edited: both visible targets select expected content in the same document",
+        "word-dpr1: independent exported ZIP/XML contains the narrow-viewport edit and untouched sentinels"
+      ],
+      "runs": [
+        {
+          "kind": "word",
+          "dpr": 1,
+          "ok": true,
+          "documentId": "0a644ce5-9a06-4fd5-a20f-29cea2d04efb",
+          "checkpoints": [
+            "wide-1560",
+            "narrow-820",
+            "narrow-820-panel-open",
+            "narrow-820-panel-closed",
+            "small-390",
+            "small-390-edited",
+            "restored-1560-edited"
+          ],
+          "postEditObservations": [],
+          "keyboardCommit": null,
+          "exportedFile": "word-dpr1-edited.docx",
+          "exported": {
+            "kind": "word",
+            "paragraphs": [
+              "RESIZED",
+              "ANCHOR",
+              "WORD_SENTINEL"
+            ]
+          },
+          "controlSelectionFailed": false
+        },
+        {
+          "kind": "calc",
+          "dpr": 1,
+          "ok": false,
+          "documentId": "cfb46775-00d4-437c-b4f2-566a5fceefa8",
+          "checkpoints": [],
+          "postEditObservations": [],
+          "keyboardCommit": null,
+          "exportedFile": null,
+          "exported": null,
+          "controlSelectionFailed": false
+        }
+      ]
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-14-21-605Z-552827/ui-report.json",
+      "ok": false,
+      "flow": "full",
+      "phase": "calc-dpr1 small-390-edited",
+      "pageErrors": 0,
+      "checks": [
+        "calc-dpr1 wide-1560: both visible targets select expected content in the same document",
+        "calc-dpr1 narrow-820: both visible targets select expected content in the same document",
+        "calc-dpr1 small-390: both visible targets select expected content in the same document"
+      ],
+      "runs": [
+        {
+          "kind": "calc",
+          "dpr": 1,
+          "ok": false,
+          "documentId": "2e6607d2-7459-47ba-abaa-a8e1852296d9",
+          "checkpoints": [
+            "wide-1560",
+            "narrow-820",
+            "small-390"
+          ],
+          "postEditObservations": [],
+          "keyboardCommit": null,
+          "exportedFile": null,
+          "exported": null,
+          "controlSelectionFailed": false
+        }
+      ]
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-18-08-469Z-553103/ui-report.json",
+      "ok": false,
+      "flow": "full",
+      "phase": "calc-dpr1 small-390-edited",
+      "pageErrors": 0,
+      "checks": [
+        "calc-dpr1 wide-1560: both visible targets select expected content in the same document",
+        "calc-dpr1 narrow-820: both visible targets select expected content in the same document",
+        "calc-dpr1 small-390: both visible targets select expected content in the same document"
+      ],
+      "runs": [
+        {
+          "kind": "calc",
+          "dpr": 1,
+          "ok": false,
+          "documentId": "cbd8cd1a-b653-4735-8fe1-3e4bcbed8ee5",
+          "checkpoints": [
+            "wide-1560",
+            "narrow-820",
+            "small-390"
+          ],
+          "postEditObservations": [],
+          "keyboardCommit": {
+            "selection": "B3",
+            "revision": 2
+          },
+          "exportedFile": null,
+          "exported": null,
+          "controlSelectionFailed": false
+        }
+      ]
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-20-27-344Z-553322/ui-report.json",
+      "ok": false,
+      "flow": "full",
+      "phase": "calc-dpr1 small-390-edited",
+      "pageErrors": 0,
+      "checks": [
+        "calc-dpr1 wide-1560: both visible targets select expected content in the same document",
+        "calc-dpr1 narrow-820: both visible targets select expected content in the same document",
+        "calc-dpr1 small-390: both visible targets select expected content in the same document"
+      ],
+      "runs": [
+        {
+          "kind": "calc",
+          "dpr": 1,
+          "ok": false,
+          "documentId": "2dafce35-f9e1-42b1-b324-e7bef4baafb0",
+          "checkpoints": [
+            "wide-1560",
+            "narrow-820",
+            "small-390"
+          ],
+          "postEditObservations": [],
+          "keyboardCommit": {
+            "selection": "B3",
+            "revision": 2
+          },
+          "exportedFile": null,
+          "exported": null,
+          "controlSelectionFailed": false
+        }
+      ]
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-25-47-450Z-553741/ui-report.json",
+      "ok": false,
+      "flow": "wide-control",
+      "phase": "calc-dpr1 wide control selection",
+      "pageErrors": 0,
+      "checks": [
+        "calc-dpr1: independent exported ZIP/XML contains the keyboard edit and untouched sentinels"
+      ],
+      "runs": [
+        {
+          "kind": "calc",
+          "dpr": 1,
+          "ok": false,
+          "documentId": "2d43ade1-a7ba-4e91-bcb7-84a6aa4bff11",
+          "checkpoints": [
+            "wide-control-before-edit"
+          ],
+          "postEditObservations": [],
+          "keyboardCommit": {
+            "selection": "B3",
+            "revision": 2
+          },
+          "exportedFile": "calc-dpr1-edited.xlsx",
+          "exported": {
+            "kind": "calc",
+            "cells": {
+              "A1": {
+                "type": "s",
+                "value": "ORIGIN",
+                "formula": ""
+              },
+              "B2": {
+                "type": "n",
+                "value": "314",
+                "formula": ""
+              },
+              "A4": {
+                "type": "s",
+                "value": "KEEP",
+                "formula": ""
+              },
+              "C5": {
+                "type": "s",
+                "value": "SHEET_SENTINEL",
+                "formula": ""
+              }
+            }
+          },
+          "controlSelectionFailed": true
+        }
+      ]
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-27-27-391Z-553969/ui-report.json",
+      "ok": true,
+      "flow": "direct-export",
+      "phase": null,
+      "pageErrors": 0,
+      "checks": [
+        "word-dpr2 wide-1560: both visible targets select expected content in the same document",
+        "word-dpr2 narrow-820: both visible targets select expected content in the same document",
+        "word-dpr2 narrow-820-panel-open: both visible targets select expected content in the same document",
+        "word-dpr2 narrow-820-panel-closed: both visible targets select expected content in the same document",
+        "word-dpr2 small-390: both visible targets select expected content in the same document",
+        "word-dpr2: independent exported ZIP/XML contains the keyboard edit and untouched sentinels",
+        "calc-dpr2 wide-1560: both visible targets select expected content in the same document",
+        "calc-dpr2 narrow-820: both visible targets select expected content in the same document",
+        "calc-dpr2 small-390: both visible targets select expected content in the same document",
+        "calc-dpr2: independent exported ZIP/XML contains the keyboard edit and untouched sentinels",
+        "Source fixtures remain unchanged; every serial native UI run completed without page runtime errors"
+      ],
+      "runs": [
+        {
+          "kind": "word",
+          "dpr": 2,
+          "ok": true,
+          "documentId": "e85fbad9-aed3-41d3-bf19-33dd704f373a",
+          "checkpoints": [
+            "wide-1560",
+            "narrow-820",
+            "narrow-820-panel-open",
+            "narrow-820-panel-closed",
+            "small-390"
+          ],
+          "postEditObservations": [
+            "small-390-edited-direct",
+            "restored-1560-edited-direct"
+          ],
+          "keyboardCommit": {
+            "selection": {
+              "id": "w1-s17",
+              "text": "",
+              "truncated": false,
+              "collapsed": true,
+              "tableName": null,
+              "cellName": null
+            },
+            "revision": 10
+          },
+          "exportedFile": "word-dpr2-edited.docx",
+          "exported": {
+            "kind": "word",
+            "paragraphs": [
+              "RESIZED",
+              "ANCHOR",
+              "WORD_SENTINEL"
+            ]
+          },
+          "controlSelectionFailed": false
+        },
+        {
+          "kind": "calc",
+          "dpr": 2,
+          "ok": true,
+          "documentId": "460fbb1e-c434-4d62-a6f7-da9145f62946",
+          "checkpoints": [
+            "wide-1560",
+            "narrow-820",
+            "small-390"
+          ],
+          "postEditObservations": [
+            "small-390-edited-direct",
+            "restored-1560-edited-direct"
+          ],
+          "keyboardCommit": {
+            "selection": "B3",
+            "revision": 2
+          },
+          "exportedFile": "calc-dpr2-edited.xlsx",
+          "exported": {
+            "kind": "calc",
+            "cells": {
+              "A1": {
+                "type": "s",
+                "value": "ORIGIN",
+                "formula": ""
+              },
+              "B2": {
+                "type": "n",
+                "value": "314",
+                "formula": ""
+              },
+              "A4": {
+                "type": "s",
+                "value": "KEEP",
+                "formula": ""
+              },
+              "C5": {
+                "type": "s",
+                "value": "SHEET_SENTINEL",
+                "formula": ""
+              }
+            }
+          },
+          "controlSelectionFailed": false
+        }
+      ]
+    }
+  ],
+  "independentNativeSummary": "test-results/viewport-iteration/ui/2026-10-14T09-27-27-391Z-553969/evidence-summary.json",
+  "knownLimits": [
+    "Calc typed B2=314, Enter to B3, DOM canvas.focus(), Ctrl+Home, then screenshot-derived B2 click can leave A1 selected/in edit mode. The failure repeats at390px and a fresh1560px document without resize.",
+    "Correct DOM pointer events and completed Enter were observed; exact focus-versus-navigation cause is not isolated. No product regression or root cause is claimed.",
+    "Pointer excursion and paced clicks did not recover selection. Successful export does not turn the failing selection case into a pass.",
+    "DPR2 direct-export checks intentionally omit post-edit focus/Ctrl+Home/canvas clicks and cannot supersede the failing full flow.",
+    "Linux Chromium sampled widths/DPR are not macOS/Windows WebView, touch, IME, or universal document compatibility validation.",
+    "Native advanced menus remain; no new desktop installer was built or released."
+  ],
+  "fingerprints": [
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-09-56-949Z-552406/ui-report.json",
+      "bytes": 838168,
+      "sha256": "ac11915edf09d950ca8a5043a20a4287ed5520d5b0ddb35faceb9ecf00698054"
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-09-56-949Z-552406/word-dpr1-edited.docx",
+      "bytes": 5231,
+      "sha256": "da9cbeff44f8d18d64415c69b28b0eb9ef43240c726c547702642c2458dedc40"
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-14-21-605Z-552827/ui-report.json",
+      "bytes": 15542,
+      "sha256": "8157379bb6d340bf0e595c5f6914c0edaab19f2e59cdb793d92d2559d0e9b00f"
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-18-08-469Z-553103/ui-report.json",
+      "bytes": 29261,
+      "sha256": "ba1e8acfd79e9933596d34256c4a2280eb266173edc891f97f2d926019cb20f8"
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-20-27-344Z-553322/ui-report.json",
+      "bytes": 30667,
+      "sha256": "d9fc5574efe4b071300f501d20c5ca4f51be21b104b424e0c3f1cce7486b063b"
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-25-47-450Z-553741/ui-report.json",
+      "bytes": 20891,
+      "sha256": "e771b7d9fcbc7cc02dd01c88243ac7d5ed3b9fd6d2ffc0d939f535f145dee98c"
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-25-47-450Z-553741/calc-dpr1-edited.xlsx",
+      "bytes": 6461,
+      "sha256": "e75ecd48a67f739aabe2c8bf847219d464e602da01f798bcaf254dccb38078b3"
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-27-27-391Z-553969/ui-report.json",
+      "bytes": 75313,
+      "sha256": "f0852e4db9851ff2c872998da6377c0f6d81f7ee6a2c2eb028b2fa926be848ed"
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-27-27-391Z-553969/word-dpr2-edited.docx",
+      "bytes": 5230,
+      "sha256": "8271a372faaecab7035ec390bc025ea95d5d95b9101d3bd852054d44d5a1f4bb"
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-27-27-391Z-553969/calc-dpr2-edited.xlsx",
+      "bytes": 6462,
+      "sha256": "7657a77ac556eb5385cde6e3b66cc0f65f2c33a2220d9b3b1818c1925f6e3b4d"
+    },
+    {
+      "path": "test-results/viewport-iteration/word-ui/ui-report.json",
+      "bytes": 41475,
+      "sha256": "3a67a436b9475c0b2bf854f7e565512e198ec4231a910cd7e0d0032a40b29989"
+    },
+    {
+      "path": "test-results/viewport-iteration/calc-ui/ui-report.json",
+      "bytes": 2328,
+      "sha256": "755e32f91ac46b86ac3a706324e8395fd535a1c0ca1e4b663b841e106a06f90c"
+    },
+    {
+      "path": "test-results/viewport-iteration/word-audit/independent-xml-report.json",
+      "bytes": 44675,
+      "sha256": "2afc7c4b151c3652a6de575efd417ddd1a143efcf2ba9d57a4b227889345ac2a"
+    },
+    {
+      "path": "test-results/viewport-iteration/calc-audit.json",
+      "bytes": 27687,
+      "sha256": "9e2c9d41f30929426df14c9841db8b7161a6f3b93046f958adf4d9dde1f7d5bd"
+    },
+    {
+      "path": "src/office/workbench.css",
+      "bytes": 14814,
+      "sha256": "35b60ea604c125b0a7a56f8eb74132cdf1b5cc2a1389806128bb3e4ade5c6515"
+    },
+    {
+      "path": "public/office/writer-tools.js",
+      "bytes": 76132,
+      "sha256": "22d72bd3af835a8ebe78837d61a3ef7542210dd276f98521de3f728b897e146f"
+    },
+    {
+      "path": "public/office/calc-tools.js",
+      "bytes": 53639,
+      "sha256": "5781d70f0b1734032507aa746b8390ccd482e2b905d4eb0e9a969799663870dd"
+    },
+    {
+      "path": "public/office/office-worker.js",
+      "bytes": 53849,
+      "sha256": "e7d6c159dcac2cfbed40d4ab40a47eb6a0f903680fe4d566ca1627036530bf19"
+    },
+    {
+      "path": "public/office/host.js",
+      "bytes": 23406,
+      "sha256": "9abeddea4362212c6e9e3ba5dd25048f124f6c36b5dc24a2e2771e68fbfc5430"
+    },
+    {
+      "path": "src/components/WordWorkbench.vue",
+      "bytes": 38852,
+      "sha256": "53993da7eb520705788ea03855b45400df1c30732df4876e4bd9fbec0eb2e4c2"
+    },
+    {
+      "path": "src/components/SheetWorkbench.vue",
+      "bytes": 51834,
+      "sha256": "38eba2fa6422ab0ab29a9d77f99c314416b6cb1ccc7010e29ada279a1c096b2e"
+    },
+    {
+      "path": "tests/browser/office-viewport.cjs",
+      "bytes": 4644,
+      "sha256": "e9be2dff6c5bde0d526cc9393fe33f62c93eb731ea9008b7b22c189a0d843639"
+    },
+    {
+      "path": "tests/browser/office-state-reader.cjs",
+      "bytes": 4371,
+      "sha256": "e1bcf487fb473f270f6ec8c6946e6e0cfc94aa26691437469883c4088e9f0b0c"
+    },
+    {
+      "path": "tests/browser/office-viewport-ui.cjs",
+      "bytes": 20395,
+      "sha256": "5d5b496f5151f15ee161431616452455eb464de67f7307727ded26ea1a2bcb73"
+    },
+    {
+      "path": "tests/browser/word-lists-ui.cjs",
+      "bytes": 8747,
+      "sha256": "9c43c9f030212ec13a050c82b15dbb64b8a9a79b23fcad6b1732fedbb3f2bafa"
+    },
+    {
+      "path": "tests/browser/word-decoration-ui.cjs",
+      "bytes": 8284,
+      "sha256": "2efd5093525d98ed56853ed59b9986275f6384f41a29f10fac2fae0484438b57"
+    },
+    {
+      "path": "tests/browser/calc-formatting-ui.cjs",
+      "bytes": 7996,
+      "sha256": "68927f70f470138201d2c741a975c0098273ebbdec46e1f419ea2133828234d3"
+    },
+    {
+      "path": "tests/compatibility/office-viewport/make-fixtures.py",
+      "bytes": 4004,
+      "sha256": "4eccd5e14c5be5e8c7f8d4a767b4aa65513a14a9891643b2aca0d07069723215"
+    },
+    {
+      "path": "tests/compatibility/office-viewport/audit-viewport.py",
+      "bytes": 3291,
+      "sha256": "afba287b269c3a6d66c5dcec3da0c8be4e43637ab5b7dcdca8cbd2c5fac2fe40"
+    },
+    {
+      "path": "tests/compatibility/office-viewport/manifest.json",
+      "bytes": 653,
+      "sha256": "8ed28611838d0bc1f879cdc5978d963e82d957fcd531f0152ee9e11a6145a44e"
+    },
+    {
+      "path": "tests/compatibility/office-viewport/viewport-source.docx",
+      "bytes": 1106,
+      "sha256": "9e2ef7a51a645e5f07ff2bc3bdbe80210bbb8014d09bad56c316554aa24941f2"
+    },
+    {
+      "path": "tests/compatibility/office-viewport/viewport-source.xlsx",
+      "bytes": 5093,
+      "sha256": "873c7ca7ce278b76529505bf50a810d305132397b79e5e3752fd6227e2acc0e5"
+    },
+    {
+      "path": "test-results/viewport-iteration/build.log",
+      "bytes": 2224,
+      "sha256": "cb2f08ed72aca7099e68fc733c22d1e1cac606e3c72643fdfe5cd95a143ad5b9"
+    },
+    {
+      "path": "test-results/viewport-iteration/ui/2026-10-14T09-27-27-391Z-553969/evidence-summary.json",
+      "bytes": 14768,
+      "sha256": "ca7c3304d8e02cd6ccc7a5f68e42fe02ddf1db16d0ceb0047eaecd88d8b91657"
+    },
+    {
+      "path": "test-results/viewport-iteration/baseline-probe.json",
+      "bytes": 3343,
+      "sha256": "cda12749963e27014cdead3654f3a99fa4862ce5e7740fb8b00ef32e4dece2df"
+    },
+    {
+      "path": "test-results/list-final/tests.log",
+      "bytes": 79292,
+      "sha256": "0365b29267bc48c375fc6c9009f24ca530129b7557ae32aae098b78c1e61f46c"
+    },
+    {
+      "path": "test-results/list-final/results-before-viewport-correction.json",
+      "bytes": 30702,
+      "sha256": "13aa01c71f7550f13ff9754a83066b575ecc158f43ea61da2e2bbeaa6525dfe7"
+    },
+    {
+      "path": "docs/office-viewport-validation.md",
+      "bytes": 5863,
+      "sha256": "4afff0033b1f110f57d24837e5ebf1a01351b8efb1986cca245acacf68319bc4"
+    },
+    {
+      "path": "docs/rea-compatibility-progress.md",
+      "bytes": 11484,
+      "sha256": "d4d2f5174f21c24b736e8ef82a7e61a41b3a4960b0552234d348a82a0815227e"
+    },
+    {
+      "path": "docs/office-feature-coverage.md",
+      "bytes": 10287,
+      "sha256": "da73898baab098793a3b3a3262cbe8785d1041ab526a47037cdaa9a83e0e037b"
+    },
+    {
+      "path": "docs/screenshots/sheet-viewport.png",
+      "bytes": 134260,
+      "sha256": "e6cf6cb7fe3d9a0f24d19e7b81a645cec66c5e16872b72f9761e91bb6f68fa51"
+    },
+    {
+      "path": "docs/screenshots/word-viewport.png",
+      "bytes": 118455,
+      "sha256": "808b07a10cd1e1ca52210bb728461bcab0b77f91d1f7cc19fa131a0687f579b8"
+    },
+    {
+      "path": "dist/index.html",
+      "bytes": 592,
+      "sha256": "14e74affe901a61b9a08856031288c750b1a92383bd199174fcdba1f00c340c1"
+    },
+    {
+      "path": "dist/build-info.json",
+      "bytes": 51,
+      "sha256": "fa17f558f1c3aa6662acc4837248081d60cdbd50a6154d115d5843a1a9f5691b"
+    },
+    {
+      "path": "dist/assets/index-BP0PiyTM.css",
+      "bytes": 78312,
+      "sha256": "24a6a2b0096fe4f82f13a68b8d6d338b2d371d123b00a035ae8f569f2a53377e"
+    },
+    {
+      "path": "dist/assets/index-BKb9zGK2.js",
+      "bytes": 1156781,
+      "sha256": "ab269a0d0f4aec3356041277dab9ee42dc9633fd90e8654ea9de36d9a34f1bd2"
+    }
+  ]
+}

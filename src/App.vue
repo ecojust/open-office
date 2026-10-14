@@ -18,9 +18,10 @@ import type { NativeDocument, RecentDocument } from './types'
 import type { OfficeDocument } from './office/types'
 import { reviewOfficeImport } from './office/import-review'
 import { useDialogFocus } from './shared/dialog-focus'
-import { bytesToBase64, base64ToBytes, extensionOf, kindOf, withExtension, defaultSaveExtension, isImportOnly, validateDocumentSignature, type Kind, type Extension, type EditorHandle } from './shared/document'
+import { bytesToBase64, base64ToBytes, extensionOf, kindOf, withExtension, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFormats, saveFileName, type SaveExtension, type Kind, type Extension, type EditorHandle } from './shared/document'
 
 interface Tab { key: string; document: NativeDocument; fileId?: string; requiresSaveAs?: boolean; importWarnings?:string[]; dirty: boolean; ready: boolean; loadError?: string }
+const appVersion = __APP_VERSION__
 const buildVersion = __BUILD_VERSION__
 const brandIcon = new URL('./favicon.svg', document.baseURI).href
 const smokeMode = ref(smokeRequested())
@@ -73,6 +74,11 @@ watch(activeKey,()=>{presentationState.value=null;writerState.value=null;calcSta
 const slidePreview = shallowRef<{base64:string;name:string;startPage:number;presentation?:PptxPresentation}>()
 const recents = ref<RecentDocument[]>([]), busy = ref(''), error = ref(''), status = ref('所有文件，仅在你的设备上处理')
 const help = ref(false), search = ref(''), closeTarget = ref<Tab | 'window' | null>(null)
+const saveAsDraft = ref<{ key:string; kind:Kind; format:SaveExtension; name:string; error:string } | null>(null)
+const saveAsDialog = ref<HTMLElement>()
+const saveAsOptions = computed(() => saveAsDraft.value ? saveFormats(saveAsDraft.value.kind) : [])
+const saveAsCopy = computed(() => !!saveAsDraft.value&&!!active.value&&saveAsDraft.value.format!==defaultSaveExtension(active.value.document.extension))
+useDialogFocus(saveAsDialog)
 const helpDialog = ref<HTMLElement>(), closeDialog = ref<HTMLElement>()
 useDialogFocus(helpDialog)
 useDialogFocus(closeDialog)
@@ -236,20 +242,25 @@ function download(base64:string,name:string) {
   const url=URL.createObjectURL(new Blob([base64ToBytes(base64).buffer as ArrayBuffer])), link=document.createElement('a')
   link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000)
 }
-async function saveActive(saveAs=false, format?:Extension):Promise<boolean> {
+async function saveActive(saveAs=false, format?:Extension, chosenName?:string):Promise<boolean> {
   const tab=active.value;if(!tab)return false
   assertWorkbenchDrafts()
   if(format&&isImportOnly(format))throw Error('旧版格式仅支持导入，请选择 DOCX、XLSX 或 PPTX 保存副本。')
   if(tab.document.kind==='presentation'&&format&&format!=='pptx'&&format!=='pdf')throw Error('独立演示编辑器支持保存 PPTX 和导出 PDF，暂不支持 ODP 转换。')
+  const requestedFormat=format||defaultSaveExtension(tab.document.extension)
+  if(!saveFormats(tab.document.kind).some(option=>option.extension===requestedFormat))throw Error('当前编辑器不支持此保存格式。')
   const handle=requireEditor(tab)
-  const exported=await handle.exportFile({format:format||defaultSaveExtension(tab.document.extension)})
+  const exported=await handle.exportFile({format:requestedFormat})
   if(activeKey.value!==tab.key)throw Error('文档已切换，本次保存已取消。')
   if(isImportOnly(exported.extension))throw Error('编辑器未生成现代格式，保存已取消，原文件未被修改。')
+  if(exported.extension!==requestedFormat)throw Error('编辑器返回的格式与所选格式不一致，保存已取消。')
   if(exported.dirty)tab.dirty=true
   const isCopy=!!format && format!==tab.document.extension
   const protectSource=tab.requiresSaveAs||isImportOnly(tab.document.extension)
-  const exportName=withExtension(exported.name||tab.document.name,exported.extension)
-  const name=protectSource?exportName.replace(/\.[^.]+$/,` - 副本.${exported.extension}`):exportName
+  // The shell owns the saved filename; editor snapshots may still carry the
+  // original import name after a same-format Save As.
+  const exportName=withExtension(tab.document.name||exported.name||'未命名',exported.extension)
+  const name=chosenName||(protectSource?exportName.replace(/\.[^.]+$/,` - 副本.${exported.extension}`):exportName)
   if(!native.isTauri()) {
     download(exported.base64,name)
     if(!isCopy) { tab.document={...tab.document,base64:exported.base64,name,extension:exported.extension};tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false;await handle.markSaved?.(exported.base64) }
@@ -267,7 +278,34 @@ async function saveActive(saveAs=false, format?:Extension):Promise<boolean> {
   }
   await refreshRecents();status.value=isCopy?`${exported.extension.toUpperCase()} 副本已保存`:'已保存到本机';return true
 }
-function save(saveAs=false,format?:Extension) {void task(format?`正在导出 ${format.toUpperCase()}`:'正在保存文档',async()=>{await saveActive(saveAs,format)})}
+function openSaveAs() {
+  const tab=active.value
+  if(!tab?.ready||busy.value||closeTarget.value)return
+  const formats=saveFormats(tab.document.kind), preferred=defaultSaveExtension(tab.document.extension)
+  saveAsDraft.value={key:tab.key,kind:tab.document.kind,format:formats.find(option=>option.extension===preferred)?.extension||formats[0]!.extension,
+    name:tab.document.name.replace(/\.[^.]+$/,'')+(tab.requiresSaveAs||isImportOnly(tab.document.extension)?' - 副本':''),error:''}
+}
+async function confirmSaveAs() {
+  const draft=saveAsDraft.value
+  if(!draft||busy.value)return
+  try {
+    if(activeKey.value!==draft.key||active.value?.document.kind!==draft.kind)throw Error('文档已经切换，请关闭此窗口后重新选择另存为。')
+    if(!saveFormats(draft.kind).some(option=>option.extension===draft.format))throw Error('请选择当前文档支持的格式。')
+    const name=saveFileName(draft.name,draft.format)
+    draft.error=''
+    await editorTransaction('正在另存文档',async()=>{
+      if(activeKey.value!==draft.key)throw Error('文档已经切换，保存已取消。')
+      const format=draft.format===defaultSaveExtension(active.value!.document.extension)?undefined:draft.format
+      if(await saveActive(true,format,name))saveAsDraft.value=null
+      else if(error.value)draft.error=error.value
+    })
+  }catch(cause){draft.error=message(cause)}
+}
+function cancelSaveAs(){if(!busy.value)saveAsDraft.value=null}
+function save(saveAs=false,format?:Extension) {
+  if(saveAs&&!format){openSaveAs();return}
+  void task(format?`正在导出 ${format.toUpperCase()}`:'正在保存文档',async()=>{await saveActive(saveAs,format)})
+}
 function newSlide() {
   void task('正在新建幻灯片',async()=>{
     assertWorkbenchDrafts()
@@ -361,6 +399,7 @@ function closeTab(tab:Tab) {
 }
 async function closeWindow() {
   if(busy.value) {pendingWindowClose=true;return}
+  saveAsDraft.value=null
   // The native close confirmation must remain visible above a presentation.
   presentationEditor.value?.stopPresentation()
   if(slidePreview.value) {closeSlidePreview();await nextTick()}
@@ -425,6 +464,7 @@ function officeRequest(request:{type:string;notice?:string;pageIndex?:number}) {
 }
 function keydown(event:KeyboardEvent) {
   if(slidePreview.value||event.defaultPrevented)return
+  if(saveAsDraft.value){if((event.ctrlKey||event.metaKey)&&['o','s'].includes(event.key.toLowerCase()))event.preventDefault();return}
   if(event.key==='F5'&&active.value?.document.kind==='presentation'&&!home.value){event.preventDefault();previewSlides();return}
   if(!(event.ctrlKey||event.metaKey)||event.altKey)return
   if(event.key.toLowerCase()==='o'){event.preventDefault();openFile()}
@@ -534,12 +574,12 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
   <div class="app-shell" :class="{'editing':!home}">
     <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.odt,.doc,.rtf,.xlsx,.ods,.xls,.pptx,.odp,.ppt,.pdf" @change="browserFile" />
     <input ref="imageInput" class="visually-hidden" type="file" accept="image/png,image/jpeg" @change="browserImage" />
-    <header class="titlebar">
+    <header class="titlebar" :inert="!!saveAsDraft">
       <button class="brand" @click="home=true;section='home'" aria-label="返回工作台"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
       <span class="titlebar-context">{{ !home && active ? active.document.name : '专注于内容，让工作更从容' }}</span>
       <div class="titlebar-right"><span class="local-badge"><i/> 本地办公</span><span class="build-version">{{ buildVersion }}</span><button class="icon-button" @click="help=true" aria-label="使用说明"><Icon name="info" :size="18"/></button></div>
     </header>
-    <div v-show="home" class="workspace">
+    <div v-show="home" class="workspace" :inert="!!saveAsDraft">
       <aside class="sidebar">
         <button class="primary open-sidebar" @click="openFile" aria-label="打开文件" title="打开文件 · Ctrl / ⌘ O"><Icon name="folder"/><span>打开文件</span><kbd>⌘ / Ctrl O</kbd></button>
         <nav aria-label="工作区"><button :class="{selected:section==='home'}" :aria-current="section==='home'?'page':undefined" aria-label="工作台" title="工作台" @click="section='home'"><Icon name="home"/><span>工作台</span></button><button :class="{selected:section==='recent'}" :aria-current="section==='recent'?'page':undefined" aria-label="最近打开" title="最近打开" @click="section='recent'"><Icon name="clock"/><span>最近打开</span></button></nav>
@@ -561,7 +601,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <footer class="home-footer"><span>支持 DOCX、XLSX、PPTX 与 PDF 文件</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
       </main>
     </div>
-    <section v-show="!home" class="editor-workspace">
+    <section v-show="!home" class="editor-workspace" :inert="!!saveAsDraft">
       <div ref="tabBar" class="tab-bar"><button class="home-tab" @click="home=true" aria-label="工作台"><Icon name="home" :size="18"/></button><div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div><button class="new-tab" @click="home=true" aria-label="新建文档"><Icon name="plus" :size="18"/></button></div>
       <div class="command-bar"><button @click="openFile"><Icon name="folder" :size="17"/>打开</button><span class="separator"/><button :disabled="!active?.ready" @click="save()"><Icon name="save" :size="17"/>保存</button><button :disabled="!active?.ready" @click="save(true)">另存为</button><button v-if="active?.document.kind!=='pdf'" :disabled="!active?.ready" @click="save(true,'pdf')"><Icon name="download" :size="17"/>导出 PDF</button><span class="separator"/><button :disabled="!active?.ready" @click="editCommand('undo')" title="撤销"><Icon name="undo" :size="17"/></button><button :disabled="!active?.ready" @click="editCommand('redo')" title="重做"><Icon name="redo" :size="17"/></button><span class="command-spacer"/><span class="save-state"><i :class="{'dirty-dot':active?.dirty}"/>{{active?.dirty?'尚未保存':'已保存'}}</span></div>
       <div v-if="active?.importWarnings?.length" class="import-review-notice" role="note" data-testid="import-review-notice"><Icon name="info" :size="16"/><div><p v-for="warning in active.importWarnings" :key="warning">{{warning}}</p><strong>保存需另存副本，避免自动覆盖原件。</strong></div></div>
@@ -580,12 +620,43 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
     <SlidePreview v-if="slidePreview" :base64="slidePreview.base64" :name="slidePreview.name" :start-page="slidePreview.startPage" :presentation="slidePreview.presentation" @close="closeSlidePreview" @error="error=$event"/>
     <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{error}}</span><button @click="error=''" aria-label="关闭错误提示"><Icon name="close" :size="16"/></button></div>
     <div v-if="busy" class="busy-overlay" role="status"><span class="busy-pill"><i/>{{busy}}</span></div>
+    <div v-if="saveAsDraft" class="modal-backdrop" @click.self="cancelSaveAs" @keydown.esc.stop.prevent="cancelSaveAs">
+      <form ref="saveAsDialog" class="modal save-format-dialog" role="dialog" aria-modal="true" aria-labelledby="save-format-title" data-testid="save-format-dialog" @submit.prevent="confirmSaveAs">
+        <h2 id="save-format-title">另存为</h2>
+        <label class="save-name-label">文件名<span class="save-name-input"><input v-model="saveAsDraft.name" :disabled="!!busy" data-testid="save-format-name" aria-label="文件名，不含扩展名" autocomplete="off" spellcheck="false" /><span>.{{saveAsDraft.format}}</span></span></label>
+        <fieldset :disabled="!!busy" class="save-format-options"><legend>文件格式</legend>
+          <label v-for="option in saveAsOptions" :key="option.extension" class="save-format-option" :class="{selected:saveAsDraft.format===option.extension}">
+            <input v-model="saveAsDraft.format" type="radio" name="save-format" :value="option.extension" :data-testid="'save-format-'+option.extension" />
+            <span><strong>{{option.title}}</strong><small>{{option.description}}</small></span>
+          </label>
+        </fieldset>
+        <p v-if="saveAsCopy" class="save-format-note">转换后生成副本，你可以继续编辑当前文稿。请检查转换后的排版与内容。</p>
+        <p v-else class="save-format-note">{{native.isTauri()?'下一步选择保存位置。':'文件将下载到浏览器设置的下载位置。'}}</p>
+        <p v-if="saveAsDraft.error" role="alert" class="save-format-error">{{saveAsDraft.error}}</p>
+        <div class="modal-actions"><button type="button" :disabled="!!busy" data-testid="save-format-cancel" @click="cancelSaveAs">取消</button><button type="submit" :disabled="!!busy" class="primary" data-testid="save-format-confirm">{{native.isTauri()?'选择保存位置':'下载文件'}}</button></div>
+      </form>
+    </div>
     <div v-if="closeTarget" class="modal-backdrop" @keydown.esc="closeTarget=null"><section ref="closeDialog" class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="close-heading"><span class="modal-icon"><Icon name="save" :size="27"/></span><h2 id="close-heading">保存你的修改？</h2><p>{{closeTarget==='window'?'有文档尚未保存。保存后再退出，可以保留所有修改。':`“${closeTarget.document.name}”有尚未保存的修改。`}}</p><div class="modal-actions"><button @click="closeTarget=null">取消</button><button @click="resolveClose('discard')">不保存</button><button class="primary" @click="resolveClose('save')">{{closeTarget==='window'?'全部保存并退出':'保存并关闭'}}</button></div></section></div>
-    <div v-if="help" class="modal-backdrop" @click.self="help=false" @keydown.esc.stop.prevent="help=false"><section ref="helpDialog" class="modal help-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>提供中文文字排版、表格与公式、数据分析、幻灯片编排及 PDF 导出。文字与表格使用本地文档引擎，高级菜单目前为英文。演示文稿采用独立编辑器，支持 PPTX，旧 PPT 与 ODP 请先转换格式。导入 DOC、RTF、XLS 后另存现代格式副本，保留原件。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持原有文字替换、文字和图片、批注、手写签名、页面整理，以及页码、透明水印和书签导航。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件时会另存副本。演示文稿提供中文编排、对象与图表编辑、备注、转场和本地媒体放映。SmartArt、逐对象动画和 Morph 尚未完整实现。Microsoft 365 的本地文档能力尚未完全对齐：复杂排版、最新函数、宏与插件仍有差异。请检查导出结果；宏不自动执行。</p><p class="help-note"><strong>永久本地范围：</strong>不提供账户、云盘、云协作或云 AI，也不将这些服务列入后续功能计划。安装包内的编辑引擎在本机处理文档。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 0.4.0 · 构建 {{buildVersion}} · 使用 LibreOffice / ZetaOffice、PDF.js 与 PyMuPDF。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
+    <div v-if="help" class="modal-backdrop" @click.self="help=false" @keydown.esc.stop.prevent="help=false"><section ref="helpDialog" class="modal help-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>提供中文文字排版、表格与公式、数据分析、幻灯片编排及 PDF 导出。文字与表格使用本地文档引擎，高级菜单目前为英文。演示文稿采用独立编辑器，支持 PPTX，旧 PPT 与 ODP 请先转换格式。导入 DOC、RTF、XLS 后另存现代格式副本，保留原件。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持原有文字替换、文字和图片、批注、手写签名、页面整理，以及页码、透明水印和书签导航。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件时会另存副本。演示文稿提供中文编排、对象与图表编辑、备注、转场和本地媒体放映。SmartArt、逐对象动画和 Morph 尚未完整实现。Microsoft 365 的本地文档能力尚未完全对齐：复杂排版、最新函数、宏与插件仍有差异。请检查导出结果；宏不自动执行。</p><p class="help-note"><strong>永久本地范围：</strong>不提供账户、云盘、云协作或云 AI，也不将这些服务列入后续功能计划。安装包内的编辑引擎在本机处理文档。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 {{appVersion}} · 构建 {{buildVersion}} · 使用 LibreOffice / ZetaOffice、PDF.js 与 PyMuPDF。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
   </div>
 </template>
 
 <style scoped>
+.save-format-dialog { width: min(480px, 100%); }
+.save-name-label { display: grid; gap: 8px; margin: 20px 0; font-size: 13px; font-weight: 500; }
+.save-name-input { display: flex; align-items: center; border: 1px solid var(--ui-line-strong); border-radius: var(--ui-radius); overflow: hidden; }
+.save-name-input:focus-within { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.save-name-input input { min-width: 0; flex: 1; padding: 11px; border: 0; outline: none; background: transparent; font: inherit; color: inherit; }
+.save-name-input > span { padding: 0 12px 0 0; color: var(--ui-muted); font-weight: 400; }
+.save-format-options { display: grid; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.save-format-options legend { font-size: 13px; font-weight: 500; padding: 0 0 8px; }
+.save-format-option { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius); cursor: pointer; }
+.save-format-option.selected { border-color: var(--ui-accent); background: var(--ui-accent-soft); }
+.save-format-option input { width: 16px; height: 16px; accent-color: var(--ui-accent); flex: none; }
+.save-format-option strong { display: block; font-size: 13px; font-weight: 600; }
+.save-format-option small { display: block; margin-top: 4px; color: var(--ui-muted); font-size: 12px; line-height: 1.5; }
+.save-format-note { margin-top: 14px; }
+.save-format-dialog .save-format-error { color: #b3261e; margin-top: 10px; }
 .import-review-notice {
   display: flex; align-items: flex-start; gap: 9px; flex: none;
   padding: 9px 16px; background: var(--ui-warning-soft); border-bottom: 1px solid #eadcb7;

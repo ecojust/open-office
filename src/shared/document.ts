@@ -1,6 +1,26 @@
 export type Kind = 'word'|'sheet'|'presentation'|'pdf'
 export type Extension = 'docx'|'odt'|'doc'|'rtf'|'xlsx'|'ods'|'xls'|'pptx'|'odp'|'ppt'|'pdf'
 export type SaveExtension = Exclude<Extension,'doc'|'rtf'|'xls'|'ppt'>
+export type SaveFormatOption = { extension: SaveExtension; title: string; description: string }
+/** Formats actually implemented by each active editor, not all import formats. */
+export function saveFormats(kind: Kind): SaveFormatOption[] {
+ const pdf: SaveFormatOption = { extension: 'pdf', title: 'PDF 文档', description: '用于阅读、打印与分享' }
+ const formats: Record<Kind, SaveFormatOption[]> = {
+  word: [{ extension: 'docx', title: 'DOCX 文档', description: '保留可编辑的文字、表格和排版' }, { extension: 'odt', title: 'ODT 文档', description: '开放文档格式，可继续编辑' }, pdf],
+  sheet: [{ extension: 'xlsx', title: 'XLSX 工作簿', description: '保留工作表、公式和单元格格式' }, { extension: 'ods', title: 'ODS 工作簿', description: '开放工作簿格式，可继续编辑' }, pdf],
+  presentation: [{ extension: 'pptx', title: 'PPTX 演示文稿', description: '保留可编辑的幻灯片与对象' }, { ...pdf, description: '静态页面，不包含放映动画与音视频' }],
+  pdf: [pdf],
+ }
+ return formats[kind]
+}
+/** Match the native file-name contract, including its UTF-8 byte limit. */
+export function saveFileName(stem: string, extension: SaveExtension): string {
+ if (!stem || stem !== stem.trim() || stem.startsWith('.') || stem.endsWith('.') || /[\x00-\x1f\x7f-\x9f/\\:<>"|?*]/.test(stem)) throw Error('文件名不能含路径、首尾空格、控制字符或系统保留字符。')
+ if (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(stem.split('.')[0]!.trimEnd())) throw Error('此文件名为系统保留名称，请换一个名称。')
+ const name = `${stem}.${extension}`
+ if (new TextEncoder().encode(name).length > 240) throw Error('文件名过长，请缩短后再保存。')
+ return name
+}
 export type EditorExport = {base64:string; extension:Extension; name?:string; saveAs?:boolean; dirty?:boolean}
 export type EditorHandle = {
  exportFile(options?:{format?:Extension}):Promise<EditorExport>;

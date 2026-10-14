@@ -11,7 +11,7 @@ if (!/^\d{4}\.\d{4}\.\d{4}$/.test(buildVersion)) throw new Error('Invalid OFFICE
 const headers = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' }
 export default defineConfig({
   plugins: [vue(), pdfDevPlugin(), { name: 'build-info', generateBundle() { this.emitFile({ type: 'asset', fileName: 'build-info.json', source: JSON.stringify({ version: packageInfo.version, buildVersion }) }) } }],
-  base: './', define: { __BUILD_VERSION__: JSON.stringify(buildVersion) },
+  base: './', define: { __APP_VERSION__: JSON.stringify(packageInfo.version), __BUILD_VERSION__: JSON.stringify(buildVersion) },
   server: { host: '127.0.0.1', port: 5198, strictPort: true, headers },
   preview: { host: '127.0.0.1', port: 4198, strictPort: true, headers },
   build: { target: 'es2022', sourcemap: false, chunkSizeWarningLimit: 1500 },

@@ -43,7 +43,9 @@ async function exerciseCore(input) {
   const flatten = objects => objects.flatMap(object => [object, ...flatten(object.children || [])]);
   const objectSnapshot = object => ({ name: object.name, type: object.type, text: object.text,
     x: object.x, y: object.y, width: object.width, height: object.height, rotation: object.rotation,
-    textStyle: object.textStyle, textLayout: object.textLayout || (object.type === 'text' ? { verticalAlign: 'top', insets: { left: 1.3, right: 1.3, top: 1.3, bottom: 1.3 }, wrap: true, rotation: 0 } : null),
+    // Optional text opacity defaults to one. Compare its semantic value for
+    // newly inserted text and imported explicit solid colors; zero stays zero.
+    textStyle: { ...object.textStyle, opacity: object.textStyle.opacity ?? 1, underlineStyle: object.textStyle.underlineStyle ?? (object.textStyle.underline ? 'single' : 'none'), strike: object.textStyle.strike ?? 'none' }, textLayout: object.textLayout || (object.type === 'text' ? { verticalAlign: 'top', insets: { left: 1.3, right: 1.3, top: 1.3, bottom: 1.3 }, wrap: true, rotation: 0 } : null),
     fillColor: object.fillColor, lineColor: object.lineColor, lineWidth: object.lineWidth,
     table: object.table || null, chart: object.chart ? { type: object.chart.type, title: object.chart.title, categories: object.chart.categories, series: object.chart.series, values: object.chart.values } : null,
     image: object.image ? { mimeType: object.image.mimeType, dataUrlLength: object.image.dataUrl.length } : null,

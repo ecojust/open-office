@@ -1,15 +1,41 @@
+import type { SmartArtTextAction } from './core/smartart-text'
 export type PresentationShapeType = 'text' | 'rectangle' | 'ellipse' | 'line' | 'image' | 'table' | 'chart' | 'group' | 'custom' | 'unknown'
+export type PresentationDecoration = 'none' | 'single' | 'double'
 export interface PresentationTextStyle {
   fontName: string
   fontSize: number
   bold: boolean
   italic: boolean
   underline: boolean
+  /** Legacy underline commands normalize to single/none. */
+  underlineStyle?: PresentationDecoration
+  strike?: PresentationDecoration
   color: string
+  /** Ordinary text paint alpha; undefined is fully opaque. */
+  opacity?: number
+  /** Independent text-marker paint. Null explicitly clears inherited highlight. */
+  highlightColor?: string | null
+  highlightOpacity?: number
   align: 'left' | 'center' | 'right' | 'justify'
 }
+export interface PresentationSpacing { unit: 'percent' | 'points'; value: number }
+export interface PresentationParagraphStyle {
+  align?: PresentationTextStyle['align']
+  lineSpacing?: PresentationSpacing
+  spaceBefore?: PresentationSpacing
+  spaceAfter?: PresentationSpacing
+}
+export interface PresentationTextLayout {
+  verticalAlign?: 'top' | 'middle' | 'bottom'
+  insets?: { left: number; right: number; top: number; bottom: number }
+  wrap?: boolean
+  rotation?: number
+}
+export type PresentationTextLayoutPatch = Omit<PresentationTextLayout, 'insets'> & { insets?: Partial<NonNullable<PresentationTextLayout['insets']>> }
 export interface PresentationGeometry { x: number; y: number; width: number; height: number; rotation: number }
 export interface PresentationShape extends PresentationGeometry {
+  fillOpacity?: number
+  lineOpacity?: number
   id: string
   name: string
   type: PresentationShapeType
@@ -43,6 +69,7 @@ export type PresentationObjectData = PresentationTableData | PresentationChartDa
 export interface PresentationObjectQuery { type: 'table' | 'chart'; id: string }
 type Revision = { expectedRevision?: number }
 export type PresentationAction = Revision & (
+  | SmartArtTextAction
   | { type: 'select-page'; pageIndex: number }
   | { type: 'add-page'; layout?: number }
   | { type: 'duplicate-page' | 'delete-page'; pageIndex: number }
@@ -60,7 +87,10 @@ export type PresentationAction = Revision & (
   | { type: 'insert-chart'; chartType: PresentationChartType; categories: string[]; series: string[]; values: number[][]; title?: string } & Partial<PresentationGeometry>
   | { type: 'update-chart'; id: string; chartType: PresentationChartType; categories: string[]; series: string[]; values: number[][]; title?: string }
   | { type: 'delete-objects'; ids: string[] }
-  | { type: 'update-object'; id: string; text?: string; textStyle?: Partial<PresentationTextStyle>; fillColor?: string | null; lineColor?: string; lineWidth?: number } & Partial<PresentationGeometry>
+  | { type: 'update-object'; id: string; text?: string; textStyle?: Partial<PresentationTextStyle>; fillColor?: string | null; lineColor?: string; lineWidth?: number; fillOpacity?: number; lineOpacity?: number } & Partial<PresentationGeometry>
+  | { type: 'format-paragraphs'; id: string; paragraphIndices: number[]; paragraphStyle: PresentationParagraphStyle; spaceFirstLastParagraph?: boolean; expectedText: string; expectedRevision: number }
+  | { type: 'set-text-layout'; id: string; layout: PresentationTextLayoutPatch }
+  | { type: 'format-text-range'; id: string; start: number; end: number; expectedText: string; expectedRevision: number; textStyle: Partial<Pick<PresentationTextStyle, 'fontName' | 'fontSize' | 'color' | 'opacity' | 'highlightColor' | 'highlightOpacity' | 'bold' | 'italic' | 'underline' | 'underlineStyle' | 'strike'>> }
   | { type: 'arrange-objects'; ids: string[]; operation: PresentationArrangeOperation }
   | { type: 'select-objects'; ids: string[] }
 )

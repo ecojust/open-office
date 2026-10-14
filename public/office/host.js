@@ -5,6 +5,12 @@ const session = new URLSearchParams(location.hash.slice(1)).get('session');
 const canvas = document.getElementById('qtcanvas');
 const runtimeBase = new URL('../office-runtime/', location.href).href;
 const adapterBase = new URL('./', location.href).href;
+function diagnosticHeapBytes(module) {
+  // Some Emscripten builds install an aborting getter for unexported HEAPU8.
+  // Diagnostics must never invoke it or change whether the engine can boot.
+  const heap = module && Object.getOwnPropertyDescriptor(module, 'HEAPU8')?.value;
+  return ArrayBuffer.isView(heap) ? heap.byteLength : 0;
+}
 // Install before loading any engine code, including its pthread bootstraps.
 // The native HTTP server enforces an equivalent CSP; host.html also confines
 // browser-preview builds to local resources instead of relying on a firewall.
@@ -82,7 +88,7 @@ if (smokeMode) {
   const heartbeat = setInterval(() => {
     const previousPhase = diagnosticPhase;
     smokeDiagnostic('heartbeat', { previousPhase, calledRun: !!window.Module?.calledRun,
-      heapBytes: window.Module?.HEAPU8?.byteLength || 0, dependencies: diagnosticDependencies,
+      heapBytes: diagnosticHeapBytes(window.Module), dependencies: diagnosticDependencies,
       unoReady: diagnosticUnoReady, pendingActions: [...pending.values()].map(value => value.action), warnings: diagnosticWarnings });
     diagnosticPhase = previousPhase;
   }, 10000);
@@ -330,7 +336,7 @@ async function start() {
   const script = document.createElement('script'); script.src = new URL('soffice.js', runtimeBase).href;
   script.onerror = () => fail('办公组件加载失败。请检查离线资源完整性，然后重试。');
   script.onload = () => {
-    smokeDiagnostic('script-loaded', { unoPromise: typeof Module.uno_main?.then, heapBytes: Module.HEAPU8?.byteLength || 0 });
+    smokeDiagnostic('script-loaded', { unoPromise: typeof Module.uno_main?.then, heapBytes: diagnosticHeapBytes(Module) });
     try {
       if (!Module.uno_main?.then) throw Error('办公组件未完成初始化，缺少 UNO 通道。');
       Module.uno_main.then(value => {

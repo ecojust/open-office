@@ -1,0 +1,113 @@
+/* Pinned independent typography source; real browser production importer,
+ * shared SVG/PDF scene and OOXML exporter. No Office runtime or network links. */
+const { chromium } = require('playwright');
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
+const root = path.resolve(__dirname, '../..');
+const manifestRoot = path.join(root, 'tests/compatibility/presentation-complex');
+const fixture = JSON.parse(fs.readFileSync(path.join(manifestRoot, 'manifest.json'))).items.find(item => item.id === 'typography-rich');
+const bytes = fs.readFileSync(path.join(manifestRoot, fixture.path));
+assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'), fixture.sha256);
+const out = path.join(root, 'test-results/presentation-rich-text');
+fs.mkdirSync(out, { recursive: true });
+(async () => {
+ const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || '/usr/bin/chromium', headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+ try {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const url=process.env.PRESENTATION_URL || 'http://127.0.0.1:5198/';
+  const external = []; page.on('request', request => { if (!request.url().startsWith(new URL(url).origin+'/') && !request.url().startsWith('data:') && !request.url().startsWith('blob:')) external.push(request.url()); });
+  await page.goto(url);
+  const result = await page.evaluate(async base64 => {
+   const { importPresentation, exportPresentation } = await import('/src/presentation/core/pptx.ts');
+   const { PresentationController } = await import('/src/presentation/core/model.ts');
+   const { buildSlideScene } = await import('/src/presentation/core/scene.ts');
+   const { slideSvg } = await import('/src/presentation/core/render.ts');
+   const { effectiveRichText } = await import('/src/presentation/core/rich-text.ts');
+   const { readRichText } = await import('/src/presentation/core/pptx-rich-text.ts');
+   const { objectFingerprint, readXml, relPart, resolvePart } = await import('/src/presentation/core/pptx-common.ts');
+   const { exportPresentationPdf } = await import('/src/presentation/core/pdf.ts');
+   const { readPptxParts, writePptxParts } = await import('/src/presentation/pptx-package.ts');
+   const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+   const checks = [], check = (value, message) => { if (!value) throw Error(message); checks.push(message); };
+   const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+   const flattened = nodes => nodes.flatMap(node => node.kind === 'group' ? flattened(node.children) : [node]);
+   const find = model => model.slides[0].objects.find(object => object.name === 'RICH_RUNS');
+   const model = await importPresentation(bytes), obj = find(model), p = obj.richText.paragraphs;
+   check(equal(p[0].runs.map(run => run.text), ['Rich run 文字 ', 'mix ± ∑ ', '大标题', '1']), 'Four original runs including cached field text imported');
+   check(equal(p[0].runs.map(run => [run.style.fontSize, run.style.bold, run.style.italic]), [[30,true,false],[21,false,true],[42,true,false],[18,false,false]]), 'Independent run size/explicit false style/field defaults do not bleed');
+   check(equal(p.map(paragraph => paragraph.style.align), ['center','right']), 'Paragraph-specific alignment retained');
+   check(!obj.warning.includes('统一样式') && obj.warning.includes('字符间距'), 'Removed stale uniform warning, retained unsupported typography warning');
+   check(objectFingerprint(obj) === objectFingerprint({ ...obj, richText: undefined }), 'Derived rich display does not alter source fingerprint');
+   const nodes = flattened(buildSlideScene(model, model.slides[0])).filter(node => node.kind === 'text');
+   const first = nodes.find(node => node.text === 'Rich run 文字 '), second = nodes.find(node => node.text === 'mix ± ∑ '), third = nodes.find(node => node.text === '大标题');
+   check(first && second && third && first.y === second.y && second.y === third.y, 'Three different fonts/sizes share one browser baseline');
+   check(first.color === '#b51d46' && second.color === '#1565a8' && third.color === '#248046', 'Original distinct run colors displayed');
+   const again = await importPresentation(await exportPresentation(model));
+   check(equal(effectiveRichText(find(again)), effectiveRichText(obj)), 'No-op export/reopen preserves all resolved rich styles');
+   // Mutate only a private copy of the pinned fixture to exercise inheritance
+   // and explicit false values not supplied by every public sample.
+   const inheritedParts = await readPptxParts(bytes), slidePart = 'ppt/slides/slide1.xml';
+   const slideDoc = readXml(inheritedParts.get(slidePart));
+   const inheritedShape = [...slideDoc.getElementsByTagNameNS('*', 'sp')].find(shape => shape.getElementsByTagNameNS('*', 'cNvPr')[0]?.getAttribute('name') === 'RICH_RUNS');
+   const pns = 'http://schemas.openxmlformats.org/presentationml/2006/main', ans = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+   const ph = slideDoc.createElementNS(pns, 'p:ph'); ph.setAttribute('type','body'); ph.setAttribute('idx','91'); inheritedShape.getElementsByTagNameNS('*','nvPr')[0].append(ph);
+   const ownBody = inheritedShape.getElementsByTagNameNS('*','txBody')[0];
+   const bodyContent = readXml(`<p:txBody xmlns:p="${pns}" xmlns:a="${ans}"><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="2400" b="1" i="1"/></a:pPr><a:r><a:rPr sz="1234" b="0" i="false"/><a:t>first</a:t></a:r><a:r><a:t>default</a:t></a:r></a:p><a:p><a:endParaRPr sz="3720"/></a:p><a:p><a:pPr><a:defRPr sz="1700"/></a:pPr><a:r><a:t>plain</a:t></a:r><a:r><a:rPr sz="4200"/><a:t>large</a:t></a:r></a:p></p:txBody>`).documentElement;
+   ownBody.replaceWith(slideDoc.importNode(bodyContent,true));
+   const relationships = readXml(inheritedParts.get(relPart(slidePart)));
+   const layoutRel = [...relationships.getElementsByTagNameNS('*','Relationship')].find(rel => rel.getAttribute('Type').endsWith('/slideLayout'));
+   const layoutPart = resolvePart(slidePart,layoutRel.getAttribute('Target')), layoutDoc = readXml(inheritedParts.get(layoutPart));
+   const template = inheritedShape.cloneNode(true), templateBody = template.getElementsByTagNameNS('*','txBody')[0];
+   templateBody.replaceWith(readXml(`<p:txBody xmlns:p="${pns}" xmlns:a="${ans}"><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="1800"/><a:t>layout</a:t></a:r></a:p></p:txBody>`).documentElement);
+   layoutDoc.getElementsByTagNameNS('*','spTree')[0].append(layoutDoc.importNode(template,true));
+   for (const [part,doc] of [[slidePart,slideDoc],[layoutPart,layoutDoc]]) inheritedParts.set(part,new TextEncoder().encode(new XMLSerializer().serializeToString(doc)));
+   const inherited = await importPresentation(writePptxParts(inheritedParts)), inheritedRich = find(inherited).richText.paragraphs;
+   check(equal(inheritedRich[0].runs.map(run => [run.style.fontSize,run.style.bold,run.style.italic]),[[12.34,false,false],[24,true,true]]), 'Direct false and fractional size override local defaults; local defaults outrank inherited placeholder runs');
+   check(inheritedRich[1].runs.length === 0 && inheritedRich[1].style.fontSize === 37.2, 'Empty paragraph preserves endParaRPr metrics');
+   const sparseEditor = new PresentationController(inherited, 'rich-sparse-properties');
+   sparseEditor.action({ type: 'update-object', id: find(inherited).id, text: 'firstdefault\n\nChanged third' });
+   check(equal(effectiveRichText(find(await importPresentation(await exportPresentation(sparseEditor.model)))), effectiveRichText(find(sparseEditor.model))), 'Editing paragraph with unstyled first run does not borrow later run formatting');
+   const originalXml = obj.sourceXml;
+   check(find(again).sourceXml === originalXml, 'No-op preserves original shape XML including hyperlink, field and baseline');
+   const editor = new PresentationController(model, 'rich-text-test');
+   editor.action({ type: 'update-object', id: obj.id, textStyle: { bold: false } });
+   editor.action({ type: 'update-object', id: obj.id, textStyle: { bold: true, color: '#B51D46' } });
+   let displayed = effectiveRichText(find(editor.model));
+   check(displayed[0].runs.every(run => run.style.bold && run.style.color === '#B51D46'), 'Returning toolbar values to import baseline explicitly applies them to all runs');
+   const styledBytes = await exportPresentation(editor.model), styled = await importPresentation(styledBytes);
+   check(equal(effectiveRichText(find(styled)), displayed), 'Explicit baseline style application survives export/reopen');
+   editor.undo(); editor.undo();
+   check(equal(effectiveRichText(find(editor.model)), effectiveRichText(obj)), 'Undo restores original mixed styles');
+   const protectedBefore=JSON.stringify(editor.model);let protectedReason='';
+   try { editor.action({ type: 'update-object', id: obj.id, text: 'Replacement paragraph\n下一行变更' }); } catch(error) { protectedReason=error.message; }
+   check(/字段|链接/.test(protectedReason)&&JSON.stringify(editor.model)===protectedBefore,'Plain editing protects cached fields and hyperlinks instead of flattening them');
+   const editedBytes = await exportPresentation(editor.model), edited = await importPresentation(editedBytes);
+   check(equal(effectiveRichText(find(edited)), effectiveRichText(find(editor.model))), 'Rejected content edit retains rich styles after export/reopen');
+   const style = obj.textStyle;
+   const malformed = readXml('<body><p><r><rPr sz="NaN"/><t>&lt;script&gt;</t></r><fld><t>FIELD</t></fld><script>IGNORE</script></p></body>').documentElement;
+   check(readRichText(malformed, '<script>FIELD', style, () => style).paragraphs[0].runs.map(run => run.text).join('') === '<script>FIELD', 'Malformed/executable-looking input enters display only as plain text');
+   check(readRichText(malformed, 'x'.repeat(100001), style, () => style) === undefined, 'Oversized text falls back without unbounded rich parsing');
+   const oversized = readXml('<body><p>' + '<r><t>x</t></r>'.repeat(10001) + '</p></body>').documentElement;
+   check(readRichText(oversized, 'x'.repeat(10001), style, () => style) === undefined, 'Run-count budget is enforced');
+   let dtdRejected = false; try { readXml('<!DOCTYPE body [<!ENTITY ext SYSTEM "https://evil.invalid">]><body/>'); } catch { dtdRejected = true; }
+   check(dtdRejected, 'DTD/external entities remain rejected');
+   const encode = bytes => { let s = ''; for (let i = 0; i < bytes.length; i += 8192) s += String.fromCharCode(...bytes.subarray(i, i + 8192)); return btoa(s); };
+   const pdf = await exportPresentationPdf(model);
+   const beforeParts = await readPptxParts(bytes), afterParts = await readPptxParts(styledBytes);
+   const externalLinks = parts => [...parts].filter(([name]) => name.endsWith('.rels')).flatMap(([name, data]) => [...readXml(data).getElementsByTagNameNS('*', 'Relationship')].filter(rel => rel.getAttribute('TargetMode') === 'External').map(rel => ({ part: name, id: rel.getAttribute('Id'), target: rel.getAttribute('Target'), type: rel.getAttribute('Type') })));
+   check(equal(externalLinks(beforeParts), externalLinks(afterParts)), 'Style edit retains original link relationships without fetching them');
+   return { checks, svg: slideSvg(model, model.slides[0]), pdf: encode(pdf), edited: encode(editedBytes), styled: encode(styledBytes) };
+  }, bytes.toString('base64'));
+  assert.deepEqual(external, []);
+  fs.writeFileSync(path.join(out, 'typography.svg'), result.svg);
+  fs.writeFileSync(path.join(out, 'typography.pdf'), Buffer.from(result.pdf, 'base64'));
+  fs.writeFileSync(path.join(out, 'typography-edited.pptx'), Buffer.from(result.edited, 'base64'));
+  fs.writeFileSync(path.join(out, 'typography-styled.pptx'), Buffer.from(result.styled, 'base64'));
+  await page.setContent(`<main style="padding:20px;background:#dde3ee">${result.svg}</main>`);
+  await page.screenshot({ path: path.join(out, 'typography.png') });
+  fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify({ fixture: fixture.id, sha256: fixture.sha256, checks: result.checks, externalRequests: external, limitations: ['No claim of complete typography fidelity: bullets, custom tabs, columns, autofit and font substitution remain limited; numeric baseline rendering differs from vendor fixed script styles.', 'PDF uses bundled fallback font; its family mapping is not the browser installed font.'] }, null, 2));
+  console.log(result.checks.map(check => 'PASS ' + check).join('\n'));
+ } finally { await browser.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });

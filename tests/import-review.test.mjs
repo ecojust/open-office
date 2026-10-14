@@ -8,10 +8,10 @@ const relationNamespace='http://schemas.openxmlformats.org/package/2006/relation
 const documentNamespace='http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 const wordNamespace='http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 const officeNamespace='urn:schemas-microsoft-com:office:office'
-function docx({body='',links='',extra={}}={}) {
+function docx({body='',links='',extra={},wNamespace=wordNamespace,rNamespace=documentNamespace}={}) {
   const files={
-    '_rels/.rels':`<Relationships xmlns="${relationNamespace}"><Relationship Id="main" Type="${documentNamespace}/officeDocument" Target="word/document.xml"/></Relationships>`,
-    'word/document.xml':`<w:document xmlns:w="${wordNamespace}" xmlns:o="${officeNamespace}" xmlns:r="${documentNamespace}"><w:body>${body}</w:body></w:document>`,
+    '_rels/.rels':`<Relationships xmlns="${relationNamespace}"><Relationship Id="main" Type="${rNamespace}/officeDocument" Target="word/document.xml"/></Relationships>`,
+    'word/document.xml':`<w:document xmlns:w="${wNamespace}" xmlns:o="${officeNamespace}" xmlns:r="${rNamespace}"><w:body>${body}</w:body></w:document>`,
     'word/_rels/document.xml.rels':`<Relationships xmlns="${relationNamespace}">${links}</Relationships>`,...extra,
   }
   return zipSync(Object.fromEntries(Object.entries(files).map(([name,value])=>[name,typeof value==='string'?strToU8(value):value])))
@@ -186,5 +186,76 @@ test('broken or mismatched DOCX object relationships yield an incomplete review,
     const review=inspectDocxImport(input)
     assert.equal(review.complete,false);assert.equal(review.requiresSaveAs,true)
     assert.match(review.warnings[0],/未能完成此 DOCX/);assert.doesNotMatch(review.warnings[0],/含嵌入附件/)
+  }
+})
+
+const objectEmbed='<w:p><w:r><w:object><w:objectEmbed drawAspect="icon" r:id="attachment" progId="Word.Document.12" shapeId="10" fieldCodes=""/></w:object></w:r></w:p>'
+const wordNamespaces=[
+  {wNamespace:wordNamespace,rNamespace:documentNamespace},
+  {wNamespace:'http://purl.oclc.org/ooxml/wordprocessingml/main',rNamespace:'http://purl.oclc.org/ooxml/officeDocument/relationships'},
+]
+
+test('WordprocessingML objectEmbed attachments receive the same copy protection in Transitional and Strict DOCX',()=>{
+  for(const namespaces of wordNamespaces)for(const type of ['oleObject','package']) {
+    const bytes=docx({...namespaces,body:objectEmbed,links:`<Relationship Id="attachment" Type="${namespaces.rNamespace}/${type}" Target="embeddings/item.bin"/>`,extra:{'word/embeddings/item.bin':new Uint8Array([0,255,1,2,3])}})
+    const before=Buffer.from(bytes),result=inspectDocxImport(bytes)
+    assert.equal(result.complete,true);assert.equal(result.requiresSaveAs,true)
+    assert.equal(result.warnings.length,1);assert.match(result.warnings[0],/含嵌入附件（1 项）/)
+    assert.deepEqual(Buffer.from(bytes),before,'Review must not parse, repair or replace embedded bytes')
+    assert.deepEqual(reviewOfficeImport({extension:'docx',base64:Buffer.from(bytes).toString('base64')}),result)
+  }
+})
+
+test('objectEmbed protection follows referenced header, footer, footnote, endnote and comment stories',()=>{
+  const stories=[
+    {kind:'header',root:'hdr',body:'<w:sectPr><w:headerReference r:id="story"/></w:sectPr>',wrap:content=>content},
+    {kind:'footer',root:'ftr',body:'<w:sectPr><w:footerReference r:id="story"/></w:sectPr>',wrap:content=>content},
+    {kind:'footnotes',root:'footnotes',body:'<w:p><w:r><w:footnoteReference w:id="1"/></w:r></w:p>',wrap:content=>`<w:footnote w:id="1">${content}</w:footnote>`},
+    {kind:'endnotes',root:'endnotes',body:'<w:p><w:r><w:endnoteReference w:id="1"/></w:r></w:p>',wrap:content=>`<w:endnote w:id="1">${content}</w:endnote>`},
+    {kind:'comments',root:'comments',body:'<w:p><w:r><w:commentReference w:id="1"/></w:r></w:p>',wrap:content=>`<w:comment w:id="1" w:author="Test">${content}</w:comment>`},
+  ]
+  for(const namespaces of wordNamespaces)for(const story of stories) {
+    const options={...namespaces,body:story.body,links:`<Relationship Id="story" Type="${namespaces.rNamespace}/${story.kind}" Target="story.xml"/>`,extra:{
+      'word/story.xml':`<w:${story.root} xmlns:w="${namespaces.wNamespace}" xmlns:r="${namespaces.rNamespace}">${story.wrap(objectEmbed)}</w:${story.root}>`,
+      'word/_rels/story.xml.rels':`<Relationships xmlns="${relationNamespace}"><Relationship Id="attachment" Type="${namespaces.rNamespace}/oleObject" Target="embeddings/item.bin"/></Relationships>`,
+      'word/embeddings/item.bin':new Uint8Array([1,2,3]),
+    }}
+    const result=inspectDocxImport(docx(options))
+    assert.equal(result.complete,true,story.kind);assert.equal(result.requiresSaveAs,true,story.kind)
+    assert.match(result.warnings[0],/含嵌入附件（1 项）/)
+    assert.deepEqual(inspectDocxImport(docx({...options,body:''})),{complete:true,requiresSaveAs:false,warnings:[]},'Unreferenced stories must not be counted as document attachments')
+  }
+})
+
+test('broken or externally targeted objectEmbed relationships fail closed in both Word namespaces',()=>{
+  for(const namespaces of wordNamespaces) {
+    const relation=`<Relationship Id="attachment" Type="${namespaces.rNamespace}/oleObject" Target="embeddings/item.bin"/>`
+    const extra={'word/embeddings/item.bin':new Uint8Array([1])}
+    for(const options of [
+      {links:''},
+      {links:relation},
+      {links:relation,extra:{'word/embeddings/item.bin':new Uint8Array()}},
+      {links:relation.replace('/oleObject','/chart'),extra},
+      {links:relation.replace('Target="embeddings/item.bin"','TargetMode="External" Target="https://example.invalid/attached.docx"'),extra},
+    ]) {
+      const result=inspectDocxImport(docx({...namespaces,body:objectEmbed,...options}))
+      assert.equal(result.complete,false);assert.equal(result.requiresSaveAs,true)
+      assert.match(result.warnings[0],/未能完成此 DOCX/);assert.doesNotMatch(result.warnings[0],/含嵌入附件/)
+    }
+  }
+})
+
+test('objectEmbed lookalikes and linked objects are not counted as embedded attachments',()=>{
+  for(const namespaces of wordNamespaces) {
+    const bytes=docx({...namespaces,body:`
+      <!-- ${objectEmbed} -->
+      <w:p><w:r><w:t>&lt;w:objectEmbed r:id="attachment"/&gt;</w:t></w:r></w:p>
+      <w:p><w:r><w:objectEmbed r:id="attachment"/></w:r></w:p>
+      <w:p><w:r><x:object xmlns:x="urn:foreign"><w:objectEmbed r:id="attachment"/></x:object></w:r></w:p>
+      <w:p><w:r><w:object><x:objectEmbed xmlns:x="urn:foreign" r:id="attachment"/></w:object></w:r></w:p>
+      <w:p><w:r><w:object><w:objectLink r:id="remote" updateMode="onCall"/></w:object></w:r></w:p>`,
+      links:`<Relationship Id="attachment" Type="${namespaces.rNamespace}/oleObject" Target="embeddings/item.bin"/><Relationship Id="remote" Type="${namespaces.rNamespace}/oleObject" TargetMode="External" Target="https://example.invalid/linked.docx"/>`,
+      extra:{'word/embeddings/item.bin':new Uint8Array([1])}})
+    assert.deepEqual(inspectDocxImport(bytes),{complete:true,requiresSaveAs:false,warnings:[]})
   }
 })

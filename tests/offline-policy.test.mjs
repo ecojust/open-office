@@ -72,6 +72,7 @@ test('pinned profile uses supported paths and protocol-free command values', () 
   assert.doesNotMatch(xml, /<value>\.uno:|AutoCheckEnabled|DisableActiveContent/)
   assert.match(xml, /Office\.Update\/Update.*?name="Enabled".*?<value>false<\/value>/)
   assert.match(xml, /name="DisableMacrosExecution".*?<value>true<\/value>/)
+  for (const name of ['WinWordToWriter','ExcelToCalc','PowerPointToImpress']) assert.match(xml,new RegExp('Office.Common/Filter/Microsoft/Import[^]*?name="'+name+'"[^]*?<value>false</value>'))
 })
 
 test('preparation touches only bundled UI/bootstrap and its own private local profile', () => {

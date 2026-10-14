@@ -7,6 +7,7 @@
     'duplicate-sheet':['sheetIndex','name'], 'delete-sheet':['sheetIndex'], 'move-sheet':['sheetIndex','targetIndex'],
     'set-sheet-hidden':['sheetIndex','hidden'], 'select-range':['sheetIndex','range'], 'set-cell':['sheetIndex','address','input'], 'patch-cells':['sheetIndex','cells'],
     'set-matrix':['sheetIndex','range','cells','formulas'],
+    'fill':['sheetIndex','range','direction'],
     format:['sheetIndex','range','fontName','fontSize','bold','italic','textColor','backgroundColor','align','verticalAlign','wrap','numberFormat'],
     merge:['sheetIndex','range','merged'], 'insert-rows':['sheetIndex','index','count'], 'delete-rows':['sheetIndex','index','count'],
     'insert-columns':['sheetIndex','index','count'], 'delete-columns':['sheetIndex','index','count'],
@@ -45,6 +46,7 @@
       case 'set-matrix':{if(!Array.isArray(data.cells)||!data.cells.length||!Array.isArray(data.cells[0])||!data.cells[0].length)throw Error('请输入矩形数据。');const width=data.cells[0].length;let textLength=0;if(data.cells.length*width>MAX_CELLS)throw Error(`一次最多写入 ${MAX_CELLS} 个单元格。`);for(const row of data.cells){if(!Array.isArray(row)||row.length!==width)throw Error('每行数据列数必须相同。');for(const value of row){if(typeof value==='string'){str(value,32767,'单元格内容',true);textLength+=value.length}else if(typeof value==='number')num(value,-1e100,1e100,'单元格数值');else if(value!==null&&typeof value!=='boolean')throw Error('单元格只支持文字、数字、布尔值或空值。')}}if(textLength>1000000)throw Error('一次粘贴文字总量不能超过一百万字符。');if(data.formulas!==undefined)bool(data.formulas,'公式模式');break}
       case 'format':if(data.fontName!==undefined)str(data.fontName,120,'字体');if(data.fontSize!==undefined)num(data.fontSize,5,200,'字号');for(const key of ['bold','italic','wrap'])if(data[key]!==undefined)bool(data[key],key);if(data.textColor!==undefined)color(data.textColor);if(data.backgroundColor!==undefined)color(data.backgroundColor,true);if(data.align!==undefined)one(data.align,['default','left','center','right','justify'],'水平对齐');if(data.verticalAlign!==undefined)one(data.verticalAlign,['default','top','center','bottom'],'垂直对齐');if(data.numberFormat!==undefined)str(data.numberFormat,120,'数字格式');break;
       case 'merge':bool(data.merged,'合并状态');break;
+      case 'fill':one(data.direction,['down','right'],'填充方向');break;
       case 'insert-rows':case 'delete-rows':case 'insert-columns':case 'delete-columns':case 'set-row-height':case 'set-column-width':num(data.index,0,data.type.includes('column')?MAX_COLUMN:MAX_ROW,'起始位置',true);num(data.count,1,1000,'数量',true);if(data.index+data.count>(data.type.includes('column')?MAX_COLUMN:MAX_ROW)+1)throw Error('行列范围越界。');if(data.type.startsWith('set-'))num(data.sizeMm,.1,500,'尺寸（毫米）');break;
       case 'sort':num(data.column,0,MAX_COLUMN,'排序列',true);bool(data.ascending,'升序');bool(data.header,'标题行');break;
       case 'filter':num(data.column,0,MAX_COLUMN,'筛选列',true);one(data.operator,['equal','not-equal','contains','greater','less'],'筛选条件');if(typeof data.value==='number'){num(data.value,-1e100,1e100,'筛选值');if(data.operator==='contains')throw Error('包含筛选需要文字条件。')}else str(data.value,1000,'筛选值',true);bool(data.header,'标题行');break;
@@ -67,10 +69,51 @@
     const hex=value=>typeof value==='number'&&value>=0?'#'+(value&0xffffff).toString(16).padStart(6,'0').toUpperCase():null;
     const rgb=value=>parseInt(value.slice(1),16);
     function environment(index){const model=getModel();if(!model||!model.supportsService('com.sun.star.sheet.SpreadsheetDocument'))throw Error('请先打开电子表格。');const sheets=model.getSheets(),count=sheets.getCount();if(!count)throw Error('文档没有工作表。');const controller=model.getCurrentController(),active=controller.getActiveSheet();const activeIndex=active.getCellRangeByPosition(0,0,0,0).getRangeAddress().Sheet;if(index!==undefined&&index>=count)throw Error('工作表已删除或编号越界。');return {model,sheets,controller,index:index??activeIndex,activeIndex,sheet:index===undefined?active:sheets.getByIndex(index),count}}
-    function selection(env){let selected=env.controller.getSelection(),a,multiple=false;try{a=selected.getRangeAddress()}catch(error){recover(error);try{const ranges=selected.getRangeAddresses();if(ranges.length){a=ranges[0];multiple=ranges.length>1}}catch(other){recover(other)}}if(!a||a.Sheet!==env.index)a={Sheet:env.index,StartColumn:0,StartRow:0,EndColumn:0,EndRow:0};return {sheetIndex:a.Sheet,startColumn:a.StartColumn,startRow:a.StartRow,endColumn:a.EndColumn,endRow:a.EndRow,address:cellName(a.StartColumn,a.StartRow)+(a.StartColumn===a.EndColumn&&a.StartRow===a.EndRow?'':':'+cellName(a.EndColumn,a.EndRow)),multiple}}
-    function range(env,name,bounded=true){const a=name?address(name):selection(env);if(a.multiple&&!name)throw Error('请先选择一个连续单元格区域。');if(bounded&&(a.endColumn-a.startColumn+1)*(a.endRow-a.startRow+1)>MAX_CELLS)throw Error(`一次操作最多 ${MAX_CELLS} 个单元格，请缩小选区。`);return {area:a,cells:env.sheet.getCellRangeByPosition(a.startColumn,a.startRow,a.endColumn,a.endRow)}}
+    function selection(env){let selected=env.controller.getSelection(),a,multiple=false;try{a=selected.getRangeAddress()}catch(error){recover(error);try{const ranges=selected.getRangeAddresses();if(ranges.length){a=ranges[0];multiple=ranges.length>1}}catch(other){recover(other)}}const available=!!a&&a.Sheet===env.index&&['StartColumn','StartRow','EndColumn','EndRow'].every(key=>Number.isSafeInteger(a[key]))&&a.StartColumn>=0&&a.StartRow>=0&&a.EndColumn>=a.StartColumn&&a.EndRow>=a.StartRow&&a.EndColumn<=MAX_COLUMN&&a.EndRow<=MAX_ROW;if(!available)a={Sheet:env.index,StartColumn:0,StartRow:0,EndColumn:0,EndRow:0};return {sheetIndex:a.Sheet,startColumn:a.StartColumn,startRow:a.StartRow,endColumn:a.EndColumn,endRow:a.EndRow,address:cellName(a.StartColumn,a.StartRow)+(a.StartColumn===a.EndColumn&&a.StartRow===a.EndRow?'':':'+cellName(a.EndColumn,a.EndRow)),multiple,available}}
+    function range(env,name,bounded=true){const a=name?address(name):selection(env);if(!name&&(a.multiple||a.available===false))throw Error('请先选择一个连续单元格区域。');if(bounded&&(a.endColumn-a.startColumn+1)*(a.endRow-a.startRow+1)>MAX_CELLS)throw Error(`一次操作最多 ${MAX_CELLS} 个单元格，请缩小选区。`);return {area:a,cells:env.sheet.getCellRangeByPosition(a.startColumn,a.startRow,a.endColumn,a.endRow)}}
     function select(env,cells){if(!read(env.sheet,'IsVisible',true))throw Error('请先取消隐藏这张工作表。');env.controller.setActiveSheet(env.sheet);env.controller.select(cells)}
     function editable(env){if(typeof env.model.isReadonly==='function'&&env.model.isReadonly())throw Error('文档为只读，不能修改。');if(typeof env.sheet.isProtected==='function'&&env.sheet.isProtected())throw Error('工作表已保护，请先在原生菜单中取消保护。')}
+    function plainContentTarget(env,column,row){
+      const cell=env.sheet.getCellByPosition(column,row);
+      // Covered cells report getIsMerged() === false and native setters can
+      // store invisible values in them. Resolve their full native merge area
+      // without changing the selection; only the visible anchor is writable.
+      const unknown=()=>{throw Error('无法确认目标单元格的合并状态，未修改内容。')};
+      if(typeof env.sheet.createCursorByRange!=='function')unknown();
+      const cursor=env.sheet.createCursorByRange(cell);
+      if(!cursor||typeof cursor.collapseToMergedArea!=='function'||typeof cursor.getRangeAddress!=='function')unknown();
+      cursor.collapseToMergedArea();const merged=cursor.getRangeAddress();
+      if(!merged||!['Sheet','StartColumn','EndColumn','StartRow','EndRow'].every(key=>Number.isInteger(merged[key]))
+        ||merged.Sheet!==env.index||merged.StartColumn<0||merged.StartRow<0||merged.EndColumn>MAX_COLUMN||merged.EndRow>MAX_ROW
+        ||merged.StartColumn>column||merged.EndColumn<column||merged.StartRow>row||merged.EndRow<row)unknown();
+      if(merged.StartColumn!==column||merged.StartRow!==row)throw Error(`目标 ${cellName(column,row)} 是合并区域的覆盖格。请编辑左上角 ${cellName(merged.StartColumn,merged.StartRow)}，或先取消合并；本次内容未修改。`);
+      // Single-cell UNO setters can overwrite one array member without rejecting
+      // it, leaving an array range whose cached value changes again on reopen.
+      // These tools edit ordinary cells only; array replacement belongs to the
+      // native whole-array editor. Inspect all batch targets before any setter.
+      if(typeof cell.getArrayFormula!=='function')throw Error('无法确认目标单元格的数组公式状态，未修改内容。');
+      const formula=cell.getArrayFormula();
+      if(typeof formula!=='string')throw Error('无法确认目标单元格的数组公式状态，未修改内容。');
+      if(formula)throw Error('目标包含数组公式，不能逐格改写。请在画布中选择完整数组范围后编辑；本次内容未修改。');
+      // UNO content setters bypass Calc's interactive validation dialogs. Do
+      // not approximate custom formulas or list/range dependencies here: STOP
+      // rules must use the native cell editor. Advisory/no-alert rules retain
+      // their existing behavior. These are authoritative reads, not fallbacks.
+      const validation=cell.getPropertyValue('Validation');
+      if(!validation||typeof validation.getPropertyValue!=='function')throw Error('无法确认目标单元格的数据验证规则，未修改内容。');
+      const kind=enumValue(validation.getPropertyValue('Type'));
+      if(kind===enumValue(css.sheet.ValidationType.ANY))return cell;
+      if(!['WHOLE','DECIMAL','LIST','DATE','TIME','TEXT_LEN','CUSTOM'].some(name=>kind===enumValue(css.sheet.ValidationType[name])))throw Error('无法确认目标单元格的数据验证类型，未修改内容。');
+      const showError=validation.getPropertyValue('ShowErrorMessage');
+      if(showError===false)return cell;
+      if(showError!==true)throw Error('无法确认目标单元格的数据验证提示方式，未修改内容。');
+      const alert=enumValue(validation.getPropertyValue('ErrorAlertStyle'));
+      if(alert===enumValue(css.sheet.ValidationAlertStyle.WARNING)||alert===enumValue(css.sheet.ValidationAlertStyle.INFO))return cell;
+      throw Error('目标包含需由原生编辑器检查的数据验证规则，请在画布单元格中输入；本次内容未修改。');
+    }
+    function plainContentRange(env,area){
+      for(let row=area.startRow;row<=area.endRow;row++)for(let column=area.startColumn;column<=area.endColumn;column++)plainContentTarget(env,column,row);
+    }
     function named(model){return read(model,'NamedRanges')}
     function richText(cell,value){if(typeof value!=='string'||!value.includes('\u0001'))return value;const cursor=cell.createTextCursor();cursor.gotoStart(false);cursor.gotoEnd(true);return cursor.getString()}
     // Native Calc 24.2 view snapshot: viewdata.cxx Write/ReadUserData (fixed
@@ -93,10 +136,50 @@
       return {columns:env.controller.getSplitColumn(),rows:env.controller.getSplitRow()}
     }
     function formulaInput(cell){const value=cell.getFormula();return enumValue(cell.getType())===2&&value.startsWith('=')?"'"+value:value}
+    const formatProperties={fontName:['CharFontName','CharFontNameAsian','CharFontNameComplex'],fontSize:['CharHeight','CharHeightAsian','CharHeightComplex'],bold:['CharWeight','CharWeightAsian','CharWeightComplex'],italic:['CharPosture','CharPostureAsian','CharPostureComplex'],textColor:['CharColor'],backgroundColor:['IsCellBackgroundTransparent','CellBackColor'],align:['HoriJustify'],verticalAlign:['VertJustify'],wrap:['IsTextWrapped'],numberFormat:['NumberFormat']};
+    const textFormatKeys=['fontName','fontSize','bold','italic','textColor'];
+    // FORMATTED (512), not EDITATTR, selects Calc edit-engine cells, including
+    // multi-paragraph text. Query native ranges, never scan every selected cell.
+    function richRanges(env,cells,area){
+      const ranges=Array.from(cells.queryContentCells(512).getRangeAddresses());
+      for(const a of ranges)if(!a||a.Sheet!==env.index||!['StartColumn','EndColumn','StartRow','EndRow'].every(k=>Number.isSafeInteger(a[k]))||a.StartColumn<area.startColumn||a.EndColumn>area.endColumn||a.StartRow<area.startRow||a.EndRow>area.endRow||a.StartColumn>a.EndColumn||a.StartRow>a.EndRow)throw Error('无法确认选区中的局部文字格式。');
+      return ranges;
+    }
+    function formatStatus(env,area){
+      const mixedFormat=[],unavailableFormat=[],keys=Object.keys(formatProperties),result={mixedFormat,unavailableFormat,richTextFormat:false};
+      if(!area.available||area.multiple||(area.endColumn-area.startColumn+1)*(area.endRow-area.startRow+1)>MAX_CELLS){unavailableFormat.push(...keys);return result}
+      const cells=env.sheet.getCellRangeByPosition(area.startColumn,area.startRow,area.endColumn,area.endRow),names=Object.values(formatProperties).flat();let states;
+      try{states=Array.from(cells.getPropertyStates(names),enumValue);if(states.length!==names.length||states.some(value=>![0,1,2].includes(value)))throw Error('Invalid property states')}catch(error){recover(error);unavailableFormat.push(...keys);return result}
+      const values=new Map(names.map((name,index)=>[name,states[index]]));
+      for(const key of keys){
+        let props=formatProperties[key];
+        if(key==='backgroundColor'&&values.get('IsCellBackgroundTransparent')!==2){try{const transparent=cells.getPropertyValue('IsCellBackgroundTransparent');if(typeof transparent!=='boolean')throw Error('Invalid fill state');if(transparent)props=['IsCellBackgroundTransparent']}catch(error){recover(error);unavailableFormat.push(key);continue}}
+        if(props.some(name=>values.get(name)===2))mixedFormat.push(key);
+      }
+      try{result.richTextFormat=richRanges(env,cells,area).length>0}catch(error){recover(error);result.richTextFormat=true}
+      // Cell format properties do not report edit-engine run attributes. Keep
+      // proven mixed states, otherwise show unknown rather than an anchor value.
+      if(result.richTextFormat)for(const key of textFormatKeys)if(!mixedFormat.includes(key))unavailableFormat.push(key);
+      return result;
+    }
+    function richFormatTargets(env,cells,area,changes){
+      const textChanges=changes.filter(([name])=>name.startsWith('Char'));if(!textChanges.length)return [];
+      let ranges;try{ranges=richRanges(env,cells,area)}catch(error){recover(error);throw Error('无法确认局部文字格式，请在画布中修改字体；本次格式未更改。')}
+      const targets=[],seen=new Set();let count=0;
+      for(const a of ranges){count+=(a.EndColumn-a.StartColumn+1)*(a.EndRow-a.StartRow+1);if(count>256)throw Error('一次最多修改 256 个含局部文字格式的单元格，请缩小选区。')}
+      for(const a of ranges)for(let row=a.StartRow;row<=a.EndRow;row++)for(let column=a.StartColumn;column<=a.EndColumn;column++){
+        const key=column+','+row;if(seen.has(key))continue;seen.add(key);
+        const cell=env.sheet.getCellByPosition(column,row);let cursor;
+        try{cursor=cell.createTextCursor();cursor.gotoStart(false);cursor.gotoEnd(true)}catch(error){recover(error);throw Error('此单元格的局部文字格式不能安全修改，请在画布中编辑。')}
+        for(const [name]of textChanges)if(!has(cursor,name))throw Error(`当前局部文字不支持 ${name}，本次格式未更改。`);
+        targets.push({cursor,changes:textChanges});
+      }
+      return targets;
+    }
     function state(){const env=environment(),selected=selection(env),cell=env.sheet.getCellByPosition(selected.startColumn,selected.startRow),fmt=range(env,cellName(selected.startColumn,selected.startRow),false).cells;const key=read(fmt,'NumberFormat',0);let numberFormat='';try{numberFormat=read(env.model.getNumberFormats().getByKey(key),'FormatString','')}catch(error){recover(error)}let merged=false;try{merged=fmt.getIsMerged()}catch(error){recover(error)}let frozen={columns:0,rows:0};try{frozen=frozenState(env)}catch(error){recover(error)}const names=named(env.model);const nameList=names?names.getElementNames().slice(0,256).map(name=>({name,content:names.getByName(name).getContent()})):[];
       const visibleIndexes=Array.from({length:Math.min(env.count,MAX_SHEETS)},(_,index)=>index);if(!visibleIndexes.includes(env.activeIndex))visibleIndexes.push(env.activeIndex);return {sheetCount:env.count,sheetsTruncated:env.count>MAX_SHEETS,sheets:visibleIndexes.map(index=>{const sheet=env.sheets.getByIndex(index);return {index,name:sheet.getName(),visible:read(sheet,'IsVisible',true)}}),activeSheetIndex:env.activeIndex,selection:selected,
         cell:{address:cellName(selected.startColumn,selected.startRow),column:selected.startColumn,row:selected.startRow,formula:formulaInput(cell),text:cell.getString(),value:cell.getValue(),type:({0:'empty',1:'number',2:'text',3:'formula'})[enumValue(cell.getType())]||'empty',error:cell.getError()},
-        format:{fontName:read(fmt,'CharFontName',''),fontSize:Number(read(fmt,'CharHeight',11)),bold:Number(read(fmt,'CharWeight',100))>=150,italic:enumValue(read(fmt,'CharPosture'))===enumValue(css.awt.FontSlant.ITALIC),textColor:hex(read(fmt,'CharColor'))||'#000000',backgroundColor:read(fmt,'IsCellBackgroundTransparent',true)?null:hex(read(fmt,'CellBackColor')),align:({0:'default',1:'left',2:'center',3:'right',4:'justify'})[enumValue(read(fmt,'HoriJustify',0))]||'default',verticalAlign:({0:'default',1:'top',2:'center',3:'bottom'})[enumValue(read(fmt,'VertJustify',0))]||'default',wrap:!!read(fmt,'IsTextWrapped',false),numberFormat,merged},frozen,namedRanges:nameList}}
+        format:{fontName:read(fmt,'CharFontName',''),fontSize:Number(read(fmt,'CharHeight',11)),bold:Number(read(fmt,'CharWeight',100))>=150,italic:enumValue(read(fmt,'CharPosture'))===enumValue(css.awt.FontSlant.ITALIC),textColor:hex(read(fmt,'CharColor'))||'#000000',backgroundColor:read(fmt,'IsCellBackgroundTransparent',true)?null:hex(read(fmt,'CellBackColor')),align:({0:'default',1:'left',2:'center',3:'right',4:'justify'})[enumValue(read(fmt,'HoriJustify',0))]||'default',verticalAlign:({0:'default',1:'top',2:'center',3:'bottom'})[enumValue(read(fmt,'VertJustify',0))]||'default',wrap:!!read(fmt,'IsTextWrapped',false),numberFormat,merged},...formatStatus(env,selected),frozen,namedRanges:nameList}}
     function differentName(env,name,except){const duplicate=Array.from(env.sheets.getElementNames()).find(item=>item.toLocaleLowerCase()===name.toLocaleLowerCase()&&item!==except);if(duplicate)throw Error('工作表名称已存在。')}
     function visibleCount(env){let count=0;for(let i=0;i<env.count;i++)if(read(env.sheets.getByIndex(i),'IsVisible',true))count++;return count}
     function conditionOperator(name){return css.sheet.ConditionOperator[{greater:'GREATER',less:'LESS',equal:'EQUAL',between:'BETWEEN'}[name]]}
@@ -124,16 +207,46 @@
         if(typeof env.model.isReadonly!=='function'||!env.model.isReadonly())env.model.setModified(true);
         return
       }
-      if(type==='set-cell'){const a=address(data.address,true),cell=env.sheet.getCellByPosition(a.startColumn,a.startRow);cell.setFormula(data.input);select(env,cell);return}
-      if(type==='patch-cells'){for(const item of data.cells){const a=address(item.address,true),cell=env.sheet.getCellByPosition(a.startColumn,a.startRow);if(item.kind==='number')cell.setValue(item.value);else if(item.kind==='text')cell.setString(item.value);else cell.setFormula(item.value)}return}
-      if(type==='set-matrix'){const base=data.range?address(data.range):selection(env),endColumn=base.startColumn+data.cells[0].length-1,endRow=base.startRow+data.cells.length-1;if(base.multiple||endColumn>MAX_COLUMN||endRow>MAX_ROW)throw Error('粘贴范围无效或越界。');if(data.range?.includes(':')&&(base.endColumn!==endColumn||base.endRow!==endRow))throw Error('数据尺寸与目标选区不一致。');const cells=env.sheet.getCellRangeByPosition(base.startColumn,base.startRow,endColumn,endRow);if(data.formulas)cells.setFormulaArray(data.cells.map(row=>row.map(value=>value===null?'':typeof value==='boolean'?value?'1':'0':String(value))));else cells.setDataArray(data.cells.map(row=>row.map(value=>value===null?'':typeof value==='boolean'?Number(value):value)));select(env,cells);return}
+      if(type==='set-cell'){const a=address(data.address,true),cell=plainContentTarget(env,a.startColumn,a.startRow);cell.setFormula(data.input);select(env,cell);return}
+      if(type==='patch-cells'){const targets=data.cells.map(item=>{const a=address(item.address,true);return{item,cell:plainContentTarget(env,a.startColumn,a.startRow)}});for(const {item,cell}of targets){if(item.kind==='number')cell.setValue(item.value);else if(item.kind==='text')cell.setString(item.value);else cell.setFormula(item.value)}return}
+      if(type==='set-matrix'){const base=data.range?address(data.range):selection(env),endColumn=base.startColumn+data.cells[0].length-1,endRow=base.startRow+data.cells.length-1;if(base.multiple||endColumn>MAX_COLUMN||endRow>MAX_ROW)throw Error('粘贴范围无效或越界。');if(data.range?.includes(':')&&(base.endColumn!==endColumn||base.endRow!==endRow))throw Error('数据尺寸与目标选区不一致。');plainContentRange(env,{startColumn:base.startColumn,startRow:base.startRow,endColumn,endRow});const cells=env.sheet.getCellRangeByPosition(base.startColumn,base.startRow,endColumn,endRow);if(data.formulas)cells.setFormulaArray(data.cells.map(row=>row.map(value=>value===null?'':typeof value==='boolean'?value?'1':'0':String(value))));else cells.setDataArray(data.cells.map(row=>row.map(value=>value===null?'':typeof value==='boolean'?Number(value):value)));select(env,cells);return}
       if(['insert-rows','delete-rows','insert-columns','delete-columns','set-row-height','set-column-width'].includes(type)){const columns=type.includes('column'),collection=columns?env.sheet.getColumns():env.sheet.getRows();if(type.startsWith('insert-'))collection.insertByIndex(data.index,data.count);else if(type.startsWith('delete-'))collection.removeByIndex(data.index,data.count);else {const property=columns?'Width':'Height';for(let i=data.index;i<data.index+data.count;i++)if(!has(collection.getByIndex(i),property))throw Error('当前对象不支持尺寸修改。');for(let i=data.index;i<data.index+data.count;i++)set(collection.getByIndex(i),property,typed('long',Math.round(data.sizeMm*100)))}return}
       if(type==='delete-name'){const names=named(env.model);if(!names?.hasByName(data.name))throw Error('命名范围已不存在。');names.removeByName(data.name);return}
       if(['delete-chart','delete-pivot','refresh-pivot'].includes(type)){const items=type==='delete-chart'?env.sheet.getCharts():env.sheet.getDataPilotTables();if(!items.hasByName(data.name))throw Error('对象已不存在，请刷新列表。');if(type==='refresh-pivot')items.getByName(data.name).refresh();else items.removeByName(data.name);return}
       const {area,cells}=range(env,data.range);
       if(type==='select-range'){select(env,cells);return}
+      if(type==='fill'){
+        if(data.direction==='down'?area.endRow===area.startRow:area.endColumn===area.startColumn)throw Error('填充需要包含来源及目标：向下至少两行，向右至少两列。');
+        if(typeof cells.fillSeries!=='function')throw Error('当前表格内核不支持原生填充。');
+        // Preflight every selected cell before the one native mutation. Filling
+        // a partial merge/array can otherwise fail after modifying early cells.
+        for(let row=area.startRow;row<=area.endRow;row++)for(let column=area.startColumn;column<=area.endColumn;column++){
+          const cell=env.sheet.getCellByPosition(column,row),cursor=env.sheet.createCursorByRange(cell);
+          cursor.collapseToMergedArea();const merged=cursor.getRangeAddress();
+          if(merged.StartColumn!==column||merged.EndColumn!==column||merged.StartRow!==row||merged.EndRow!==row)throw Error('填充选区包含合并单元格，请先取消合并。');
+          if(cell.getArrayFormula())throw Error('填充选区包含数组公式，请先选择普通单元格区域。');
+        }
+        // Native SIMPLE fill preserves cell types/formats and translates relative
+        // references. Never rebuild formulas with textual A1 replacement.
+        cells.fillSeries(data.direction==='down'?css.sheet.FillDirection.TO_BOTTOM:css.sheet.FillDirection.TO_RIGHT,css.sheet.FillMode.SIMPLE,css.sheet.FillDateMode.FILL_DATE_DAY,0,0);
+        return
+      }
       if(type==='define-name'){const names=named(env.model);if(!names)throw Error('文档不支持命名范围。');const content=read(cells,'AbsoluteName');if(!content)throw Error('无法读取范围的完整地址。');const base=new css.table.CellAddress({Sheet:env.index,Column:area.startColumn,Row:area.startRow});if(names.hasByName(data.name))names.getByName(data.name).setContent(content);else {if(names.getElementNames().length>=256)throw Error('命名范围数量已达到工作台上限。');names.addNewByName(data.name,content,base,0)}return}
-      if(type==='format'){const changes=[];const add=(name,value)=>changes.push([name,value]);if(data.fontName!==undefined)for(const name of ['CharFontName','CharFontNameAsian','CharFontNameComplex'])add(name,data.fontName);if(data.fontSize!==undefined)for(const name of ['CharHeight','CharHeightAsian','CharHeightComplex'])add(name,typed('float',data.fontSize));if(data.bold!==undefined)for(const name of ['CharWeight','CharWeightAsian','CharWeightComplex'])add(name,typed('float',data.bold?150:100));if(data.italic!==undefined)for(const name of ['CharPosture','CharPostureAsian','CharPostureComplex'])add(name,data.italic?css.awt.FontSlant.ITALIC:css.awt.FontSlant.NONE);if(data.textColor!==undefined)add('CharColor',typed('long',rgb(data.textColor)));if(data.backgroundColor!==undefined){add('IsCellBackgroundTransparent',data.backgroundColor===null);if(data.backgroundColor!==null)add('CellBackColor',typed('long',rgb(data.backgroundColor)))}if(data.align!==undefined)add('HoriJustify',css.table.CellHoriJustify[{default:'STANDARD',left:'LEFT',center:'CENTER',right:'RIGHT',justify:'BLOCK'}[data.align]]);if(data.verticalAlign!==undefined)add('VertJustify',css.table.CellVertJustify[{default:'STANDARD',top:'TOP',center:'CENTER',bottom:'BOTTOM'}[data.verticalAlign]]);if(data.wrap!==undefined)add('IsTextWrapped',data.wrap);for(const [name]of changes)if(!has(cells,name))throw Error(`当前选区不支持 ${name}。`);if(data.numberFormat!==undefined){if(!has(cells,'NumberFormat'))throw Error('选区不支持数字格式。');const formats=env.model.getNumberFormats(),locale=new css.lang.Locale({Language:'en',Country:'US',Variant:''});let key=formats.queryKey(data.numberFormat,locale,true);if(key<0)key=formats.addNew(data.numberFormat,locale);add('NumberFormat',typed('long',key))}for(const [name,value]of changes)set(cells,name,value);return}
+      if(type==='format'){const changes=[];const add=(name,value)=>changes.push([name,value]);if(data.fontName!==undefined)for(const name of ['CharFontName','CharFontNameAsian','CharFontNameComplex'])add(name,data.fontName);if(data.fontSize!==undefined)for(const name of ['CharHeight','CharHeightAsian','CharHeightComplex'])add(name,typed('float',data.fontSize));if(data.bold!==undefined)for(const name of ['CharWeight','CharWeightAsian','CharWeightComplex'])add(name,typed('float',data.bold?150:100));if(data.italic!==undefined)for(const name of ['CharPosture','CharPostureAsian','CharPostureComplex'])add(name,data.italic?css.awt.FontSlant.ITALIC:css.awt.FontSlant.NONE);if(data.textColor!==undefined)add('CharColor',typed('long',rgb(data.textColor)));if(data.backgroundColor!==undefined){add('IsCellBackgroundTransparent',data.backgroundColor===null);if(data.backgroundColor!==null)add('CellBackColor',typed('long',rgb(data.backgroundColor)))}if(data.align!==undefined)add('HoriJustify',css.table.CellHoriJustify[{default:'STANDARD',left:'LEFT',center:'CENTER',right:'RIGHT',justify:'BLOCK'}[data.align]]);if(data.verticalAlign!==undefined)add('VertJustify',css.table.CellVertJustify[{default:'STANDARD',top:'TOP',center:'CENTER',bottom:'BOTTOM'}[data.verticalAlign]]);if(data.wrap!==undefined)add('IsTextWrapped',data.wrap);for(const [name]of changes)if(!has(cells,name))throw Error(`当前选区不支持 ${name}。`);const richTargets=richFormatTargets(env,cells,area,changes);let numberFormat;
+        if(data.numberFormat!==undefined){if(!has(cells,'NumberFormat'))throw Error('选区不支持数字格式。');const formats=env.model.getNumberFormats(),locale=new css.lang.Locale({Language:'en',Country:'US',Variant:''});numberFormat={formats,locale,key:formats.queryKey(data.numberFormat,locale,true)}}
+        const undo=typeof env.model.getUndoManager==='function'?env.model.getUndoManager():null,grouped=!!undo&&typeof undo.enterUndoContext==='function'&&typeof undo.leaveUndoContext==='function';
+        if(richTargets.length&&!grouped)throw Error('无法创建完整的格式撤销记录，本次格式未更改。');
+        if(grouped)undo.enterUndoContext('单元格格式');
+        try{
+          if(numberFormat){const {formats,locale}=numberFormat;let key=numberFormat.key;if(key<0)key=formats.addNew(data.numberFormat,locale);add('NumberFormat',typed('long',key))}
+          for(const [name,value]of changes)set(cells,name,value);
+          // Calc may interpret the first built-in General write on a mixed
+          // locale range as language-only. Reapply after that normalization,
+          // inside the same undo context, to actually reset the number format.
+          if(data.numberFormat==='General')set(cells,'NumberFormat',changes.find(([name])=>name==='NumberFormat')[1]);
+          for(const {cursor,changes:attributes}of richTargets)for(const [name,value]of attributes)set(cursor,name,value);
+        }finally{if(grouped)undo.leaveUndoContext()}
+        return}
       if(type==='merge'){if(data.merged){const values=cells.getFormulaArray();for(let r=0;r<values.length;r++)for(let c=0;c<values[r].length;c++)if((r||c)&&values[r][c]!=='')throw Error('合并会丢弃其他单元格内容，请先移走内容再合并。')}cells.merge(data.merged);return}
       if(type==='sort'){if(data.column>area.endColumn-area.startColumn)throw Error('排序列超出选区。');if(typeof dispatch!=='function')throw Error('原生排序命令不可用。');
         // The fixed WASM lacks sequence<SortField> bindings. DataSort is the
@@ -154,7 +267,21 @@
       if(type==='insert-pivot'){const columns=area.endColumn-area.startColumn+1;if(data.rowField>=columns||data.dataField>=columns||area.endRow===area.startRow)throw Error('透视表需要标题行、数据行以及选区内的字段。');const headers=cells.getDataArray()[0];if(headers.some(value=>typeof value!=='string'||!value.trim())||new Set(headers).size!==headers.length)throw Error('透视表每列都需要唯一非空的文字标题。');const output=environment(data.outputSheetIndex??env.index);editable(output);const a=address(data.outputAddress,true);if(a.startColumn+1>MAX_COLUMN||a.startRow+(area.endRow-area.startRow)+3>MAX_ROW)throw Error('透视表输出范围越界。');const target=output.sheet.getCellRangeByPosition(a.startColumn,a.startRow,a.startColumn+1,a.startRow+(area.endRow-area.startRow)+3);if(target.getFormulaArray().some(row=>row.some(value=>value!=='')))throw Error('透视表输出区域必须为空。');const tables=output.sheet.getDataPilotTables();if(tables.hasByName(data.name))throw Error('透视表名称已存在。');if(tables.getElementNames().length>=100)throw Error('透视表数量已达到上限。');const descriptor=tables.createDataPilotDescriptor();descriptor.setSourceRange(cells.getRangeAddress());const fields=descriptor.getDataPilotFields();for(let i=0;i<fields.getCount();i++)set(fields.getByIndex(i),'Orientation',css.sheet.DataPilotFieldOrientation.HIDDEN);set(fields.getByIndex(data.rowField),'Orientation',css.sheet.DataPilotFieldOrientation.ROW);const value=fields.getByIndex(data.dataField);set(value,'Orientation',css.sheet.DataPilotFieldOrientation.DATA);set(value,'Function',css.sheet.GeneralFunction[{sum:'SUM',count:'COUNT',average:'AVERAGE'}[data.operation]]);tables.insertNewByName(data.name,new css.table.CellAddress({Sheet:output.index,Column:a.startColumn,Row:a.startRow}),descriptor);return}
       throw Error('此操作尚未实现。')
     }
-    function data(query){object(query,['type','sheetIndex','range']);one(query.type,['range','charts','pivots','rules'],'数据查询');if(query.sheetIndex!==undefined)num(query.sheetIndex,0,32766,'工作表编号',true);if(['range','rules'].includes(query.type))address(query.range);const env=environment(query.sheetIndex);if(query.type==='range'){const {area,cells}=range(env,query.range);const values=cells.getDataArray(),formulas=cells.getFormulaArray(),cellTypes=values.map(row=>row.map(()=> 'empty'));
+    function data(query){object(query,['type','sheetIndex','range',...(query?.type==='summary'?['includeHidden']:[])]);if(query?.includeHidden!==undefined)bool(query.includeHidden,'包含隐藏行');one(query.type,['range','charts','pivots','rules','summary'],'数据查询');if(query.sheetIndex!==undefined)num(query.sheetIndex,0,32766,'工作表编号',true);if(['range','rules','summary'].includes(query.type))address(query.range);const env=environment(query.sheetIndex);if(query.type==='summary'){
+        const {area,cells}=range(env,query.range),values=cells.getDataArray(),formulas=cells.getFormulaArray(),errors=new Set(),visible=values.map((_,index)=>{if(query.includeHidden===true)return true;const shown=read(env.sheet.getRows().getByIndex(area.startRow+index),'IsVisible');if(typeof shown!=='boolean')throw Error('无法读取行可见状态，暂不能统计。');return shown});
+        // FormulaResult.ERROR = 4, as defined by the native XCellRangesQuery API.
+        for(const a of cells.queryFormulaCells(4).getRangeAddresses())for(let r=Math.max(a.StartRow,area.startRow);r<=Math.min(a.EndRow,area.endRow);r++)for(let c=Math.max(a.StartColumn,area.startColumn);c<=Math.min(a.EndColumn,area.endColumn);c++)if(visible[r-area.startRow])errors.add((r-area.startRow)+','+(c-area.startColumn));
+        let count=0,numericCount=0,sum=0,correction=0,minimum=null,maximum=null;
+        for(let r=0;r<values.length;r++)for(let c=0;c<values[r].length;c++){
+          if(!visible[r])continue;
+          if(formulas[r][c]!=='')count++;
+          const value=values[r][c];if(errors.has(r+','+c)||typeof value!=='number'||!Number.isFinite(value))continue;
+          numericCount++;minimum=minimum===null?value:Math.min(minimum,value);maximum=maximum===null?value:Math.max(maximum,value);
+          const adjusted=value-correction,next=sum+adjusted;correction=(next-sum)-adjusted;sum=next;
+        }
+        return {range:area.address,count,numericCount,sum:Number.isFinite(sum)?sum:null,average:numericCount&&Number.isFinite(sum)?sum/numericCount:null,minimum,maximum,errorCount:errors.size,includesHidden:query.includeHidden===true}
+      }
+      if(query.type==='range'){const {area,cells}=range(env,query.range);const values=cells.getDataArray(),formulas=cells.getFormulaArray(),cellTypes=values.map(row=>row.map(()=> 'empty'));
         // Query content ranges in bulk, avoiding one bridge call per cell and
         // distinguishing literal '=text' from actual formulas losslessly.
         for(const [kind,flags]of [['number',3],['text',4],['formula',16]])for(const a of cells.queryContentCells(flags).getRangeAddresses())for(let r=Math.max(a.StartRow,area.startRow);r<=Math.min(a.EndRow,area.endRow);r++)for(let c=Math.max(a.StartColumn,area.startColumn);c<=Math.min(a.EndColumn,area.endColumn);c++)cellTypes[r-area.startRow][c-area.startColumn]=kind;

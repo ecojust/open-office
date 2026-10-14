@@ -1,0 +1,68 @@
+{
+  "scope": "Authored grid/row/fill fixtures; native height can grow from text",
+  "items": [
+    {
+      "id": "matched",
+      "path": "matched.pptx",
+      "sha256": "60f6779132b112636eb11741b2e199a21753c53da932b5f48946fe3b7eafd4db",
+      "expected": {
+        "slides": 1
+      },
+      "gridWidthsMm": [
+        20,
+        60,
+        40
+      ],
+      "rowHeightsMm": [
+        10,
+        30
+      ],
+      "frameMm": [
+        120,
+        40
+      ]
+    },
+    {
+      "id": "mismatched-frame",
+      "path": "mismatched-frame.pptx",
+      "sha256": "47043a1df7a7bea66785f600799c8e75e7b8bdd0f29e60435010870a395e0158",
+      "expected": {
+        "slides": 1
+      },
+      "gridWidthsMm": [
+        20,
+        60,
+        40
+      ],
+      "rowHeightsMm": [
+        10,
+        30
+      ],
+      "frameMm": [
+        180,
+        80
+      ]
+    },
+    {
+      "id": "content-growth",
+      "path": "content-growth.pptx",
+      "sha256": "1506ac0408847f8a520fb6955b4beac8c3c59e08894a690b11e1cf3922f80bbb",
+      "expected": {
+        "slides": 1
+      },
+      "gridWidthsMm": [
+        20,
+        60,
+        40
+      ],
+      "rowHeightsMm": [
+        2,
+        2
+      ],
+      "frameMm": [
+        120,
+        4
+      ]
+    }
+  ]
+}

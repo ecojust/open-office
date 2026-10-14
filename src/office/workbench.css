@@ -104,10 +104,7 @@
   scrollbar-width: thin;
 }
 
-.ow-toolbar > button,
-.ow-toolbar > label,
-.ow-toolbar > .ow-control,
-.ow-toolbar > .ow-divider {
+.ow-toolbar > :not(.ow-spacer) {
   flex-shrink: 0;
 }
 
@@ -264,7 +261,8 @@
 }
 
 .ow-canvas > .ow-workbench,
-.ow-canvas > .presentation-workbench {
+.ow-canvas > .presentation-workbench,
+.ow-canvas > .office-editor {
   flex: 1;
   height: auto;
 }

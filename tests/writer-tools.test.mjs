@@ -21,7 +21,7 @@ function fixture() {
   const owner = { createEnumeration:()=>enumeration([]), createTextCursorByRange: () => ({ gotoRange() {}, getString:()=>selectionText }), compareRegionStarts: () => 0, compareRegionEnds: () => 0 }
   const view = Object.assign(props({ PageStyleName: 'Standard', ParaAdjust: 0, CharHeight: 12, CharHeightAsian: 12, CharHeightComplex: 12,
     CharWeight: 100, CharWeightAsian: 100, CharWeightComplex: 100, CharColor: 0, CharBackColor: -1, CharBackTransparent: true }, 'view'), {
-    getText: () => owner, getStart: () => view, getEnd: () => view, getString: () => '', isCollapsed: () => true,
+    getText: () => owner, getStart: () => view, getEnd: () => view, getString: () => '', isCollapsed: () => true, getPropertyState:()=>0,
   })
   const page = props({ Width: 21000, Height: 29700, IsLandscape: false, LeftMargin: 2000, RightMargin: 2000,
     TopMargin: 2000, BottomMargin: 2000, HeaderIsOn: false, FooterIsOn: false }, 'page')
@@ -34,10 +34,10 @@ function fixture() {
     getTextTables:()=>({getElementNames:()=>['Table1'],hasByName:name=>name==='Table1',getByName:()=>table}),
   }
   let modelReads=0, revision=0, dispatchHandler=null
-  const context = vm.createContext({ WebAssembly, Error })
+  const context = vm.createContext({ WebAssembly, Error, URL })
   vm.runInContext(source,context)
   const api=context.createWriterTools({ getModel:()=>{modelReads++;return model}, getRevision:()=>revision, css:{beans:{PropertyValue:Struct},awt:{FontSlant:{ITALIC:2,NONE:0}},style:{LineSpacing:Struct,LineSpacingMode:{PROP:0}}},
-    zetajs:{Any,type:{float:'float',short:'short'},sameUnoObject:(a,b)=>a===b,catchUnoException:error=>{errors.push(error);return {Message:'optional'}}},
+    zetajs:{Any,type:{float:'float',short:'short',byte:'byte'},sameUnoObject:(a,b)=>a===b,catchUnoException:error=>{errors.push(error);return {Message:'optional'}}},
     dispatch:(command,args)=>{writes.push(['dispatch',command,args]);dispatchHandler?.(command,args)} })
   return {api,writes,reads,view,page,model,controller,errors,tableCells,set selectionText(value){selectionText=value},set revision(value){revision=value},set dispatchHandler(fn){dispatchHandler=fn},get modelReads(){return modelReads}}
 }
@@ -193,6 +193,59 @@ test('disabling a native header/footer requires explicit removal confirmation ev
   assert.equal(h.page.values.FooterIsOn,false)
   rejectsBeforeModel({type:'set-header-footer',target:'footer',enabled:false,confirmRemoval:'yes'})
 })
+function decorationFixture(groups, target='footer') {
+  const h=fixture(),runs=groups.map(group=>group.map(item=>typeof item==='string'?{text:item,type:'Text',link:''}:{link:'',...item}));
+  const owner={getString:()=>runs.map(group=>group.map(run=>run.text).join('')).join('\n'),createEnumeration:()=>enumeration(runs.map(group=>({supportsService:name=>name==='com.sun.star.text.Paragraph',getString:()=>group.map(run=>run.text).join(''),createEnumeration:()=>enumeration(group.map(run=>({getString:()=>run.text,getStart:()=>run,getPropertyValue:name=>name==='TextPortionType'?run.type:run.link})))}))),
+    createTextCursorByRange:run=>{let start=0,end=0;return{goRight(count,expand){const next=end+count;if(next>run.text.length)return false;end=next;if(!expand)start=end;return true},collapseToEnd(){start=end},getString:()=>run.text.slice(start,end),setString:value=>{h.writes.push(['decoration-run',run.text,start,end,value]);run.text=run.text.slice(0,start)+value+run.text.slice(end)}}},
+    setString:value=>h.writes.push(['flattened-decoration',value]),
+  };
+  const prefix=target==='header'?'Header':'Footer';h.page.values[prefix+'IsOn']=true;h.page.values[prefix+'Text']=owner;
+  return {...h,owner,runs,apply:value=>h.api.action({type:'set-header-footer',target,enabled:true,text:value})};
+}
+test('Header and footer edits replace only a proven plain run and never flatten field or hyperlink text',()=>{
+  for(const target of ['header','footer']){
+    const h=decorationFixture([['Report ','Page ',{type:'TextField',text:'1'},{type:'Text',text:' Help',link:'https://example.com'},' tail']],target);
+    h.apply('Review Page 1 Help tail');assert.equal(h.owner.getString(),'Review Page 1 Help tail');assert.equal(h.writes.length,1);assert.deepEqual(h.writes[0],['decoration-run','Report ',2,6,'view']);
+    assert.equal(h.runs[0][2].text,'1');assert.equal(h.runs[0][3].link,'https://example.com');
+  }
+});
+test('Plain run insertion seeds existing formatting and unchanged paragraphs stay untouched',()=>{
+  const h=decorationFixture([['Report '],['第二段']]);h.apply('Re新port \n第二段');assert.equal(h.writes.length,1);assert.deepEqual(h.writes[0],['decoration-run','Report ',2,3,'新p']);
+  h.writes.length=0;h.apply('Re新port \n第二篇');assert.equal(h.writes.length,1);assert.deepEqual(h.writes[0],['decoration-run','第二段',2,3,'篇']);
+  const empty=decorationFixture([['']]);empty.apply('新的页脚');assert.equal(empty.owner.getString(),'新的页脚');assert.equal(empty.writes.length,1);
+});
+test('Changing fields, links, formatting boundaries or paragraph structure refuses before any write',()=>{
+  const original='Report Page 1 Help tail';
+  for(const next of ['Report Page 2 Help tail','Report Page 1 Docs tail','New title 1 Help tail','Report Page 1X Help tail','Report\nPage 1 Help tail','']){
+    const h=decorationFixture([['Report ','Page ',{type:'TextField',text:'1'},{type:'Text',text:' Help',link:'https://example.com'},' tail']]);
+    assert.throws(()=>h.apply(next),/字段.*画布/);assert.equal(h.owner.getString(),original);assert.deepEqual(h.writes,[]);
+  }
+});
+test('Zero-width decorations and ambiguous insertion boundaries cannot be absorbed into a text edit',()=>{
+  for(const groups of [[['Hello',{type:'Bookmark',text:''},' world']],[['Hello',{type:'Frame',text:''},' world']],[['Hello',' world']]]){
+    const h=decorationFixture(groups);assert.throws(()=>h.apply('Hello! world'),/画布/);assert.deepEqual(h.writes,[]);
+  }
+  const h=decorationFixture([[{type:'Bookmark',text:''},'Hello']]);assert.throws(()=>h.apply('Jello'),/画布/);assert.deepEqual(h.writes,[]);
+});
+test('Decoration edits cannot remove or replace soft line breaks inside one native text run',()=>{
+  for(const separator of ['\n','\r','\v','\f','\u0085','\u2028','\u2029']){
+    for(const next of ['Helloworld','Hello world']){
+      const h=decorationFixture([['Hello'+separator+'world']]);
+      assert.throws(()=>h.apply(next),/画布/);assert.deepEqual(h.writes,[]);
+    }
+  }
+});
+test('Decoration inspection limits and inconsistent expanded text fail closed',()=>{
+  for(const groups of [Array.from({length:65},()=>['x']),[Array.from({length:129},()=> 'x')]]){
+    const h=decorationFixture(groups);assert.throws(()=>h.apply('y'+h.owner.getString().slice(1)),/画布/);assert.deepEqual(h.writes,[]);
+  }
+  const h=decorationFixture([['Hello']]);h.owner.getString=()=> 'Unknown Hello';assert.throws(()=>h.apply('Unknown Jello'),/画布/);assert.deepEqual(h.writes,[]);
+});
+test('Decoration diffs use complete Unicode code points and verify native cursor text before writing',()=>{
+  const h=decorationFixture([['甲😀乙']]);h.apply('甲😺乙');assert.deepEqual(h.writes,[['decoration-run','甲😀乙',1,3,'😺']]);
+  const failed=decorationFixture([['Hello']]);failed.owner.createTextCursorByRange=()=>({goRight:()=>true,getString:()=> 'wrong',collapseToEnd(){},setString:value=>failed.writes.push(value)});
+  assert.throws(()=>failed.apply('Hallo'),/画布/);assert.deepEqual(failed.writes,[]);
+});
 function casFixture() {
   const h=fixture()
   for(let index=0;index<2;index++) {
@@ -301,4 +354,73 @@ test('new header command requires an authoritative disabled section and never us
   const existing=fixture();existing.page.values.HeaderIsOn=true;existing.page.values.HeaderText={getString:()=>''}
   assert.throws(()=>existing.api.command({action:{type:'set-header-footer',target:'header',enabled:true,text:'new'},target:commandTarget(existing)}),/版本保护/)
   assert.deepEqual(existing.writes,[])
+})
+
+
+test('extended text formats preflight and explicitly reset native baseline and highlight',()=>{
+  for(const payload of [{type:'format-text',baseline:'automatic'},{type:'format-text',strikethrough:'yes'}]) rejectsBeforeModel(payload)
+  const h=fixture();Object.assign(h.view.values,{CharStrikeout:0,CharEscapement:0,CharEscapementHeight:100})
+  h.api.action({type:'format-text',strikethrough:true,baseline:'superscript',highlight:'#FFFF00'})
+  assert.equal(h.view.values.CharStrikeout,1);assert.equal(h.view.values.CharEscapement,14000);assert.equal(h.view.values.CharEscapementHeight,58)
+  h.api.action({type:'format-text',strikethrough:false,baseline:'normal',highlight:null})
+  assert.equal(h.view.values.CharStrikeout,0);assert.equal(h.view.values.CharEscapement,0);assert.equal(h.view.values.CharEscapementHeight,100);assert.equal(h.view.values.CharBackTransparent,true)
+  delete h.view.values.CharEscapementHeight;h.writes.length=0
+  assert.throws(()=>h.api.action({type:'format-text',strikethrough:true,baseline:'subscript'}),/不支持/);assert.deepEqual(h.writes,[])
+})
+test('hyperlinks reject unsafe schemes, malformed URLs, collapsed and stale selections before writes',()=>{
+  for(const url of ['javascript:alert(1)','data:text/html,x','file:///tmp/a','ftp://example.com','https://','http://:bad','https://example.com/\n','mailto:not-an-email']) rejectsBeforeModel({type:'set-hyperlink',url})
+  const h=fixture();h.view.values.HyperLinkURL='';h.selectionText='link';
+  assert.throws(()=>h.api.action({type:'set-hyperlink',url:'https://example.com'}),/选中/)
+  h.view.isCollapsed=()=>false
+  assert.throws(()=>h.api.action({type:'set-hyperlink',url:'https://example.com',expectedSelectionId:'stale'}),/选区已改变/)
+  assert.deepEqual(h.writes,[])
+  const groups=[];h.model.getUndoManager=()=>({enterUndoContext:label=>groups.push(label),leaveUndoContext:()=>groups.push('end')})
+  h.api.action({type:'set-hyperlink',url:'https://example.com/a?x=1&y=2'});assert.equal(h.view.values.HyperLinkURL,'https://example.com/a?x=1&y=2')
+  h.dispatchHandler=command=>{assert.equal(command,'.uno:RemoveHyperlink');h.view.values.HyperLinkURL=''}
+  h.api.action({type:'set-hyperlink',url:''});assert.equal(h.view.values.HyperLinkURL,'');assert.equal(h.writes.length,3);assert.deepEqual(groups,['设置超链接','end','移除超链接','end'])
+})
+test('replace-one prefers the exact native selected match without skipping to a repeated word',()=>{
+  const h=fixture(), start={},end={},owner=h.view.getText(),ranges=[]
+  h.view.getStart=()=>start;h.view.getEnd=()=>end;h.view.isCollapsed=()=>false
+  const selected={getText:()=>owner,getString:()=> 'Alpha',getEnd:()=>end,setString:value=>ranges.push(['selected',value])},next={getText:()=>owner,getString:()=> 'Alpha',getEnd:()=>end,setString:value=>ranges.push(['next',value])}
+  const descriptor={getPropertySetInfo:()=>({hasPropertyByName:()=>true}),setPropertyValue(){},setSearchString(){},setReplaceString(){}}
+  h.model.createReplaceDescriptor=()=>descriptor;h.model.findNext=position=>position===start?selected:next;h.model.findFirst=()=>next;const chosen=[];h.controller.select=range=>{chosen.push(range);return true}
+  h.api.action({type:'find-replace',search:'Alpha',replace:'Beta',wholeWords:true,matchCase:true})
+  assert.deepEqual(ranges,[['selected','Beta']]);assert.deepEqual(chosen,[selected,next])
+  ranges.length=0;chosen.length=0;h.api.action({type:'find-replace',search:'Alpha',replace:'Alpha'});assert.deepEqual(ranges,[],'Identical replacement preserves rich runs and skips mutation');assert.deepEqual(chosen,[selected,next],'Identical replacements still advance to the next match')
+  chosen.length=0;h.api.action({type:'find-replace',search:'Alpha',replace:'alpha'});assert.deepEqual(ranges,[['selected','alpha']]);assert.deepEqual(chosen,[selected,next],'Case-only replacements also advance')
+  ranges.length=0;owner.compareRegionEnds=range=>range===selected?1:0
+  h.api.action({type:'find-replace',search:'Alpha',replace:'Beta'})
+  assert.deepEqual(ranges,[['next','Beta']],'A partial or overlapping selection must not be treated as the native search hit')
+  ranges.length=0;h.controller.select=()=>false
+  assert.throws(()=>h.api.action({type:'find-replace',search:'Alpha',replace:'Beta'}),/无法选中/);assert.deepEqual(ranges,[],'Selection failure must precede any text replacement')
+})
+
+
+test('character format groups native multi-property undo only after complete preflight',()=>{
+ const h=fixture(),groups=[];h.model.getUndoManager=()=>({enterUndoContext:name=>groups.push(['enter',name]),leaveUndoContext:()=>groups.push(['leave'])})
+ h.api.action({type:'format-text',bold:true,fontSize:18});assert.deepEqual(groups,[['enter','文字格式'],['leave']])
+ groups.length=0;delete h.view.values.CharHeightComplex
+ assert.throws(()=>h.api.action({type:'format-text',bold:false,fontSize:12}),/不支持/);assert.deepEqual(groups,[])
+})
+
+
+test('changing an existing advanced or ambiguous hyperlink rejects before removing any metadata',()=>{
+ for(const patch of [{HyperLinkTarget:'_blank'},{HyperLinkName:'KeepName'},{HyperLinkEvents:undefined},{VisitedCharStyleName:'CustomVisited'},{UnvisitedCharStyleName:'Emphasis'},{UnvisitedCharStyleName:'Internetlink'},{UnvisitedCharStyleName:'Inter net link'},{HyperLinkEvents:{getElementNames:()=>['OnClick'],getByName:()=>[{Name:'Script',Value:'macro'}]}},{HyperLinkEvents:{getElementNames:()=>['OnClick'],getByName:()=>[{Name:'EventType',Value:'None'},{Name:'Script',Value:'macro'}]}}]) {
+  const h=fixture();h.selectionText='Link';h.view.isCollapsed=()=>false
+  Object.assign(h.view.values,{HyperLinkURL:'https://example.com/old',HyperLinkTarget:'',HyperLinkName:'',VisitedCharStyleName:'Visited Internet Link',UnvisitedCharStyleName:'Internet link',HyperLinkEvents:null},patch)
+  assert.throws(()=>h.api.action({type:'set-hyperlink',url:'https://example.com/new'}),/普通链接|无法完整读取/);assert.deepEqual(h.writes,[])
+ }
+ const h=fixture();h.selectionText='Mixed';h.view.isCollapsed=()=>false;h.view.values.HyperLinkURL='';h.view.getPropertyState=()=>2
+ assert.throws(()=>h.api.action({type:'set-hyperlink',url:'https://example.com/new'}),/混合/);assert.deepEqual(h.writes,[])
+})
+
+
+test('ordinary links allow the native named event container when every event is unassigned',()=>{
+ for(const values of [[],[{Handle:0,Name:'EventType',State:{enumValue:0},Value:'None'}]]) {
+ const h=fixture();h.selectionText='Link';h.view.isCollapsed=()=>false
+ Object.assign(h.view.values,{HyperLinkURL:'https://example.com/old',HyperLinkTarget:'',HyperLinkName:'',VisitedCharStyleName:'Visited Internet Link',UnvisitedCharStyleName:'Internet link',HyperLinkEvents:{getElementNames:()=>['OnClick','OnMouseOut','OnMouseOver'],getByName:()=>values}})
+ h.api.action({type:'set-hyperlink',url:'https://example.com/new'});assert.equal(h.view.values.HyperLinkURL,'https://example.com/new')
+ assert.equal(h.writes[0][0],'dispatch');assert.equal(h.writes[0][1],'.uno:RemoveHyperlink')
+ }
 })

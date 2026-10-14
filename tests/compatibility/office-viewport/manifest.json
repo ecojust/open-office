@@ -1,0 +1,22 @@
+{
+  "provenance": "Independent OOXML: Python stdlib DOCX package and openpyxl XLSX; no application import/export.",
+  "sha256": {
+    "viewport-source.docx": "9e2ef7a51a645e5f07ff2bc3bdbe80210bbb8014d09bad56c316554aa24941f2",
+    "viewport-source.xlsx": "873c7ca7ce278b76529505bf50a810d305132397b79e5e3752fd6227e2acc0e5"
+  },
+  "word": {
+    "primary": "VIEWPORT",
+    "primaryColor": "D40A8E",
+    "anchor": "ANCHOR",
+    "anchorColor": "7541C8",
+    "sentinel": "WORD_SENTINEL"
+  },
+  "calc": {
+    "primary": "B2",
+    "value": 25,
+    "primaryColor": "20B2AA",
+    "anchor": "A4",
+    "anchorColor": "DB7311",
+    "sentinel": "SHEET_SENTINEL"
+  }
+}

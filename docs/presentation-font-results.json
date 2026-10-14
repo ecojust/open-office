@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "completedAt": "2026-10-14T01:02:12.776836+00:00",
+  "scope": "Third iteration: bounded read-only font compatibility diagnostics in the Vue presentation editor",
+  "checks": {
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "nodeTests": 466,
+    "pythonPdfTests": 28,
+    "fontHelperTests": 10,
+    "fontBrowserChecks": 11,
+    "wholeEditorBrowserChecks": 24,
+    "externalRequests": 0,
+    "pageErrors": 0
+  },
+  "reports": [
+    {
+      "path": "test-results/font-iteration-final/font-browser.json",
+      "sha256": "8ce35ebc9bcf3f9a3e3dce91867534e74da26bcc20a516138a09afb1c451d8a6"
+    },
+    {
+      "path": "test-results/font-iteration-final/full-ui.json",
+      "sha256": "7d5b1a3399198ba06316245559659816cee6eaecb576b62fa6f2547692b75627"
+    }
+  ],
+  "logs": [
+    {
+      "path": "/tmp/open-office-font-tests.log",
+      "sha256": "3bbbdbc2a1b92db6c5426e9e4cfb76db94017319cb5a288d0dec30be80cf266c"
+    },
+    {
+      "path": "/tmp/open-office-font-build.log",
+      "sha256": "928c3736f1f77170fe14fbf985265a75b105762926532557273af1d8a1ed9195"
+    }
+  ],
+  "implementationFingerprints": [
+    {
+      "path": "src/components/PresentationFontNotice.vue",
+      "sha256": "5637e75dd8c6e0a7892f038989676687db1469681d168329334221e6cdd74daa"
+    },
+    {
+      "path": "src/components/StandalonePresentationEditor.vue",
+      "sha256": "1fcd00d8c31339f6fa84cbdae6b024a2ed572982decbaabfa6e09d1dcc0b61f2"
+    },
+    {
+      "path": "src/presentation/core/font-diagnostics.ts",
+      "sha256": "f72a36cbdf7912fe37c198a19569fe1bb80f1acc740852ea653c1e6f0a259ecd"
+    },
+    {
+      "path": "src/presentation/core/fontkit-compat.ts",
+      "sha256": "bef23fc51f6796e59380e3f8d8a4c4bb12ecc83e3fcd812dc7fb5d5d0d68aed2"
+    },
+    {
+      "path": "src/presentation/core/model.ts",
+      "sha256": "d32c3202db9a01dab16adfbc42bfa7ed884ef52f52566dfe983a6d06604e184d"
+    },
+    {
+      "path": "src/presentation/core/pdf.ts",
+      "sha256": "2d3dbd9ec01ed863caa14b41aa4c6317a2fd57131917cb482e479f8a19a88519"
+    },
+    {
+      "path": "src/presentation/core/pptx-common.ts",
+      "sha256": "0007b951d8fad7b2c9c71969eca47907955489c3fd45ca2a57842c6e8fe4f46d"
+    },
+    {
+      "path": "src/presentation/core/pptx-export.ts",
+      "sha256": "238e3b736ce186c8cbc1deecd4e344cb300fa548d6c3801e134b8baba6075f6e"
+    },
+    {
+      "path": "src/presentation/core/pptx-import.ts",
+      "sha256": "e428299c8738eaa7471da5b2e7b1240c0a6a668427f7982e1052f418fec613f4"
+    },
+    {
+      "path": "src/presentation/core/pptx-notes.ts",
+      "sha256": "7057a1d5d6122dc23484079d904abff244c72075af46b73c513f178a7df3b53e"
+    },
+    {
+      "path": "src/presentation/core/pptx-rich-text.ts",
+      "sha256": "1be1522e461b1f4a8bd45c1bef9e36052a4c431ec066874511e65bf83f870620"
+    },
+    {
+      "path": "src/presentation/core/pptx.ts",
+      "sha256": "dc7d4a62add2f6db0a84efef6f099423358badf55a9760ade20740c35c52c42b"
+    },
+    {
+      "path": "src/presentation/core/render.ts",
+      "sha256": "5f3ade70c213f4e3c60f264727fd682f0657b41d14c9b6442f17524569411728"
+    },
+    {
+      "path": "src/presentation/core/rich-text-layout.ts",
+      "sha256": "6a1f1a594cf28894e8caa61f017ae65208534eafd577466d8cdcb666d3f436c2"
+    },
+    {
+      "path": "src/presentation/core/rich-text.ts",
+      "sha256": "450bd5a1cbeb553bf23a6a56a9c301b8978d70fdc09358e71b208ccc37dde1a9"
+    },
+    {
+      "path": "src/presentation/core/scene.ts",
+      "sha256": "64226e91ae8986e69189cebfcfd53d6d4702230b24989043668d331b2bcf0c1a"
+    },
+    {
+      "path": "src/presentation/core/smartart-preview.ts",
+      "sha256": "622c60fdcab60abf479504b8928b33a3533b6f97ea10829bb78f48649df7e049"
+    },
+    {
+      "path": "src/presentation/core/types.ts",
+      "sha256": "251c340dd554a88f06d07b28c66a752030a877e596532a2109a2c4663ae23ae2"
+    }
+  ],
+  "reaEvidence": "ev_ec1cda9d4590939655a52539b73287522e2d5f22be2ccf9bfe31cd6aa81f2851",
+  "limitations": [
+    "Font probes are heuristics, not a system-font inventory, glyph-coverage check or exact substitute identification.",
+    "Diagnostics do not replace font installation and do not promise visual equivalence.",
+    "No new native Windows/macOS package validation or publication."
+  ]
+}

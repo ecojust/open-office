@@ -1,10 +1,20 @@
 # Offline Writer / Calc / Impress adapter
 
+## Current application architecture (2026-10-14)
+
+The current shell uses this adapter for **Word and Calc only**. Presentations use the independent Vue/PPTX editor described in [the presentation workspace](../../docs/standalone-presentation.md); PDF uses PDF.js and the local PDF backend. The historical Impress adapter and its regression helpers remain in this directory, but do not define the current presentation UI or its supported formats.
+
+The shell's Save As dialog now offers DOCX/ODT/PDF for Word, XLSX/ODS/PDF for Calc, PPTX/PDF for presentations, and PDF for PDF documents. Saving another format creates a copy and keeps the original editable tab and its unsaved state. A successful same-format save updates the tab name and save state. Legacy DOC/RTF/XLS imports default to a modern-format copy; binary PPT and ODP are not supported by the current presentation editor.
+
+New Word/Calc actions still use the native model; they do not replace the engine. A native undo context groups history but is not a generic rollback transaction. Reads do not write document state, and writes validate their target and revision before mutation. See [the current all-module coverage](../../docs/office-feature-coverage.md) and [this iteration's review](../../docs/office-completion-review.md). Historical installation-package results below apply only to their stated release, not to the current unbuilt desktop package.
+
+## Historical 0.4.0 adapter contract and release evidence
+
 `OfficeEditor.vue` keeps one ZetaOffice WASM engine in a same-origin iframe. It accepts `document` (id/name/kind/extension/base64/sha256/sizeBytes), with `kind` set to `word`, `sheet`, or `presentation`. This document describes the [public 0.4.0 prerelease](https://github.com/ecojust/open-office/releases/tag/desktop-v0.4.0-38348938454). Writer, Calc and Impress have Chinese workbench controls that edit actual model objects; a new presentation uses `private:factory/simpress` and defaults to PPTX in the application shell. The component emits `ready`, `dirty`, `status`, `error`, and `request` for desktop file actions. `request.type` is `open`, `new`, `save`, `save-as`, `export-pdf`, `print`, `close`, or `insert-image`; `quit` requests the application's existing guarded exit flow. `request.notice` must be surfaced when present. Generic Export currently routes to PDF with an explicit notice; Save a Copy routes to native Save As. Print Preview remains an engine view, while all print buttons request the shell's explicit “export PDF, then print in a system application” guidance; no system print job is claimed.
 
 Exposed methods:
 
-- `exportFile({format?})`: returns `{base64, extension, name, revision, dirty}`. Writer supports DOCX/ODT/PDF; Calc supports XLSX/ODS/PDF; Impress supports PPTX/ODP/PDF. Export does **not** clear unsaved changes. A PDF export is a copy, not a replacement for the editable presentation tab. These are adapter capabilities; the shell's Save As action currently retains the original document format.
+- `exportFile({format?})`: returns `{base64, extension, name, revision, dirty}`. Writer supports DOCX/ODT/PDF; Calc supports XLSX/ODS/PDF; Impress supports PPTX/ODP/PDF. Export does **not** clear unsaved changes. A PDF export is a copy, not a replacement for the editable presentation tab. These are adapter capabilities; the current shell offers the formats described above, while the historical release retained the original format for Save As.
 - `markSaved()`: call only after the native filesystem confirms a successful save. It only clears changes if the document revision still matches the exported revision.
 - `discardChanges()`: only clears a state already exported at the same revision, preventing edits during a save/switch from being lost. After explicit user confirmation, `discardChanges({force:true})` may discard the current document without that check.
 - `undo()`, `redo()`, `search(query?)`, `focus()`.
@@ -27,6 +37,6 @@ The native server must serve the full built frontend through loopback HTTP with 
 
 Resources are pinned by exact SHA-256 in `vendor/office-runtime-manifest.json`. Run `node scripts/fetch-office-runtime.mjs` during preparation, or use `--verify` for a strictly offline integrity check. Keep giant runtime files out of Git; Vite copies `public/office-runtime` into the distribution. Once packaged, editing never downloads these resources. The engine has English menus; the application wrapper is Chinese, and a bundled Noto Sans CJK SC font supports Chinese document rendering. The engine currently does not import PDF; the separate PDF editor handles original PDF text edits.
 
-Legacy binary DOC/XLS/PPT files are not accepted by the application; convert them to a supported format before opening. PPTX/ODP support does not imply full Microsoft PowerPoint compatibility. Check complex slide masters, fonts, embedded media, transitions, animations, and exported output before delivery; do not claim lossless preservation of every effect or complete PowerPoint feature parity.
+The historical release did not accept legacy binary DOC/XLS/PPT files. The current shell imports DOC/RTF/XLS with modern-format copy protection; PPT and ODP still require conversion. Historical adapter PPTX/ODP support does not imply full Microsoft PowerPoint compatibility or current shell ODP support. Check complex slide masters, fonts, embedded media, transitions, animations, and exported output before delivery; do not claim lossless preservation of every effect or complete PowerPoint feature parity.
 
 Do not describe the complete product as MIT-only: ZetaJS is MIT but LibreOffice, its bundled Qt WASM platform plugin, fonts and other dependencies have separate redistribution/source obligations. See the project's third-party notices and corresponding-source records before distribution.

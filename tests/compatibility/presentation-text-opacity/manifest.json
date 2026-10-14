@@ -1,0 +1,254 @@
+{
+  "scope": "Ordinary glyph alpha, body-local inheritance, independent opaque shape paint. Ordered-chain reference behavior is measured separately.",
+  "items": [
+    {
+      "id": "ordinary-text-alpha",
+      "path": "ordinary-text-alpha.pptx",
+      "sha256": "fe8a376a332ba9902b387e500227045d36b11aa5f46ce28f8b9df28379be3aae",
+      "expected": {
+        "slides": 1
+      },
+      "slideMm": [
+        338.6666666667,
+        190.5
+      ],
+      "objects": [
+        {
+          "id": "direct-half",
+          "alpha": [
+            0.5
+          ],
+          "mods": [
+            [
+              "alpha",
+              50000
+            ]
+          ],
+          "boxMm": [
+            15,
+            12,
+            88,
+            32
+          ],
+          "text": "H"
+        },
+        {
+          "id": "direct-zero",
+          "alpha": [
+            0
+          ],
+          "mods": [
+            [
+              "alpha",
+              0
+            ]
+          ],
+          "boxMm": [
+            120,
+            12,
+            88,
+            32
+          ],
+          "text": "H"
+        },
+        {
+          "id": "opaque-control",
+          "alpha": [
+            1
+          ],
+          "mods": [],
+          "boxMm": [
+            225,
+            12,
+            88,
+            32
+          ],
+          "text": "H"
+        },
+        {
+          "id": "paragraph-inherited",
+          "alpha": [
+            0.5
+          ],
+          "default": [
+            [
+              "alpha",
+              50000
+            ]
+          ],
+          "inherit": true,
+          "boxMm": [
+            15,
+            56,
+            88,
+            32
+          ],
+          "text": "H"
+        },
+        {
+          "id": "explicit-overrides-default",
+          "alpha": [
+            1
+          ],
+          "default": [
+            [
+              "alpha",
+              50000
+            ]
+          ],
+          "mods": [],
+          "boxMm": [
+            120,
+            56,
+            88,
+            32
+          ],
+          "text": "H"
+        },
+        {
+          "id": "mixed-runs",
+          "alpha": [
+            1,
+            0.5,
+            0
+          ],
+          "mixed": true,
+          "boxMm": [
+            225,
+            56,
+            88,
+            32
+          ],
+          "text": "H H H"
+        },
+        {
+          "id": "ordered-chain",
+          "alpha": [
+            0.5
+          ],
+          "mods": [
+            [
+              "alpha",
+              80000
+            ],
+            [
+              "alphaMod",
+              50000
+            ],
+            [
+              "alphaOff",
+              10000
+            ]
+          ],
+          "boxMm": [
+            15,
+            100,
+            88,
+            32
+          ],
+          "text": "H"
+        },
+        {
+          "id": "bold-half",
+          "alpha": [
+            0.5
+          ],
+          "mods": [
+            [
+              "alpha",
+              50000
+            ]
+          ],
+          "bold": true,
+          "boxMm": [
+            120,
+            100,
+            88,
+            32
+          ],
+          "text": "H"
+        },
+        {
+          "id": "underline-half",
+          "alpha": [
+            0.5
+          ],
+          "mods": [
+            [
+              "alpha",
+              50000
+            ]
+          ],
+          "underline": true,
+          "boxMm": [
+            225,
+            100,
+            88,
+            32
+          ],
+          "text": "H"
+        },
+        {
+          "id": "theme-color-half",
+          "alpha": [
+            0.5
+          ],
+          "mods": [
+            [
+              "alpha",
+              50000
+            ]
+          ],
+          "theme": true,
+          "boxMm": [
+            15,
+            144,
+            88,
+            32
+          ],
+          "text": "H"
+        },
+        {
+          "id": "end-paragraph-only",
+          "alpha": [
+            1
+          ],
+          "mods": [],
+          "end": [
+            [
+              "alpha",
+              0
+            ]
+          ],
+          "boxMm": [
+            120,
+            144,
+            88,
+            32
+          ],
+          "text": "H"
+        },
+        {
+          "id": "body-list-inherited",
+          "alpha": [
+            0.25
+          ],
+          "listdefault": [
+            [
+              "alpha",
+              25000
+            ]
+          ],
+          "inherit": true,
+          "boxMm": [
+            225,
+            144,
+            88,
+            32
+          ],
+          "text": "H"
+        }
+      ]
+    }
+  ]
+}

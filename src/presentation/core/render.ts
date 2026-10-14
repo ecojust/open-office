@@ -22,11 +22,11 @@ export function slideSvg(model: PresentationModel, slide: SlideModel, options: S
       const b = node.clip
       return `<g${identity}${rotation}${opacity}><svg x="${n(b.x)}" y="${n(b.y)}" width="${n(b.width)}" height="${n(b.height)}" viewBox="${n(b.x)} ${n(b.y)} ${n(b.width)} ${n(b.height)}" overflow="hidden" data-text-clip="${clipIndex}">${content}</svg></g>`
     }
-    if (node.kind === 'rect') return `<rect x="${n(node.x)}" y="${n(node.y)}" width="${n(node.width)}" height="${n(node.height)}" ${paint(node)}/>`
+    if (node.kind === 'rect') return `<rect${node.textHighlight ? ' data-text-highlight="1"' : ''} x="${n(node.x)}" y="${n(node.y)}" width="${n(node.width)}" height="${n(node.height)}" ${paint(node)}/>`
     if (node.kind === 'ellipse') return `<ellipse cx="${n(node.x + node.width / 2)}" cy="${n(node.y + node.height / 2)}" rx="${n(node.width / 2)}" ry="${n(node.height / 2)}" ${paint(node)}/>`
-    if (node.kind === 'path') return `<path d="${node.points.map(([x, y], i) => `${i ? 'L' : 'M'}${n(x)} ${n(y)}`).join(' ')}${node.closed ? ' Z' : ''}" ${paint(node)}/>`
+    if (node.kind === 'path') return `<path${node.decoration ? ` data-text-decoration="${node.decoration}"` : ''} d="${node.points.map(([x, y], i) => `${i ? 'L' : 'M'}${n(x)} ${n(y)}`).join(' ')}${node.closed ? ' Z' : ''}" ${paint(node)}/>`
     if (node.kind === 'image') return `<image x="${n(node.x)}" y="${n(node.y)}" width="${n(node.width)}" height="${n(node.height)}" href="${escapeXml(node.dataUrl)}" preserveAspectRatio="none"/>`
-    return `<text x="${n(node.x)}" y="${n(node.y)}" font-family="${escapeXml(node.family)}, Noto Sans CJK SC, sans-serif" font-size="${n(node.size)}" font-weight="${node.bold ? '700' : '400'}" font-style="${node.italic ? 'italic' : 'normal'}" text-decoration="${node.underline ? 'underline' : 'none'}" fill="${node.color}" xml:space="preserve">${escapeXml(node.text)}</text>`
+    return `<text x="${n(node.x)}" y="${n(node.y)}" font-family="${escapeXml(node.family)}, Noto Sans CJK SC, sans-serif" font-size="${n(node.size)}" font-weight="${node.bold ? '700' : '400'}" font-style="${node.italic ? 'italic' : 'normal'}" text-decoration="none" fill="${node.color}" xml:space="preserve">${escapeXml(node.text)}</text>`
   }
   const width = Math.max(1, finite(model.width, 254)), height = Math.max(1, finite(model.height, 142.875))
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${options.width ? n(Math.max(1, finite(options.width))) : '100%'}" height="${options.height ? n(Math.max(1, finite(options.height))) : '100%'}" viewBox="0 0 ${n(width)} ${n(height)}" role="img" aria-label="${escapeXml(slide.name || '幻灯片')}" overflow="hidden">${buildSlideScene(model, slide, options).map(render).join('')}</svg>`

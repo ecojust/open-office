@@ -1,0 +1,652 @@
+{
+  "recordedAt": "2026-10-14T04:52:53.186183+00:00",
+  "scope": "PPT table layout, direct cell paint and group-coordinate preservation; source iteration, not release",
+  "published": false,
+  "newDesktopPackages": false,
+  "reference": {
+    "reaVersion": "6.4.0",
+    "desktopVersion": "10.0.0-169",
+    "sdkCommit": "72b0421c0bbf9d01eed9cf14834ae47eb2df1b50",
+    "evidenceId": "ev_7fb24daef79eed413484057004a3e847f5db6ae858b7d8d09e8a55d45fab0ef5",
+    "excerptFiles": 6,
+    "functions": 18,
+    "astNodes": 7744,
+    "failed": 0,
+    "semanticCoverage": "unknown"
+  },
+  "fullVerification": {
+    "nodeTests": 541,
+    "pythonTests": 53,
+    "failures": 0,
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "buildTime": "19.85s",
+    "logs": [
+      {
+        "path": "test-results/table-layout-final/tests.log",
+        "sha256": "3fe11f4601b52268dcff8908481418df44b20ae972eb41ce9a2b8816ab128162",
+        "bytes": 61558
+      },
+      {
+        "path": "test-results/table-layout-final/build.log",
+        "sha256": "467a4826e0c40704bb1dae0f9ec15823e5e926f81d112688c2e546858f661ab5",
+        "bytes": 2224
+      }
+    ]
+  },
+  "tableSpecialty": {
+    "report": {
+      "path": "test-results/presentation-table-layout/report.json",
+      "sha256": "c2bc739a8c41834426fdebbdc114b51d0466e9b0fdff84497092c3c38038efb5",
+      "bytes": 4030
+    },
+    "checks": 52,
+    "errors": 0,
+    "external": 0
+  },
+  "independentReview": {
+    "report": {
+      "path": "/workspace/open-office-research/onlyoffice/table-layout-review/report.json",
+      "sha256": "3f6cffb2f24383e85d87eaa74f2eaa1b4d5808935504b88910f0689c6b289bbc",
+      "bytes": 5236
+    },
+    "checks": 54,
+    "errors": 0,
+    "fixedFindings": [
+      "Detached group source coordinates must be baked into final shape/grid",
+      "Do not call unsupported color modifiers accurate direct table fills"
+    ]
+  },
+  "actualUi": {
+    "report": {
+      "path": "test-results/presentation-table-layout-ui/report.json",
+      "sha256": "c0b3868ca4e1e856c2f81ef552c9cdbc9a3d75ce26174094716a1a9df1f656a4",
+      "bytes": 11569
+    },
+    "checks": 5,
+    "errors": 0,
+    "scope": "Actual Vue actions, downloads and active-slide XML; no pixel parity or desktop package claim"
+  },
+  "independentPdf": {
+    "report": {
+      "path": "test-results/presentation-table-layout-ui/independent-pdf.json",
+      "sha256": "fe91e47b8fc06bb792a1000ee9403b74b12c2b39804acc746727dbe63abc7275",
+      "bytes": 828
+    },
+    "input": {
+      "path": "test-results/presentation-table-layout-ui/layout-resized.pdf",
+      "sha256": "bf1759c9e61ae92ef2137e0a8a6d48b8256c692181a3bf7d88c906c91337b4b6",
+      "bytes": 5275
+    },
+    "coordinateToleranceMm": 0.001,
+    "textLabels": 6
+  },
+  "complexRegression": {
+    "report": {
+      "path": "test-results/table-layout-complex/report.json",
+      "sha256": "b6dcc31280df90b0b4ebe0a87a456214cb1de68a27670657184ae58f5c2d7d31",
+      "bytes": 597270
+    },
+    "fixtures": 12,
+    "exports": 65,
+    "packageAudits": 41,
+    "noOpReopenCycles": 36,
+    "pageErrors": 0,
+    "consoleErrors": 0,
+    "externalRequests": 0,
+    "legacyRuntimeRequests": 0
+  },
+  "native": [
+    {
+      "report": {
+        "path": "test-results/table-layout-native-baseline-valid/report.json",
+        "sha256": "ec6be75e6e91fbecdf812accdc01c566de799239303699cea05f3db20651ba7e",
+        "bytes": 15588
+      },
+      "files": 3,
+      "scope": "Read-only open and rendered screenshot; no native saveback"
+    },
+    {
+      "report": {
+        "path": "test-results/table-layout-native-outputs/report.json",
+        "sha256": "e6c5b225ebec03b525ba36202669c3de127b5e83449d7dfabcf24ff8072a0deb",
+        "bytes": 3532
+      },
+      "files": 2,
+      "scope": "Read-only open and rendered screenshot; no native saveback"
+    },
+    {
+      "report": {
+        "path": "test-results/table-layout-native-detached/report.json",
+        "sha256": "09aa5c7a623223032bce0740fb3d9e0fcc731060f24143ce43cfdae6afbeb3b3",
+        "bytes": 2075
+      },
+      "files": 1,
+      "scope": "Read-only open and rendered screenshot; no native saveback"
+    }
+  ],
+  "referencePixelEvidence": [
+    {
+      "path": "test-results/table-layout-native-baseline-valid/pixel-observations.json",
+      "sha256": "cb7c2d9bcbb7e3493f3b3da18eca2ab490e873cd109ca466b153d166abeeae75",
+      "bytes": 1272
+    },
+    {
+      "path": "test-results/table-layout-native-outputs/pixel-observations.json",
+      "sha256": "6263fcfcc0b87bc3f02eb65d09dd937f2bf3acadd000f279979a1b3713276159",
+      "bytes": 498
+    }
+  ],
+  "fixtureManifest": {
+    "path": "tests/compatibility/presentation-table-layout/manifest.json",
+    "sha256": "f9327defcc98a0c1aac5914aea6ab69a99a26c3a72fc94ca5fea71624646928b",
+    "bytes": 1251
+  },
+  "verificationCorrections": [
+    "Initial generated fixture retained a second background: generator corrected, all three native originals rerun; use baseline-valid evidence",
+    "UI XML audit switched from lexical namespace equality to expanded-name canonical equality; source grid/frame/cell property assertions retained",
+    "Pre-detachment full suite retained separately; final full suite rerun after marker fix"
+  ],
+  "knownRemaining": [
+    "Content-based automatic row growth and minimum-size redistribution",
+    "Table theme styles, border resolution, merged and bidi table layout",
+    "Advanced fill color modifiers",
+    "No complete suite parity or universal visual fidelity",
+    "No Windows/macOS native package validation"
+  ],
+  "sourceFiles": [
+    {
+      "path": "package-lock.json",
+      "sha256": "ae3eac2e166d790e5c0c2b367e70727b80d2df0c006eb37791543c216a45b13a",
+      "bytes": 68777
+    },
+    {
+      "path": "package.json",
+      "sha256": "43a7e82bf51fdeb39b1879657ad27a664ddb6ba40be20a7d1a1942bc2595fc3b",
+      "bytes": 3364
+    },
+    {
+      "path": "pdf-backend/engine.py",
+      "sha256": "721cb5c4e373de122ef31e04e2622d16057ab899c7c5634a7dc651ae28099fdd",
+      "bytes": 48905
+    },
+    {
+      "path": "public/office/calc-tools.js",
+      "sha256": "ee6fce0d67149c148c45d36f9282aa6865f906c31e3cf91046fff0d655f9effc",
+      "bytes": 43891
+    },
+    {
+      "path": "public/office/clipboard-compat.js",
+      "sha256": "1da01796ffd5073481d00cf7f990433fe2718af52411c2e4dbfb4eae512e6ff4",
+      "bytes": 1452
+    },
+    {
+      "path": "public/office/host.js",
+      "sha256": "9abeddea4362212c6e9e3ba5dd25048f124f6c36b5dc24a2e2771e68fbfc5430",
+      "bytes": 23406
+    },
+    {
+      "path": "public/office/office-worker.js",
+      "sha256": "791d90f54c1baaaea10f84e41dc7bf684b171da2614af228ba8477eb0c21f043",
+      "bytes": 53605
+    },
+    {
+      "path": "public/office/offline-audit.js",
+      "sha256": "9027d9a6167204ba54a79f8688ffd2aba4e352059690ce58de5ca3f0dfd79ace",
+      "bytes": 3129
+    },
+    {
+      "path": "public/office/offline-policy.js",
+      "sha256": "d8b9d8974eb4082256edb7340e75f586e55fb963e79a32b1108546596f9af548",
+      "bytes": 11390
+    },
+    {
+      "path": "public/office/presentation-objects.js",
+      "sha256": "c713083fbec71f5506859c66fd5c6cb639441dce99db45b9c72fe25b880808e4",
+      "bytes": 29897
+    },
+    {
+      "path": "public/office/writer-tools.js",
+      "sha256": "4802680d529c70a204776dcf829f0ae32e6aa825f62c3816a3ae1dbfee15468c",
+      "bytes": 56424
+    },
+    {
+      "path": "public/office/zeta.js",
+      "sha256": "7bdfa389a1d220c279f60602b2e0724b2280fa91d68d5237d1bce3bf0dedbf32",
+      "bytes": 43277
+    },
+    {
+      "path": "scripts/build-pdf-backend.mjs",
+      "sha256": "4d8ab3d3c6cfe4613ad3f78ddc25b2a722e4ac987c231ee5f1ee513ef3f55466",
+      "bytes": 2750
+    },
+    {
+      "path": "scripts/copy-pdf-assets.mjs",
+      "sha256": "15f23846f145c3aa7623954fe4d4b2304034bf46ba08d28c24dadb7d4e61a3b6",
+      "bytes": 501
+    },
+    {
+      "path": "scripts/ensure-pdf-backend.mjs",
+      "sha256": "52bb4a9d61225f8215138d096419fc7361c46651f1c51890becb1dcac1cf53bf",
+      "bytes": 2312
+    },
+    {
+      "path": "scripts/fetch-corresponding-sources.mjs",
+      "sha256": "dfe65d3277916bc0d79c28751f631badfa0c4855a425960e972e3cca6a734198",
+      "bytes": 7336
+    },
+    {
+      "path": "scripts/fetch-office-runtime.mjs",
+      "sha256": "e9f55a8b675f34d442bf8495def043d1d9eee10143bbb5e29338852f6971d7c7",
+      "bytes": 2757
+    },
+    {
+      "path": "scripts/macos-intel-transfer.mjs",
+      "sha256": "7993b7c7daf254ee7acebec22d341fb06e4f8f18278b0b9cad50d81a77ecd83a",
+      "bytes": 9732
+    },
+    {
+      "path": "scripts/native-report-summary.mjs",
+      "sha256": "ab50502abc6ac43f6129bbb1d0c708a81de1075d3b93f82dbbdd235110bdd529",
+      "bytes": 4557
+    },
+    {
+      "path": "scripts/native-smoke.mjs",
+      "sha256": "50065e9e0c88f2cddd135dabdf925232f04296b6fe02201a211f18a611a4f5f1",
+      "bytes": 37347
+    },
+    {
+      "path": "scripts/pdf-backend-tools.mjs",
+      "sha256": "5583856cf81ddb8dabac76b0f11508d7cfc7aa94e826739929468f74c8a99ea0",
+      "bytes": 7412
+    },
+    {
+      "path": "scripts/read-failed-job-log.mjs",
+      "sha256": "bf1337ce67525b071d7b46faba5f090a06571cb9e8409eae24f9f10cec76cc44",
+      "bytes": 8639
+    },
+    {
+      "path": "scripts/seal-macos-pdf-runtime.mjs",
+      "sha256": "d322831f264f14702f5bed9eae14433e7f6c69b7820f7f6042a42084c63c09cc",
+      "bytes": 3330
+    },
+    {
+      "path": "scripts/test-pdf-backend.mjs",
+      "sha256": "f921d420cac259f5f7107df95a64e5db7390c527ccf294bed7a1242c6666e4a2",
+      "bytes": 404
+    },
+    {
+      "path": "src/App.vue",
+      "sha256": "7be3d8f5ec62fbd0e8f8720276d3a6232c6a8a161e188f2cdbd265b26d5a6e90",
+      "bytes": 54339
+    },
+    {
+      "path": "src/components/Icon.vue",
+      "sha256": "7903dc708c3ebd5fda8135d1193a6236be599c50b80dfa38f16453cc788cae95",
+      "bytes": 1637
+    },
+    {
+      "path": "src/components/OfficeEditor.vue",
+      "sha256": "a2e6314f0edeaefc02f79c277116784bddf5adbc733faeb392ab576bb87dfed4",
+      "bytes": 23213
+    },
+    {
+      "path": "src/components/PdfEditor.vue",
+      "sha256": "fea030a94d4473063df17934e69dab76d6437301dafa03313c6b058704fdcfbf",
+      "bytes": 81790
+    },
+    {
+      "path": "src/components/PresentationEffects.vue",
+      "sha256": "434b7ee67acb2755c9f356a9bafde25c4f41d4f6f6231cde0214588b002d1807",
+      "bytes": 10151
+    },
+    {
+      "path": "src/components/PresentationFontNotice.vue",
+      "sha256": "5637e75dd8c6e0a7892f038989676687db1469681d168329334221e6cdd74daa",
+      "bytes": 3631
+    },
+    {
+      "path": "src/components/PresentationWorkbench.vue",
+      "sha256": "6fe46199d04382421cfdb2aa6abcf47bf4ef9225a09714d97632fcb60e6c11a0",
+      "bytes": 44069
+    },
+    {
+      "path": "src/components/SheetWorkbench.vue",
+      "sha256": "d6c3cb43f092045181a1b51fd1e11a01e6ddf23993e2b1c16f309f25f6a79f4a",
+      "bytes": 46892
+    },
+    {
+      "path": "src/components/SlidePreview.vue",
+      "sha256": "52df4b40230bdfbd5d842ec6d5d848ecdd04989262aae82f80902bec69c67ed8",
+      "bytes": 30085
+    },
+    {
+      "path": "src/components/StandalonePresentationEditor.vue",
+      "sha256": "53cd1c3fcc9669f520cbade902afdab21315a5acabcd7c5529c944d1308ec055",
+      "bytes": 74363
+    },
+    {
+      "path": "src/components/WordWorkbench.vue",
+      "sha256": "b0b47d8d73b91807256448c424732de15e1b5c7752e46ff0dfb3dd73280a1602",
+      "bytes": 35321
+    },
+    {
+      "path": "src/env.d.ts",
+      "sha256": "5853f72b58c661647c5f3e9cdfbe2478d5501904ced4e11116564b1941744b19",
+      "bytes": 78
+    },
+    {
+      "path": "src/main.ts",
+      "sha256": "bdbe20b0b723d281d98897e0f40de48a9a804c89b71242e4a317096d45cbff01",
+      "bytes": 199
+    },
+    {
+      "path": "src/native.ts",
+      "sha256": "36622b32f6dac79abda2f6daec3fd7dfea0c1ae8882e77fdab6fc5ef57e749e8",
+      "bytes": 1585
+    },
+    {
+      "path": "src/office/bridge.ts",
+      "sha256": "ee1f8fe2e43c3d67028015ac198810f4e24da3aa445e37a989eaac9a72b5f4b8",
+      "bytes": 5137
+    },
+    {
+      "path": "src/office/docx-embedded.ts",
+      "sha256": "ffa1bc90c0841822e2a1564f25ca6f719cedd03ad99172a5276f14f8e08df3c6",
+      "bytes": 20598
+    },
+    {
+      "path": "src/office/import-review.ts",
+      "sha256": "7eec8da33107ea47fcd425d7077822f738c5cade52700294d3dfc90a6c7f093a",
+      "bytes": 20063
+    },
+    {
+      "path": "src/office/native-workbench-smoke.ts",
+      "sha256": "b7d0f34385876c0e6c486d67f80aa13756c635eeffd538b6d13d97d3a1e10ddd",
+      "bytes": 17071
+    },
+    {
+      "path": "src/office/pdf-readback.ts",
+      "sha256": "2bc56f680c250ff7521d443d54be2e4e3ddfd8f3080f19ba711d38c413ae6490",
+      "bytes": 752
+    },
+    {
+      "path": "src/office/types.ts",
+      "sha256": "043c5248dc64d2a3e7541774cfb5df0d09314a987dc3f96101ef0df7f7c54183",
+      "bytes": 1072
+    },
+    {
+      "path": "src/office/workbench.css",
+      "sha256": "914b324110573722e0eb73b0b12e4f4ed5af8b3c2b4583676bed16907e882b75",
+      "bytes": 14879
+    },
+    {
+      "path": "src/pdf/backend.ts",
+      "sha256": "8f4158c2d142b033c378ae1a4353fa8dee4e93e5f9c195b682bc9178f78dfa6c",
+      "bytes": 3567
+    },
+    {
+      "path": "src/pdf/pdf.css",
+      "sha256": "5c9743db45e6185b7e25f7f98489293e67fbc336474b411d29a5c97c5794ac6e",
+      "bytes": 21053
+    },
+    {
+      "path": "src/pdf/protocol.ts",
+      "sha256": "73a0737ca4739dfc51acaa6e43d7f213a46a9dd8577048bc2a42aa8829d19afa",
+      "bytes": 5272
+    },
+    {
+      "path": "src/pdf/resources.ts",
+      "sha256": "56c08e99a1e3b7c07c4f351e55558da45eb11a5374a47230769752b056151676",
+      "bytes": 2617
+    },
+    {
+      "path": "src/presentation/chart-workbook.ts",
+      "sha256": "b7c7ac784bae3f4e8bf4704740b566439535e11cb9d86f4eda8013ba41de7bfa",
+      "bytes": 6849
+    },
+    {
+      "path": "src/presentation/core/editor.css",
+      "sha256": "e5c5dfa54563e79487f1d8e8acb5af9d3458596fa30f90ea810739fc6ba7d21d",
+      "bytes": 15129
+    },
+    {
+      "path": "src/presentation/core/font-diagnostics.ts",
+      "sha256": "94d988f5b0e7c1138886922fe9f012723dc434bd6543fd1f46a8f888af39768c",
+      "bytes": 8649
+    },
+    {
+      "path": "src/presentation/core/fontkit-compat.ts",
+      "sha256": "bef23fc51f6796e59380e3f8d8a4c4bb12ecc83e3fcd812dc7fb5d5d0d68aed2",
+      "bytes": 2781
+    },
+    {
+      "path": "src/presentation/core/model.ts",
+      "sha256": "1b8fdfacf269a853df70750a09ed1946d120933559de83ec86a981ecc19aed85",
+      "bytes": 48380
+    },
+    {
+      "path": "src/presentation/core/paragraph-format.ts",
+      "sha256": "5897311735cb28677702aed9675776273c0065a9444ef2898c463d7b9f1dd198",
+      "bytes": 5699
+    },
+    {
+      "path": "src/presentation/core/pdf.ts",
+      "sha256": "2d3dbd9ec01ed863caa14b41aa4c6317a2fd57131917cb482e479f8a19a88519",
+      "bytes": 10717
+    },
+    {
+      "path": "src/presentation/core/pptx-common.ts",
+      "sha256": "67b09b0bd29d897acd4b9c40f7e92346f9932a14d0d5182ce21f232a1bcd48d5",
+      "bytes": 4694
+    },
+    {
+      "path": "src/presentation/core/pptx-export.ts",
+      "sha256": "186f31357a4f96c1102a22176dea95775ec05b9e26908ce60fd32af81b108432",
+      "bytes": 58116
+    },
+    {
+      "path": "src/presentation/core/pptx-import.ts",
+      "sha256": "fc3ee779d671be0e71d965f3a063496e3b519f1c993b1349fcdb0869f76e82fd",
+      "bytes": 44903
+    },
+    {
+      "path": "src/presentation/core/pptx-notes.ts",
+      "sha256": "7057a1d5d6122dc23484079d904abff244c72075af46b73c513f178a7df3b53e",
+      "bytes": 5099
+    },
+    {
+      "path": "src/presentation/core/pptx-rich-text.ts",
+      "sha256": "07f288148575b2c0ce4901523d6d8c0c401312fd7b7c4e14bf81750c7e61f729",
+      "bytes": 2689
+    },
+    {
+      "path": "src/presentation/core/pptx-text.ts",
+      "sha256": "937e3c28dbbaa118c55be13526aab89ccd7373dab292aaa694b4f960ac1c90c3",
+      "bytes": 9479
+    },
+    {
+      "path": "src/presentation/core/pptx.ts",
+      "sha256": "dc7d4a62add2f6db0a84efef6f099423358badf55a9760ade20740c35c52c42b",
+      "bytes": 102
+    },
+    {
+      "path": "src/presentation/core/render.ts",
+      "sha256": "5f3ade70c213f4e3c60f264727fd682f0657b41d14c9b6442f17524569411728",
+      "bytes": 3541
+    },
+    {
+      "path": "src/presentation/core/rich-text-layout.ts",
+      "sha256": "6a1f1a594cf28894e8caa61f017ae65208534eafd577466d8cdcb666d3f436c2",
+      "bytes": 9354
+    },
+    {
+      "path": "src/presentation/core/rich-text.ts",
+      "sha256": "a98c9dd0c7934c3a8ed82394132f841cd11bf8bbd0ee4194d9b8805a031f542c",
+      "bytes": 2602
+    },
+    {
+      "path": "src/presentation/core/scene.ts",
+      "sha256": "b175a444748077a49092274b401b47cec5184c4543a76ca22f699a0fe98b893d",
+      "bytes": 23847
+    },
+    {
+      "path": "src/presentation/core/smartart-preview.ts",
+      "sha256": "622c60fdcab60abf479504b8928b33a3533b6f97ea10829bb78f48649df7e049",
+      "bytes": 16872
+    },
+    {
+      "path": "src/presentation/core/smartart-text.ts",
+      "sha256": "45f72c0fe4594cde09e53f258319b91f917ba3339e11d8f4b982054a44759ca3",
+      "bytes": 24956
+    },
+    {
+      "path": "src/presentation/core/table-layout.ts",
+      "sha256": "afb7814b1161ab5df1f57075e78d165dcfb6c80d6164dd89322073b6c043fb55",
+      "bytes": 7242
+    },
+    {
+      "path": "src/presentation/core/table-text-content.ts",
+      "sha256": "c7f13efd80dde66248ff08c1de48affa595375b9943202a0aed60f1331ebca66",
+      "bytes": 12442
+    },
+    {
+      "path": "src/presentation/core/text-content-edit.ts",
+      "sha256": "b68d3a39a7c3bd2d4af7ecaa0c45f1f10ab3c415d25ef2489820cd5d7f1ce98b",
+      "bytes": 13664
+    },
+    {
+      "path": "src/presentation/core/text-diff.ts",
+      "sha256": "a8f8b0faca1ecb54fb9ed52e0fce65f1e8e506ac03a345a33b518015b47aab62",
+      "bytes": 4284
+    },
+    {
+      "path": "src/presentation/core/text-range-format.ts",
+      "sha256": "d176b0a346e29550bd10e95f55a3fe465b899ceb7ec1711979d9b47d2a38963f",
+      "bytes": 14419
+    },
+    {
+      "path": "src/presentation/core/types.ts",
+      "sha256": "227d6cbbe51a36c042badbd72dbe3de5de16aaee64eadf981e3bd451ad525ee2",
+      "bytes": 3391
+    },
+    {
+      "path": "src/presentation/native-smoke.ts",
+      "sha256": "647a90814196fa9a7d70d8b9276619ddf4ea61debe2894d16727848932e47f6a",
+      "bytes": 6605
+    },
+    {
+      "path": "src/presentation/pptx-package.ts",
+      "sha256": "705c35a8503efb7328150f326574c6905a57e73569b49904957b04fbb5eaaa7d",
+      "bytes": 73815
+    },
+    {
+      "path": "src/presentation/session.ts",
+      "sha256": "67c5d89176b81cb57de4f785b5cff4c67b4a7a752af7317bc9896a5fce10ec5d",
+      "bytes": 8292
+    },
+    {
+      "path": "src/presentation/types.ts",
+      "sha256": "958d2c41ae6c1eaeb2009826395a2c932db45980a5d825479980b9ed1bbce818",
+      "bytes": 5472
+    },
+    {
+      "path": "src/presentation/workbench.css",
+      "sha256": "7741faf066a069f0867610c9846e25effc20dbac5cf7e7a8141d098c0c6ecdbb",
+      "bytes": 25148
+    },
+    {
+      "path": "src/shared/dialog-focus.ts",
+      "sha256": "5541cc0c23c7e9d7828915ad7ca210d6d4c20f9714e2b2e03a476b4815cc97ea",
+      "bytes": 1746
+    },
+    {
+      "path": "src/shared/document.ts",
+      "sha256": "67d808d00bf4300a178cfdfe57b2f5b45748d3b1729f63e5eb202917e0792e62",
+      "bytes": 6449
+    },
+    {
+      "path": "src/sheet/types.ts",
+      "sha256": "0af734aa326471352a27ad77bc6cc6d29496b9b997ea1c55d0b62beb161f7d2f",
+      "bytes": 5261
+    },
+    {
+      "path": "src/smoke.ts",
+      "sha256": "48cdab1bd13bf6d3259a1ecf45be07308428fa0dd561cead0bb9bda1da453d45",
+      "bytes": 2413
+    },
+    {
+      "path": "src/style.css",
+      "sha256": "b2db1a9b20fba2ac08e0aef5fdc732bf5b6dcf280b11cfc9537d3614fed63247",
+      "bytes": 19536
+    },
+    {
+      "path": "src/types.ts",
+      "sha256": "da14e0f998a83c9a2881a4fdcc6c8b8739a144d9ec8a2059ad2f699f8b54ae0e",
+      "bytes": 1118
+    },
+    {
+      "path": "src/word/draft-review.ts",
+      "sha256": "f6e3944e6babd67660100c11aea42319dcb5046e2de8694f1459fb0ef4a4982f",
+      "bytes": 3124
+    },
+    {
+      "path": "src/word/types.ts",
+      "sha256": "94e18e06cac7abbfc9b5ccde651effe045f837f27676e01b72810d4738b855b4",
+      "bytes": 5655
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "db3a90edc5f463874bffec089e551dcf1377277bb7c893dd763a26fa16907121",
+      "bytes": 498
+    },
+    {
+      "path": "vite.config.ts",
+      "sha256": "8055641a4e194c9ccc76bf2b8023ebc71db4c4c2d4dfb86c00cb8c1cb164a0bf",
+      "bytes": 1317
+    }
+  ],
+  "sourceFingerprint": "8be4c5b090154750a35aa4049de1551979e79184d79b995ee83d0edd15b9b6c0",
+  "buildFiles": [
+    {
+      "path": "dist/index.html",
+      "sha256": "d3da95265136903413d37945e025d3651c28ac0e8bddf2c8f77e45d7f5e9eaac",
+      "bytes": 592
+    },
+    {
+      "path": "dist/assets/fontkit.es-B5CoPyR6.js",
+      "sha256": "9560e0bcc3637bb13bd872649f2c3a34a0163b707541443a88df93803c4401af",
+      "bytes": 716715
+    },
+    {
+      "path": "dist/assets/index-CV2rYnsl.js",
+      "sha256": "0d23231779be264233df0b4975918b3e9db2debe17e1e6ae6e4701d62c35a19d",
+      "bytes": 1123218
+    },
+    {
+      "path": "dist/assets/index-DnVB7SM3.js",
+      "sha256": "0419a22c4c02abec9fcf563cd3153bb6de9125d1917472a1edc7b7ebfb661480",
+      "bytes": 46137
+    },
+    {
+      "path": "dist/assets/index-q0GMiG5F.js",
+      "sha256": "32f84c7e0a31776b6d077c74cefe9fd8011da95671344d02f77f0ec08956fb73",
+      "bytes": 390770
+    },
+    {
+      "path": "dist/assets/native-smoke-CMTgoruf.js",
+      "sha256": "32ad90451eb5a972021bd1770caab312e5d4ce3966713b7cd57d2394df99d665",
+      "bytes": 4380
+    },
+    {
+      "path": "dist/assets/native-workbench-smoke-Dtnwbept.js",
+      "sha256": "e9296e991e9d3a55953d57a625fb826c310f633fefe97c88d86c309cbf8734d5",
+      "bytes": 10794
+    }
+  ],
+  "screenshot": {
+    "path": "docs/screenshots/table-layout-preserved.png",
+    "sha256": "4596bec1ec9a49ac0e3412be2550b84cd854107cf13aa41dfbc8f28f222e512f",
+    "bytes": 73483
+  }
+}

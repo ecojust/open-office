@@ -21,7 +21,7 @@ function host() {
     navigator: { permissions: {} }, installOfficeClipboardPermissionCompatibility: () => () => {},
     OpenOfficeOfflinePolicy: { installLocalTransport() {} }, setTimeout() {}, clearTimeout() {}, Event: class {},
   })
-  vm.runInContext(source.replace('start().catch(fail);', 'globalThis.memoryHost = { setPort(value) { port = value }, workerMessage, inputBytes, toBase64 };'), context)
+  vm.runInContext(source.replace('start().catch(fail);', 'globalThis.memoryHost = { setPort(value) { port = value }, workerMessage, inputBytes, toBase64, diagnosticHeapBytes };'), context)
   context.memoryHost.setPort(port)
   const request = (action, data, id = 'document') => {
     const requestId = `req-${workerPosts.length}`
@@ -72,4 +72,14 @@ test('legacy base64 protocol still exports identical bytes and pagehide stops al
   h.request('open', { id: 'late', kind: 'word', extension: 'docx', base64: 'AQID' })
   assert.equal(h.posts.length, count)
   assert.equal(h.writes.length, 0)
+})
+
+test('startup memory diagnostics never invoke an unexported Emscripten heap getter', () => {
+  const { context } = host(), inspect = context.memoryHost.diagnosticHeapBytes
+  let invoked = false
+  const newerModule = Object.defineProperty({}, 'HEAPU8', { get() { invoked = true; throw Error('Aborted: HEAPU8 was not exported') } })
+  assert.equal(inspect(newerModule), 0)
+  assert.equal(invoked, false)
+  assert.equal(inspect({ HEAPU8: new Uint8Array(32768) }), 32768)
+  assert.equal(inspect(undefined), 0)
 })

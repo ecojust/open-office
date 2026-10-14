@@ -3,6 +3,11 @@ import type { PptxPatch } from '../pptx-package'
 import { patchPptxPackage, writePptxParts, PptxPackageError, PPTX_LIMITS } from '../pptx-package'
 import { buildChartWorkbook } from '../chart-workbook'
 import { ensureNotesMasters } from './pptx-notes'
+import { applySmartArtTextParts } from './smartart-text'
+import { textParagraphs, generatedTextBody, plainText, patchDrawingText as patchText } from './pptx-text'
+import { materializeTextBody } from './text-range-format'
+import { patchTableGrid } from './table-layout'
+import { patchPaintOpacity } from './paint-opacity'
 import { P, A, R, C, PR, CT, readXml, writeXml, child, children, all, relPart, resolvePart, relativePart, xmlEscape as esc, objectFingerprint, emu, xmlBytes } from './pptx-common'
 
 const NS = `xmlns:p="${P}" xmlns:a="${A}" xmlns:r="${R}" xmlns:c="${C}"`
@@ -25,27 +30,29 @@ function color(value: string | null | undefined): string { return (value || '000
 function solid(value: string | null, opacity = 1) {
   return value === null ? '<a:noFill/>' : `<a:solidFill><a:srgbClr val="${esc(color(value))}">${opacity < 1 ? `<a:alpha val="${Math.round(Math.max(0, opacity) * 100000)}"/>` : ''}</a:srgbClr></a:solidFill>`
 }
-function line(object: SlideObject) { return `<a:ln w="${Math.max(0, emu(object.lineWidth))}">${solid(object.lineColor)}<a:prstDash val="solid"/></a:ln>` }
+function line(object: SlideObject) { return `<a:ln w="${Math.max(0, emu(object.lineWidth))}">${solid(object.lineColor, object.lineOpacity)}<a:prstDash val="solid"/></a:ln>` }
 function transform(object: SlideObject, graphic = false, group = false) {
   return `<${graphic ? 'p' : 'a'}:xfrm${object.rotation ? ` rot="${Math.round(object.rotation * 60000)}"` : ''}><a:off x="${emu(object.x)}" y="${emu(object.y)}"/><a:ext cx="${Math.max(1, emu(object.width))}" cy="${Math.max(1, emu(object.height))}"/>${group ? `<a:chOff x="${emu(object.x)}" y="${emu(object.y)}"/><a:chExt cx="${Math.max(1, emu(object.width))}" cy="${Math.max(1, emu(object.height))}"/>` : ''}</${graphic ? 'p' : 'a'}:xfrm>`
 }
-function textParagraphs(text: string, object: SlideObject) {
-  const style = object.textStyle, alignment = { left: 'l', center: 'ctr', right: 'r', justify: 'just' }[style.align]
-  const properties = `lang="zh-CN" sz="${Math.round(style.fontSize * 100)}" b="${style.bold ? 1 : 0}" i="${style.italic ? 1 : 0}" u="${style.underline ? 'sng' : 'none'}"`
-  const fonts = `<a:latin typeface="${esc(style.fontName)}"/><a:ea typeface="${esc(style.fontName)}"/><a:cs typeface="${esc(style.fontName)}"/>`
-  return text.split('\n').map(paragraph => `<a:p><a:pPr algn="${alignment}"/><a:r><a:rPr ${properties}>${solid(style.color)}${fonts}</a:rPr><a:t xml:space="preserve">${esc(paragraph)}</a:t></a:r><a:endParaRPr ${properties}/></a:p>`).join('')
+function textBody(object: SlideObject, prefix = 'p', text = object.text) {
+  return object.textBodyOverride && prefix === 'p' && text === object.text
+    ? writeXml(materializeTextBody(object)) : generatedTextBody(object, prefix, text)
 }
-function bodyProperties(object: SlideObject) {
-  const layout = object.textLayout, insets = layout?.insets || { left: 1.3, right: 1.3, top: 1.3, bottom: 1.3 }
-  return `<a:bodyPr wrap="${layout?.wrap === false ? 'none' : 'square'}" anchor="${({ top: 't', middle: 'ctr', bottom: 'b' } as const)[layout?.verticalAlign || 'top']}" lIns="${emu(insets.left)}" rIns="${emu(insets.right)}" tIns="${emu(insets.top)}" bIns="${emu(insets.bottom)}" rot="${Math.round((layout?.rotation || 0) * 60000)}"/>`
-}
-function textBody(object: SlideObject, prefix = 'p', text = object.text) { return `<${prefix}:txBody>${bodyProperties(object)}<a:lstStyle/>${textParagraphs(text, object)}</${prefix}:txBody>` }
 function nonVisual(object: SlideObject, id: number, kind: 'sp' | 'pic' | 'graphicFrame' | 'grpSp') {
   const name = kind === 'graphicFrame' ? 'GraphicFrame' : kind[0]!.toUpperCase() + kind.slice(1)
   return `<p:nv${name}Pr><p:cNvPr id="${id}" name="${esc(object.name)}"/><p:cNv${name}Pr${object.type === 'text' ? ' txBox="1"' : ''}/><p:nvPr/></p:nv${name}Pr>`
 }
-function plainText(parent: Element | undefined) {
-  return parent ? all(parent, 'p').map(paragraph => children(paragraph).map(run => run.localName === 'br' ? '\n' : all(run, 't').map(t => t.textContent || '').join('')).join('')).join('\n') : ''
+/** A data/image replacement changes the visual payload, not its enclosing
+ * object's description, links, locks or placeholder identity. The source has
+ * already received destination relationship IDs and its current shape ID/name
+ * in exportShape. Copy that container, never the old payload or geometry. */
+function retainNonVisual(rebuilt: Element, source: Element | undefined): Element {
+  if (!source || source.namespaceURI !== P || rebuilt.localName !== source.localName) return rebuilt
+  const local = rebuilt.localName === 'graphicFrame' ? 'nvGraphicFramePr' : rebuilt.localName === 'pic' ? 'nvPicPr' : undefined
+  if (!local) return rebuilt
+  const original = child(source, local), generated = child(rebuilt, local)
+  if (original?.namespaceURI === P && generated?.namespaceURI === P) rebuilt.replaceChild(rebuilt.ownerDocument.importNode(original, true), generated)
+  return rebuilt
 }
 function baseline(object: SlideObject): Partial<SlideObject> | undefined {
   try { return object.sourceFingerprint ? JSON.parse(object.sourceFingerprint) : undefined } catch { return undefined }
@@ -53,92 +60,14 @@ function baseline(object: SlideObject): Partial<SlideObject> | undefined {
 function differs(object: SlideObject, previous: Partial<SlideObject> | undefined, key: keyof SlideObject) { return !previous || JSON.stringify(object[key]) !== JSON.stringify(previous[key]) }
 function mediaShape(shape: Element) { return all(shape, 'audioFile').length > 0 || all(shape, 'videoFile').length > 0 || all(shape, 'media').length > 0 }
 
-/** Keep paragraph/run structure, links, fields and all unmodeled formatting.
- * The editor changes only the explicitly modified character attributes. */
-function patchTextStyle(body: Element, object: SlideObject, previous: Partial<SlideObject> | undefined) {
-  const style = object.textStyle, before = previous?.textStyle
-  const changed = (key: keyof SlideObject['textStyle']) => !before || style[key] !== before[key]
-  const paragraphs = children(body, 'p')
-  for (const paragraph of paragraphs) {
-    let properties = child(paragraph, 'pPr')
-    if (!properties) { properties = paragraph.ownerDocument.createElementNS(A, 'a:pPr'); paragraph.insertBefore(properties, paragraph.firstChild) }
-    if (changed('align')) properties.setAttribute('algn', { left: 'l', center: 'ctr', right: 'r', justify: 'just' }[style.align])
-    if (!child(properties, 'defRPr')) {
-      const defaults = properties.ownerDocument.createElementNS(A, 'a:defRPr'); properties.insertBefore(defaults, child(properties, 'extLst') || null)
-    }
-    for (const run of children(paragraph).filter(element => ['r', 'fld', 'br'].includes(element.localName))) if (!child(run, 'rPr')) {
-      const properties = run.ownerDocument.createElementNS(A, 'a:rPr'); run.insertBefore(properties, run.firstChild)
-    }
-    if (!child(paragraph, 'endParaRPr')) append(paragraph, '<a:endParaRPr/>')
-  }
-  const properties = [...all(body, 'rPr'), ...all(body, 'defRPr'), ...all(body, 'endParaRPr')]
-  for (const property of properties) {
-    if (changed('fontSize')) property.setAttribute('sz', String(Math.round(style.fontSize * 100)))
-    if (changed('bold')) property.setAttribute('b', style.bold ? '1' : '0')
-    if (changed('italic')) property.setAttribute('i', style.italic ? '1' : '0')
-    if (changed('underline')) property.setAttribute('u', style.underline ? 'sng' : 'none')
-    if (changed('color')) {
-      for (const fill of children(property)) if (['noFill', 'solidFill', 'gradFill', 'blipFill', 'pattFill', 'grpFill'].includes(fill.localName)) fill.remove()
-      property.insertBefore(property.ownerDocument.importNode(node(solid(style.color)), true), children(property).find(element => element.localName !== 'ln') || null)
-    }
-    if (changed('fontName')) for (const [fontName, successors] of [['latin', ['ea', 'cs', 'sym', 'hlinkClick', 'hlinkMouseOver', 'rtl', 'extLst']], ['ea', ['cs', 'sym', 'hlinkClick', 'hlinkMouseOver', 'rtl', 'extLst']], ['cs', ['sym', 'hlinkClick', 'hlinkMouseOver', 'rtl', 'extLst']]] as const) {
-      let font = child(property, fontName)
-      if (!font) { font = property.ownerDocument.createElementNS(A, `a:${fontName}`); property.insertBefore(font, children(property).find(element => (successors as readonly string[]).includes(element.localName)) || null) }
-      font.setAttribute('typeface', style.fontName)
-    }
-  }
-}
-
-function patchTextLayout(body: Element, object: SlideObject, previous: Partial<SlideObject> | undefined) {
-  if (!differs(object, previous, 'textLayout')) return
-  const generated = node(bodyProperties(object)), existing = child(body, 'bodyPr')
-  if (!existing) { body.insertBefore(body.ownerDocument.importNode(generated, true), body.firstChild); return }
-  // bodyPr may also contain vertical text, columns, fitting and 3D settings.
-  // Updating the modeled fields never replaces those unrelated settings.
-  const before = previous?.textLayout, current = object.textLayout
-  const changed: Record<string, boolean> = {
-    anchor: !before || current?.verticalAlign !== before.verticalAlign,
-    wrap: !before || current?.wrap !== before.wrap,
-    rot: !before || current?.rotation !== before.rotation,
-    lIns: !before || current?.insets?.left !== before.insets?.left,
-    rIns: !before || current?.insets?.right !== before.insets?.right,
-    tIns: !before || current?.insets?.top !== before.insets?.top,
-    bIns: !before || current?.insets?.bottom !== before.insets?.bottom,
-  }
-  for (const attribute of Array.from(generated.attributes)) if (!attribute.namespaceURI && changed[attribute.name]) existing.setAttribute(attribute.name, attribute.value)
-}
-
-function patchText(body: Element, object: SlideObject, previous: Partial<SlideObject> | undefined, text = object.text) {
-  if (plainText(body) !== text) {
-    const originals = children(body, 'p'), paragraphs = text.split('\n')
-    for (const paragraph of originals) paragraph.remove()
-    paragraphs.forEach((value, index) => {
-      const original = originals[Math.min(index, originals.length - 1)], paragraph = original ? original.cloneNode(true) as Element : node('<a:p/>')
-      // Retain every run when the paragraph's text has not changed. Edited
-      // plain text uses its paragraph and first run formatting as a template.
-      const oldText = original ? children(original).map(run => run.localName === 'br' ? '\n' : all(run, 't').map(element => element.textContent || '').join('')).join('') : undefined
-      if (oldText !== value) {
-        const runProperties = all(paragraph, 'rPr')[0]?.cloneNode(true) as Element | undefined
-        for (const run of children(paragraph)) if (['r', 'fld', 'br'].includes(run.localName)) run.remove()
-        const run = paragraph.ownerDocument.createElementNS(A, 'a:r')
-        if (runProperties) run.appendChild(runProperties)
-        const content = paragraph.ownerDocument.createElementNS(A, 'a:t'); content.setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve'); content.textContent = value; run.appendChild(content)
-        paragraph.insertBefore(run, child(paragraph, 'endParaRPr') || null)
-      }
-      body.appendChild(body.ownerDocument.importNode(paragraph, true))
-    })
-  }
-  if (differs(object, previous, 'textStyle')) patchTextStyle(body, object, previous)
-  patchTextLayout(body, object, previous)
-}
-
 function patchLine(properties: Element, object: SlideObject, previous: Partial<SlideObject> | undefined) {
   const existing = child(properties, 'ln')
   if (!existing) { replace(properties, 'ln', line(object)); return }
   if (differs(object, previous, 'lineWidth')) existing.setAttribute('w', String(Math.max(0, emu(object.lineWidth))))
-  if (differs(object, previous, 'lineColor')) {
+  if (object.lineColorOverride || differs(object, previous, 'lineColor') || differs(object, previous, 'lineOpacity')) {
+    if (!object.lineColorOverride && !differs(object, previous, 'lineColor') && object.lineOpacity !== undefined && patchPaintOpacity(properties, 'line', object.lineOpacity)) return
     for (const fill of children(existing)) if (['noFill', 'solidFill', 'gradFill', 'blipFill', 'pattFill', 'grpFill'].includes(fill.localName)) fill.remove()
-    existing.insertBefore(existing.ownerDocument.importNode(node(solid(object.lineColor)), true), existing.firstChild)
+    existing.insertBefore(existing.ownerDocument.importNode(node(solid(object.lineColor, object.lineOpacity)), true), existing.firstChild)
   }
 }
 
@@ -359,15 +288,31 @@ function newChart(object: SlideObject, id: number, context: ShapeContext) {
   return `<p:graphicFrame>${nonVisual(object, id, 'graphicFrame')}${transform(object, true)}<a:graphic><a:graphicData uri="${C}"><c:chart r:id="${chartRelationship}"/></a:graphicData></a:graphic></p:graphicFrame>`
 }
 
-function patchTable(source: Element, object: SlideObject, previous: Partial<SlideObject> | undefined) {
+function patchTableGeometry(source: Element, object: SlideObject, previous: Partial<SlideObject> | undefined, forceGeometry: boolean) {
+  const resized = ['width', 'height'].some(key => differs(object, previous, key as keyof SlideObject))
+  if (forceGeometry || resized) patchTableGrid(all(source, 'tbl')[0]!, object, forceGeometry)
+  if (forceGeometry || ['x', 'y', 'width', 'height', 'rotation'].some(key => differs(object, previous, key as keyof SlideObject))) {
+    const old = child(child(source, 'xfrm'), 'ext')?.cloneNode(true)
+    const next = replace(source, 'xfrm', transform(object, true))
+    // Merely moving a source table need not repair a mismatched source frame.
+    if (!forceGeometry && !resized && old) next.replaceChild(next.ownerDocument.importNode(old, true), child(next, 'ext')!)
+  }
+}
+function patchTable(source: Element, object: SlideObject, previous: Partial<SlideObject> | undefined, forceGeometry: boolean) {
   const table = all(source, 'tbl')[0], rows = children(table, 'tr'), cells = object.table?.cells
-  if (!cells || rows.length !== cells.length || rows.some((row, i) => children(row, 'tc').length !== cells[i]!.length)) return false
-  replace(source, 'xfrm', transform(object, true))
+  if (object.table?.rebuilt || !cells || rows.length !== cells.length || rows.some((row, i) => children(row, 'tc').length !== cells[i]!.length)) return false
+  patchTableGeometry(source, object, previous, forceGeometry)
   const fillChanged = differs(object, previous, 'fillColor')
   rows.forEach((row, r) => children(row, 'tc').forEach((cell, c) => {
     const value = cells[r]![c]!, body = child(cell, 'txBody')
-    if (body) patchText(body, object, previous, value)
-    else cell.insertBefore(cell.ownerDocument.importNode(node(textBody(object, 'a', value)), true), cell.firstChild)
+    const override = object.table?.textOverrides?.[`${r}:${c}`]
+    if (override) {
+      const replacement = readXml(override.xml).documentElement
+      if (override.text !== value || plainText(replacement) !== value) throw new PptxPackageError('TABLE_TEXT', '单元格文字与保存格式不一致。')
+      if (body) cell.replaceChild(cell.ownerDocument.importNode(replacement, true), body)
+      else cell.insertBefore(cell.ownerDocument.importNode(replacement, true), cell.firstChild)
+    } else if (body && plainText(body) !== value) throw new PptxPackageError('TABLE_TEXT', '单元格文字没有安全的保存映射，原文件未被替换。')
+    else if (!body && value) throw new PptxPackageError('TABLE_TEXT', '单元格缺少可安全编辑的正文。')
     if (fillChanged) {
       const properties = child(cell, 'tcPr') || append(cell, '<a:tcPr/>')
       for (const existing of children(properties)) if (['solidFill', 'noFill', 'gradFill', 'blipFill', 'pattFill', 'grpFill'].includes(existing.localName)) existing.remove()
@@ -408,7 +353,7 @@ function checkSiblingConnectorCopies(objects: SlideObject[]) {
 function groupHasOnlyAffineChange(object: SlideObject, previous: Partial<SlideObject> | undefined): boolean {
   if (!previous || !previous.children || !object.children || !previous.width || !previous.height || previous.x === undefined || previous.y === undefined) return false
   const sx = object.width / previous.width, sy = object.height / previous.height
-  const ignored = new Set(['id', 'x', 'y', 'width', 'height', 'rotation', 'children', 'sourceXml', 'sourceFingerprint', 'sourcePart', 'sourceCopy', 'hasAnimation', 'hasComplexGroupTransform', 'warning', 'locked'])
+  const ignored = new Set(['id', 'x', 'y', 'width', 'height', 'rotation', 'children', 'sourceXml', 'sourceFingerprint', 'sourcePart', 'sourceCopy', 'hasAnimation', 'hasComplexGroupTransform', 'warning', 'locked', 'diagramPreview', 'richText', 'tableCellText', 'tableLayout', 'smartArt'])
   const content = (value: Partial<SlideObject>, root = false) => JSON.stringify(value, (key, field) => ignored.has(key) || root && ['name', 'zIndex'].includes(key) ? undefined : field)
   if (content(object, true) !== content(previous, true)) return false
   const near = (a: number, b: number) => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(a), Math.abs(b))
@@ -448,6 +393,7 @@ function restoreTransform(shape: Element, original: Element) {
 }
 
 function exportShape(object: SlideObject, context: ShapeContext, forceGeometry = false): Element {
+  forceGeometry ||= !!object.sourceTransformDetached
   const source = object.sourceXml ? readXml(object.sourceXml).documentElement : undefined, previous = baseline(object)
   const sourceId = source && all(source, 'cNvPr')[0]?.getAttribute('id') || ''
   const native = !!source && (object.sourceCopy === false || object.sourceCopy === undefined && object.id === `${object.sourcePart}#${sourceId}`)
@@ -519,31 +465,35 @@ function exportShape(object: SlideObject, context: ShapeContext, forceGeometry =
     let properties = child(source, 'spPr')
     if (!properties) properties = append(source, '<p:spPr/>')
     if (forceGeometry || ['x', 'y', 'width', 'height', 'rotation'].some(key => differs(object, previous, key as keyof SlideObject))) replace(properties, 'xfrm', transform(object))
-    if (differs(object, previous, 'fillColor') || differs(object, previous, 'opacity')) {
-      for (const existing of children(properties)) if (['solidFill', 'noFill', 'gradFill', 'blipFill', 'pattFill', 'grpFill'].includes(existing.localName)) existing.remove()
-      const value = properties.ownerDocument.importNode(node(solid(object.fillColor, object.opacity)), true)
-      properties.insertBefore(value, children(properties).find(item => ['ln', 'effectLst', 'effectDag', 'scene3d', 'sp3d', 'extLst'].includes(item.localName)) || null)
+    if (object.fillColorOverride || differs(object, previous, 'fillColor') || differs(object, previous, 'fillOpacity') || object.fillOpacity === undefined && differs(object, previous, 'opacity')) {
+      if (object.fillColorOverride || differs(object, previous, 'fillColor') || object.fillOpacity === undefined || !patchPaintOpacity(properties, 'fill', object.fillOpacity)) {
+        for (const existing of children(properties)) if (['solidFill', 'noFill', 'gradFill', 'blipFill', 'pattFill', 'grpFill'].includes(existing.localName)) existing.remove()
+        const value = properties.ownerDocument.importNode(node(solid(object.fillColor, object.fillOpacity ?? object.opacity)), true)
+        properties.insertBefore(value, children(properties).find(item => ['ln', 'effectLst', 'effectDag', 'scene3d', 'sp3d', 'extLst'].includes(item.localName)) || null)
+      }
     }
-    if (differs(object, previous, 'lineColor') || differs(object, previous, 'lineWidth')) patchLine(properties, object, previous)
-    if (object.capabilities.text && (differs(object, previous, 'text') || differs(object, previous, 'textStyle') || differs(object, previous, 'textLayout'))) {
+    if (object.lineColorOverride || differs(object, previous, 'lineColor') || differs(object, previous, 'lineWidth') || differs(object, previous, 'lineOpacity')) patchLine(properties, object, previous)
+    if (object.capabilities.text && (differs(object, previous, 'text') || differs(object, previous, 'textStyle') || differs(object, previous, 'textStyleOverrides') || differs(object, previous, 'textBodyOverride') || differs(object, previous, 'textLayout'))) {
       const body = child(source, 'txBody')
-      if (body) patchText(body, object, previous)
+      if (object.textBodyOverride) replace(source, 'txBody', writeXml(materializeTextBody(object, body, previous)))
+      else if (body) patchText(body, object, previous)
       else replace(source, 'txBody', textBody(object))
     }
     return source
   }
   if (source && ((object.type === 'chart' && !differs(object, previous, 'chart')) || (object.type === 'table' && !differs(object, previous, 'table') && !differs(object, previous, 'textStyle') && !differs(object, previous, 'fillColor')) || (object.type === 'image' && !differs(object, previous, 'image')))) {
     const frame = source.localName === 'graphicFrame'
-    if (frame) replace(source, 'xfrm', transform(object, true))
+    if (object.type === 'table') patchTableGeometry(source, object, previous, forceGeometry)
+    else if (frame) replace(source, 'xfrm', transform(object, true))
     else { const properties = child(source, 'spPr') || append(source, '<p:spPr/>'); replace(properties, 'xfrm', transform(object)); if (differs(object, previous, 'lineColor') || differs(object, previous, 'lineWidth')) patchLine(properties, object, previous) }
     return source
   }
-  if (object.type === 'image') return node(imageXml(object, id, context))
-  if (source && object.type === 'table' && patchTable(source, object, previous)) return source
-  if (object.type === 'table') return node(tableXml(object, id))
-  if (object.type === 'chart') return node(newChart(object, id, context))
+  if (object.type === 'image') return retainNonVisual(node(imageXml(object, id, context)), source)
+  if (source && object.type === 'table' && patchTable(source, object, previous, forceGeometry)) return source
+  if (object.type === 'table') return retainNonVisual(node(tableXml(object, id)), source)
+  if (object.type === 'chart') return retainNonVisual(node(newChart(object, id, context)), source)
   const preset = object.type === 'ellipse' ? 'ellipse' : object.type === 'line' ? 'line' : 'rect'
-  return node(`<p:sp>${nonVisual(object, id, 'sp')}<p:spPr>${transform(object)}<a:prstGeom prst="${preset}"><a:avLst/></a:prstGeom>${solid(object.fillColor, object.opacity)}${line(object)}</p:spPr>${object.type === 'text' || object.text ? textBody(object) : ''}</p:sp>`)
+  return node(`<p:sp>${nonVisual(object, id, 'sp')}<p:spPr>${transform(object)}<a:prstGeom prst="${preset}"><a:avLst/></a:prstGeom>${solid(object.fillColor, object.fillOpacity ?? object.opacity)}${line(object)}</p:spPr>${object.type === 'text' || object.text ? textBody(object) : ''}</p:sp>`)
 }
 
 function writeNotes(writer: PackageWriter, slide: SlideModel, slidePart: string, rels: Document) {
@@ -580,6 +530,7 @@ export async function exportPresentation(model: PresentationModel): Promise<Uint
   if ([...(model.sourceParts?.keys() || [])].some(part => /^_xmlsignatures\//i.test(part))) throw new PptxPackageError('SIGNED_PACKAGE', '含数字签名的演示文稿不能修改，请先另存未签名副本。')
   if ([...(model.sourceParts?.keys() || [])].some(part => /(?:vbaProject|vbaData)\.(?:bin|xml)$/i.test(part)) || /macroEnabled|vbaProject/i.test(new TextDecoder().decode(model.sourceParts?.get('[Content_Types].xml')))) throw new PptxPackageError('MACRO_PACKAGE', '含宏的演示文稿不能作为普通 PPTX 导出。')
   const writer = new PackageWriter(model.sourceParts), presentationPart = model.sourcePresentationPart || 'ppt/presentation.xml'
+  applySmartArtTextParts(model, writer.parts)
   const source = writer.parts.get(presentationPart), presentation = source ? readXml(source) : readXml(`<p:presentation ${NS}><p:sldIdLst/><p:sldSz cx="${emu(model.width)}" cy="${emu(model.height)}"/><p:notesSz cx="6858000" cy="9144000"/><p:defaultTextStyle/></p:presentation>`)
   if (presentation.documentElement.namespaceURI !== P) throw new PptxPackageError('STRICT_OOXML', '严格 OOXML 演示文稿目前仅支持预览；请在原编辑器另存为标准 PPTX 后编辑。')
   const presentationRels = writer.rels(presentationPart), existingIds = child(presentation.documentElement, 'sldIdLst'), existingSlides = new Map<string, { id: string; rel: string }>()

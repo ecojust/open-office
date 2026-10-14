@@ -273,11 +273,18 @@ export function inspectDocxImport(bytes:Uint8Array):ImportReview {
         if(!parents.length)requireValue(node.local===root&&W.has(node.uri))
         // A chart's backing workbook is not a user attachment. Require an
         // actual Word object plus its own internal OLE/package relationship.
+        // OOXML also represents attachments with w:objectEmbed (including
+        // Strict documents), rather than the legacy Office o:OLEObject.
         // The attachment is only checked for existence; never parse or run it.
-        if(node.uri===O&&node.local==='OLEObject'&&parents.some(parent=>parent.local==='object'&&W.has(parent.uri))) {
-          const type=attribute(node,'Type')
-          if(type==='Link')return
-          requireValue(!type||type==='Embed')
+        const parent=parents.at(-1)
+        const objectEmbed=W.has(node.uri)&&node.local==='objectEmbed'&&parent?.local==='object'&&parent.uri===node.uri
+        const legacyObject=node.uri===O&&node.local==='OLEObject'&&parents.some(parent=>parent.local==='object'&&W.has(parent.uri))
+        if(objectEmbed||legacyObject) {
+          if(legacyObject) {
+            const type=attribute(node,'Type')
+            if(type==='Link')return
+            requireValue(!type||type==='Embed')
+          }
           const id=attribute(node,'id',DOC_REL),link=id?links.get(id):null
           requireValue(link&&(isType(link.type,'oleObject')||isType(link.type,'package')))
           requireValue(archive.has(link.part)&&archive.get(link.part)!.size>0)

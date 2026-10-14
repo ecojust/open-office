@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 1,
+  "completedAt": "2026-10-14T00:39:58.483103+00:00",
+  "scope": "First PPT compatibility iteration: cached SmartArt preview, mixed-run text, empty/image-only PDF export. No universal lossless compatibility claim.",
+  "environment": {
+    "platform": "Linux x86_64",
+    "reference": "ONLYOFFICE Desktop Editors 10.0.0-169",
+    "analysisTool": "rea-agents 6.4.0",
+    "ui": "Vue in Chromium",
+    "nativePlatformsNotVerified": [
+      "macOS",
+      "Windows"
+    ]
+  },
+  "checks": {
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "nodeTestsPassed": 446,
+    "pythonPdfTestsPassed": 28,
+    "complexFixtures": 12,
+    "noOpReopenCycles": 36,
+    "exports": 65,
+    "independentPackageAudits": 41,
+    "originalSourcesUnchanged": true,
+    "existingBrowserChecks": 24,
+    "mixedRunBrowserChecks": 21,
+    "smartArtFixtures": 3,
+    "smartArtBoundaryCases": 8,
+    "newFeatureUiChecks": 3,
+    "officialDesktopOpenChecks": 14,
+    "independentPdfReadbacks": 4
+  },
+  "fixtureSources": [
+    {
+      "id": "typography-rich",
+      "path": "tests/compatibility/presentation-complex/fixtures/generated/typography-rich.pptx",
+      "sha256": "3f1b8c8598a5073111a0e9d06264b3269ad79eaff95d4a00c6029f8de27a34cf",
+      "bytes": 33717
+    },
+    {
+      "id": "text-layout-vertical",
+      "path": "tests/compatibility/presentation-complex/fixtures/generated/text-layout-vertical.pptx",
+      "sha256": "3c03ecb055aefbbf11b5814ad4e6bb622aa5ca00616c6c23159f2dae1462b831",
+      "bytes": 33457
+    },
+    {
+      "id": "nested-groups-images",
+      "path": "tests/compatibility/presentation-complex/fixtures/generated/nested-groups-images.pptx",
+      "sha256": "bb6820325e97cb3a848c355ecc36493c1835bf313d8ae12e9a99e47fcce36e6d",
+      "bytes": 34758
+    },
+    {
+      "id": "merged-styled-tables",
+      "path": "tests/compatibility/presentation-complex/fixtures/generated/merged-styled-tables.pptx",
+      "sha256": "4fe9d3b3235d7060cc1dd11ec252dd92573585161394f8886195c4d5974f2b75",
+      "bytes": 33706
+    },
+    {
+      "id": "combo-and-doughnut-charts",
+      "path": "tests/compatibility/presentation-complex/fixtures/generated/combo-and-doughnut-charts.pptx",
+      "sha256": "cbc9d85d39d2576f762f7c4da4692dafeb15345c96157a5855dc01a8f3cecac3",
+      "bytes": 45667
+    },
+    {
+      "id": "motion-triggers-connectors",
+      "path": "tests/compatibility/presentation-complex/fixtures/generated/motion-triggers-connectors.pptx",
+      "sha256": "99c1d2e0b8dc9991c6da11da1f46d2bb29fd66ca42008f1d0798b621afa3e0a1",
+      "bytes": 36079
+    },
+    {
+      "id": "slide-links-inheritance",
+      "path": "tests/compatibility/presentation-complex/fixtures/generated/slide-links-inheritance.pptx",
+      "sha256": "224ca6c6867a7c8f7328f0ff407606b05905695127cac857921ed42892a0bce2",
+      "bytes": 37986
+    },
+    {
+      "id": "placeholder-inheritance",
+      "path": "tests/compatibility/presentation-complex/fixtures/generated/placeholder-inheritance.pptx",
+      "sha256": "d046fbce07fe6a1b539c615ea2ef81779303c2147cb532290f94d6a534b63188",
+      "bytes": 33175
+    },
+    {
+      "id": "poi-smartart-default-list",
+      "path": "tests/compatibility/presentation-complex/fixtures/upstream/apache-poi/SmartArt.pptx",
+      "sha256": "b97e4c6d2ee1dd4094f50f9043820610268dd452d7717c537f5456636adcc353",
+      "bytes": 41382
+    },
+    {
+      "id": "poi-smartart-alternating-hexagons",
+      "path": "tests/compatibility/presentation-complex/fixtures/upstream/apache-poi/smartart-rotated-text.pptx",
+      "sha256": "a357985aec81b0bfa8a71138bbe94c9b3f6e00dee110c0da34302e22253de260",
+      "bytes": 43459
+    },
+    {
+      "id": "poi-smartart-venn",
+      "path": "tests/compatibility/presentation-complex/fixtures/upstream/apache-poi/smartart-simple.pptx",
+      "sha256": "238ff6433dac00b2722edb9a29d97f56ab4f3c9c37f33a73d6f53baf494916aa",
+      "bytes": 71102
+    },
+    {
+      "id": "affine-group-mc-custom",
+      "path": "tests/compatibility/presentation-complex/fixtures/generated/affine-group-mc-custom.pptx",
+      "sha256": "b6f19bd0ef4a394c371ce209cc7c23917bbbec9b326080e250feeba0e691fd1e",
+      "bytes": 33966
+    }
+  ],
+  "reports": [
+    {
+      "path": "test-results/onlyoffice-iteration-complex-final/report.json",
+      "sha256": "9aa7ed4a14ba63e9ec3e279ca8283fd51a36f5762c2b8f1ab191866f85ac83f1"
+    },
+    {
+      "path": "test-results/standalone-presentation/report.json",
+      "sha256": "b016b75c053056552b208b17faf18314da1d91ed4f067bb10551336a75063e19"
+    },
+    {
+      "path": "test-results/presentation-rich-text/report.json",
+      "sha256": "f33bd0a69c6ac51587455ab2c2710c0ee71232b2f745d8b57fcc987026dff210"
+    },
+    {
+      "path": "test-results/smartart-preview/report.json",
+      "sha256": "dd214927fe3d16b089e43d7995a26bca86fce445ca7a6bbf8dc5bcf2384c65c7"
+    },
+    {
+      "path": "test-results/presentation-compatibility-ui/report.json",
+      "sha256": "5cc268f920a38cacb59b14a5c4c9c3e86d696473e944ff66d0bfc5b5c78f808d"
+    },
+    {
+      "path": "test-results/onlyoffice-iteration-native/report.json",
+      "sha256": "8bb9ad6a9d11ed16cd76c865e9e4d9316b59eda0c2927df80047a47e3e348ea2"
+    },
+    {
+      "path": "test-results/onlyoffice-iteration-native-style/report.json",
+      "sha256": "7150d7271f423e8beeeba9259b6ede58941a5a672dfea8fd6ccca27fbd7ae694"
+    },
+    {
+      "path": "test-results/onlyoffice-iteration-pdf-readback.json",
+      "sha256": "839d83ee3bce025dddd06cf6ac3bac3d93be4b9636eeaa85731f9c318c97f8b0"
+    }
+  ],
+  "logs": [
+    {
+      "path": "/tmp/open-office-iteration-tests-final.log",
+      "sha256": "b0b0d3f942a8cacd86c0b17dcd48722dc343022ab1ce51dfcd2e18b56d437567"
+    },
+    {
+      "path": "/tmp/open-office-iteration-build.log",
+      "sha256": "41545431ec585b5c13d126688f42ffd6fea941be087e4111bcacb820a30f0eb0"
+    }
+  ],
+  "implementationFingerprints": [
+    {
+      "path": "src/components/StandalonePresentationEditor.vue",
+      "sha256": "d92256db5a44ebdec5d998838f8cd6f004c818493237b9fb830751ac3dad0a62"
+    },
+    {
+      "path": "src/presentation/core/fontkit-compat.ts",
+      "sha256": "bef23fc51f6796e59380e3f8d8a4c4bb12ecc83e3fcd812dc7fb5d5d0d68aed2"
+    },
+    {
+      "path": "src/presentation/core/model.ts",
+      "sha256": "d32c3202db9a01dab16adfbc42bfa7ed884ef52f52566dfe983a6d06604e184d"
+    },
+    {
+      "path": "src/presentation/core/pdf.ts",
+      "sha256": "2d3dbd9ec01ed863caa14b41aa4c6317a2fd57131917cb482e479f8a19a88519"
+    },
+    {
+      "path": "src/presentation/core/pptx-common.ts",
+      "sha256": "0007b951d8fad7b2c9c71969eca47907955489c3fd45ca2a57842c6e8fe4f46d"
+    },
+    {
+      "path": "src/presentation/core/pptx-export.ts",
+      "sha256": "238e3b736ce186c8cbc1deecd4e344cb300fa548d6c3801e134b8baba6075f6e"
+    },
+    {
+      "path": "src/presentation/core/pptx-import.ts",
+      "sha256": "6d4ee711877b71769150bc66d9a3cd6f19dbf9c167c7b9f7d0155c3ae9ecc248"
+    },
+    {
+      "path": "src/presentation/core/pptx-notes.ts",
+      "sha256": "7057a1d5d6122dc23484079d904abff244c72075af46b73c513f178a7df3b53e"
+    },
+    {
+      "path": "src/presentation/core/pptx-rich-text.ts",
+      "sha256": "732a804e483d6af0b2a9019404109a844ffae1943677a3f337f08e128f388dd3"
+    },
+    {
+      "path": "src/presentation/core/pptx.ts",
+      "sha256": "dc7d4a62add2f6db0a84efef6f099423358badf55a9760ade20740c35c52c42b"
+    },
+    {
+      "path": "src/presentation/core/render.ts",
+      "sha256": "5f3ade70c213f4e3c60f264727fd682f0657b41d14c9b6442f17524569411728"
+    },
+    {
+      "path": "src/presentation/core/rich-text-layout.ts",
+      "sha256": "d1acfd600b6d89f9a6546c49936e94b35076089e068ad732eb72985744aeccfb"
+    },
+    {
+      "path": "src/presentation/core/rich-text.ts",
+      "sha256": "6fffa4994511b043c48f5af62bd5b25811dd9a4d03b585542f487335a4cdea32"
+    },
+    {
+      "path": "src/presentation/core/scene.ts",
+      "sha256": "9d6027130b052f370db97a5a84611d4f9569163ef4f972260abc8af8a56d8873"
+    },
+    {
+      "path": "src/presentation/core/smartart-preview.ts",
+      "sha256": "622c60fdcab60abf479504b8928b33a3533b6f97ea10829bb78f48649df7e049"
+    },
+    {
+      "path": "src/presentation/core/types.ts",
+      "sha256": "251c340dd554a88f06d07b28c66a752030a877e596532a2109a2c4663ae23ae2"
+    }
+  ],
+  "researchEvidence": {
+    "smartArt": "ev_2d3b74b0b34c42e28ccf42960da9c5e57b1a65c9d162892b23959fb5e1254dbd",
+    "mixedRuns": "ev_52ba8bd872eec1679f6ffad96ca69bb9d34b0934f59ff8aee6f4835ba3774b33",
+    "sdkjsSourceCommit": "72b0421c0bbf9d01eed9cf14834ae47eb2df1b50"
+  },
+  "limitations": [
+    "SmartArt preview is read-only and rasterized; node editing and layout regeneration are unavailable.",
+    "SmartArt cache text is not searchable in exported PDF.",
+    "Advanced spacing, baseline offsets, typography, font substitution and complex animations still have limitations.",
+    "Package preservation, rendering and editing capabilities are evaluated separately; screenshots are not pixel-equality assertions.",
+    "Word and spreadsheet engines were not replaced in this iteration.",
+    "No new native installers were validated or published."
+  ]
+}

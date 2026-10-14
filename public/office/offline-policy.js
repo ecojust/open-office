@@ -64,11 +64,13 @@
     ]);
   }
 
+  // Preserve imported Office OLE containers as opaque payloads. DOCX export is
+  // paired with src/office/docx-embedded.ts to repair the engine's package labels.
   function profileXml() {
     const items = disabledCommands.map(name => `<node oor:name="local_only_${name}" oor:op="replace"><prop oor:name="Command" oor:type="xs:string"><value>${name}</value></prop></node>`).join('');
     // These paths and property types are present in the pinned main.xcd. The
     // command configuration also hides commands in native menus/toolbars.
-    return `<?xml version="1.0" encoding="UTF-8"?><oor:items xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema"><item oor:path="/org.openoffice.Office.Commands/Execute/Disabled">${items}</item><item oor:path="/org.openoffice.Office.Update/Update"><prop oor:name="Enabled" oor:type="xs:boolean"><value>false</value></prop></item><item oor:path="/org.openoffice.Office.Common/Security/Scripting"><prop oor:name="DisableMacrosExecution" oor:type="xs:boolean"><value>true</value></prop><prop oor:name="BlockUntrustedRefererLinks" oor:type="xs:boolean"><value>true</value></prop></item></oor:items>`;
+    return `<?xml version="1.0" encoding="UTF-8"?><oor:items xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema"><item oor:path="/org.openoffice.Office.Commands/Execute/Disabled">${items}</item><item oor:path="/org.openoffice.Office.Update/Update"><prop oor:name="Enabled" oor:type="xs:boolean"><value>false</value></prop></item><item oor:path="/org.openoffice.Office.Common/Security/Scripting"><prop oor:name="DisableMacrosExecution" oor:type="xs:boolean"><value>true</value></prop><prop oor:name="BlockUntrustedRefererLinks" oor:type="xs:boolean"><value>true</value></prop></item><item oor:path="/org.openoffice.Office.Common/Filter/Microsoft/Import"><prop oor:name="WinWordToWriter" oor:type="xs:boolean"><value>false</value></prop><prop oor:name="ExcelToCalc" oor:type="xs:boolean"><value>false</value></prop><prop oor:name="PowerPointToImpress" oor:type="xs:boolean"><value>false</value></prop></item></oor:items>`;
   }
 
   // The input is trusted, bundled UI XML, never document XML. Preserve every

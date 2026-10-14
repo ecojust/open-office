@@ -11,6 +11,23 @@ const insert = (c, x = 10, y = 20, width = 30, height = 40) => {
 }
 const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a/wAAAABJRU5ErkJggg=='
 
+test('ungroup records the removed source coordinate space and undo restores it without mutating XML', () => {
+  const c = controller(), first = insert(c), second = insert(c, 50, 20, 30, 40)
+  const original = '<source-local-transform/>'
+  c.model.slides[0].objects[0].sourceXml = original
+  c.action({ type: 'arrange-objects', ids: [first, second], operation: 'group' })
+  const group = c.model.slides[0].objects[0]
+  c.action({ type: 'arrange-objects', ids: [group.id], operation: 'ungroup' })
+  assert.equal(c.model.slides[0].objects[0].sourceTransformDetached, true)
+  assert.equal(c.model.slides[0].objects[1].sourceTransformDetached, undefined)
+  assert.equal(c.model.slides[0].objects[0].sourceXml, original)
+  c.undo()
+  assert.equal(c.model.slides[0].objects[0].children[0].sourceTransformDetached, undefined)
+  c.redo()
+  assert.equal(c.model.slides[0].objects[0].sourceTransformDetached, true)
+  assert.equal(c.model.slides[0].objects[0].sourceXml, original)
+})
+
 test('a new presentation has a complete detached workbench state and no runtime dependency', () => {
   const c = controller(), state = c.state()
   assert.equal(state.documentId, 'model-test')
@@ -166,6 +183,43 @@ test('font sizes, geometry and colors remain distinct units and reject invalid n
     assert.throws(() => c.action({ type: 'update-object', id: objectId, ...patch }))
     assert.deepEqual(c.state(), before)
   }
+})
+
+test('ordinary paint opacity is independent, bounded, undoable, and rejects unsupported objects atomically', () => {
+  const c = controller(), objectId = insert(c), original = structuredClone(last(c))
+  c.action({ type: 'update-object', id: objectId, fillOpacity: .1234567, lineOpacity: 0 })
+  assert.equal(last(c).fillOpacity, .12346)
+  assert.equal(last(c).lineOpacity, 0)
+  assert.equal(last(c).opacity, undefined)
+  c.undo(); assert.deepEqual(last(c), original)
+  c.redo(); assert.equal(last(c).fillOpacity, .12346)
+  const before = c.state()
+  for (const field of ['fillOpacity', 'lineOpacity']) for (const value of [-.001, 1.001, NaN, Infinity, '0.5', null]) {
+    assert.throws(() => c.action({ type: 'update-object', id: objectId, x: 32, [field]: value }))
+    assert.deepEqual(c.state(), before)
+  }
+  c.action({ type: 'update-object', id: objectId, fillOpacity: 0, lineOpacity: 1 })
+  assert.equal(last(c).fillOpacity, 0); assert.equal(last(c).lineOpacity, 1)
+  c.action({ type: 'update-object', id: objectId, fillColor: null, lineColor: null })
+  for (const field of ['fillOpacity', 'lineOpacity']) assert.throws(() => c.action({ type: 'update-object', id: objectId, [field]: .5 }), /先选择/)
+  for (const type of ['table', 'image', 'chart', 'group']) {
+    const source = last(c); source.type = type; source.fillColor = '#112233'; source.lineColor = '#445566'
+    for (const field of ['fillOpacity', 'lineOpacity']) assert.throws(() => c.action({ type: 'update-object', id: objectId, [field]: .5 }), /普通实色/)
+  }
+})
+
+test('explicit same-color replacement records paint intent and survives a later separate opacity edit', () => {
+  const c = controller(), objectId = insert(c), source = last(c), originalFill = source.fillColor, originalLine = source.lineColor
+  source.sourceXml = '<source-theme-reference/>'
+  source.sourceFingerprint = JSON.stringify(source)
+  c.action({ type: 'update-object', id: objectId, fillColor: originalFill, lineColor: originalLine })
+  assert.equal(last(c).fillColorOverride, true); assert.equal(last(c).lineColorOverride, true)
+  c.action({ type: 'update-object', id: objectId, fillOpacity: .5, lineOpacity: .25 })
+  assert.equal(last(c).fillOpacity, .5); assert.equal(last(c).lineOpacity, .25)
+  c.undo(); c.undo()
+  assert.equal(last(c).fillColorOverride, undefined); assert.equal(last(c).lineColorOverride, undefined)
+  c.redo(); assert.equal(last(c).fillColorOverride, true)
+  assert.equal(last(c).sourceXml, '<source-theme-reference/>')
 })
 
 test('table grid edits can add and remove rows and columns as one atomic undoable operation', () => {

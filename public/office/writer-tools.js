@@ -3,8 +3,8 @@
 (function (scope) {
   const ACTIONS = ['insert-text', 'format-text', 'format-paragraph', 'apply-style', 'insert-table', 'update-table',
     'set-page', 'set-header-footer', 'insert-page-number', 'insert-break', 'find-replace', 'goto-outline',
-    'insert-comment', 'navigate-comment', 'delete-comment', 'set-track-changes', 'review-changes', 'insert-footnote', 'insert-toc', 'update-indexes'];
-  const TEXT_STYLE = ['fontName', 'fontSize', 'bold', 'italic', 'underline', 'color', 'highlight'];
+    'set-hyperlink', 'list', 'insert-comment', 'navigate-comment', 'delete-comment', 'set-track-changes', 'review-changes', 'insert-footnote', 'insert-toc', 'update-indexes'];
+  const TEXT_STYLE = ['fontName', 'fontSize', 'bold', 'italic', 'underline', 'color', 'highlight', 'strikethrough', 'baseline'];
   const PARAGRAPH = ['align', 'outlineLevel', 'leftIndent', 'rightIndent', 'firstLineIndent', 'spaceAbove', 'spaceBelow', 'lineSpacingPercent'];
   const PAGE = ['width', 'height', 'landscape', 'marginLeft', 'marginRight', 'marginTop', 'marginBottom'];
   const GUARDS = ['type', 'expectedRevision', 'expectedSelectionId'];
@@ -40,7 +40,7 @@
     if (!input || !ACTIONS.includes(input.type)) throw Error('不支持的文字编辑操作。');
     const fields = {
       'insert-text': ['text', 'replaceSelection'], 'format-text': TEXT_STYLE, 'format-paragraph': PARAGRAPH,
-      'apply-style': ['name'], 'insert-table': ['rows', 'columns', 'cells'], 'update-table': ['name', 'cells', 'expectedTableId', 'expectedCells', 'expectedCellSignatures'],
+      'set-hyperlink': ['url'], 'list': ['operation'], 'apply-style': ['name'], 'insert-table': ['rows', 'columns', 'cells'], 'update-table': ['name', 'cells', 'expectedTableId', 'expectedCells', 'expectedCellSignatures'],
       'set-page': PAGE, 'set-header-footer': ['target', 'enabled', 'text', 'confirmRemoval'], 'insert-page-number': ['target', 'align'],
       'insert-break': ['kind'], 'find-replace': ['search', 'replace', 'all', 'matchCase', 'wholeWords'],
       'goto-outline': ['id'], 'insert-comment': ['text', 'author'], 'set-track-changes': ['enabled', 'show'],
@@ -55,13 +55,23 @@
     if (input.type === 'navigate-comment' || input.type === 'delete-comment') number(input.index, 0, 99, '批注编号', true);
     if (input.type === 'review-changes') { choice(input.decision, ['accept', 'reject'], '审阅操作'); choice(input.scope, ['all', 'selection'], '审阅范围'); }
     if (input.type === 'apply-style' || input.type === 'update-table') text(input.name, 200, '名称', false);
+    if (input.type === 'list') choice(input.operation, ['bullet','number','remove','promote','demote','restart'], '列表操作');
     if (input.type === 'goto-outline') text(input.id, 80, '大纲编号', false);
     for (const key of ['replaceSelection', 'all', 'matchCase', 'wholeWords', 'enabled', 'show', 'endnote', 'landscape', 'confirmRemoval']) if (input[key] !== undefined) boolean(input[key], key);
+    if (input.type === 'set-hyperlink') {
+      text(input.url, 2048, '链接地址');
+      if (input.url) {
+        let parsed; try { parsed = new URL(input.url); } catch { throw Error('请输入有效的网页或邮件地址。'); }
+        if (!['https:', 'http:', 'mailto:'].includes(parsed.protocol) || /[\u0000-\u0020\u007f<>\\]/.test(input.url)
+          || (parsed.protocol === 'mailto:' ? !/^[^\s@]+@[^\s@]+$/.test(parsed.pathname) : !parsed.hostname || !/^https?:\/\//i.test(input.url))) throw Error('链接仅支持有效的 http、https 网页地址或 mailto 邮件地址。');
+      }
+    }
     if (input.type === 'format-text') {
       if (!TEXT_STYLE.some(key => input[key] !== undefined)) throw Error('请选择至少一项文字格式。');
       if (input.fontName !== undefined) text(input.fontName, 120, '字体', false);
       if (input.fontSize !== undefined) number(input.fontSize, 5, 300, '字号');
-      for (const key of ['bold', 'italic', 'underline']) if (input[key] !== undefined) boolean(input[key], key);
+      for (const key of ['bold', 'italic', 'underline', 'strikethrough']) if (input[key] !== undefined) boolean(input[key], key);
+      if (input.baseline !== undefined) choice(input.baseline, ['normal', 'superscript', 'subscript'], '上下标格式');
       if (input.color !== undefined) color(input.color);
       if (input.highlight !== undefined) color(input.highlight, true);
     }
@@ -119,6 +129,11 @@
     let currentModel = null, generation = 0, selectionSerial = 0, previousSelection = null, outlineTargets = new Map(), message = '';
     let styleCatalogKey = '', styleCatalog = [], metadata = null, metadataRevision = null;
     let tableIdentities = [], nextTableIdentity = 0, readSerial = 0, cellBaselines = new Map();
+    let listDisplayCache = null;
+    // Factory NumberingRules owns its native rule and may delete an unused
+    // rule when its proxy is collected. Keep owners until the native document
+    // closes; never evict an owner that can still participate in undo/redo.
+    let listRuleOwners = [];
     function recover(error) {
       if (error instanceof WebAssembly.RuntimeError) throw error;
       if (error instanceof Error) return;
@@ -133,7 +148,7 @@
     function env() {
       const model = getModel();
       if (!model || !model.supportsService('com.sun.star.text.TextDocument')) throw Error('请先打开文字文档。');
-      if (!same(model, currentModel)) { currentModel = model; generation++; selectionSerial = 0; previousSelection = null; outlineTargets = new Map(); message = ''; styleCatalogKey = ''; styleCatalog = []; metadata = null; metadataRevision = null; tableIdentities = []; nextTableIdentity = 0; readSerial = 0; cellBaselines = new Map(); }
+      if (!same(model, currentModel)) { currentModel = model; generation++; selectionSerial = 0; previousSelection = null; outlineTargets = new Map(); message = ''; styleCatalogKey = ''; styleCatalog = []; metadata = null; metadataRevision = null; tableIdentities = []; nextTableIdentity = 0; readSerial = 0; cellBaselines = new Map(); listRuleOwners = []; }
       const controller = model.getCurrentController(), view = controller.getViewCursor();
       if (!view) throw Error('请先在文档中选择编辑位置。');
       return { model, controller, view, text: view.getText() };
@@ -324,11 +339,14 @@
       return metadata;
     }
     function commandState(e = env()) {
-      const view = e.view, spacing = read(view, 'ParaLineSpacing');
-      return { selection: selection(e), textStyle: { fontName: String(read(view, 'CharFontNameAsian', read(view, 'CharFontName', ''))).slice(0, 120),
+      const view = e.view, spacing = read(view, 'ParaLineSpacing'), selected = selection(e);
+      return { selection: selected, list: listDisplay(e, selected), textStyle: { fontName: String(read(view, 'CharFontNameAsian', read(view, 'CharFontName', ''))).slice(0, 120),
         fontSize: Number(read(view, 'CharHeight', 12)), bold: Number(read(view, 'CharWeight', 100)) >= 150,
         italic: enumValue(read(view, 'CharPosture')) === enumValue(css.awt.FontSlant.ITALIC), underline: Number(read(view, 'CharUnderline', 0)) !== 0,
+        strikethrough: Number(read(view, 'CharStrikeout', 0)) !== 0,
+        baseline: Number(read(view, 'CharEscapement', 0)) > 0 ? 'superscript' : Number(read(view, 'CharEscapement', 0)) < 0 ? 'subscript' : 'normal',
         color: hex(read(view, 'CharColor')), highlight: read(view, 'CharBackTransparent', false) ? null : hex(read(view, 'CharBackColor'), null) },
+        hyperlink: { url: String(read(view, 'HyperLinkURL', '') || '').slice(0, 2048), mixed: optional(() => enumValue(view.getPropertyState('HyperLinkURL')) === 2, false) },
         paragraph: { styleName: String(read(view, 'ParaStyleName', '')).slice(0, 200), align: ({0:'left',1:'right',2:'justify',3:'center'})[enumValue(read(view, 'ParaAdjust', 0))] || 'left',
           outlineLevel: Number(read(view, 'OutlineLevel', 0)), leftIndent: Number(read(view, 'ParaLeftMargin', 0)) / 100,
           rightIndent: Number(read(view, 'ParaRightMargin', 0)) / 100, firstLineIndent: Number(read(view, 'ParaFirstLineIndent', 0)) / 100,
@@ -340,11 +358,218 @@
     function cursor(env, replace = true) {
       const range = env.text.createTextCursorByRange(env.view.getStart()); range.gotoRange(env.view.getEnd(), replace); return range;
     }
+    function listDisplay(e, selected) {
+      const revision = typeof getRevision === 'function' ? getRevision() : null;
+      const key = generation + ':' + revision + ':' + selected.id;
+      if (Number.isSafeInteger(revision) && listDisplayCache?.key === key) return listDisplayCache.value;
+      // Display is deliberately cheap: one current level, never a paragraph or
+      // all-level rule audit on each toolbar refresh. Writes recheck everything.
+      const value = optional(() => {
+        const states=['NumberingRules','NumberingLevel','NumberingIsNumber'].map(name=>enumValue(e.view.getPropertyState(name)));
+        if(states.some(value=>![0,1,2].includes(value)))return {kind:'other',level:null};
+        if(states.includes(2))return {kind:'mixed',level:null};
+        const rules=e.view.getPropertyValue('NumberingRules'),level=e.view.getPropertyValue('NumberingLevel');
+        if(rules===null||rules===undefined&&states[0]===1)return {kind:'none',level:null};
+        if(!Number.isInteger(level)||level<0||level>8)return {kind:'other',level:null};
+        const entry=rules.getByIndex(level).find(item=>item.Name==='NumberingType'),type=enumValue(entry?.Value);
+        return {kind:type===enumValue(css.style.NumberingType.ARABIC)?'number':type===enumValue(css.style.NumberingType.CHAR_SPECIAL)?'bullet':'other',level};
+      }, {kind:'other',level:null});
+      if(Number.isSafeInteger(revision))listDisplayCache={key,value};
+      return value;
+    }
+    function listProperty(object, name) {
+      if(!has(object,name)||typeof object.getPropertyState!=='function')throw Error('无法确认列表属性，请在画布中编辑。');
+      const state=enumValue(object.getPropertyState(name));
+      if(state!==0&&state!==1)throw Error('选区包含混合或未知列表属性，请缩小选区。');
+      return object.getPropertyValue(name);
+    }
+    function listNullableProperty(object, name) {
+      const value=listProperty(object,name);
+      // The bundled UNO bridge represents absent default interface properties
+      // as undefined (observed TextSection, TextTable and NumberingRules).
+      // Only this proven DEFAULT_VALUE case is normalized; missing properties,
+      // failed reads, unknown states and direct undefined values still refuse.
+      return value===undefined&&enumValue(object.getPropertyState(name))===1?null:value;
+    }
+    function ordinaryListRules(rules) {
+      const complex=()=>{throw Error('此列表包含复杂编号、章节规则或图片符号，请在画布中编辑；原列表已保留。')};
+      if(!rules||typeof rules.getCount!=='function'||typeof rules.getByIndex!=='function'||typeof rules.getPropertyValue!=='function')complex();
+      if(rules.getPropertyValue('NumberingIsOutline')!==false||rules.getPropertyValue('IsContinuousNumbering')!==false)complex();
+      const count=rules.getCount();if(!Number.isInteger(count)||count<1||count>10)complex();
+      const allowed=['Adjust','ParentNumbering','Prefix','Suffix','ListFormat','CharStyleName','StartWith','PositionAndSpaceMode','LabelFollowedBy','ListtabStopPosition','FirstLineIndent','IndentAt','NumberingType','BulletId','BulletChar','BulletFontName','BulletFont','LeftMargin','SymbolTextDistance','FirstLineOffset','BulletRelSize'];
+      let kind=null;
+      for(let level=0;level<count;level++){
+        const entries=rules.getByIndex(level);if(!Array.isArray(entries)||entries.length<5||entries.length>32)complex();
+        const values={};
+        for(const item of entries){if(!item||!allowed.includes(item.Name)||Object.prototype.hasOwnProperty.call(values,item.Name))complex();values[item.Name]=item.Value}
+        const type=enumValue(values.NumberingType),next=type===enumValue(css.style.NumberingType.ARABIC)?'number':type===enumValue(css.style.NumberingType.CHAR_SPECIAL)?'bullet':null;
+        // DOCX has nine levels; Writer adds its tenth default slot on import.
+        // It remains fully audited and untouched, but may be another basic type.
+        if(!next||kind&&kind!==next&&level<9||values.ParentNumbering!==1||values.Prefix!==''||!Number.isInteger(values.StartWith)||values.StartWith<1||values.StartWith>32767)complex();
+        if(level===0)kind=next;
+        if(next==='number'){
+          if(!['.',')',''].includes(values.Suffix)||values.ListFormat!==undefined&&values.ListFormat!=='%'+(level+1)+'%'+values.Suffix)complex();
+        }else{
+          // ODT reload represents an ordinary Unicode bullet using the current
+          // level placeholder (%1%, %2%, …), without a prefix or suffix.
+          const plain=values.Suffix===''&&['•','●','◦','▪','–','-'].includes(values.BulletChar)&&(values.ListFormat===undefined||values.ListFormat===''||values.ListFormat==='%'+(level+1)+'%');
+          // Native DOCX roundtrip of our Unicode dot: Symbol charset 10 maps
+          // U+F0B7 to • and exposes that glyph as suffix/list format as well.
+          const symbol=values.BulletChar==='\uF0B7'&&values.BulletFontName===''&&values.BulletFont?.Name==='Symbol'&&enumValue(values.BulletFont.CharSet)===10&&values.Suffix==='\uF0B7'&&values.ListFormat==='\uF0B7';
+          if(!plain&&!symbol)complex();
+        }
+      }
+      return {kind,count};
+    }
+    function listTargets(e) {
+      if(typeof e.model.isReadonly!=='function'||e.model.isReadonly()!==false)throw Error('文档为只读或状态未知，不能调整列表。');
+      if(!same(e.text,e.model.getText()))throw Error('列表侧栏目前只支持正文，请在画布中编辑表格、页眉或其他区域。');
+      const active=e.controller.getSelection();
+      if(!active||typeof active.getCount!=='function'||active.getCount()!==1||typeof active.getByIndex!=='function')throw Error('请只选择一个连续正文文字范围。');
+      const actual=active.getByIndex(0);
+      if(!actual||typeof actual.getText!=='function'||!same(actual.getText(),e.text)||e.text.compareRegionStarts(actual,e.view)!==0||e.text.compareRegionEnds(actual,e.view)!==0)throw Error('文字选区已改变，请重新定位后调整列表。');
+      const selected=selection(e);if(selected.truncated)throw Error('选区过大，请缩小后调整列表。');
+      const range=cursor(e),enumeration=range.createEnumeration(),targets=[],cache=new Map();let total=0;
+      while(enumeration.hasMoreElements()){
+        const paragraph=enumeration.nextElement();
+        if(!paragraph.supportsService('com.sun.star.text.Paragraph'))throw Error('选区跨越表格或复杂对象，请缩小为普通正文段落。');
+        // Writer enumerates the paragraph at an exclusive end boundary too.
+        if(!selected.collapsed&&e.text.compareRegionStarts(paragraph,e.view.getEnd())===0)continue;
+        if(targets.length>=100)throw Error('一次最多调整 100 个段落，请缩小选区。');
+        const value=paragraph.getString();if(typeof value!=='string'||value.length>20000||(total+=value.length)>64000)throw Error('段落文字过多，请缩小选区。');
+        if(listProperty(paragraph,'OutlineLevel')!==0||listNullableProperty(paragraph,'TextSection')!==null||listNullableProperty(paragraph,'TextTable')!==null)throw Error('标题、章节、分区或表格段落请在画布中调整列表。');
+        const rules=listNullableProperty(paragraph,'NumberingRules'),style=listProperty(paragraph,'NumberingStyleName'),level=listProperty(paragraph,'NumberingLevel'),id=listProperty(paragraph,'ListId'),counted=listProperty(paragraph,'NumberingIsNumber');
+        const restart=listProperty(paragraph,'ParaIsNumberingRestart'),start=listProperty(paragraph,'NumberingStartValue');
+        if(typeof style!=='string'||style.length>200||typeof id!=='string'||id.length>500||!Number.isInteger(level)||level<0||level>8||typeof counted!=='boolean'||typeof restart!=='boolean'||!Number.isInteger(start)||start< -1||start>32767)throw Error('列表状态不明确，请在画布中编辑。');
+        let info={kind:'none',count:0};
+        if(rules!==null){
+          if(!id||!counted)throw Error('此列表包含未计数条目，请在画布中编辑。');
+          const key=JSON.stringify([style,id]),cached=cache.get(key);
+          info=cached&&same(cached.rules,rules)?cached.info:ordinaryListRules(rules);cache.set(key,{rules,info});
+          if(level>=info.count)throw Error('列表层级超出规则范围，已保留原文档。');
+        }else if(style||id||counted||restart)throw Error('列表状态不明确，请在画布中编辑。');
+        targets.push({paragraph,rules,style,level,id,restart,start,...info});
+      }
+      if(!targets.length)throw Error('请在正文段落中定位或选择文字。');
+      const first=targets[0];
+      if(targets.some(item=>item.kind!==first.kind||item.id!==first.id||item.style!==first.style))throw Error('选区跨越不同列表或普通段落，请分别调整。');
+      const full=e.text.createTextCursorByRange(first.paragraph.getStart());full.gotoRange(targets.at(-1).paragraph.getEnd(),true);
+      return {targets,full,kind:first.kind};
+    }
+    function newListRules(e, kind, undo) {
+      // A fresh rule instance is only attached to proven unnumbered paragraphs.
+      // Never replace a level on an imported/shared NumberingRules object.
+      if(listRuleOwners.length>=512)throw Error('本次打开已创建 512 个列表，请保存并重新打开后继续创建；已有列表仍可编辑。');
+      if(typeof undo.lock!=='function'||typeof undo.unlock!=='function'||typeof undo.isLocked!=='function'||undo.isLocked()!==false)throw Error('列表撤销环境暂不可用，未修改正文。');
+      // Factory creation otherwise inserts a separate default-numbering undo
+      // record. Initializing that factory does not update its saved snapshot.
+      // Suppress only this internal setup; binding below remains undoable.
+      undo.lock();
+      try {
+      const rules=e.model.createInstance('com.sun.star.text.NumberingRules');
+      listRuleOwners.push(rules);
+      const count=rules.getCount();
+      if(!Number.isInteger(count)||count<1||count>10||typeof rules.replaceByIndex!=='function')throw Error('当前内核不支持创建普通列表。');
+      const seq=zetajs.type.sequence(zetajs.type.struct(css.beans.PropertyValue));
+      for(let level=0;level<count;level++){
+        const values=[['NumberingType',typed('short',kind==='bullet'?css.style.NumberingType.CHAR_SPECIAL:css.style.NumberingType.ARABIC)],['ParentNumbering',typed('short',1)],['Prefix',''],['Suffix',kind==='bullet'?'':'.'],['StartWith',typed('short',1)],['PositionAndSpaceMode',typed('short',1)],['LabelFollowedBy',typed('short',0)],['ListtabStopPosition',typed('long',(level+1)*635)],['FirstLineIndent',typed('long',-317)],['IndentAt',typed('long',(level+1)*635)]];
+        if(kind==='bullet')values.push(['BulletChar','•']);
+        rules.replaceByIndex(level,new zetajs.Any(seq,values.map(([Name,Value])=>new css.beans.PropertyValue({Name,Value}))));
+      }
+      return rules;
+      } finally { undo.unlock(); }
+    }
+    function editList(e, operation) {
+      const {targets,full,kind}=listTargets(e),create=operation==='bullet'||operation==='number';
+      if(create&&kind===operation||operation==='remove'&&kind==='none'){message='列表未改变。';return}
+      if(create&&kind!=='none')throw Error('请先取消现有列表，再创建另一种普通列表；现有编号规则已保留。');
+      if(!create&&kind==='none')throw Error('请先定位到一个普通列表条目。');
+      if(operation==='restart'&&kind!=='number')throw Error('只有普通数字编号可以从 1 重新开始。');
+      const delta=operation==='promote'?-1:operation==='demote'?1:0;
+      if(delta&&targets.some(item=>item.level+delta<0||item.level+delta>Math.min(8,item.count-1)))throw Error('列表已到达可用层级边界，本次没有修改。');
+      const property=create?'NumberingRules':operation==='remove'?'NumberingStyleName':delta?'NumberingLevel':'ParaIsNumberingRestart';
+      for(const item of targets){if(!has(item.paragraph,property))throw Error('此段落不支持列表操作。')}
+      if(delta&&(typeof dispatch!=='function'||typeof e.controller.select!=='function'))throw Error('当前内核不支持可撤销的层级调整。');
+      if(create&&(!has(full,'NumberingRules')||!has(full,'NumberingLevel')))throw Error('此选区不支持普通列表。');
+      const undo=e.model.getUndoManager();if(!undo||typeof undo.enterUndoContext!=='function'||typeof undo.leaveUndoContext!=='function')throw Error('列表撤销环境不可用，未修改内容。');
+      const rules=create?newListRules(e,operation,undo):null,originalSelection=delta?cursor(e):null;
+      if(delta)try{e.controller.select(full);if(e.text.compareRegionStarts(e.controller.getViewCursor(),full)!==0||e.text.compareRegionEnds(e.controller.getViewCursor(),full)!==0)throw Error('无法定位完整段落，本次没有修改。')}catch(error){e.controller.select(originalSelection);throw error}
+      let grouped=false;
+      try{
+        undo.enterUndoContext('调整列表');grouped=true;
+        if(create){full.setPropertyValue('NumberingRules',rules);full.setPropertyValue('NumberingLevel',typed('short',0))}
+        else if(operation==='remove')for(const item of targets)item.paragraph.setPropertyValue('NumberingStyleName','');
+        else if(delta){
+          // UNO NumberingLevel setters bypass SwUndoNumUpDown. These exact
+          // non-SubLevels slots use the native undoable list operation. Names
+          // refer to hierarchy rank: DecrementLevel demotes, Increment promotes.
+          dispatch(delta>0?'.uno:DecrementLevel':'.uno:IncrementLevel',[new css.beans.PropertyValue({Name:'SynchronMode',Value:true})]);
+          if(targets.some(item=>listProperty(item.paragraph,'NumberingLevel')!==item.level+delta))throw Error('列表层级未能完整调整，请在画布中检查当前列表。');
+        }
+        else {targets[0].paragraph.setPropertyValue('ParaIsNumberingRestart',true);targets[0].paragraph.setPropertyValue('NumberingStartValue',typed('short',1))}
+      }finally{try{if(grouped)undo.leaveUndoContext()}finally{if(originalSelection)e.controller.select(originalSelection)}}
+      listDisplayCache=null;message=operation==='restart'?'已从选区首段重新编号；后续条目按原列表规则继续。':'已调整 '+targets.length+' 个段落的列表。';
+    }
+    function editDecorationText(owner, previous, next) {
+      const refused = () => { throw Error('此改动跨越格式、字段、链接或复杂内容，已保留原页眉页脚。请在画布中编辑；侧栏只支持同一普通文字片段内的改字。'); };
+      if (typeof owner.createEnumeration !== 'function' || typeof owner.createTextCursorByRange !== 'function') refused();
+      const paragraphs=owner.createEnumeration(),pieces=[];let joined='',paragraphCount=0,portionCount=0;
+      while(paragraphs.hasMoreElements()) {
+        if(++paragraphCount>64)refused();
+        const paragraph=paragraphs.nextElement();
+        if(!paragraph.supportsService('com.sun.star.text.Paragraph'))refused();
+        if(paragraphCount>1){pieces.push({start:joined.length,end:joined.length+1,plain:false,text:'\n'});joined+='\n'}
+        const portions=paragraph.createEnumeration();let paragraphText='';
+        while(portions.hasMoreElements()) {
+          if(++portionCount>128)refused();
+          const portion=portions.nextElement(),value=portion.getString(),type=portion.getPropertyValue('TextPortionType');
+          if(typeof value!=='string'||typeof type!=='string')refused();
+          const link=type==='Text'?portion.getPropertyValue('HyperLinkURL'):null;
+          if(type==='Text'&&typeof link!=='string')refused();
+          const start=joined.length;joined+=value;paragraphText+=value;
+          if(joined.length>5000)refused();
+          pieces.push({start,end:joined.length,plain:type==='Text'&&link==='',text:value,portion});
+        }
+        if(paragraphText!==paragraph.getString())refused();
+      }
+      // Expanded field text is not assumed to have the same native cursor
+      // length. Only a proven plain run supplies a cursor and local offsets.
+      if(joined!==previous||owner.getString()!==previous)refused();
+      const before=Array.from(previous),after=Array.from(next);let left=0,tail=0;
+      while(left<before.length&&left<after.length&&before[left]===after[left])left++;
+      while(tail<before.length-left&&tail<after.length-left&&before[before.length-1-tail]===after[after.length-1-tail])tail++;
+      let start=before.slice(0,left).join('').length,end=previous.length-before.slice(before.length-tail).join('').length;
+      let replacement=after.slice(left,after.length-tail).join('');
+      if(/[\r\n\u000b\u000c\u0085\u2028\u2029]/.test(replacement))refused();
+      const insertion=start===end;
+      // Zero-width bookmarks/objects and either edge of a field/link are not
+      // guessed to belong to the neighboring plain run during insertion.
+      if(pieces.some(piece=>!piece.plain&&(piece.start===piece.end?piece.start>=start&&piece.start<=end:insertion&&piece.start<=start&&start<=piece.end)))refused();
+      const candidates=pieces.filter(piece=>piece.plain&&piece.start<=start&&end<=piece.end);
+      if(candidates.length!==1)refused();
+      const target=candidates[0];
+      if(insertion&&target.text){
+        // Include one existing character so native replacement inherits this
+        // run's formatting instead of ambiguous insertion-point formatting.
+        if(start<target.end){const seed=Array.from(previous.slice(start,target.end))[0];end+=seed.length;replacement+=seed}
+        else{const seed=Array.from(target.text).at(-1);start-=seed.length;replacement=seed+replacement}
+      }else if(insertion&&(pieces.length!==1||paragraphCount!==1))refused();
+      if(/[\r\n\u000b\u000c\u0085\u2028\u2029]/.test(previous.slice(start,end)))refused();
+      const selected=owner.createTextCursorByRange(target.portion.getStart()),offset=start-target.start;
+      if(offset){if(!selected.goRight(offset,true)||selected.getString()!==target.text.slice(0,offset))refused();selected.collapseToEnd()}
+      else if(selected.getString()!=='')refused();
+      if(end>start&&!selected.goRight(end-start,true))refused();
+      if(selected.getString()!==previous.slice(start,end))refused();
+      // The only mutation: fields, neighboring runs, paragraph properties and
+      // hyperlink objects are never reconstructed or assigned plain strings.
+      selected.setString(replacement);
+    }
     function action(input) {
       validateAction(input); const e = env();
       if (input.expectedSelectionId !== undefined && selection(e).id !== input.expectedSelectionId) throw Error('文档选区已改变，请在目标位置重新操作。');
       message = ''; metadata = null;
       switch (input.type) {
+        case 'list': { editList(e,input.operation); break; }
         case 'insert-text': { const range = cursor(e, input.replaceSelection !== false); e.text.insertString(range, input.text, input.replaceSelection !== false); range.collapseToEnd(); e.view.gotoRange(range, false); break; }
         case 'format-text': {
           const fields = [];
@@ -353,10 +578,18 @@
           if (input.bold !== undefined) for (const name of ['CharWeight','CharWeightAsian','CharWeightComplex']) fields.push([name, typed('float', input.bold ? 150 : 100)]);
           if (input.italic !== undefined) for (const name of ['CharPosture','CharPostureAsian','CharPostureComplex']) fields.push([name, input.italic ? css.awt.FontSlant.ITALIC : css.awt.FontSlant.NONE]);
           if (input.underline !== undefined) fields.push(['CharUnderline', typed('short', input.underline ? 1 : 0)]);
+          if (input.strikethrough !== undefined) fields.push(['CharStrikeout', typed('short', input.strikethrough ? 1 : 0)]);
+          // Native SvxEscapement uses ±14000 for automatic placement, not ±101.
+          if (input.baseline !== undefined) { fields.push(['CharEscapement', typed('short', input.baseline === 'superscript' ? 14000 : input.baseline === 'subscript' ? -14000 : 0)]); fields.push(['CharEscapementHeight', typed('byte', input.baseline === 'normal' ? 100 : 58)]); }
           if (input.color !== undefined) fields.push(['CharColor', rgb(input.color)]);
           if (input.highlight !== undefined) { fields.push(['CharBackColor', input.highlight === null ? -1 : rgb(input.highlight)]); if (has(e.view, 'CharBackTransparent')) fields.push(['CharBackTransparent', input.highlight === null]); }
           for (const [name] of fields) if (!has(e.view, name)) throw Error(`此选区不支持 ${name}。`);
-          for (const [name, value] of fields) set(e.view, name, value); break;
+          const undo = optional(() => e.model.getUndoManager());
+          const grouped = !!undo && typeof undo.enterUndoContext === 'function' && typeof undo.leaveUndoContext === 'function';
+          if (grouped) undo.enterUndoContext('文字格式');
+          try { for (const [name, value] of fields) set(e.view, name, value); }
+          finally { if (grouped) undo.leaveUndoContext(); }
+          break;
         }
         case 'format-paragraph': {
           const fields = [];
@@ -366,6 +599,53 @@
           if (input.lineSpacingPercent !== undefined) fields.push(['ParaLineSpacing', new css.style.LineSpacing({ Mode: css.style.LineSpacingMode.PROP, Height: input.lineSpacingPercent })]);
           for (const [name] of fields) if (!has(e.view, name)) throw Error(`此选区不支持 ${name}。`);
           for (const [name, value] of fields) set(e.view, name, value); break;
+        }
+        case 'set-hyperlink': {
+          const selected = selection(e);
+          if (selected.collapsed || selected.truncated || !selected.text) throw Error('请先在画布中选中要设置链接的文字，选区不能超过 20,000 字。');
+          const active = e.controller.getSelection();
+          if (!active || typeof active.getCount !== 'function' || active.getCount() !== 1 || typeof active.getByIndex !== 'function') throw Error('请选中单一文字范围，对象或多选不能设置链接。');
+          const range = active.getByIndex(0);
+          if (!range || typeof range.getText !== 'function' || !same(range.getText(), e.text)
+            || e.text.compareRegionStarts(range, e.view) !== 0 || e.text.compareRegionEnds(range, e.view) !== 0) throw Error('文字选区已改变，请重新选中目标文字。');
+          if (!has(e.view, 'HyperLinkURL')) throw Error('此选区不支持超链接。');
+          if (typeof dispatch !== 'function') throw Error('链接编辑操作尚未初始化。');
+          if (input.url) {
+            const property = name => {
+              if (!has(e.view, name) || ![0, 1].includes(enumValue(e.view.getPropertyState(name)))) throw Error('此选区的链接设置混合或无法完整读取，请在画布中分别编辑链接。');
+              const value = e.view.getPropertyValue(name);
+              if (value === undefined) throw Error('无法完整读取此链接，请在画布中编辑。');
+              return value;
+            };
+            const previousUrl = property('HyperLinkURL');
+            if (typeof previousUrl !== 'string') throw Error('无法确认当前链接，请在画布中编辑。');
+            if (previousUrl) {
+              const target = property('HyperLinkTarget'), name = property('HyperLinkName');
+              const visited = property('VisitedCharStyleName'), unvisited = property('UnvisitedCharStyleName');
+              const events = safeFormatValue(property('HyperLinkEvents'));
+              // The native container exposes unbound events as EventType=None,
+              // not just empty arrays. No Script/Macro or unknown fields pass.
+              const unassignedEvent = value => Array.isArray(value) && (value.length === 0 || (value.length === 1
+                && value[0]?.Name === 'EventType' && value[0]?.Value === 'None'
+                && Object.keys(value[0]).every(key => ['Name', 'Value', 'Handle', 'State'].includes(key))));
+              const noEvents = events === null || events?.emptyContainer === true || (Array.isArray(events?.namedValues) && events.namedValues.every(([, value]) => unassignedEvent(value)));
+              const basicStyle = (value, expected) => typeof value === 'string' && (!value || value === expected);
+              if (target !== '' || name !== '' || !basicStyle(visited, 'Visited Internet Link') || !basicStyle(unvisited, 'Internet link')
+                || !noEvents) throw Error('此链接包含目标窗口、名称、自定义样式或事件；请在画布中编辑，工作台只修改普通链接。');
+            }
+          }
+          const undo = optional(() => e.model.getUndoManager());
+          const grouped = !!undo && typeof undo.enterUndoContext === 'function' && typeof undo.leaveUndoContext === 'function';
+          if (grouped) undo.enterUndoContext(input.url ? '设置超链接' : '移除超链接');
+          try {
+            // Clearing or overwriting HyperLinkURL directly drops the previous
+            // attribute without a restorable native undo entry. First record
+            // its removal through the exact native slot, then apply the new
+            // address in the same undo context. Mixed links can only be removed.
+            dispatch('.uno:RemoveHyperlink', [new css.beans.PropertyValue({ Name: 'SynchronMode', Value: true })]);
+            if (input.url) set(e.view, 'HyperLinkURL', input.url);
+          } finally { if (grouped) undo.leaveUndoContext(); }
+          message = input.url ? '已为选中文字设置链接。' : '已移除链接，保留文字及手动设置的格式。'; break;
         }
         case 'apply-style': { const styles = e.model.getStyleFamilies().getByName('ParagraphStyles'); if (!styles.hasByName(input.name)) throw Error('段落样式不存在。'); set(e.view, 'ParaStyleName', input.name); break; }
         case 'insert-table': {
@@ -399,7 +679,9 @@
         }
         case 'set-header-footer': {
           const style = pageStyle(e).style, prefix = input.target === 'header' ? 'Header' : 'Footer';
-          const wasEnabled = !!read(style, `${prefix}IsOn`, false), existing = wasEnabled ? read(style, `${prefix}Text`) : null;
+          const wasEnabled = style.getPropertyValue(`${prefix}IsOn`);
+          if(typeof wasEnabled!=='boolean')throw Error('无法确认当前页眉页脚状态，未修改内容。');
+          const existing = wasEnabled ? style.getPropertyValue(`${prefix}Text`) : null;
           const previous = existing ? existing.getString() : '';
           // Writer removes the native content section on disable; this is not
           // a visibility toggle, and an apparently empty range can hold fields
@@ -408,7 +690,11 @@
           if (input.enabled && input.text !== undefined && previous.length > 5000) throw Error('此页眉页脚超过侧栏的 5000 字范围，请在文档内核中编辑，避免截断内容。');
           if (input.enabled !== wasEnabled) set(style, `${prefix}IsOn`, input.enabled);
           // An unchanged preview must not turn a real PAGE field into text.
-          if (input.enabled && input.text !== undefined && input.text !== previous) read(style, `${prefix}Text`).setString(input.text); break;
+          if (input.enabled && input.text !== undefined && input.text !== previous) {
+            if(wasEnabled)editDecorationText(existing,previous,input.text);
+            else style.getPropertyValue(`${prefix}Text`).setString(input.text);
+          }
+          break;
         }
         case 'insert-page-number': {
           let owner = e.text, range = cursor(e);
@@ -431,14 +717,30 @@
           if (input.replace !== undefined) descriptor.setReplaceString(input.replace);
           if (input.all) { const count = e.model.replaceAll(descriptor); message = `已替换 ${count} 处。`; }
           else {
-            const found = e.model.findNext(e.view.getEnd(), descriptor) || e.model.findFirst(descriptor);
+            // Replace the active native match first. Asking the engine to search
+            // from its start preserves whole-word/case semantics; comparing both
+            // range ends prevents replacing a merely overlapping substring.
+            let found = null;
+            if (input.replace !== undefined && !e.view.isCollapsed()) {
+              const candidate = e.model.findNext(e.view.getStart(), descriptor);
+              if (candidate && same(candidate.getText(), e.text) && e.text.compareRegionStarts(candidate, e.view) === 0 && e.text.compareRegionEnds(candidate, e.view) === 0) found = candidate;
+            }
+            if (!found) found = e.model.findNext(e.view.getEnd(), descriptor) || e.model.findFirst(descriptor);
             if (!found) message = '未找到匹配内容。';
             else {
-              if (input.replace !== undefined) found.setString(input.replace);
-              // XSelectionSupplier selects the complete native range in one
-              // operation, including ranges inside another table-cell XText.
+              // Verify selection before any text mutation. A selection failure
+              // must not report an error after already replacing the document.
+              // XSelectionSupplier also handles another table-cell XText.
               if (e.controller.select(found) !== true) throw Error('已找到内容，但无法选中此位置。请在画布中定位后再操作。');
-              message = input.replace === undefined ? '已选中匹配内容。' : '已替换一处。';
+              if (input.replace !== undefined) {
+                // An identical replacement must preserve native rich formatting.
+                if (found.getString() !== input.replace) found.setString(input.replace);
+                // Advance even when only case changes (or text stays identical),
+                // otherwise repeated Replace clicks get stuck on the same word.
+                const next = optional(() => e.model.findNext(found.getEnd(), descriptor) || e.model.findFirst(descriptor));
+                const selectedNext = next && optional(() => e.controller.select(next) === true, false);
+                message = selectedNext ? '已替换一处，并选中下一处匹配。' : '已替换一处。';
+              } else message = '已选中匹配内容。';
             }
           } break;
         }
@@ -578,6 +880,9 @@
       while (cellBaselines.size > 512) cellBaselines.delete(cellBaselines.keys().next().value);
       return { name: query.name, tableId, rows, columns, cells, cellSignatures };
     }
-    return Object.freeze({ state, action, command, applyTableSnapshot: input => applyTableSnapshot(input, true), data, validateAction, allowedTypes: new Set(ACTIONS) });
+    // Called only after native close succeeds. An unrelated failed-open model
+    // must not release the currently displayed document's rule owners.
+    function releaseDocument(model) { if(model===currentModel||same(model,currentModel))listRuleOwners=[]; }
+    return Object.freeze({ state, action, command, releaseDocument, applyTableSnapshot: input => applyTableSnapshot(input, true), data, validateAction, allowedTypes: new Set(ACTIONS) });
   };
 })(globalThis);

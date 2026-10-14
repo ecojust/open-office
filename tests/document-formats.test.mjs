@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { extensionOf, kindOf, defaultSaveExtension, isImportOnly, validateDocumentSignature } from '../src/shared/document.ts'
+import { extensionOf, kindOf, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFileName } from '../src/shared/document.ts'
 
 function ole(major=3) {
   const bytes=new Uint8Array(512),view=new DataView(bytes.buffer)
@@ -10,6 +10,13 @@ function ole(major=3) {
 }
 function zip(){const bytes=new Uint8Array(32);bytes.set([0x50,0x4b,0x03,0x04]);return bytes}
 const encode=value=>new TextEncoder().encode(value)
+
+test('chosen save names preserve meaningful dots and follow cross-platform native file limits',()=>{
+  assert.equal(saveFileName('季度报告.v2','docx'),'季度报告.v2.docx')
+  for(const value of ['', '../report', 'a/b', 'a\\b', 'a:b', 'a\x00b', 'a\x7fb', '.hidden', 'report.', 'report ', ' report', 'CON','nul.part','COM1','LPT9'])assert.throws(()=>saveFileName(value,'pdf'),undefined,value)
+  assert.equal(saveFileName('字'.repeat(78),'docx').length,83)
+  assert.throws(()=>saveFileName('字'.repeat(79),'docx'),/过长/)
+})
 
 test('old Office imports keep their family while the default save is a modern copy',()=>{
   for(const [source,kind,target] of [['doc','word','docx'],['rtf','word','docx'],['xls','sheet','xlsx'],['ppt','presentation','pptx']]){

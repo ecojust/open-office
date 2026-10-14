@@ -41,7 +41,8 @@ async function until(predicate) {
 async function editor(t, kind = 'presentation') {
   const workDocument = id => kind === 'presentation' ? document(id) : {...document(id),kind,extension:kind==='word'?'docx':'xlsx'}
   const props = { document: workDocument('A') }, events = [], clients = [], sessions = [], unmount = []
-  const queued = new Map(), calls = []
+  const queued = new Map(), calls = [], normalized = []
+  const normalizer = { normalizeDocxEmbeddedContainers(bytes) { normalized.push(bytes); const queue=queued.get("normalize"); if(queue?.length){const value=queue.shift(); if(value instanceof Error) throw value; return value} return {bytes,normalized:0} } }
   let exposed
   class BridgeDouble {
     constructor() { this.hostUrl = 'http://127.0.0.1/test/office/host.html'; clients.push(this) }
@@ -77,6 +78,7 @@ async function editor(t, kind = 'presentation') {
     defineProps: () => props, defineEmits: () => (...args) => events.push(args), defineExpose: value => { exposed = value },
     require(name) {
       if (name === 'vue') return { ...vue, onMounted() {}, onBeforeUnmount: callback => unmount.push(callback), watch() {} }
+      if (name === '../office/docx-embedded') return normalizer
       if (name === '../office/bridge') return { OfficeBridge: BridgeDouble }
       if (name === '../presentation/session') return { PresentationSession: SessionDouble }
       if (name === '../shared/document') return utilityModule.exports
@@ -88,7 +90,7 @@ async function editor(t, kind = 'presentation') {
   await exposed.loadDocument(props.document)
   t.after(() => { for (const callback of unmount) callback() })
   return {
-    state, exposed, props, sessions, events, calls, clients,
+    state, exposed, props, sessions, events, calls, clients, normalized,
     unmount(){for(const callback of unmount)callback()},
     enqueue(action, value) { if (!queued.has(action)) queued.set(action, []); queued.get(action).push(value) },
     count(action) { return calls.filter(call => call.action === action).length },
@@ -445,3 +447,8 @@ test('Writer command uses one RPC and rejects a response after the document chan
   await failed
   assert.equal(h.count('word-command'),1);assert.equal(h.events.length,events)
 })
+
+for (const [kind,extension,expected] of [['word','docx',1],['word','odt',0],['word','pdf',0],['sheet','xlsx',0],['presentation','pptx',0]]) test(`current export container normalization route ${kind}/${extension}`,async t=>{
+  const h=await editor(t,kind);h.enqueue('export',{...exportResult(),extension});h.enqueue('normalize',{bytes:Uint8Array.from([79,76,69]),normalized:1});const result=await h.exposed.exportFile({format:extension});assert.equal(h.normalized.length,expected);if(expected){assert.equal(Buffer.from(h.normalized[0]).toString(),'EXPORT');assert.equal(Buffer.from(result.base64,'base64').toString(),'OLE');assert.equal(h.props.document.base64,'U09VUkNF')}
+})
+test('Word container protection failure never marks export saved or changes source bytes',async t=>{const h=await editor(t,'word');h.enqueue('export',{...exportResult(),extension:'docx'});h.enqueue('normalize',Error('DOCX 附件保护'));await assert.rejects(h.exposed.exportFile(),/附件保护/);assert.equal(h.state.savedExport,null);assert.equal(h.props.document.base64,'U09VUkNF');assert.equal(h.count('mark-saved'),0)})

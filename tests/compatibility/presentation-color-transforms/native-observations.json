@@ -1,0 +1,292 @@
+{
+  "screenshotSha256": "b85a14195a1e27b498d34e601b57a8068c15eba41ec1f9da294b911c840c8a70",
+  "slidePixelBounds": [
+    329,
+    164,
+    780,
+    439
+  ],
+  "samples": [
+    {
+      "id": "base",
+      "pixel": [
+        428,
+        231
+      ],
+      "rgb": [
+        51,
+        102,
+        153
+      ],
+      "hex": "#336699",
+      "uniform7x7": true
+    },
+    {
+      "id": "tint-0",
+      "pixel": [
+        571,
+        231
+      ],
+      "rgb": [
+        255,
+        255,
+        255
+      ],
+      "hex": "#FFFFFF",
+      "uniform7x7": true
+    },
+    {
+      "id": "tint-25",
+      "pixel": [
+        714,
+        231
+      ],
+      "rgb": [
+        226,
+        229,
+        235
+      ],
+      "hex": "#E2E5EB",
+      "uniform7x7": true
+    },
+    {
+      "id": "tint-50",
+      "pixel": [
+        856,
+        231
+      ],
+      "rgb": [
+        190,
+        198,
+        212
+      ],
+      "hex": "#BEC6D4",
+      "uniform7x7": true
+    },
+    {
+      "id": "tint-100",
+      "pixel": [
+        999,
+        231
+      ],
+      "rgb": [
+        51,
+        102,
+        153
+      ],
+      "hex": "#336699",
+      "uniform7x7": true
+    },
+    {
+      "id": "shade-50",
+      "pixel": [
+        428,
+        328
+      ],
+      "rgb": [
+        35,
+        73,
+        111
+      ],
+      "hex": "#23496F",
+      "uniform7x7": true
+    },
+    {
+      "id": "lum-mod-50",
+      "pixel": [
+        571,
+        328
+      ],
+      "rgb": [
+        25,
+        51,
+        77
+      ],
+      "hex": "#19334D",
+      "uniform7x7": true
+    },
+    {
+      "id": "lum-off-20",
+      "pixel": [
+        714,
+        328
+      ],
+      "rgb": [
+        102,
+        153,
+        204
+      ],
+      "hex": "#6699CC",
+      "uniform7x7": true
+    },
+    {
+      "id": "lum-mod-off",
+      "pixel": [
+        856,
+        328
+      ],
+      "rgb": [
+        51,
+        102,
+        153
+      ],
+      "hex": "#336699",
+      "uniform7x7": true
+    },
+    {
+      "id": "lum-off-mod",
+      "pixel": [
+        999,
+        328
+      ],
+      "rgb": [
+        38,
+        76,
+        115
+      ],
+      "hex": "#264C73",
+      "uniform7x7": true
+    },
+    {
+      "id": "green-tint-50",
+      "pixel": [
+        428,
+        424
+      ],
+      "rgb": [
+        188,
+        255,
+        188
+      ],
+      "hex": "#BCFFBC",
+      "uniform7x7": true
+    },
+    {
+      "id": "green-shade-50",
+      "pixel": [
+        571,
+        424
+      ],
+      "rgb": [
+        0,
+        188,
+        0
+      ],
+      "hex": "#00BC00",
+      "uniform7x7": true
+    },
+    {
+      "id": "scrgb-50",
+      "pixel": [
+        714,
+        424
+      ],
+      "rgb": [
+        187,
+        187,
+        187
+      ],
+      "hex": "#BBBBBB",
+      "uniform7x7": true
+    },
+    {
+      "id": "scrgb-percent",
+      "pixel": [
+        856,
+        424
+      ],
+      "rgb": [
+        1,
+        1,
+        1
+      ],
+      "hex": "#010101",
+      "uniform7x7": true
+    },
+    {
+      "id": "srgb-equivalent",
+      "pixel": [
+        999,
+        424
+      ],
+      "rgb": [
+        188,
+        188,
+        188
+      ],
+      "hex": "#BCBCBC",
+      "uniform7x7": true
+    },
+    {
+      "id": "tint-percent",
+      "pixel": [
+        428,
+        521
+      ],
+      "rgb": [
+        255,
+        255,
+        255
+      ],
+      "hex": "#FFFFFF",
+      "uniform7x7": true
+    },
+    {
+      "id": "tint-shade",
+      "pixel": [
+        571,
+        521
+      ],
+      "rgb": [
+        139,
+        145,
+        155
+      ],
+      "hex": "#8B919B",
+      "uniform7x7": true
+    },
+    {
+      "id": "shade-tint",
+      "pixel": [
+        714,
+        521
+      ],
+      "rgb": [
+        189,
+        193,
+        200
+      ],
+      "hex": "#BDC1C8",
+      "uniform7x7": true
+    },
+    {
+      "id": "system-tint",
+      "pixel": [
+        856,
+        521
+      ],
+      "rgb": [
+        188,
+        188,
+        188
+      ],
+      "hex": "#BCBCBC",
+      "uniform7x7": true
+    },
+    {
+      "id": "alpha-chain",
+      "pixel": [
+        999,
+        521
+      ],
+      "rgb": [
+        91,
+        132,
+        173
+      ],
+      "hex": "#5B84AD",
+      "uniform7x7": true
+    }
+  ],
+  "scope": "Center samples of flat native-rendered swatches, not whole-slide pixel parity"
+}

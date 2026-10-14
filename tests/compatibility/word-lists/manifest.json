@@ -1,0 +1,79 @@
+{
+  "name": "independent-lists.docx",
+  "sha256": "32e7d56b7afd9603f26270f503116007aefa0718e8ea277d8d4c15b481bf2896",
+  "paragraphs": [
+    {
+      "name": "PlainTarget",
+      "numId": null,
+      "level": 0,
+      "rich": true
+    },
+    {
+      "name": "AFirst",
+      "numId": 1,
+      "level": 0,
+      "rich": false
+    },
+    {
+      "name": "ATarget",
+      "numId": 1,
+      "level": 0,
+      "rich": true
+    },
+    {
+      "name": "AChild",
+      "numId": 1,
+      "level": 1,
+      "rich": false
+    },
+    {
+      "name": "Separator",
+      "numId": null,
+      "level": 0,
+      "rich": false
+    },
+    {
+      "name": "BFirst",
+      "numId": 2,
+      "level": 0,
+      "rich": false
+    },
+    {
+      "name": "BSecond",
+      "numId": 2,
+      "level": 0,
+      "rich": false
+    },
+    {
+      "name": "BulletFirst",
+      "numId": 3,
+      "level": 0,
+      "rich": false
+    },
+    {
+      "name": "BulletSecond",
+      "numId": 3,
+      "level": 0,
+      "rich": false
+    },
+    {
+      "name": "AContinued",
+      "numId": 1,
+      "level": 0,
+      "rich": false
+    },
+    {
+      "name": "PlainSentinel",
+      "numId": null,
+      "level": 0,
+      "rich": false
+    }
+  ],
+  "invariants": [
+    "All paragraphs retain body text and character properties",
+    "LinkKeep retains external hyperlink target",
+    "Two PAGE fields remain fields",
+    "A/B lists share abstractNum 10 in input but have independent numIds 1 and 2",
+    "PlainSentinel remains unlisted"
+  ]
+}

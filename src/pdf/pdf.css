@@ -149,7 +149,7 @@
 .pdf-panel-heading .pdf-icon-button { flex: none; }
 
 .pdf-sidebar-tabs { display: flex; gap: 3px; padding: 8px 8px 0; }
-.pdf-sidebar-tabs button { flex: 1; min-width: 0; min-height: 32px; padding: 5px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--pdf-muted); font-size: 12px; }
+.pdf-sidebar-tabs button { flex: 1; min-width: 0; min-height: 32px; padding: 5px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--pdf-muted); font-size: 12px; white-space: nowrap; }
 .pdf-sidebar-tabs button:hover { background: var(--pdf-surface); }
 .pdf-sidebar-tabs button.active { border-color: var(--pdf-line); background: var(--pdf-surface); color: var(--pdf-accent); }
 .pdf-sidebar-tabs small { margin-left: 4px; font-size: 11px; }
@@ -173,6 +173,19 @@
 .pdf-outline-list > button span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .pdf-outline-list > button small { flex: none; color: var(--pdf-muted); font-size: 11px; }
 .pdf-outline-empty { margin: 10px 12px; color: var(--pdf-muted); font-size: 12px; line-height: 1.8; }
+.pdf-annotation-list { min-height: 0; overflow: auto; padding-bottom: 12px; }
+.pdf-annotation-list > button { display: flex; flex-direction: column; gap: 5px; width: 100%; padding: 12px; border: 0; border-bottom: 1px solid var(--pdf-line); background: transparent; text-align: left; font-size: 12px; }
+.pdf-annotation-list > button:hover:not(:disabled), .pdf-annotation-list > button.selected { background: var(--pdf-soft); }
+.pdf-annotation-list span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; }
+.pdf-annotation-list small { color: var(--pdf-muted); overflow-wrap: anywhere; }
+.pdf-annotation-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.pdf-annotation-overlay button { position: absolute; min-width: 4px; min-height: 4px; padding: 0; background: transparent; border: 1px dashed #b5821670; pointer-events: auto; }
+.pdf-annotation-overlay button:hover, .pdf-annotation-overlay button.chosen { outline: 2px solid #bf8720; background: #e5b64325; }
+.pdf-form-overlay button { border-color: #4473ac88; background: #537ead0c; }
+.pdf-form-overlay button:hover, .pdf-form-overlay button.chosen { outline-color: #4473ac; background: #537ead20; }
+.pdf-form-name { overflow-wrap: anywhere; font-size: 13px; font-weight: 600; }
+.pdf-form-checkbox { display: flex; align-items: center; gap: 9px; min-height: 36px; font-size: 13px; }
+.pdf-form-checkbox input { width: 17px; height: 17px; accent-color: var(--pdf-accent); }
 
 /* The paper and annotation colors belong to the document, not the UI theme. */
 .pdf-stage { position: relative; display: block; flex: 1; min-width: 0; min-height: 0; padding: 24px; overflow: auto; overscroll-behavior: contain; background: #eef0f3; scrollbar-width: thin; }
@@ -272,6 +285,9 @@
 @media (max-width: 760px) {
   .pdf-workspace { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
   .pdf-pages-panel { grid-column: 1; grid-row: 1; width: 124px; }
+  .pdf-sidebar-tabs { padding-inline: 4px; gap: 1px; }
+  .pdf-sidebar-tabs button { padding-inline: 3px; }
+  .pdf-sidebar-tabs small { display: none; }
   .pdf-stage { grid-column: 2; grid-row: 1; padding: 16px; }
   .pdf-properties { grid-column: 1 / -1; grid-row: 2; max-height: min(34vh, 250px); gap: 10px; padding: 0 14px 14px; border-top: 1px solid var(--pdf-line); border-left: 0; }
   .pdf-properties .pdf-panel-heading { position: sticky; z-index: 1; top: 0; padding-top: 6px; padding-bottom: 4px; background: var(--pdf-surface); }

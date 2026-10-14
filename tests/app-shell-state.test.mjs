@@ -14,13 +14,13 @@ import { reviewOfficeImport } from '../src/office/import-review.ts'
 const app = (await readFile(new URL('../src/App.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
 const utilities = await readFile(new URL('../src/shared/document.ts', import.meta.url), 'utf8')
 const dialogFocus = await readFile(new URL('../src/shared/dialog-focus.ts', import.meta.url), 'utf8')
-const names = 'tabs,activeKey,active,home,tabBar,helpDialog,closeDialog,officeDocument,pdfDocument,presentationDocument,officeEditor,pdfEditor,presentationEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,browserFile,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest'
+const names = 'tabs,activeKey,active,home,tabBar,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,officeDocument,pdfDocument,presentationDocument,officeEditor,pdfEditor,presentationEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,browserFile,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest'
 
 function compile(source, require, extra = {}) {
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
   const module = { exports: {} }
   vm.runInNewContext(output, { module, exports: module.exports, require, console, URL, setTimeout, clearTimeout,
-    crypto: { randomUUID }, btoa, atob, __BUILD_VERSION__: 'test', HTMLElement: class {}, document: { baseURI: 'http://127.0.0.1/' }, ...extra })
+    crypto: { randomUUID }, btoa, atob, TextEncoder, __BUILD_VERSION__: 'test', __APP_VERSION__: 'test', HTMLElement: class {}, document: { baseURI: 'http://127.0.0.1/' }, ...extra })
   return module.exports
 }
 
@@ -104,6 +104,71 @@ function shell({nativeEnabled = true, smoke = false} = {}) {
   }
 }
 
+test('save-as exposes supported formats, preserves cancelled drafts and saves a named converted copy', async () => {
+  const h=shell(), a=h.tab('report',{dirty:true});h.active(a)
+  h.handle.exportFile=async({format})=>({base64:'TkVX',extension:format,dirty:true})
+  h.state.openSaveAs()
+  assert.deepEqual(Array.from(h.state.saveAsOptions.value,option=>option.extension),['docx','odt','pdf'])
+  h.state.saveAsDraft.value.name='Renamed project.v2'
+  h.state.saveAsDraft.value.format='odt'
+  assert.equal(h.state.saveAsCopy.value,true)
+  h.native.saveDocument=async request=>{h.calls.push(['cancelled-save',request]);return{status:'cancelled'}}
+  await h.state.confirmSaveAs()
+  assert.equal(h.state.saveAsDraft.value.name,'Renamed project.v2')
+  assert.equal(a.dirty,true);assert.equal(a.fileId,'report');assert.equal(a.document.extension,'docx')
+  assert.equal(h.calls.find(c=>c[0]==='cancelled-save')[1].name,'Renamed project.v2.odt')
+  h.native.saveDocument=async request=>{h.calls.push(['copy-save',request]);return{status:'saved',document:{id:'copy',extension:'odt',name:request.name,kind:'word'}}}
+  await h.state.confirmSaveAs()
+  assert.equal(h.state.saveAsDraft.value,null)
+  assert.equal(a.dirty,true);assert.equal(a.fileId,'report');assert.equal(a.document.extension,'docx')
+  assert.ok(!h.calls.some(c=>c[0]==='marked'))
+  assert.equal(h.calls.find(c=>c[0]==='copy-save')[1].documentId,undefined)
+})
+
+test('save-as rejects invalid names and stale targets before export; same-format success marks the saved document',async()=>{
+  const h=shell(),a=h.tab('a',{dirty:true}),b=h.tab('b');h.active(a)
+  let exports=0
+  h.handle.exportFile=async({format})=>{exports++;return{base64:'TkVX',extension:format,dirty:true}}
+  h.state.openSaveAs();h.state.saveAsDraft.value.name='../file'
+  await h.state.confirmSaveAs();assert.equal(exports,0);assert.match(h.state.saveAsDraft.value.error,/文件名/)
+  h.state.saveAsDraft.value.name='Safe';h.active(b)
+  await h.state.confirmSaveAs();assert.equal(exports,0);assert.match(h.state.saveAsDraft.value.error,/切换/)
+  h.state.cancelSaveAs();h.active(a);h.state.openSaveAs();h.state.saveAsDraft.value.name='Renamed'
+  await h.state.confirmSaveAs()
+  assert.equal(exports,1);assert.equal(h.state.saveAsDraft.value,null);assert.equal(a.dirty,false)
+  assert.equal(a.document.name,'Renamed.docx');assert.ok(h.calls.some(c=>c[0]==='marked'))
+  h.handle.exportFile=async()=>({base64:'TkVX',extension:'docx',name:'a.docx',dirty:true})
+  await h.state.saveActive()
+  assert.equal(h.calls.filter(c=>c[0]==='save').at(-1)[1].name,'Renamed.docx','Later exports retain the chosen filename instead of the stale editor import name')
+})
+
+test('save-as preserves its form and dirty state after a native conflict or export format mismatch',async()=>{
+  const h=shell(),a=h.tab('a',{dirty:true});h.active(a)
+  h.state.openSaveAs()
+  h.handle.exportFile=async()=>({base64:'TkVX',extension:'pdf',dirty:true})
+  await h.state.confirmSaveAs()
+  assert.match(h.state.saveAsDraft.value.error,/格式.*不一致/);assert.equal(a.dirty,true)
+  assert.ok(!h.calls.some(c=>c[0]==='save'))
+  h.handle.exportFile=async()=>({base64:'TkVX',extension:'docx',dirty:true})
+  h.native.saveDocument=async()=>({status:'conflict',message:'File changed'})
+  await h.state.confirmSaveAs()
+  assert.match(h.state.saveAsDraft.value.error,/File changed/);assert.equal(a.dirty,true)
+})
+
+test('save-as format choices match the active engine and preserve legacy source-copy behavior',async()=>{
+  for(const [kind,expected]of [['sheet',['xlsx','ods','pdf']],['presentation',['pptx','pdf']],['pdf',['pdf']]]){
+    const h=shell(),a=h.tab(kind,{kind});h.active(a);h.state.openSaveAs()
+    assert.deepEqual(Array.from(h.state.saveAsOptions.value,o=>o.extension),expected)
+    h.state.cancelSaveAs();assert.equal(h.state.saveAsDraft.value,null)
+  }
+  const h=shell(),a=h.tab('legacy',{dirty:true});a.document.extension='doc';a.document.name='Original.doc';h.active(a)
+  h.state.openSaveAs();assert.equal(h.state.saveAsDraft.value.name,'Original - 副本')
+  assert.equal(h.state.saveAsDraft.value.format,'docx');assert.equal(h.state.saveAsCopy.value,false)
+  await h.state.confirmSaveAs()
+  const saved=h.calls.find(c=>c[0]==='save')[1];assert.equal(saved.documentId,undefined)
+  assert.equal(saved.name,'Original - 副本.docx');assert.equal(a.document.extension,'docx')
+})
+
 test('tab overflow follows the active tab and disconnects its observer on unmount', async () => {
   const h = shell({nativeEnabled:false})
   let bounds = { left: 260, right: 360 }
@@ -180,11 +245,12 @@ function riskyWorkbook() {
   return zipSync(Object.fromEntries(Object.entries(entries).map(([name,xml])=>[name,strToU8(xml)])))
 }
 
-function attachedWordDocument() {
-  const w='http://schemas.openxmlformats.org/wordprocessingml/2006/main',r='http://schemas.openxmlformats.org/officeDocument/2006/relationships',pr='http://schemas.openxmlformats.org/package/2006/relationships'
+function attachedWordDocument(mode='legacy') {
+  const w=mode==='strict'?'http://purl.oclc.org/ooxml/wordprocessingml/main':'http://schemas.openxmlformats.org/wordprocessingml/2006/main',r=mode==='strict'?'http://purl.oclc.org/ooxml/officeDocument/relationships':'http://schemas.openxmlformats.org/officeDocument/2006/relationships',pr='http://schemas.openxmlformats.org/package/2006/relationships'
+  const object=mode==='legacy'?'<o:OLEObject Type="Embed" r:id="file"/>':'<w:objectEmbed r:id="file" drawAspect="icon" progId="Word.Document.12" shapeId="10" fieldCodes=""/>'
   const entries={
     '_rels/.rels':`<Relationships xmlns="${pr}"><Relationship Id="main" Type="${r}/officeDocument" Target="word/document.xml"/></Relationships>`,
-    'word/document.xml':`<w:document xmlns:w="${w}" xmlns:r="${r}" xmlns:o="urn:schemas-microsoft-com:office:office"><w:body><w:p><w:r><w:object><o:OLEObject Type="Embed" r:id="file"/></w:object></w:r></w:p></w:body></w:document>`,
+    'word/document.xml':`<w:document xmlns:w="${w}" xmlns:r="${r}" xmlns:o="urn:schemas-microsoft-com:office:office"><w:body><w:p><w:r><w:object>${object}</w:object></w:r></w:p></w:body></w:document>`,
     'word/_rels/document.xml.rels':`<Relationships xmlns="${pr}"><Relationship Id="file" Type="${r}/oleObject" Target="embeddings/item.bin"/></Relationships>`,
     'word/embeddings/item.bin':'Original embedded attachment',
   }
@@ -394,8 +460,8 @@ test('the browser import path applies the same XLSX warning and source-copy safe
   assert.match(a.importWarnings[0],/ISFORMULA/);assert.match(a.importWarnings[1],/veryHidden/)
 })
 
-test('DOCX embedded attachment warning survives snapshots and cancelled saving until a new copy succeeds',async()=>{
-  const h=shell(),bytes=attachedWordDocument()
+for(const mode of ['legacy','transitional','strict'])test(`DOCX ${mode} embedded attachment warning survives snapshots and cancelled saving until a new copy succeeds`,async()=>{
+  const h=shell(),bytes=attachedWordDocument(mode)
   await h.state.addDocument({id:'word-source',kind:'word',extension:'docx',name:'Attachments.docx',base64:Buffer.from(bytes).toString('base64'),sha256:'source-hash',sizeBytes:bytes.length},'word-source')
   const a=h.state.tabs.value[0];a.ready=true;a.dirty=true
   assert.equal(h.reviews.length,1);assert.equal(a.requiresSaveAs,true);assert.match(a.importWarnings[0],/嵌入附件/)
@@ -409,6 +475,7 @@ test('DOCX embedded attachment warning survives snapshots and cancelled saving u
   const request=h.calls.find(call=>call[0]==='save')[1]
   assert.equal(request.saveAs,true);assert.equal(request.documentId,undefined);assert.equal(request.name,'Attachments - 副本.docx')
   assert.notEqual(a.fileId,'word-source');assert.equal(a.importWarnings.length,0);assert.equal(a.requiresSaveAs,false)
+  h.unmount()
 })
 
 test('reopening an already-open file retains its in-memory edits', async () => {

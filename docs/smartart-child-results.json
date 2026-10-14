@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "completedAt": "2026-10-14T01:35:21.194750+00:00",
+  "scope": "Fifth iteration: safe child text editing when SmartArt layout ownership points to a provable direct parent",
+  "checks": {
+    "positiveScenarios": 5,
+    "editReopenCycles": 15,
+    "invalidRelationScenarios": 15,
+    "existingSmartArtFixtures": 3,
+    "existingSmartArtEditCycles": 9,
+    "existingAdversarialCases": 21,
+    "productionUiChecks": 4,
+    "nativeOpenChecks": 3,
+    "nodeTests": 466,
+    "pythonPdfTests": 28,
+    "typecheck": "passed",
+    "productionBuild": "passed"
+  },
+  "reports": [
+    {
+      "path": "test-results/smartart-child-text/report.json",
+      "sha256": "9aebc4e4a91c40a94fc733a52b4d3ed66d44962328c7204413a409dde8b73721"
+    },
+    {
+      "path": "test-results/smartart-child-text/native-inputs.json",
+      "sha256": "d8ee646af73c19842b6fb8cc6d219125786779485262da1c7b987dfffb05879c"
+    },
+    {
+      "path": "test-results/smartart-child-regression/report.json",
+      "sha256": "5c869b8a22affec832fd7e2302b5d51f0d811d435b0fccc9ba28822f2dba00c3"
+    },
+    {
+      "path": "test-results/smartart-child-production/report.json",
+      "sha256": "f3fcf8934811a8474bce058958e009d0a069bf149f67277b6fcd0dd6fd4d6e1a"
+    },
+    {
+      "path": "test-results/smartart-child-native/report.json",
+      "sha256": "81ddea0ff0bd54f74b166b1fb95f00472f98fb22cda89e7f7b2a1335e63dd607"
+    }
+  ],
+  "logs": [
+    {
+      "path": "/tmp/open-office-smartart-child-tests.log",
+      "sha256": "5dae005654ea96d64d1b620b33bac2cce6c358622541cf2468c550bf9102986a"
+    },
+    {
+      "path": "/tmp/open-office-smartart-child-build.log",
+      "sha256": "b4e61562ea6113e5d194af426fbc1a0bf199437e2770b03cb42550ccf6a1f9d5"
+    }
+  ],
+  "research": {
+    "tool": "rea-agents@6.4.0",
+    "sdkjsCommit": "72b0421c0bbf9d01eed9cf14834ae47eb2df1b50",
+    "evidenceId": "ev_10dcfe55650c8db0c8b4564a920ca9761cbb6ceac719cb3b78dc180f3925e457",
+    "files": 3,
+    "functions": 7,
+    "astNodes": 1222,
+    "parseFailures": 0
+  },
+  "implementationFingerprints": [
+    {
+      "path": "src/presentation/core/smartart-text.ts",
+      "sha256": "45f72c0fe4594cde09e53f258319b91f917ba3339e11d8f4b982054a44759ca3"
+    },
+    {
+      "path": "tests/browser/smartart-child-text.cjs",
+      "sha256": "4fc72db34e23b22d48fd8c4687d425839a7c274d1ff6e9de35edf921757bf40d"
+    },
+    {
+      "path": "tests/browser/smartart-text.cjs",
+      "sha256": "12730ea253e373c4288164c4f7a8e97c57415f43a0e818e2888a5804eeaf52ca"
+    },
+    {
+      "path": "tests/browser/smartart-production.cjs",
+      "sha256": "9bf48222f53d9fd4ecc5a5f73b410205af3c490fa53fceca2b30f30e72dad03e"
+    }
+  ],
+  "limitations": [
+    "The parent-chain check applies only to newly allowed parent-layout associations, not general validation of every SmartArt graph.",
+    "No node insertion/deletion, layout recomputation, full formatting editor or pixel-fidelity claim.",
+    "Shared or unsupported nodes remain protected.",
+    "Word/spreadsheet engine replacement and macOS/Windows package validation are not included."
+  ]
+}

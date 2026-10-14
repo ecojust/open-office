@@ -1,0 +1,283 @@
+{
+  "scope": "Independent paints and opaque text; text-alpha is an explicit unsupported control; chain behavior may differ from reference",
+  "items": [
+    {
+      "id": "independent-alpha",
+      "path": "independent-alpha.pptx",
+      "sha256": "4d849cd2ed9d515845a40f95ead7d80588fb1705983b862624a7a6edeccbc84f",
+      "expected": {
+        "slides": 1
+      },
+      "slideMm": [
+        338.6666666667,
+        190.5
+      ],
+      "objects": [
+        {
+          "id": "fill-half",
+          "preset": "rect",
+          "boxMm": [
+            15,
+            12,
+            88,
+            32
+          ],
+          "fillModifiers": [
+            [
+              "alpha",
+              "50000"
+            ]
+          ],
+          "lineModifiers": [],
+          "textModifiers": [],
+          "theme": false
+        },
+        {
+          "id": "fill-zero",
+          "preset": "rect",
+          "boxMm": [
+            120,
+            12,
+            88,
+            32
+          ],
+          "fillModifiers": [
+            [
+              "alpha",
+              "0"
+            ]
+          ],
+          "lineModifiers": [],
+          "textModifiers": [],
+          "theme": false
+        },
+        {
+          "id": "line-quarter",
+          "preset": "rect",
+          "boxMm": [
+            225,
+            12,
+            88,
+            32
+          ],
+          "fillModifiers": [],
+          "lineModifiers": [
+            [
+              "alpha",
+              "25000"
+            ]
+          ],
+          "textModifiers": [],
+          "theme": false
+        },
+        {
+          "id": "independent",
+          "preset": "rect",
+          "boxMm": [
+            15,
+            56,
+            88,
+            32
+          ],
+          "fillModifiers": [
+            [
+              "alpha",
+              "50000"
+            ]
+          ],
+          "lineModifiers": [
+            [
+              "alpha",
+              "25000"
+            ]
+          ],
+          "textModifiers": [],
+          "theme": false
+        },
+        {
+          "id": "line-zero",
+          "preset": "ellipse",
+          "boxMm": [
+            120,
+            56,
+            88,
+            32
+          ],
+          "fillModifiers": [],
+          "lineModifiers": [
+            [
+              "alpha",
+              "0"
+            ]
+          ],
+          "textModifiers": [],
+          "theme": false
+        },
+        {
+          "id": "ellipse-independent",
+          "preset": "ellipse",
+          "boxMm": [
+            225,
+            56,
+            88,
+            32
+          ],
+          "fillModifiers": [
+            [
+              "alpha",
+              "50000"
+            ]
+          ],
+          "lineModifiers": [
+            [
+              "alpha",
+              "25000"
+            ]
+          ],
+          "textModifiers": [],
+          "theme": false
+        },
+        {
+          "id": "line-only",
+          "preset": "line",
+          "boxMm": [
+            15,
+            100,
+            88,
+            32
+          ],
+          "fillModifiers": [],
+          "lineModifiers": [
+            [
+              "alpha",
+              "25000"
+            ]
+          ],
+          "textModifiers": [],
+          "theme": false
+        },
+        {
+          "id": "fill-chain",
+          "preset": "rect",
+          "boxMm": [
+            120,
+            100,
+            88,
+            32
+          ],
+          "fillModifiers": [
+            [
+              "alpha",
+              "80000"
+            ],
+            [
+              "alphaMod",
+              "50000"
+            ],
+            [
+              "alphaOff",
+              "10000"
+            ]
+          ],
+          "lineModifiers": [],
+          "textModifiers": [],
+          "theme": false
+        },
+        {
+          "id": "line-chain",
+          "preset": "rect",
+          "boxMm": [
+            225,
+            100,
+            88,
+            32
+          ],
+          "fillModifiers": [],
+          "lineModifiers": [
+            [
+              "alpha",
+              "80000"
+            ],
+            [
+              "alphaMod",
+              "50000"
+            ],
+            [
+              "alphaOff",
+              "10000"
+            ]
+          ],
+          "textModifiers": [],
+          "theme": false
+        },
+        {
+          "id": "text-alpha-limitation",
+          "preset": "rect",
+          "boxMm": [
+            15,
+            144,
+            88,
+            32
+          ],
+          "fillModifiers": [
+            [
+              "alpha",
+              "50000"
+            ]
+          ],
+          "lineModifiers": [
+            [
+              "alpha",
+              "25000"
+            ]
+          ],
+          "textModifiers": [
+            [
+              "alpha",
+              "50000"
+            ]
+          ],
+          "theme": false
+        },
+        {
+          "id": "theme-fill",
+          "preset": "rect",
+          "boxMm": [
+            120,
+            144,
+            88,
+            32
+          ],
+          "fillModifiers": [
+            [
+              "alpha",
+              "50000"
+            ]
+          ],
+          "lineModifiers": [],
+          "textModifiers": [],
+          "theme": true
+        },
+        {
+          "id": "theme-line",
+          "preset": "rect",
+          "boxMm": [
+            225,
+            144,
+            88,
+            32
+          ],
+          "fillModifiers": [],
+          "lineModifiers": [
+            [
+              "alpha",
+              "25000"
+            ]
+          ],
+          "textModifiers": [],
+          "theme": true
+        }
+      ]
+    }
+  ]
+}

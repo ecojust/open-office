@@ -89,3 +89,47 @@ COMPAT_RUN=my-new-run PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium node test
 生成样例的外链指向保留域 `example.invalid`，只用于测试链接结构；测试不应联网拉取链接内容。上游文件也作为不可信输入处理，导入保持禁用宏与外链自动更新。不要为兼容性数字而降低这些约束。
 
 可通过 `COMPAT_CASES` 选择逗号分隔的样例 ID、`COMPAT_RUN` 指定独立结果目录。反复测试产生的输出和截图属于运行产物，不能覆盖这里的源文件。若源断言失败，应先修复语料或解析器并明确记录，再评价产品；不能把测试错误算成产品兼容性失败，也不能删掉真实丢失特性使报告变绿。
+
+## 官方桌面编辑器对照（可选）
+
+`onlyoffice-desktop.mjs` 在 Linux 的独立显示器上运行另行安装的官方 Desktop Editors，分别打开固定源文件、当前应用三轮保存后的文件、当前应用修改后的文件。它检查官方编辑器实际加载的页数和画布，保留真实截图供人工评估。源文件复制到测试目录后打开，不覆盖语料，也不把外部软件打包进产品。
+
+先启动开发服务，再生成本轮导出物：
+
+```sh
+PRESENTATION_COMPLEX_CASES=poi-smartart-default-list,poi-smartart-alternating-hexagons,poi-smartart-venn \
+  npm run test:browser:ppt-complex
+
+# DISPLAY 需事先指向隔离的 X / Xvfb 显示器。
+ONLYOFFICE_BINARY=/absolute/path/to/desktopeditors/DesktopEditors \
+ONLYOFFICE_DISPLAY=:105 \
+  npm run test:compatibility:onlyoffice
+```
+
+默认测试上面三份 SmartArt。`ONLYOFFICE_CASES` 可选择复杂专项清单中的其他 ID；对应导出文件必须先生成。`ONLYOFFICE_EXPORTS` 可指定复杂专项输出目录，`ONLYOFFICE_OUTPUT` 可指定本次官方对照记录目录，`ONLYOFFICE_DEBUG_PORT` 可覆盖默认本机调试端口 9232。调试端口已被占用时测试会拒绝启动，不连接或关闭现有应用。
+
+`ONLYOFFICE_VARIANTS` 默认是 `original,noop,edited`，分别对应原件、`noop-3.pptx` 与 `edited.pptx`。也可指定如 `format-color,format-size`，读取每个样例输出目录下的同名 PPTX，以验证实际格式修改后的文件。
+
+测试命令仅管理自己启动的进程组。`report.json` 记录文件指纹、页数、画布及截图；自动断言通过只说明这些检查成立，不代表逐像素一致，也不代表动画播放或任意复杂文档无损兼容。此入口不替代 Windows/macOS 安装包验证。
+
+## 补充排版样例
+
+新增独立语料与回读脚本见 [presentation-typography](presentation-typography/README.md)。官方桌面测试支持 `ONLYOFFICE_MANIFEST` 指定该语料清单，以及 `ONLYOFFICE_CAPTURE_ALL_SLIDES=1` 逐页截图；默认行为仍使用原复杂文档语料和第一页截图。
+
+### SmartArt 节点编辑与双向读回
+
+启动开发服务后运行 `node tests/browser/smartart-text.cjs` 和 `node tests/browser/smartart-text-ui.cjs`。专项用固定节点 ID 独立读取数据与缓存，不以生产映射器作为唯一判定。设置 `SMARTART_TEXT_OUTPUT` 可隔离输出。
+
+生产构建后用 `npm run preview` 启动 4198，再运行 `node tests/browser/smartart-production.cjs`。此检查不使用开发模块或 Vue 内部接口。
+
+官方桌面重开可设置 `ONLYOFFICE_EXPORTS=test-results/smartart-text`、`ONLYOFFICE_VARIANTS=edited,edited-cycle-3`，其余安装和显示环境要求同上。双向编辑必须先在隔离的官方程序中真实修改并保存，再运行 `SMARTART_NATIVE_RETURN=/absolute/path/native-bidirectional-return.pptx node tests/browser/smartart-native-return.cjs`；此场景固定检查先前本应用改成 Plan Q4、后由参考软件普通输入改成 Native Q4 的 Venn 节点。
+
+本轮证据及支持范围见 [节点编辑说明](../../docs/smartart-text-editing.md)。
+
+父子图示关联专项：`node tests/browser/smartart-child-text.cjs`。它用固定 GUID 核对父节点不变，覆盖隐式/显式父连接、空子节点、同文父子及异常关系。生产页面可用 `SMARTART_PRODUCTION_CHILD=1 node tests/browser/smartart-production.cjs` 检查同一子节点入口。
+
+### 局部文字格式
+
+开发服务启动后运行 `node tests/browser/presentation-range-format.cjs`。它从固定排版语料派生测试副本，独立按 UTF-16 字符核对原生 run 属性、段落不变量与包部件，检查三次保存重开、操作顺序、撤销和异常拒绝。输出为 `test-results/presentation-range-format/`。
+
+生产构建后启动 `npm run preview`，运行 `node tests/browser/presentation-range-ui.cjs`。这条测试通过真实界面选择文字、修改六种格式、撤销重做和下载重开，不调用开发模块或组件内部接口。`PRESENTATION_URL` 可选择服务地址，`PRESENTATION_RANGE_UI_OUTPUT` 可隔离输出目录。支持范围见[局部格式说明](../../docs/presentation-range-format.md)。

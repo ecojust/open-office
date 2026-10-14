@@ -1,0 +1,408 @@
+{
+  "scope": "Self-authored solid-color oracle; percentage lexical cases are deliberate compatibility probes.",
+  "items": [
+    {
+      "id": "swatches",
+      "path": "swatches.pptx",
+      "sha256": "f71fcd85e924533c21d7d85cc621e957fc48ddd5b605ac2d950ad8fce3f97401",
+      "expected": {
+        "slides": 1
+      },
+      "slideMm": [
+        338.6666666667,
+        190.5
+      ],
+      "swatches": [
+        {
+          "id": "base",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [],
+          "boxMm": [
+            20,
+            15,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "tint-0",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "tint",
+              "0"
+            ]
+          ],
+          "boxMm": [
+            82,
+            15,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "tint-25",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "tint",
+              "25000"
+            ]
+          ],
+          "boxMm": [
+            144,
+            15,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "tint-50",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "tint",
+              "50000"
+            ]
+          ],
+          "boxMm": [
+            206,
+            15,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "tint-100",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "tint",
+              "100000"
+            ]
+          ],
+          "boxMm": [
+            268,
+            15,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "shade-50",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "shade",
+              "50000"
+            ]
+          ],
+          "boxMm": [
+            20,
+            57,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "lum-mod-50",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "lumMod",
+              "50000"
+            ]
+          ],
+          "boxMm": [
+            82,
+            57,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "lum-off-20",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "lumOff",
+              "20000"
+            ]
+          ],
+          "boxMm": [
+            144,
+            57,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "lum-mod-off",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "lumMod",
+              "50000"
+            ],
+            [
+              "lumOff",
+              "20000"
+            ]
+          ],
+          "boxMm": [
+            206,
+            57,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "lum-off-mod",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "lumOff",
+              "20000"
+            ],
+            [
+              "lumMod",
+              "50000"
+            ]
+          ],
+          "boxMm": [
+            268,
+            57,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "green-tint-50",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "00FF00"
+          },
+          "transforms": [
+            [
+              "tint",
+              "50000"
+            ]
+          ],
+          "boxMm": [
+            20,
+            99,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "green-shade-50",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "00FF00"
+          },
+          "transforms": [
+            [
+              "shade",
+              "50000"
+            ]
+          ],
+          "boxMm": [
+            82,
+            99,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "scrgb-50",
+          "color": "scrgbClr",
+          "attributes": {
+            "r": "50000",
+            "g": "50000",
+            "b": "50000"
+          },
+          "transforms": [],
+          "boxMm": [
+            144,
+            99,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "scrgb-percent",
+          "color": "scrgbClr",
+          "attributes": {
+            "r": "50%",
+            "g": "50%",
+            "b": "50%"
+          },
+          "transforms": [],
+          "boxMm": [
+            206,
+            99,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "srgb-equivalent",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "BCBCBC"
+          },
+          "transforms": [],
+          "boxMm": [
+            268,
+            99,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "tint-percent",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "tint",
+              "50%"
+            ]
+          ],
+          "boxMm": [
+            20,
+            141,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "tint-shade",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "tint",
+              "50000"
+            ],
+            [
+              "shade",
+              "50000"
+            ]
+          ],
+          "boxMm": [
+            82,
+            141,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "shade-tint",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "shade",
+              "50000"
+            ],
+            [
+              "tint",
+              "50000"
+            ]
+          ],
+          "boxMm": [
+            144,
+            141,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "system-tint",
+          "color": "sysClr",
+          "attributes": {
+            "val": "windowText",
+            "lastClr": "336699"
+          },
+          "transforms": [
+            [
+              "tint",
+              "50000"
+            ]
+          ],
+          "boxMm": [
+            206,
+            141,
+            46,
+            28
+          ]
+        },
+        {
+          "id": "alpha-chain",
+          "color": "srgbClr",
+          "attributes": {
+            "val": "336699"
+          },
+          "transforms": [
+            [
+              "alpha",
+              "80000"
+            ],
+            [
+              "alphaMod",
+              "50000"
+            ],
+            [
+              "alphaOff",
+              "10000"
+            ]
+          ],
+          "boxMm": [
+            268,
+            141,
+            46,
+            28
+          ]
+        }
+      ]
+    }
+  ]
+}

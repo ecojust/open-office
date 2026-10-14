@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { OfficeBridge } from '../office/bridge'
+import { normalizeDocxEmbeddedContainers } from '../office/docx-embedded'
 import { PresentationSession } from '../presentation/session'
 import type { ChartSourceProof } from '../presentation/pptx-package'
 import { base64ToBytes, bytesToBase64, defaultSaveExtension } from '../shared/document'
@@ -113,6 +114,10 @@ async function exportFile(options: OfficeExportRequest = {}): Promise<OfficeExpo
   if (state && result.revision !== state.revision) throw Error('导出期间幻灯片发生变化，请重新保存。')
   if (state && result.extension === 'pptx') result.base64 = bytesToBase64(await source.merge(base64ToBytes(result.base64), state,
     (result as OfficeExportResult & { chartProof?: ChartSourceProof[] }).chartProof || []))
+  if (loaded.kind === 'word' && result.extension === 'docx') {
+    const normalized = normalizeDocxEmbeddedContainers(base64ToBytes(result.base64))
+    if (normalized.normalized) result.base64 = bytesToBase64(normalized.bytes)
+  }
   result.dirty ||= source.dirty
   if (featureRevision !== source.revision) throw Error('导出期间演示效果发生变化，请重新保存。')
   if (disposed || bridge !== client || loaded?.id !== id || props.document.id !== id || presentation !== source) throw Error('导出期间文档已切换，旧结果已丢弃。')

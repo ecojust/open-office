@@ -21,6 +21,29 @@ export interface PdfTextBlock {
   fontSize: number
   color: number | PdfColor
 }
+export interface PdfAnnotation {
+  id: number
+  pageIndex: number
+  type: string
+  rect: PdfRect
+  content: string
+  author: string
+  token: string
+  readonlyReason: string
+}
+export interface PdfFormField {
+  id: number
+  pageIndex: number
+  name: string
+  type: string
+  rect: PdfRect
+  value: string | boolean
+  maxLength: number
+  multiline: boolean
+  required: boolean
+  token: string
+  readonlyReason: string
+}
 export interface PdfMetadata {
   pageCount: number
   pages: PdfPageInfo[]
@@ -39,6 +62,12 @@ export interface PdfResponse {
   base64?: string
   metadata?: PdfMetadata
   textBlocks?: PdfTextBlock[]
+  annotations?: PdfAnnotation[]
+  annotationPages?: number[]
+  annotationsTruncated?: boolean
+  formFields?: PdfFormField[]
+  formPages?: number[]
+  formsTruncated?: boolean
   warnings?: string[]
   error?: { code: string; message: string; details?: unknown }
 }

@@ -6,7 +6,7 @@ import type { NativeDocument } from '../types'
 import {
   appendHistory, base64ToBytes, colorToRgb, errorMessage, movePages, orderedRect,
   PdfOperationError, pointToDocument, rectToViewport, requestPdf,
-  type PdfMetadata, type PdfPoint, type PdfRect, type PdfResponse, type PdfTextBlock,
+  type PdfAnnotation, type PdfFormField, type PdfMetadata, type PdfPoint, type PdfRect, type PdfResponse, type PdfTextBlock,
 } from '../pdf/protocol'
 import '../pdf/pdf.css'
 import { hasPdfEditingEngine, pickPdfDocument, pickPdfImage, saveExtractedPdf } from '../pdf/backend'
@@ -24,13 +24,14 @@ const emit = defineEmits<{
   status: [message: string]
 }>()
 
-type Tool = 'select' | 'text' | 'highlight' | 'ink' | 'image'
+type Tool = 'select' | 'text' | 'highlight' | 'ink' | 'image' | 'note'
 type Viewport = ReturnType<pdfjs.PDFPageProxy['getViewport']>
 const tool = ref<Tool>('select')
 const tools: { id: Tool; label: string; icon: string }[] = [
   { id: 'select', label: '编辑原文', icon: 'cursor' },
   { id: 'text', label: '新增文字', icon: 'text' },
   { id: 'highlight', label: '高亮', icon: 'highlight' },
+  { id: 'note', label: '便签批注', icon: 'note' },
   { id: 'ink', label: '手绘 / 签名', icon: 'pen' },
   { id: 'image', label: '插入图片', icon: 'image' },
 ]
@@ -42,6 +43,7 @@ const icons: Record<string, string> = {
   image: 'M3 3h18v18H3V3Zm0 14 6-6 4 4 3-3 5 5M16 7h.01',
   pages: 'M7 3h14v15H7V3ZM3 7v14h14',
   search: 'M16 16l5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z',
+  note: 'M4 3h16v14l-5 4H4V3Zm11 18v-5h5M8 7h8M8 11h6',
   undo: 'M3 10h12a6 6 0 0 1 0 12M3 10l6-6M3 10l6 6',
   redo: 'M21 10H9a6 6 0 0 0 0 12M21 10l-6-6M21 10l-6 6',
   rotate: 'M20 7V2l-5 5h5a9 9 0 1 0 1 9',
@@ -79,7 +81,16 @@ const allowSignedCopy = ref(false)
 const signedSource = ref(false)
 const copyRequired = ref(false)
 const showPages = ref(true)
-const sidebarTab = ref<'pages' | 'outline'>('pages')
+const sidebarTab = ref<'pages' | 'outline' | 'annotations' | 'forms'>('pages')
+const annotations = ref<PdfAnnotation[]>([])
+const annotationsTruncated = ref(false)
+const selectedAnnotation = ref<PdfAnnotation | null>(null)
+const annotationContent = ref(''), annotationAuthor = ref('')
+const formFields = ref<PdfFormField[]>([])
+const formsTruncated = ref(false)
+const selectedFormField = ref<PdfFormField | null>(null)
+const formValue = ref<string | boolean>('')
+const formTextValue = computed({ get: () => String(formValue.value), set: (value: string) => { formValue.value = value } })
 const outline = ref<{ level: number; title: string; pageIndex: number | null }[]>([])
 const stampMode = ref<'page_numbers' | 'watermark' | null>(null)
 const stampDialog = ref<HTMLFormElement | null>(null)
@@ -113,6 +124,8 @@ const redoStack = ref<string[]>([])
 let pdf: pdfjs.PDFDocumentProxy | null = null
 let documentEpoch = 0
 let documentRevision = 0
+let annotationRevision = -1
+let formRevision = -1
 let renderSequence = 0
 let textSequence = 0
 let searchSequence = 0
@@ -148,14 +161,21 @@ const permission = computed(() => {
 const signedLocked = computed(() => signedSource.value && !allowSignedCopy.value)
 const canModify = computed(() => currentBytes.value.length > 0 && engineAvailable && !signedLocked.value && permission.value?.modify !== false && permission.value?.edit !== false)
 const canAnnotate = computed(() => currentBytes.value.length > 0 && engineAvailable && !signedLocked.value && permission.value?.annotate !== false)
+const canFillForms = computed(() => currentBytes.value.length > 0 && engineAvailable && !signedLocked.value && permission.value?.fillForms === true)
 const canAssemble = computed(() => currentBytes.value.length > 0 && engineAvailable && !signedLocked.value && permission.value?.assemble !== false)
 const canCopy = computed(() => currentBytes.value.length > 0 && engineAvailable && permission.value?.copy !== false)
 const canUndo = computed(() => !!undoStack.value.length && !isBusy.value)
 const canRedo = computed(() => !!redoStack.value.length && !isBusy.value)
-const currentTextBlocks = computed(() => textBlocks.value.filter(block => block.pageIndex === pageIndex.value && block.text.trim()))
-const propertyPanelVisible = computed(() => !!selectedText.value || tool.value !== 'select')
+const currentTextBlocks = computed(() => textBlocks.value.filter(block => block.pageIndex === pageIndex.value && block.text.trim()
+  && !formFields.value.some(field => field.pageIndex === block.pageIndex && block.bbox[0] < field.rect[2] && block.bbox[2] > field.rect[0] && block.bbox[1] < field.rect[3] && block.bbox[3] > field.rect[1])))
+const currentAnnotations = computed(() => annotations.value.filter(item => item.pageIndex === pageIndex.value))
+const currentFormFields = computed(() => formFields.value.filter(item => item.pageIndex === pageIndex.value))
+const propertyPanelVisible = computed(() => !!selectedText.value || !!selectedAnnotation.value || !!selectedFormField.value || tool.value !== 'select')
 const hasPendingEdits = computed(() => {
   if (stampChanged.value) return true
+  if (selectedFormField.value) return formValue.value !== selectedFormField.value.value
+  if (selectedAnnotation.value) return annotationContent.value !== selectedAnnotation.value.content || annotationAuthor.value !== selectedAnnotation.value.author
+  if (tool.value === 'note') return !!annotationContent.value || !!annotationAuthor.value || !!pendingRect.value
   if (selectedText.value) {
     const block = selectedText.value
     return editText.value !== block.text || Math.abs(fontSize.value - block.fontSize) > 0.05 || color.value !== textColorHex(block)
@@ -171,7 +191,9 @@ const hasPendingEdits = computed(() => {
 const pageStyle = computed(() => ({ width: `${viewport.value?.width ?? 0}px`, height: `${viewport.value?.height ?? 0}px` }))
 const selectionStyle = computed(() => pendingRect.value && viewport.value ? rectStyle(pendingRect.value) : undefined)
 const toolHint = computed(() => {
+  if (tool.value === 'select' && sidebarTab.value === 'forms') return '从左侧选择当前页的表单字段。填写后点击应用，再保存 PDF；特殊表单会标明只读原因。'
   if (!engineAvailable) return '浏览器仅提供 PDF 预览。请使用桌面应用编辑文件。'
+  if (tool.value === 'note') return '点击页面放置便签图标，填写备注后应用。便签不会覆盖或替换原文。'
   if (tool.value === 'select' && permission.value?.copy === false) return '文件权限不允许提取原文，因此不能显示可编辑的文字区域。需要文档所有者授权。'
   if (tool.value === 'select') return currentTextBlocks.value.length ? '点击页面上的文字，编辑内容后应用。' : '本页没有可直接编辑的文本，可能是扫描页或轮廓文字。可新增文字或批注；编辑原文需要先进行 OCR。'
   if (tool.value === 'text') return '在页面拖出文字区域，再输入内容并应用。'
@@ -207,6 +229,12 @@ function clearPlacement() {
 }
 function clearEditorSelection() {
   selectedText.value = null
+  selectedAnnotation.value = null
+  selectedFormField.value = null
+  formRevision = -1
+  formValue.value = ''
+  annotationRevision = -1
+  annotationContent.value = ''; annotationAuthor.value = ''
   editText.value = ''
   clearPlacement()
 }
@@ -247,8 +275,14 @@ async function installDocument(base64: string, response: PdfResponse, epoch: num
   if (!response.metadata?.outline) void readPreviewOutline(nextPdf, epoch)
   pageIndex.value = Math.min(Math.max(0, pageIndex.value), nextPdf.numPages - 1)
   textBlocks.value = (response.textBlocks ?? []).filter(block => block.pageIndex === pageIndex.value)
+  annotations.value = (response.annotations ?? []).filter(item => item.pageIndex === pageIndex.value)
+  annotationsTruncated.value = response.annotationsTruncated ?? false
+  formFields.value = (response.formFields ?? []).filter(item => item.pageIndex === pageIndex.value)
+  formsTruncated.value = response.formsTruncated ?? false
   inspectedPages.clear()
-  for (const block of textBlocks.value) inspectedPages.add(block.pageIndex)
+  // Mutations compact xrefs while saving. Only an inspection of the serialized
+  // bytes may supply annotation identifiers for the next edit.
+  if (response.annotationPages?.includes(pageIndex.value) && response.formPages?.includes(pageIndex.value)) inspectedPages.add(pageIndex.value)
   warnings.value = response.warnings ?? []
   signedSource.value ||= !!metadata.value.signed
   selectedPages.value = selectedPages.value.filter(index => index < nextPdf.numPages)
@@ -353,6 +387,9 @@ async function openCurrentDocument(reset = true) {
     undoStack.value = []
     redoStack.value = []
     textBlocks.value = []
+    annotations.value = []; selectedAnnotation.value = null
+    formFields.value = []; selectedFormField.value = null; formsTruncated.value = false; formValue.value = ''; formRevision = -1
+    annotationContent.value = ''; annotationAuthor.value = ''; annotationsTruncated.value = false
     searchResults.value = []
     searchedQuery.value = ''
     signedSource.value = false
@@ -545,6 +582,10 @@ async function inspectCurrentPage() {
     const response = await requestPdf('inspect', currentBytes.value, { pageIndices: [index] }, password.value || undefined)
     if (!alive(epoch) || revision !== documentRevision || sequence !== textSequence) return
     textBlocks.value = response.textBlocks ?? []
+    annotations.value = response.annotations ?? []
+    annotationsTruncated.value = response.annotationsTruncated ?? false
+    formFields.value = response.formFields ?? []
+    formsTruncated.value = response.formsTruncated ?? false
     inspectedPages.clear()
     inspectedPages.add(index)
   } catch (error) { if (alive(epoch) && revision === documentRevision) fail(error) }
@@ -597,6 +638,7 @@ function isSearchMatch(block: PdfTextBlock) {
 
 function queueOperation(operation: string, options: Record<string, unknown>, message: string): Promise<void> {
   const epoch = documentEpoch
+  const revision = documentRevision
   const run = operationTail.then(async () => {
     if (!alive(epoch) || !currentBytes.value) return
     working.value = true
@@ -604,6 +646,7 @@ function queueOperation(operation: string, options: Record<string, unknown>, mes
     localError.value = ''
     const before = currentBytes.value
     try {
+      if (revision !== documentRevision) throw new PdfOperationError('STALE_DOCUMENT', '文档已改变，请重新选择目标后操作。')
       const response = await requestPdf(operation, before, { ...options, allowSignedCopy: options.allowSignedCopy === true || allowSignedCopy.value }, password.value || undefined)
       if (!alive(epoch)) return
       if (!response.base64) throw new Error('PDF 引擎未返回修改后的文件，原文件已保留。')
@@ -633,6 +676,7 @@ function runOperation(operation: string, options: Record<string, unknown>, messa
 function chooseText(block: PdfTextBlock) {
   if (!canModify.value || isBusy.value || tool.value !== 'select') return
   if (hasPendingEdits.value && selectedText.value?.id !== block.id) { setStatus('请先应用或取消当前文字编辑。'); return }
+  clearEditorSelection()
   selectedText.value = block
   editText.value = block.text
   fontSize.value = Math.round(block.fontSize * 10) / 10
@@ -668,7 +712,51 @@ async function chooseImage() {
     if (alive(epoch) && result) { image.value = result; clearPlacement(); tool.value = 'image' }
   } catch (error) { if (alive(epoch)) fail(error) }
 }
-function toolEnabled(id: Tool) { return id === 'highlight' || id === 'ink' ? canAnnotate.value : canModify.value }
+function annotationLabel(item: PdfAnnotation) {
+  return ({ Text: '便签', Highlight: '高亮', Ink: '手绘', Underline: '下划线', StrikeOut: '删除线', FreeText: '文本框' } as Record<string, string>)[item.type] || item.type
+}
+function formLabel(item: PdfFormField) {
+  return ({ Text: '文本框', CheckBox: '复选框', RadioButton: '单选框', ComboBox: '下拉框', ListBox: '列表框', Signature: '签名', Button: '按钮' } as Record<string, string>)[item.type] || item.type
+}
+async function chooseFormField(item: PdfFormField) {
+  if (isBusy.value) return
+  if (hasPendingEdits.value) { setStatus('请先应用或清除当前编辑，再选择表单字段。'); return }
+  clearEditorSelection(); tool.value = 'select'
+  selectedFormField.value = item; formValue.value = item.value; formRevision = documentRevision
+  await nextTick()
+  pageSurface.value?.querySelector(`[data-field-id="${item.id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+}
+function applyFormField() {
+  const item = selectedFormField.value
+  if (!item || item.readonlyReason || !canFillForms.value || isBusy.value || !hasPendingEdits.value) return
+  if (formRevision !== documentRevision) { fail(new PdfOperationError('STALE_FIELD', '文档已改变，请重新选择表单字段。')); return }
+  runOperation('fill_field', { pageIndex: item.pageIndex, fieldId: item.id, expectedToken: item.token, value: formValue.value }, '正在保存表单内容…')
+}
+async function chooseAnnotation(item: PdfAnnotation) {
+  if (isBusy.value) return
+  if (hasPendingEdits.value) { setStatus('请先应用或清除当前编辑，再选择批注。'); return }
+  clearEditorSelection(); tool.value = 'select'
+  selectedAnnotation.value = item
+  annotationRevision = documentRevision
+  annotationContent.value = item.content; annotationAuthor.value = item.author
+  await nextTick()
+  pageSurface.value?.querySelector(`[data-annotation-id="${item.id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+}
+function applyNote() {
+  if (!canAnnotate.value || !pendingRect.value || !annotationContent.value.trim() || isBusy.value) return
+  runOperation('add_note', { pageIndex: pageIndex.value, point: pendingRect.value.slice(0, 2), content: annotationContent.value, author: annotationAuthor.value }, '正在添加便签…')
+}
+function editSelectedAnnotation(remove = false) {
+  const item = selectedAnnotation.value
+  if (!item || item.readonlyReason || !canAnnotate.value || isBusy.value) return
+  if (annotationRevision !== documentRevision) { fail(new PdfOperationError('STALE_ANNOTATION', '文档已改变，请重新选择批注。')); return }
+  if (remove && hasPendingEdits.value) { setStatus('请先应用或取消批注文字修改，再删除批注。'); return }
+  runOperation(remove ? 'delete_annotation' : 'update_annotation', {
+    pageIndex: item.pageIndex, annotationId: item.id, expectedToken: item.token,
+    ...(remove ? {} : { content: annotationContent.value, author: annotationAuthor.value }),
+  }, remove ? '正在删除批注…' : '正在更新批注…')
+}
+function toolEnabled(id: Tool) { return id === 'highlight' || id === 'ink' || id === 'note' ? canAnnotate.value : canModify.value }
 function chooseTool(id: Tool) {
   if (isBusy.value || !toolEnabled(id)) return
   if (hasPendingEdits.value) { setStatus('请先应用或清除当前编辑，再切换工具。'); return }
@@ -689,6 +777,13 @@ function pointerDown(event: PointerEvent) {
   const point = pointerDocumentPoint(event)
   if (!point) return
   event.preventDefault()
+  if (tool.value === 'note') {
+    const page = metadata.value?.pages[pageIndex.value]
+    if (!page || page.width < 20 || page.height < 20) { setStatus('此页尺寸太小，无法放置便签。'); return }
+    const x = Math.min(point[0], page.width - 20), y = Math.min(point[1], page.height - 20)
+    pendingRect.value = [x, y, x + 20, y + 20]
+    return
+  }
   dragStart = point
   activePointer = event.pointerId
   pageSurface.value?.setPointerCapture(event.pointerId)
@@ -803,6 +898,7 @@ async function restoreHistory(direction: 'undo' | 'redo') {
   const from = direction === 'undo' ? undoStack : redoStack
   const to = direction === 'undo' ? redoStack : undoStack
   if (!from.value.length || isBusy.value) return
+  if (hasPendingEdits.value) { setStatus('请先应用或取消当前编辑，再撤销或重做。'); return }
   const value = from.value.at(-1)!
   const before = currentBytes.value
   const epoch = documentEpoch
@@ -970,7 +1066,7 @@ onBeforeUnmount(() => {
 
     <div v-if="localError" class="pdf-message pdf-message-error" role="alert" data-testid="pdf-error"><span>{{ localError }}</span><button aria-label="关闭 PDF 错误提示" @click="localError = ''">×</button></div>
     <div v-if="signedSource" class="pdf-message pdf-message-warning" data-testid="pdf-signature-notice"><span>{{ allowSignedCopy ? '正在编辑签名文件的副本。修改将使原有数字签名失效，保存时请另存。' : '此文件含数字签名。修改会使签名失效，原件应保留。' }}</span><button v-if="!allowSignedCopy" :disabled="isBusy" @click="allowSignedCopy = true">编辑副本</button></div>
-    <div v-if="permission && (permission.modify === false || permission.assemble === false || permission.annotate === false)" class="pdf-message pdf-message-info">此文件包含权限限制。{{ permission.modify === false ? '不能修改原文。' : '' }}{{ permission.annotate === false ? '不能添加批注。' : '' }}{{ permission.assemble === false ? '不能调整页面。' : '' }}</div>
+    <div v-if="permission && (permission.modify === false || permission.assemble === false || permission.annotate === false || permission.fillForms === false)" class="pdf-message pdf-message-info">此文件包含权限限制。{{ permission.modify === false ? '不能修改原文。' : '' }}{{ permission.annotate === false ? '不能添加批注。' : '' }}{{ permission.assemble === false ? '不能调整页面。' : '' }}{{ permission.fillForms === false ? '不能填写表单。' : '' }}</div>
     <div v-for="warning in warnings" :key="warning" class="pdf-message pdf-message-warning">{{ warning }}</div>
 
     <div v-if="showSearch" class="pdf-search-bar">
@@ -980,7 +1076,7 @@ onBeforeUnmount(() => {
 
     <div class="pdf-workspace">
       <aside v-show="showPages && pageCount" class="pdf-pages-panel" aria-label="PDF 页面管理">
-        <div class="pdf-sidebar-tabs" aria-label="PDF 侧栏"><button :class="{active:sidebarTab==='pages'}" :aria-pressed="sidebarTab==='pages'" @click="sidebarTab='pages'">页面</button><button :class="{active:sidebarTab==='outline'}" :aria-pressed="sidebarTab==='outline'" data-testid="pdf-outline-tab" @click="sidebarTab='outline'">目录 <small>{{ outline.length }}</small></button></div>
+        <div class="pdf-sidebar-tabs" aria-label="PDF 侧栏"><button :class="{active:sidebarTab==='pages'}" :aria-pressed="sidebarTab==='pages'" @click="sidebarTab='pages'">页面</button><button :class="{active:sidebarTab==='outline'}" :aria-pressed="sidebarTab==='outline'" data-testid="pdf-outline-tab" @click="sidebarTab='outline'">目录 <small>{{ outline.length }}</small></button><button :class="{active:sidebarTab==='annotations'}" :aria-pressed="sidebarTab==='annotations'" data-testid="pdf-annotations-tab" @click="sidebarTab='annotations'">批注</button><button :class="{active:sidebarTab==='forms'}" :aria-pressed="sidebarTab==='forms'" data-testid="pdf-forms-tab" @click="sidebarTab='forms'">表单</button></div>
         <div v-show="sidebarTab==='pages'" class="pdf-page-manager">
         <div class="pdf-panel-heading"><strong>页面</strong><span>{{ selectedPages.length }} 页已选</span></div>
         <div class="pdf-page-actions">
@@ -1003,6 +1099,20 @@ onBeforeUnmount(() => {
           <p v-if="!outline.length" class="pdf-outline-empty">此 PDF 没有目录书签。页面中的普通标题不会自动成为书签。</p>
           <button v-for="(item,index) in outline" :key="index" :style="{paddingLeft:`${12 + (item.level-1)*12}px`}" :disabled="isBusy || item.pageIndex === null" :aria-current="item.pageIndex===pageIndex ? 'page' : undefined" :title="item.pageIndex === null ? '外部或无页码的目标，不能在此跳转' : `转到第 ${item.pageIndex+1} 页`" data-testid="pdf-outline-item" @click="item.pageIndex !== null && selectPage(item.pageIndex)"><span>{{ item.title || '未命名书签' }}</span><small>{{ item.pageIndex === null ? '—' : item.pageIndex+1 }}</small></button>
         </nav>
+        <nav v-show="sidebarTab==='annotations'" class="pdf-annotation-list" aria-label="当前页批注" data-testid="pdf-annotations-list">
+          <p class="pdf-outline-empty">第 {{ pageIndex + 1 }} 页 · {{ currentAnnotations.length }} 条批注</p>
+          <p v-if="!engineAvailable" class="pdf-outline-empty">请在桌面应用中管理批注。</p>
+          <p v-else-if="!currentAnnotations.length" class="pdf-outline-empty">本页暂无批注。可添加便签、高亮或手绘。</p>
+          <p v-if="annotationsTruncated" class="pdf-outline-empty">批注内容较多，当前仅显示安全范围内的条目。</p>
+          <button v-for="item in currentAnnotations" :key="item.id" :class="{selected:selectedAnnotation?.id===item.id}" :disabled="isBusy" data-testid="pdf-annotation-item" @click="chooseAnnotation(item)"><strong>{{ annotationLabel(item) }}{{ item.readonlyReason ? ' · 只读' : '' }}</strong><span>{{ item.content || '无备注' }}</span><small>{{ item.author || '未署名' }}</small></button>
+        </nav>
+        <nav v-show="sidebarTab==='forms'" class="pdf-annotation-list" aria-label="当前页表单" data-testid="pdf-forms-list">
+          <p class="pdf-outline-empty">第 {{ pageIndex + 1 }} 页 · {{ currentFormFields.length }} 个字段</p>
+          <p v-if="!engineAvailable" class="pdf-outline-empty">浏览器可预览已有表单外观；请在桌面应用中填写并保存。</p>
+          <p v-else-if="!currentFormFields.length" class="pdf-outline-empty">本页没有可读取的表单字段。扫描件或普通文字不属于交互表单。</p>
+          <p v-if="formsTruncated" class="pdf-outline-empty">文档字段较多，仅显示安全范围内的条目；未完整检查的字段只读。</p>
+          <button v-for="item in currentFormFields" :key="item.id" :class="{selected:selectedFormField?.id===item.id}" :disabled="isBusy" data-testid="pdf-form-item" @click="chooseFormField(item)"><strong>{{ item.name }}</strong><span>{{ item.type==='CheckBox' ? (item.value ? '已勾选' : '未勾选') : item.value || '未填写' }}</span><small>{{ formLabel(item) }}{{ item.required ? ' · 必填' : '' }}{{ item.readonlyReason || !canFillForms ? ' · 只读' : '' }}</small></button>
+        </nav>
       </aside>
 
       <main ref="stage" class="pdf-stage" :class="{ 'pdf-stage-drawing': tool !== 'select' }" aria-label="PDF 页面">
@@ -1013,6 +1123,12 @@ onBeforeUnmount(() => {
           <div class="pdf-text-overlay" :class="{ interactive: tool === 'select' && canModify && !isBusy && !rendering }">
             <button v-for="block in currentTextBlocks" :key="block.id" type="button" class="pdf-text-hit" :class="{ chosen: selectedText?.id === block.id, 'search-match': isSearchMatch(block) }" :style="rectStyle(block.bbox)" :title="block.text" :aria-label="`编辑文本：${block.text}`" :disabled="tool !== 'select' || !canModify || isBusy || rendering" data-testid="pdf-text-block" @pointerdown.stop @click.stop="chooseText(block)"><span class="pdf-sr-only">{{ block.text }}</span></button>
           </div>
+          <div v-if="sidebarTab==='annotations' && tool==='select'" class="pdf-annotation-overlay">
+            <button v-for="item in currentAnnotations" :key="item.id" :data-annotation-id="item.id" :class="{chosen:selectedAnnotation?.id===item.id}" :style="rectStyle(item.rect)" :aria-label="`${annotationLabel(item)}：${item.content || '无备注'}`" :disabled="isBusy || rendering" @pointerdown.stop @click.stop="chooseAnnotation(item)" />
+          </div>
+          <div v-if="sidebarTab==='forms' && tool==='select'" class="pdf-annotation-overlay pdf-form-overlay">
+            <button v-for="item in currentFormFields" :key="item.id" :data-field-id="item.id" :class="{chosen:selectedFormField?.id===item.id}" :style="rectStyle(item.rect)" :aria-label="`填写表单：${item.name}`" :disabled="isBusy || rendering" @pointerdown.stop @click.stop="chooseFormField(item)" />
+          </div>
           <div v-if="pendingRect && tool !== 'ink'" class="pdf-placement-rectangle" :style="selectionStyle" :class="{ 'pdf-highlight-preview': tool === 'highlight' }" :aria-label="tool === 'highlight' ? '高亮预览，尚未应用' : '编辑区域'" :data-color="highlightColor" />
           <svg v-if="inkPaths.length" class="pdf-ink-preview" :width="viewport?.width" :height="viewport?.height" aria-label="手绘预览，尚未应用"><polyline v-for="(path, index) in inkPaths" :key="index" :points="inkDisplayPoints(path)" fill="none" :stroke="color" :stroke-width="inkWidth * zoom" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </div>
@@ -1021,9 +1137,28 @@ onBeforeUnmount(() => {
       </main>
 
       <aside v-if="propertyPanelVisible && currentBytes && !passwordRequired" class="pdf-properties" aria-label="PDF 编辑属性" data-testid="pdf-properties">
-        <div class="pdf-panel-heading"><strong>{{ selectedText ? '编辑原文' : tools.find(item => item.id === tool)?.label }}</strong><button class="pdf-icon-button" title="取消当前编辑" aria-label="取消当前编辑" @click="clearEditorSelection(); tool = 'select'"><svg><use href="#pdf-icon-close" /></svg></button></div>
-        <p class="pdf-property-hint">{{ selectedText ? '应用后会移除原文字并写入新内容，不使用白块遮盖。原字体不可用时会替换为本地字体。' : toolHint }}</p>
-        <template v-if="selectedText || tool === 'text'">
+        <div class="pdf-panel-heading"><strong>{{ selectedFormField ? formLabel(selectedFormField) : selectedAnnotation ? annotationLabel(selectedAnnotation) + '批注' : selectedText ? '编辑原文' : tools.find(item => item.id === tool)?.label }}</strong><button class="pdf-icon-button" title="取消当前编辑" aria-label="取消当前编辑" @click="clearEditorSelection(); tool = 'select'"><svg><use href="#pdf-icon-close" /></svg></button></div>
+        <p class="pdf-property-hint">{{ selectedFormField ? selectedFormField.readonlyReason || '填写已有字段，应用后保存为可重新打开的 PDF 表单。' : selectedAnnotation ? selectedAnnotation.readonlyReason || '修改备注与作者，保留原有高亮、手绘轨迹和页面文字。' : selectedText ? '应用后会移除原文字并写入新内容，不使用白块遮盖。原字体不可用时会替换为本地字体。' : toolHint }}</p>
+        <template v-if="selectedFormField">
+          <p class="pdf-form-name">{{ selectedFormField.name }}{{ selectedFormField.required ? ' · 必填' : '' }}</p>
+          <label v-if="selectedFormField.type==='CheckBox'" class="pdf-form-checkbox"><input v-model="formValue" type="checkbox" data-testid="pdf-form-checkbox" :disabled="isBusy || !canFillForms || !!selectedFormField.readonlyReason" />勾选此项</label>
+          <label v-else class="pdf-field">字段内容<textarea v-if="selectedFormField.multiline" v-model="formTextValue" rows="5" :maxlength="selectedFormField.maxLength" data-testid="pdf-form-value" :disabled="isBusy || !canFillForms || !!selectedFormField.readonlyReason" /><input v-else v-model="formTextValue" :maxlength="selectedFormField.maxLength" data-testid="pdf-form-value" :disabled="isBusy || !canFillForms || !!selectedFormField.readonlyReason" /></label>
+          <p v-if="!canFillForms" class="pdf-property-hint">{{ signedLocked ? '请先选择编辑签名副本。' : !engineAvailable ? '填写表单需要桌面应用的本地 PDF 引擎。' : '此文件未授予填写表单权限。' }}</p>
+          <button class="pdf-primary-button" :disabled="isBusy || !canFillForms || !!selectedFormField.readonlyReason || !hasPendingEdits" data-testid="pdf-form-apply" @click="applyFormField">应用填写</button>
+          <p class="pdf-property-hint">不执行表单脚本或自动计算。长文字可能超出原框，请检查保存后的外观。</p>
+        </template>
+        <template v-else-if="selectedAnnotation || tool === 'note'">
+          <label class="pdf-field">备注<textarea v-model="annotationContent" rows="5" maxlength="20000" data-testid="pdf-annotation-content" :disabled="isBusy || !canAnnotate || !!selectedAnnotation?.readonlyReason" /></label>
+          <label class="pdf-field">作者（可选）<input v-model="annotationAuthor" maxlength="200" data-testid="pdf-annotation-author" :disabled="isBusy || !canAnnotate || !!selectedAnnotation?.readonlyReason" /></label>
+          <p v-if="tool === 'note' && !pendingRect" class="pdf-property-hint">请先在页面上点击便签的位置。</p>
+          <template v-if="selectedAnnotation">
+            <button class="pdf-primary-button" :disabled="isBusy || !canAnnotate || !!selectedAnnotation.readonlyReason || !hasPendingEdits" data-testid="pdf-annotation-apply" @click="editSelectedAnnotation()">应用备注</button>
+            <button class="pdf-secondary-button" :disabled="isBusy || !canAnnotate || !!selectedAnnotation.readonlyReason || hasPendingEdits" data-testid="pdf-annotation-delete" @click="editSelectedAnnotation(true)">删除此批注</button>
+            <p class="pdf-property-hint">删除会移除对应的便签、高亮或手绘，可撤销。仅清空备注时，将文字清空后应用即可。</p>
+          </template>
+          <button v-else class="pdf-primary-button" :disabled="isBusy || !canAnnotate || !pendingRect || !annotationContent.trim()" data-testid="pdf-note-apply" @click="applyNote">添加便签</button>
+        </template>
+        <template v-else-if="selectedText || tool === 'text'">
           <label class="pdf-field">文字内容<textarea v-model="editText" rows="6" placeholder="输入文字" data-testid="pdf-text-input" :disabled="isBusy" /></label>
           <div class="pdf-property-row"><label class="pdf-field">字号<input v-model.number="fontSize" type="number" min="4" max="144" step="0.5" :disabled="isBusy" data-testid="pdf-font-size" /></label><label class="pdf-field">颜色<input v-model="color" type="color" :disabled="isBusy" aria-label="文字颜色" /></label></div>
           <div v-if="pendingRect" class="pdf-property-row"><label class="pdf-field">区域宽度（点）<input type="number" :value="Math.round(pendingRect[2] - pendingRect[0])" min="5" :disabled="isBusy" data-testid="pdf-region-width" @change="resizeTextRegion('width', $event)" /></label><label class="pdf-field">区域高度（点）<input type="number" :value="Math.round(pendingRect[3] - pendingRect[1])" min="5" :disabled="isBusy" data-testid="pdf-region-height" @change="resizeTextRegion('height', $event)" /></label></div>

@@ -1,0 +1,278 @@
+{
+  "date": "2026-10-14",
+  "scope": "Iteration six: bounded format-only edits on ordinary PPTX character ranges",
+  "ok": true,
+  "research": {
+    "tool": "REA 6.4.0",
+    "reference": "ONLYOFFICE Desktop Editors 10.0.0-169",
+    "sdkjsCommit": "72b0421c0bbf9d01eed9cf14834ae47eb2df1b50",
+    "evidence": "ev_007a0a259821d1833918585454b2a70ddd345a98098bd8635c70bd0a7595a0a6",
+    "files": 5,
+    "functions": 18,
+    "astNodes": 6272,
+    "parseFailures": 0
+  },
+  "source": {
+    "path": "tests/compatibility/presentation-typography/spacing-baseline.pptx",
+    "sha256": "59454cd1a0f02259f2828bf98a63f747116737f8019a0420dc19e05e66226034"
+  },
+  "rangeSuite": {
+    "report": "test-results/presentation-range-format/report.json",
+    "assertions": 447,
+    "rejectedCases": 33,
+    "rejections": [
+      {
+        "label": "Stale document revision",
+        "message": "演示文稿已更新，请刷新后再操作，未应用过期更改。"
+      },
+      {
+        "label": "negative range",
+        "message": "请选择有效的非空文字范围。"
+      },
+      {
+        "label": "reversed range",
+        "message": "请选择有效的非空文字范围。"
+      },
+      {
+        "label": "empty range",
+        "message": "请选择有效的非空文字范围。"
+      },
+      {
+        "label": "overflow range",
+        "message": "请选择有效的非空文字范围。"
+      },
+      {
+        "label": "fractional range",
+        "message": "请选择有效的非空文字范围。"
+      },
+      {
+        "label": "nonfinite range",
+        "message": "请选择有效的非空文字范围。"
+      },
+      {
+        "label": "empty style",
+        "message": "请选择至少一项文字格式。"
+      },
+      {
+        "label": "paragraph alignment through range",
+        "message": "选区格式仅设置字形，段落对齐请使用整框格式。"
+      },
+      {
+        "label": "bad color",
+        "message": "颜色必须为 #RRGGBB。"
+      },
+      {
+        "label": "bad size",
+        "message": "字号必须在 5–300 之间。"
+      },
+      {
+        "label": "font lone surrogate",
+        "message": "字体名称含无效 Unicode 或 XML 字符。"
+      },
+      {
+        "label": "font forbidden XML character",
+        "message": "字体名称含无效 Unicode 或 XML 字符。"
+      },
+      {
+        "label": "nonboolean style",
+        "message": "bold必须为布尔值。"
+      },
+      {
+        "label": "mismatched expected text",
+        "message": "正文已改变，请重新选择文字后设置格式。"
+      },
+      {
+        "label": "missing expected text",
+        "message": "正文已改变，请重新选择文字后设置格式。"
+      },
+      {
+        "label": "missing expected revision",
+        "message": "选区格式需要当前文稿版本，请重新选择文字。"
+      },
+      {
+        "label": "Selection contains only soft break",
+        "message": "选区需要包含普通文字，不能只有段落分隔或换行标记。"
+      },
+      {
+        "label": "Split surrogate at selection start",
+        "message": "选区边界不能切开一个 Unicode 字符。"
+      },
+      {
+        "label": "Split surrogate at selection end",
+        "message": "选区边界不能切开一个 Unicode 字符。"
+      },
+      {
+        "label": "cached field",
+        "message": "字段、链接、图片项目符号、扩展或符号字体暂不支持选区格式。"
+      },
+      {
+        "label": "hyperlink",
+        "message": "字段、链接、图片项目符号、扩展或符号字体暂不支持选区格式。"
+      },
+      {
+        "label": "relationship-bearing run",
+        "message": "文字包含部件关系，暂不支持选区格式。"
+      },
+      {
+        "label": "picture bullet",
+        "message": "字段、链接、图片项目符号、扩展或符号字体暂不支持选区格式。"
+      },
+      {
+        "label": "extension payload",
+        "message": "字段、链接、图片项目符号、扩展或符号字体暂不支持选区格式。"
+      },
+      {
+        "label": "foreign namespace run",
+        "message": "文字包含不支持的命名空间，无法安全设置选区格式。"
+      },
+      {
+        "label": "foreign namespace attribute",
+        "message": "文字包含扩展属性，暂不支持选区格式。"
+      },
+      {
+        "label": "nested text element",
+        "message": "文字内容包含嵌套元素或特殊节点，不能安全切分。"
+      },
+      {
+        "label": "symbol font",
+        "message": "字段、链接、图片项目符号、扩展或符号字体暂不支持选区格式。"
+      },
+      {
+        "label": "existing text animation",
+        "message": "带原有动画关系的文字暂不支持选区格式，以免改变动画文字片段。"
+      },
+      {
+        "label": "carriage return",
+        "message": "含回车符的文字暂不支持选区格式，请先规范为普通换行。"
+      },
+      {
+        "label": "action text character budget",
+        "message": "文字长度超过选区格式的安全限制。"
+      },
+      {
+        "label": "action run/element budget",
+        "message": "文字节点数量超过选区格式的安全限制。"
+      }
+    ],
+    "externalRequests": [],
+    "pageErrors": []
+  },
+  "productionUi": {
+    "report": "test-results/presentation-range-ui/report.json",
+    "checks": [
+      "No selection or no explicit style disables Apply; pending selection format blocks Save; Cancel preserves the scene",
+      "Apply formats a selection crossing two differently colored, raised/lowered runs",
+      "One keyboard undo/redo restores the complete mixed-format scene",
+      "Real download XML changes all six supported properties only in intended character ranges; original baseline/color outside them remains intact",
+      "Saved file reopens with the same rendered scene and editable selection; Escape cancels"
+    ],
+    "errors": [],
+    "externalRequests": []
+  },
+  "complexRegression": {
+    "report": "test-results/presentation-range-complex/report.json",
+    "fixtures": 12,
+    "outputs": 65,
+    "packageAudits": 41,
+    "noOpReopens": 36,
+    "allFixturesPassed": true,
+    "pageErrors": [],
+    "externalRequests": []
+  },
+  "nativeOpen": [
+    {
+      "report": "test-results/presentation-range-native/report.json",
+      "fixture": "spacing-baseline",
+      "variant": "ui-edited",
+      "sha256": "513f70618fe0d8fcbc6143e44cb76b711bd19bf4924f1555b433f4dac2e5cd6b",
+      "slideCount": 4,
+      "screenshots": 4,
+      "ok": true
+    },
+    {
+      "report": "test-results/presentation-range-cycle-native/report.json",
+      "fixture": "spacing-baseline",
+      "variant": "third-edited",
+      "sha256": "ba0f03666affbae20bcc7d5d848e659cef0ec07ef91b8dad36f614456cdb320b",
+      "slideCount": 4,
+      "screenshots": 4,
+      "ok": true
+    }
+  ],
+  "finalProductionNativeEquivalence": {
+    "ok": true,
+    "assertion": "Final production export and natively opened export contain byte-identical uncompressed package parts.",
+    "nativeInputSha256": "513f70618fe0d8fcbc6143e44cb76b711bd19bf4924f1555b433f4dac2e5cd6b",
+    "finalProductionSha256": "513f70618fe0d8fcbc6143e44cb76b711bd19bf4924f1555b433f4dac2e5cd6b",
+    "comparedParts": 44,
+    "differences": []
+  },
+  "validation": {
+    "nodeTestsPassed": 466,
+    "pythonTestsPassed": 28,
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "buildSeconds": 17.55,
+    "testLog": "/tmp/open-office-range-tests-final.log",
+    "buildLog": "/tmp/open-office-range-build-final.log"
+  },
+  "artifacts": [
+    {
+      "file": "test-results/presentation-range-format/range-source.pptx",
+      "sha256": "50092b258e76a9b6c171fde788e0d546d1b813d41be548e589efa6011dc7d9c7"
+    },
+    {
+      "file": "test-results/presentation-range-format/range-cycle-1.pptx",
+      "sha256": "6b6a9c50d51695f1c5e19e76f15e747c254159f6d9113d711a5a1517d070c80d"
+    },
+    {
+      "file": "test-results/presentation-range-format/range-cycle-2.pptx",
+      "sha256": "603d5896a22dbe9cd3c02243dea4350178d044325c4233c0e276574fdd6d5165"
+    },
+    {
+      "file": "test-results/presentation-range-format/range-cycle-3.pptx",
+      "sha256": "ba0f03666affbae20bcc7d5d848e659cef0ec07ef91b8dad36f614456cdb320b"
+    },
+    {
+      "file": "test-results/presentation-range-format/range-format-chain.pptx",
+      "sha256": "cbbca9ad8ea2960013bfa497ad785a3ea6e6356bd81ce518a2f312ec571c6259"
+    },
+    {
+      "file": "test-results/presentation-range-format/range-breaks.pptx",
+      "sha256": "9325b0adeaf3e623abd3726398c3c3cb74d38d80b16bb98ebf7e834d7041934b"
+    },
+    {
+      "file": "test-results/presentation-range-format/range-unicode.pptx",
+      "sha256": "e20b98c05318bc7f9bd2953e04ca2d3f254fa883b841e62b5a1f0007526650bf"
+    },
+    {
+      "file": "test-results/presentation-range-format/range-inherited.pptx",
+      "sha256": "54db9174c1555b8a4d6004f9e15c0ea75cb10a04614f3e397272e97b78091a1c"
+    },
+    {
+      "file": "test-results/presentation-range-format/range-font-precision.pptx",
+      "sha256": "bc58cd09799108d3a8fe2ae3868848d7cd719aaecd4a5b0730f6ac635fedae5b"
+    },
+    {
+      "file": "test-results/presentation-range-format/range-object-copy.pptx",
+      "sha256": "54795a6705e22bebc8f4491f8a699f71f3935a935ba141be50595b1a65e14506"
+    },
+    {
+      "file": "test-results/presentation-range-format/range-page-copy.pptx",
+      "sha256": "e54509f2c3aab6d2bf756e953240cb0941ccaf52a7bf9f11f1506ba1bf7c5e5f"
+    },
+    {
+      "file": "test-results/presentation-range-format/range-new-text.pptx",
+      "sha256": "ae7873b7077ea439875aa257e1d632e4779be482e876267d359a87e965305b5f"
+    }
+  ],
+  "limitations": [
+    "Character/run budget cases exercise the new action layer directly; large-document import performance is outside this suite.",
+    "Reference-editor open/re-save is a separate acceptance step.",
+    "Fields, links, relationship-bearing text, symbol fonts and unsafe XML remain rejected.",
+    "This test proves bounded character-format edits, not universal typography or text-layout fidelity.",
+    "Native open only; no native re-save of the sixth-iteration files was tested.",
+    "Numeric baseline rendering, advanced typography, and font substitution are not pixel-equivalent to the reference editor.",
+    "No Windows/macOS installer built or published; Word/Excel engines unchanged."
+  ]
+}

@@ -1,0 +1,415 @@
+{
+  "recordedAt": "2026-10-14T03:44:02.268478+00:00",
+  "scope": "Final source iteration: four-workspace functionality followed by targeted file-preservation fixes. No universal fidelity or complete feature parity claim.",
+  "published": false,
+  "postSuiteChange": "After all logic regressions passed, only the imported-field warning wording was corrected to describe protected editing. Typecheck and production build were rerun for that wording change.",
+  "reference": {
+    "reaVersion": "6.4.0",
+    "desktopVersion": "10.0.0-169",
+    "sdkCommit": "72b0421c0bbf9d01eed9cf14834ae47eb2df1b50",
+    "researchDirectory": "/workspace/open-office-research/onlyoffice",
+    "semanticCoverage": "unknown",
+    "evidenceIds": [
+      "ev_b7eb93f59f8bae3d72a8e53eab241314aef7fd9fcdb23d916dbc0ec7228fa0e4",
+      "ev_8ff3f6d26ed25604374708718ff4348314474c09a62040081f725bcb01699912",
+      "ev_e707a012fa44040875a1cd7ff196218a0064da62dee7497bd329587b2073ae82"
+    ]
+  },
+  "fullVerification": {
+    "nodeTests": 498,
+    "nodeFailed": 0,
+    "pythonTests": 39,
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "buildDuration": "10.29s",
+    "logs": [
+      {
+        "path": "/tmp/open-office-preservation-final-tests.log",
+        "sha256": "8a8af1fcc862f86662b10c20727d4e82c330c3281b2bb5caf4bb68d997e4d1c2",
+        "bytes": 56252
+      },
+      {
+        "path": "/tmp/open-office-preservation-final-build.log",
+        "sha256": "ef1e34263b1b255f62961466700509d6ee9ec82712f819c4dcefbad55e31b954",
+        "bytes": 2224
+      }
+    ]
+  },
+  "textContent": {
+    "report": {
+      "path": "test-results/presentation-text-content/report.json",
+      "sha256": "7a7381af4429a14a1a2489fdc369865e4cd291b3e881b8ade218602bfc15cb66",
+      "bytes": 8738
+    },
+    "assertions": 92,
+    "protectedRejectCases": 13,
+    "uiReport": {
+      "path": "test-results/presentation-text-content-ui/report.json",
+      "sha256": "f05f88228e72def6d7ebef3ac00eab7de32e145dd5e3a74a100f76a8f13f04aa",
+      "bytes": 542
+    },
+    "uiGroups": 5
+  },
+  "objectMetadata": {
+    "report": {
+      "path": "test-results/presentation-object-metadata/report.json",
+      "sha256": "6c110447691173d9a4c943e8713c27dec48f05803745eda6ce851c91442f6451",
+      "bytes": 20866
+    },
+    "assertions": 229,
+    "independentXml": {
+      "path": "test-results/presentation-object-metadata/independent-xml.json",
+      "sha256": "9c22a7ae4a3e2b6b324eac5fbee5ffb5a37baabb89ace8c4a0bc65d7b231097f",
+      "bytes": 808
+    }
+  },
+  "wordEmbedding": {
+    "newPreflightGroups": 4,
+    "newShellVariants": 2,
+    "targetedNodeTests": 80,
+    "scope": "Detection and protected-copy workflow; conversion fidelity not repaired."
+  },
+  "complexPresentations": {
+    "report": {
+      "path": "test-results/preservation-complex/report.json",
+      "sha256": "9c5eba09ce1182b1c1310cf6501d911628204e3f4205281d843087caf7a1ad54",
+      "bytes": 597398
+    },
+    "fixtures": 12,
+    "noExternalRequests": true,
+    "noLegacyOfficeRuntimeRequests": true
+  },
+  "nativeReadOnlyOpen": [
+    {
+      "report": {
+        "path": "test-results/preservation-text-native/report.json",
+        "sha256": "cc5c28af851f912ebb0c63be94a71508c5d102eba28ceadecc5fb304c18ec1e3",
+        "bytes": 4791
+      },
+      "openedFiles": 2,
+      "slideCaptures": 8,
+      "cases": [
+        {
+          "id": "text-cycle-three",
+          "inputs": [
+            {
+              "source": "test-results/presentation-text-content/text-content-cycle-3.pptx",
+              "sha256": "53ebd9cd509c4692286d34cc8c3b4fad25253e23e93cb8c38e9902c403c95015",
+              "slideCount": 4
+            }
+          ]
+        },
+        {
+          "id": "text-ui-export",
+          "inputs": [
+            {
+              "source": "test-results/presentation-text-content-ui/text-content-ui-edited.pptx",
+              "sha256": "8556e38941dd7805e9a6e0fa1272e3de693db07d27e2c7e4d1ed7954afe95c50",
+              "slideCount": 4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "report": {
+        "path": "test-results/preservation-metadata-native-retry/report.json",
+        "sha256": "a21675bd2a638d1ea865c232059a2496f2eca5637fa0a9dde54c0652aecc5f98",
+        "bytes": 3976
+      },
+      "openedFiles": 2,
+      "slideCaptures": 4,
+      "cases": [
+        {
+          "id": "metadata-cycle-three",
+          "inputs": [
+            {
+              "source": "test-results/presentation-object-metadata/cycle-3.pptx",
+              "sha256": "dc97afb5ea8b3f075f6c5821af8daf4267b42b2bd25a147b208e97344d15e1ba",
+              "slideCount": 2
+            }
+          ]
+        },
+        {
+          "id": "metadata-cross-slide",
+          "inputs": [
+            {
+              "source": "test-results/presentation-object-metadata/cross-slide.pptx",
+              "sha256": "75f566a7fa6e8284813caa483b40e177e000039eebb8051d79195b315af93ca6",
+              "slideCount": 2
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "nativeLimitations": [
+    "Opening/rendering only; no pixel equality or native resave claim.",
+    "Initial metadata attempt had no usable X display; the isolated Xorg retry passed. Initial report retained.",
+    "No new Windows/macOS package verification."
+  ],
+  "exactNativeTextSnapshots": {
+    "path": "test-results/preservation-text-native/verified-inputs.json",
+    "sha256": "0f6bc9e1b30d1255da5a95280a6d7601c06251b53483b32794250431df3430cf",
+    "bytes": 642
+  },
+  "regressions": [
+    {
+      "name": "presentation-range-format",
+      "report": {
+        "path": "test-results/presentation-range-format/report.json",
+        "sha256": "9af1e827490aaabd56a8345bb9fd065da73c35772352399e59eeb1b0f2b96915",
+        "bytes": 40627
+      },
+      "checks": 449,
+      "rejected": 34
+    },
+    {
+      "name": "presentation-rich-text",
+      "report": {
+        "path": "test-results/presentation-rich-text/report.json",
+        "sha256": "40f95f175a147c28ec24907f4de3e3eeca8386ae6bd797993cf4b85bbd07cbd8",
+        "bytes": 1946
+      },
+      "checks": 22,
+      "rejected": 0
+    },
+    {
+      "name": "presentation-paragraphs",
+      "report": {
+        "path": "test-results/presentation-paragraphs/report.json",
+        "sha256": "d23d74f4c37e0b9ce96dc5ed220e278552543d8531aed70c8581d4ea594723db",
+        "bytes": 4106
+      },
+      "checks": 72,
+      "rejected": 0
+    },
+    {
+      "name": "presentation-paragraph-ui",
+      "report": {
+        "path": "test-results/presentation-paragraph-ui/report.json",
+        "sha256": "42cfaa055acb30b3c7055c62c7c4882d8e1b8fc65ece505ea92118f7740e55a7",
+        "bytes": 574
+      },
+      "checks": 4,
+      "rejected": 0
+    }
+  ],
+  "knownUnresolved": [
+    "Calc UNIQUE unsupported by current runtime; COUNTA can mask the error as 1.",
+    "Calc boolean constant is changed into a formula on import.",
+    "Calc veryHidden is downgraded to hidden.",
+    "DOCX embedded attachment conversion fidelity.",
+    "Structured rich-text input, table-cell/notes run preservation, SmartArt structure editing, complete animation and advanced layout.",
+    "Word/Calc independent engine replacement and advanced features; PDF OCR/forms/certificate signing."
+  ],
+  "sourceFiles": [
+    {
+      "path": "package.json",
+      "sha256": "43a7e82bf51fdeb39b1879657ad27a664ddb6ba40be20a7d1a1942bc2595fc3b",
+      "bytes": 3364
+    },
+    {
+      "path": "pdf-backend/engine.py",
+      "sha256": "e7e67b3a7ea061e9651d9d1bb6fdd035a1bfd944b6d46fc474b21f3bb268d37d",
+      "bytes": 34785
+    },
+    {
+      "path": "public/office/calc-tools.js",
+      "sha256": "ee6fce0d67149c148c45d36f9282aa6865f906c31e3cf91046fff0d655f9effc",
+      "bytes": 43891
+    },
+    {
+      "path": "public/office/writer-tools.js",
+      "sha256": "4802680d529c70a204776dcf829f0ae32e6aa825f62c3816a3ae1dbfee15468c",
+      "bytes": 56424
+    },
+    {
+      "path": "src/App.vue",
+      "sha256": "7be3d8f5ec62fbd0e8f8720276d3a6232c6a8a161e188f2cdbd265b26d5a6e90",
+      "bytes": 54339
+    },
+    {
+      "path": "src/components/PdfEditor.vue",
+      "sha256": "9fd28a54541341e4f69a680dad9bbccc1a560607d3933ac58b5b1a405e106e29",
+      "bytes": 75305
+    },
+    {
+      "path": "src/components/PresentationFontNotice.vue",
+      "sha256": "5637e75dd8c6e0a7892f038989676687db1469681d168329334221e6cdd74daa",
+      "bytes": 3631
+    },
+    {
+      "path": "src/components/SheetWorkbench.vue",
+      "sha256": "d6c3cb43f092045181a1b51fd1e11a01e6ddf23993e2b1c16f309f25f6a79f4a",
+      "bytes": 46892
+    },
+    {
+      "path": "src/components/StandalonePresentationEditor.vue",
+      "sha256": "2e09c94cb3cb720de44def9c9d5ec83bc42582562928c341f0ece843299f1e03",
+      "bytes": 72440
+    },
+    {
+      "path": "src/components/WordWorkbench.vue",
+      "sha256": "b0b47d8d73b91807256448c424732de15e1b5c7752e46ff0dfb3dd73280a1602",
+      "bytes": 35321
+    },
+    {
+      "path": "src/office/README.md",
+      "sha256": "e81306cf3d91beaf5f189709d10195f154156f11ad0aec4f34cfced399a8ea2f",
+      "bytes": 10471
+    },
+    {
+      "path": "src/office/import-review.ts",
+      "sha256": "7eec8da33107ea47fcd425d7077822f738c5cade52700294d3dfc90a6c7f093a",
+      "bytes": 20063
+    },
+    {
+      "path": "src/office/workbench.css",
+      "sha256": "914b324110573722e0eb73b0b12e4f4ed5af8b3c2b4583676bed16907e882b75",
+      "bytes": 14879
+    },
+    {
+      "path": "src/pdf/pdf.css",
+      "sha256": "e4ec95f5e1363a081efc1b8b7f1c79dae8d99c9ce99fd79b66df3b2615cdd03d",
+      "bytes": 20589
+    },
+    {
+      "path": "src/pdf/protocol.ts",
+      "sha256": "fd856a814902a4d7614e0e09362c9e5597291de0f8659cecf8dd3ecb2fbb4dd3",
+      "bytes": 4951
+    },
+    {
+      "path": "src/presentation/core/editor.css",
+      "sha256": "c391c03e113f31e966e017ac1634767bb5e541b79e9cc69e369d443cdc4bcbce",
+      "bytes": 14764
+    },
+    {
+      "path": "src/presentation/core/font-diagnostics.ts",
+      "sha256": "f72a36cbdf7912fe37c198a19569fe1bb80f1acc740852ea653c1e6f0a259ecd",
+      "bytes": 8434
+    },
+    {
+      "path": "src/presentation/core/model.ts",
+      "sha256": "6c08d3f57fa20e97cf49e92b173f0f2343e5ee8da9b41dd56444f6d54b43b55d",
+      "bytes": 48064
+    },
+    {
+      "path": "src/presentation/core/paragraph-format.ts",
+      "sha256": "5897311735cb28677702aed9675776273c0065a9444ef2898c463d7b9f1dd198",
+      "bytes": 5699
+    },
+    {
+      "path": "src/presentation/core/pdf.ts",
+      "sha256": "2d3dbd9ec01ed863caa14b41aa4c6317a2fd57131917cb482e479f8a19a88519",
+      "bytes": 10717
+    },
+    {
+      "path": "src/presentation/core/pptx-common.ts",
+      "sha256": "535c8a05d9800d24f93ce9dc5ddcf2a4ff7ed125fade78b75d059e9ca734e530",
+      "bytes": 4662
+    },
+    {
+      "path": "src/presentation/core/pptx-export.ts",
+      "sha256": "65a472b731c40f380305ea71d3cfee1dc56d8a06aa6791986b41bd8e4479d9e2",
+      "bytes": 56400
+    },
+    {
+      "path": "src/presentation/core/pptx-import.ts",
+      "sha256": "d0fc992ef2a8516b88bbd1832b0f56fe32f40f51af098d06d83729bfebac17b4",
+      "bytes": 41235
+    },
+    {
+      "path": "src/presentation/core/pptx-rich-text.ts",
+      "sha256": "07f288148575b2c0ce4901523d6d8c0c401312fd7b7c4e14bf81750c7e61f729",
+      "bytes": 2689
+    },
+    {
+      "path": "src/presentation/core/pptx-text.ts",
+      "sha256": "937e3c28dbbaa118c55be13526aab89ccd7373dab292aaa694b4f960ac1c90c3",
+      "bytes": 9479
+    },
+    {
+      "path": "src/presentation/core/rich-text-layout.ts",
+      "sha256": "6a1f1a594cf28894e8caa61f017ae65208534eafd577466d8cdcb666d3f436c2",
+      "bytes": 9354
+    },
+    {
+      "path": "src/presentation/core/rich-text.ts",
+      "sha256": "a98c9dd0c7934c3a8ed82394132f841cd11bf8bbd0ee4194d9b8805a031f542c",
+      "bytes": 2602
+    },
+    {
+      "path": "src/presentation/core/scene.ts",
+      "sha256": "64226e91ae8986e69189cebfcfd53d6d4702230b24989043668d331b2bcf0c1a",
+      "bytes": 22397
+    },
+    {
+      "path": "src/presentation/core/smartart-preview.ts",
+      "sha256": "622c60fdcab60abf479504b8928b33a3533b6f97ea10829bb78f48649df7e049",
+      "bytes": 16872
+    },
+    {
+      "path": "src/presentation/core/smartart-text.ts",
+      "sha256": "45f72c0fe4594cde09e53f258319b91f917ba3339e11d8f4b982054a44759ca3",
+      "bytes": 24956
+    },
+    {
+      "path": "src/presentation/core/text-content-edit.ts",
+      "sha256": "be127395a42ab5d5569cc3842378d7d7aa37d98580cb8f8024c3a54c24e0c4c6",
+      "bytes": 12870
+    },
+    {
+      "path": "src/presentation/core/text-diff.ts",
+      "sha256": "a8f8b0faca1ecb54fb9ed52e0fce65f1e8e506ac03a345a33b518015b47aab62",
+      "bytes": 4284
+    },
+    {
+      "path": "src/presentation/core/text-range-format.ts",
+      "sha256": "f7a73424c1e5dea3deb5b9a14d1492ebf644e88fb179bf2db66e36a852f5fa34",
+      "bytes": 14373
+    },
+    {
+      "path": "src/presentation/core/types.ts",
+      "sha256": "bbe7d6ec405f7af885faa4bebe6e4e25808cf2d8c26c83841a949ccf9f1bbb8d",
+      "bytes": 2850
+    },
+    {
+      "path": "src/presentation/types.ts",
+      "sha256": "958d2c41ae6c1eaeb2009826395a2c932db45980a5d825479980b9ed1bbce818",
+      "bytes": 5472
+    },
+    {
+      "path": "src/shared/document.ts",
+      "sha256": "67d808d00bf4300a178cfdfe57b2f5b45748d3b1729f63e5eb202917e0792e62",
+      "bytes": 6449
+    },
+    {
+      "path": "src/sheet/types.ts",
+      "sha256": "0af734aa326471352a27ad77bc6cc6d29496b9b997ea1c55d0b62beb161f7d2f",
+      "bytes": 5261
+    },
+    {
+      "path": "src/word/types.ts",
+      "sha256": "94e18e06cac7abbfc9b5ccde651effe045f837f27676e01b72810d4738b855b4",
+      "bytes": 5655
+    }
+  ],
+  "buildFiles": [
+    {
+      "path": "dist/index.html",
+      "sha256": "4fa7a4eb554a942754bfff4ea7d9faa22c6466223cea485cf2a5562e05bad809",
+      "bytes": 592
+    },
+    {
+      "path": "dist/build-info.json",
+      "sha256": "4d13ef3799aef09ee8149e2e6e504b84dee33c8f951f34d87d37254eaff962a3",
+      "bytes": 51
+    }
+  ],
+  "screenshot": {
+    "path": "docs/screenshots/text-content-preserved.png",
+    "sha256": "17d54f6a2c2c7b268f0d74eb3685b705bd98c1343884292382a6c0ead8bbca04",
+    "bytes": 112584
+  }
+}

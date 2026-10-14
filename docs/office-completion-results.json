@@ -1,0 +1,324 @@
+{
+  "date": "2026-10-14",
+  "scope": "Four-workspace incremental completion, not full feature parity or universal file fidelity.",
+  "suite": {
+    "command": "npm test",
+    "nodePassed": 486,
+    "pythonPassed": 39,
+    "failed": 0,
+    "typecheck": "passed",
+    "logSha256": "8970c0cc2397b4f04a071146976552faebcc02e310bc1d84c74eb13eeef7fc2d"
+  },
+  "build": {
+    "command": "npm run build",
+    "ok": true,
+    "viteSeconds": 23.26,
+    "output": "dist",
+    "indexSha256": "6dd8361d85b845ad39a2d74e8c672a3737fcff4c173dd47841a735e2ae09256f",
+    "logSha256": "94fe79ca86ec9d26ff8066c27b287c999c81bc57e0d8a7b45364f1bc96617d0f",
+    "productSourcesNotNewerThanBuild": true
+  },
+  "checksMayOverlap": true,
+  "evidence": {
+    "word-engine": {
+      "path": "test-results/writer-completion/completion-proof.json",
+      "sha256": "e534848c5dcd56000df39b1717a133e09e369fed36392a68b3ead2b5e74977bd",
+      "ok": true,
+      "checks": 10
+    },
+    "word-link-metadata": {
+      "path": "test-results/writer-link-metadata/report.json",
+      "sha256": "6f1f05a948c80538b35eb12291ef44b2ee589266a7afa08ce640711ef7afd030",
+      "ok": true,
+      "checks": 3
+    },
+    "word-ui": {
+      "path": "test-results/writer-completion-ui/report.json",
+      "sha256": "d5514b9605ae4e5aaa55514dfab213b242b8b2ad5c70f47cb903501b121ab78b",
+      "ok": true,
+      "checks": 5
+    },
+    "sheet-engine": {
+      "path": "test-results/calc-completion/report.json",
+      "sha256": "466d758951c6bd4075e23530e81e441c9ffa90569e87e3e3ba3e1569073bc30a",
+      "ok": true,
+      "checks": 12
+    },
+    "sheet-ui": {
+      "path": "test-results/calc-completion-ui/report.json",
+      "sha256": "15f2a2eae469435358e79a7f53cdab2a21f98244d1cc708df1e1348312c800a6",
+      "ok": true,
+      "checks": 10
+    },
+    "presentation-paragraphs": {
+      "path": "test-results/presentation-paragraphs/report.json",
+      "sha256": "d23d74f4c37e0b9ce96dc5ed220e278552543d8531aed70c8581d4ea594723db",
+      "ok": true,
+      "checks": 72
+    },
+    "presentation-ui": {
+      "path": "test-results/presentation-paragraph-ui/report.json",
+      "sha256": "42cfaa055acb30b3c7055c62c7c4882d8e1b8fc65ece505ea92118f7740e55a7",
+      "ok": true,
+      "checks": 4
+    },
+    "presentation-range-regression": {
+      "path": "test-results/presentation-range-format/report.json",
+      "sha256": "a9d397196caf6d3a7df5bc3c921038d596285819dd782118e40ff3c50add44c2",
+      "ok": true,
+      "checks": 447,
+      "rejectedScenarios": 33
+    },
+    "presentation-typography-regression": {
+      "path": "test-results/presentation-typography/report.json",
+      "sha256": "21f540dcf04457b0161e8ef12b2abf513673be6a25abc6bd3dad2f8b9184ed42",
+      "ok": true,
+      "checks": 27
+    },
+    "pdf-annotation-ui": {
+      "path": "test-results/pdf-annotations/report.json",
+      "sha256": "e4829b8f4a506c658ae016e89d6c5f4c73ac25273f10bbe5d59d1840524c7253",
+      "ok": true,
+      "checks": 9
+    },
+    "pdf-ui-regression": {
+      "path": "test-results/pdf-completion-regression/pdf-ui-report.json",
+      "sha256": "f2512e2a30e5d71bc4a4fca6dc8a9b04e083075c426a8b69b6e3ed4671f84c3a",
+      "ok": true,
+      "checks": 26
+    },
+    "save-as-final-production-ui": {
+      "path": "test-results/save-formats-ui/report.json",
+      "sha256": "049a4d8421352d8c936ff565643085cd042ddadd89d535aa761873a5eca146ae",
+      "ok": true,
+      "checks": 4
+    }
+  },
+  "independentFinalPdfRead": {
+    "file": "test-results/save-formats-ui/format-copy.pdf",
+    "sha256": "f065ae8d96ee76552593a9144fd827e6507076dc6a562de9e91bccaf30201a81",
+    "pages": 4,
+    "extractedCharacters": [
+      305,
+      177,
+      174,
+      215
+    ]
+  },
+  "externalReference": {
+    "software": "ONLYOFFICE Desktop Editors 10.0.0-169",
+    "firstAttempt": "Retained timeout evidence in test-results/presentation-paragraph-native/report.json",
+    "retryReport": "test-results/presentation-paragraph-native-retry/report.json",
+    "retryReportSha256": "8898f3be1cdaec8d518eeeb52fdbde5e5c02d4009bf810d6da5d64780d44c954",
+    "ok": true,
+    "cases": [
+      {
+        "id": "paragraph-ui-export",
+        "variants": [
+          {
+            "variant": "original",
+            "source": "test-results/presentation-paragraph-ui/paragraph-ui-edited.pptx",
+            "sha256": "8321af38155dbcdf9112ee58c29fadb8b5e52f7e87bd8b5f61186cd520eba21e",
+            "ok": true,
+            "slideCount": 4,
+            "canvases": [
+              {
+                "id": "id_thumbnails_background",
+                "width": 245,
+                "height": 526
+              },
+              {
+                "id": "id_thumbnails",
+                "width": 245,
+                "height": 526
+              },
+              {
+                "id": "id_viewer",
+                "width": 839,
+                "height": 470
+              },
+              {
+                "id": "id_viewer_overlay",
+                "width": 839,
+                "height": 470
+              }
+            ],
+            "editorType": "object",
+            "title": "ONLYOFFICE Documents",
+            "screenshotSettled": true,
+            "renderWaitMs": 7883,
+            "screenshotSha256": "6bc65014c2495a7a01b3b04794ae3c8c8000e996aace691877a75b65c6e53b53",
+            "screenshot": "paragraph-ui-export/original/editor.png",
+            "slideScreenshots": [
+              {
+                "index": 0,
+                "path": "paragraph-ui-export/original/editor.png",
+                "sha256": "6bc65014c2495a7a01b3b04794ae3c8c8000e996aace691877a75b65c6e53b53"
+              },
+              {
+                "index": 1,
+                "path": "paragraph-ui-export/original/slide-2.png",
+                "sha256": "d384069d298c2c9a8fe0db9488ce0c5ed02200e7472fb7b4cddf28e15a3fd4e5"
+              },
+              {
+                "index": 2,
+                "path": "paragraph-ui-export/original/slide-3.png",
+                "sha256": "ba9bb6a3f30d09e327f0c7e02f27fef6a81d918bb8881c0ec854815a637ab293"
+              },
+              {
+                "index": 3,
+                "path": "paragraph-ui-export/original/slide-4.png",
+                "sha256": "71edebac458f4e1a3ef828e7fbf2d1f1a7c194a98a7cf0343f8d5b7d3be6762c"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "paragraph-cycle-three",
+        "variants": [
+          {
+            "variant": "original",
+            "source": "test-results/presentation-paragraphs/paragraph-cycle-3.pptx",
+            "sha256": "ac20d819a0772d1ad32c6affbce66914464854819dc292519c59c9aeb37720ca",
+            "ok": true,
+            "slideCount": 4,
+            "canvases": [
+              {
+                "id": "id_thumbnails_background",
+                "width": 245,
+                "height": 526
+              },
+              {
+                "id": "id_thumbnails",
+                "width": 245,
+                "height": 526
+              },
+              {
+                "id": "id_viewer",
+                "width": 839,
+                "height": 470
+              },
+              {
+                "id": "id_viewer_overlay",
+                "width": 839,
+                "height": 470
+              }
+            ],
+            "editorType": "object",
+            "title": "ONLYOFFICE Documents",
+            "screenshotSettled": true,
+            "renderWaitMs": 5718,
+            "screenshotSha256": "87d84ed5ce4465749b9a9d4a89a9c30450b777dbf456cac2759c061e2af26b94",
+            "screenshot": "paragraph-cycle-three/original/editor.png",
+            "slideScreenshots": [
+              {
+                "index": 0,
+                "path": "paragraph-cycle-three/original/editor.png",
+                "sha256": "87d84ed5ce4465749b9a9d4a89a9c30450b777dbf456cac2759c061e2af26b94"
+              },
+              {
+                "index": 1,
+                "path": "paragraph-cycle-three/original/slide-2.png",
+                "sha256": "49cf8f92172d96167c1c1e61c1316e20e6b5d3f828a0fd02f25704b04cd65cf2"
+              },
+              {
+                "index": 2,
+                "path": "paragraph-cycle-three/original/slide-3.png",
+                "sha256": "873317862f93e70121e8fe2590ad1a41328aa96501151cd3c3712a4d2eb91d02"
+              },
+              {
+                "index": 3,
+                "path": "paragraph-cycle-three/original/slide-4.png",
+                "sha256": "f4c31dd5411b89d9bd370f60dcf459c54134acf2881cb399b2d2f25509f8aadb"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "limitations": [
+      "Read-only open and render, not pixel equality or native resave.",
+      "No new Windows/macOS installer validation."
+    ]
+  },
+  "sourceSha256": {
+    "package-lock.json": "ae3eac2e166d790e5c0c2b367e70727b80d2df0c006eb37791543c216a45b13a",
+    "package.json": "43a7e82bf51fdeb39b1879657ad27a664ddb6ba40be20a7d1a1942bc2595fc3b",
+    "pdf-backend/engine.py": "e7e67b3a7ea061e9651d9d1bb6fdd035a1bfd944b6d46fc474b21f3bb268d37d",
+    "public/office/calc-tools.js": "ee6fce0d67149c148c45d36f9282aa6865f906c31e3cf91046fff0d655f9effc",
+    "public/office/writer-tools.js": "4802680d529c70a204776dcf829f0ae32e6aa825f62c3816a3ae1dbfee15468c",
+    "src/App.vue": "7be3d8f5ec62fbd0e8f8720276d3a6232c6a8a161e188f2cdbd265b26d5a6e90",
+    "src/components/Icon.vue": "7903dc708c3ebd5fda8135d1193a6236be599c50b80dfa38f16453cc788cae95",
+    "src/components/OfficeEditor.vue": "b98988bbcec3104f33244bef565cbb176837eb51b326a56b22dc397481b3750c",
+    "src/components/PdfEditor.vue": "9fd28a54541341e4f69a680dad9bbccc1a560607d3933ac58b5b1a405e106e29",
+    "src/components/PresentationEffects.vue": "434b7ee67acb2755c9f356a9bafde25c4f41d4f6f6231cde0214588b002d1807",
+    "src/components/PresentationFontNotice.vue": "5637e75dd8c6e0a7892f038989676687db1469681d168329334221e6cdd74daa",
+    "src/components/PresentationWorkbench.vue": "6fe46199d04382421cfdb2aa6abcf47bf4ef9225a09714d97632fcb60e6c11a0",
+    "src/components/SheetWorkbench.vue": "d6c3cb43f092045181a1b51fd1e11a01e6ddf23993e2b1c16f309f25f6a79f4a",
+    "src/components/SlidePreview.vue": "52df4b40230bdfbd5d842ec6d5d848ecdd04989262aae82f80902bec69c67ed8",
+    "src/components/StandalonePresentationEditor.vue": "6cdb9dda22501a43637527be776550d8ba31624b24f26b0cf9f4b740ffd97d8b",
+    "src/components/WordWorkbench.vue": "b0b47d8d73b91807256448c424732de15e1b5c7752e46ff0dfb3dd73280a1602",
+    "src/env.d.ts": "5853f72b58c661647c5f3e9cdfbe2478d5501904ced4e11116564b1941744b19",
+    "src/main.ts": "bdbe20b0b723d281d98897e0f40de48a9a804c89b71242e4a317096d45cbff01",
+    "src/native.ts": "36622b32f6dac79abda2f6daec3fd7dfea0c1ae8882e77fdab6fc5ef57e749e8",
+    "src/office/bridge.ts": "ee1f8fe2e43c3d67028015ac198810f4e24da3aa445e37a989eaac9a72b5f4b8",
+    "src/office/import-review.ts": "b6c571e6108ee36bf6e2f23c0ec657a2f171384c261e97ec08d6bc96b1a84d73",
+    "src/office/native-workbench-smoke.ts": "b7d0f34385876c0e6c486d67f80aa13756c635eeffd538b6d13d97d3a1e10ddd",
+    "src/office/pdf-readback.ts": "2bc56f680c250ff7521d443d54be2e4e3ddfd8f3080f19ba711d38c413ae6490",
+    "src/office/types.ts": "043c5248dc64d2a3e7541774cfb5df0d09314a987dc3f96101ef0df7f7c54183",
+    "src/office/workbench.css": "914b324110573722e0eb73b0b12e4f4ed5af8b3c2b4583676bed16907e882b75",
+    "src/pdf/backend.ts": "8f4158c2d142b033c378ae1a4353fa8dee4e93e5f9c195b682bc9178f78dfa6c",
+    "src/pdf/pdf.css": "e4ec95f5e1363a081efc1b8b7f1c79dae8d99c9ce99fd79b66df3b2615cdd03d",
+    "src/pdf/protocol.ts": "fd856a814902a4d7614e0e09362c9e5597291de0f8659cecf8dd3ecb2fbb4dd3",
+    "src/pdf/resources.ts": "56c08e99a1e3b7c07c4f351e55558da45eb11a5374a47230769752b056151676",
+    "src/presentation/chart-workbook.ts": "b7c7ac784bae3f4e8bf4704740b566439535e11cb9d86f4eda8013ba41de7bfa",
+    "src/presentation/core/editor.css": "c391c03e113f31e966e017ac1634767bb5e541b79e9cc69e369d443cdc4bcbce",
+    "src/presentation/core/font-diagnostics.ts": "f72a36cbdf7912fe37c198a19569fe1bb80f1acc740852ea653c1e6f0a259ecd",
+    "src/presentation/core/fontkit-compat.ts": "bef23fc51f6796e59380e3f8d8a4c4bb12ecc83e3fcd812dc7fb5d5d0d68aed2",
+    "src/presentation/core/model.ts": "d818a40464e0339cbc6496f991d1a92f8afef54c97185380ea2f36c51d3de6c6",
+    "src/presentation/core/paragraph-format.ts": "5897311735cb28677702aed9675776273c0065a9444ef2898c463d7b9f1dd198",
+    "src/presentation/core/pdf.ts": "2d3dbd9ec01ed863caa14b41aa4c6317a2fd57131917cb482e479f8a19a88519",
+    "src/presentation/core/pptx-common.ts": "535c8a05d9800d24f93ce9dc5ddcf2a4ff7ed125fade78b75d059e9ca734e530",
+    "src/presentation/core/pptx-export.ts": "8362c27b217874ce4ca7c9513ed1ceafde64533437f4945ebf69872e87978c1e",
+    "src/presentation/core/pptx-import.ts": "4ae35a9118f7d1322e2a560b98e95834797be1aff7d9ae9dbdf578264573b00e",
+    "src/presentation/core/pptx-notes.ts": "7057a1d5d6122dc23484079d904abff244c72075af46b73c513f178a7df3b53e",
+    "src/presentation/core/pptx-rich-text.ts": "07f288148575b2c0ce4901523d6d8c0c401312fd7b7c4e14bf81750c7e61f729",
+    "src/presentation/core/pptx-text.ts": "937e3c28dbbaa118c55be13526aab89ccd7373dab292aaa694b4f960ac1c90c3",
+    "src/presentation/core/pptx.ts": "dc7d4a62add2f6db0a84efef6f099423358badf55a9760ade20740c35c52c42b",
+    "src/presentation/core/render.ts": "5f3ade70c213f4e3c60f264727fd682f0657b41d14c9b6442f17524569411728",
+    "src/presentation/core/rich-text-layout.ts": "6a1f1a594cf28894e8caa61f017ae65208534eafd577466d8cdcb666d3f436c2",
+    "src/presentation/core/rich-text.ts": "a98c9dd0c7934c3a8ed82394132f841cd11bf8bbd0ee4194d9b8805a031f542c",
+    "src/presentation/core/scene.ts": "64226e91ae8986e69189cebfcfd53d6d4702230b24989043668d331b2bcf0c1a",
+    "src/presentation/core/smartart-preview.ts": "622c60fdcab60abf479504b8928b33a3533b6f97ea10829bb78f48649df7e049",
+    "src/presentation/core/smartart-text.ts": "45f72c0fe4594cde09e53f258319b91f917ba3339e11d8f4b982054a44759ca3",
+    "src/presentation/core/text-range-format.ts": "d9fb0a33f4ff7551d96b591e6c5935ad023244552c64e742c1615a2707c2caf8",
+    "src/presentation/core/types.ts": "bbe7d6ec405f7af885faa4bebe6e4e25808cf2d8c26c83841a949ccf9f1bbb8d",
+    "src/presentation/native-smoke.ts": "647a90814196fa9a7d70d8b9276619ddf4ea61debe2894d16727848932e47f6a",
+    "src/presentation/pptx-package.ts": "705c35a8503efb7328150f326574c6905a57e73569b49904957b04fbb5eaaa7d",
+    "src/presentation/session.ts": "67c5d89176b81cb57de4f785b5cff4c67b4a7a752af7317bc9896a5fce10ec5d",
+    "src/presentation/types.ts": "958d2c41ae6c1eaeb2009826395a2c932db45980a5d825479980b9ed1bbce818",
+    "src/presentation/workbench.css": "7741faf066a069f0867610c9846e25effc20dbac5cf7e7a8141d098c0c6ecdbb",
+    "src/shared/dialog-focus.ts": "5541cc0c23c7e9d7828915ad7ca210d6d4c20f9714e2b2e03a476b4815cc97ea",
+    "src/shared/document.ts": "67d808d00bf4300a178cfdfe57b2f5b45748d3b1729f63e5eb202917e0792e62",
+    "src/sheet/types.ts": "0af734aa326471352a27ad77bc6cc6d29496b9b997ea1c55d0b62beb161f7d2f",
+    "src/smoke.ts": "48cdab1bd13bf6d3259a1ecf45be07308428fa0dd561cead0bb9bda1da453d45",
+    "src/style.css": "b2db1a9b20fba2ac08e0aef5fdc732bf5b6dcf280b11cfc9537d3614fed63247",
+    "src/types.ts": "da14e0f998a83c9a2881a4fdcc6c8b8739a144d9ec8a2059ad2f699f8b54ae0e",
+    "src/word/draft-review.ts": "f6e3944e6babd67660100c11aea42319dcb5046e2de8694f1459fb0ef4a4982f",
+    "src/word/types.ts": "94e18e06cac7abbfc9b5ccde651effe045f837f27676e01b72810d4738b855b4"
+  },
+  "screenshotsSha256": {
+    "docs/screenshots/writer-completion.png": "fc9cb956537d853267945362f2ce6f26d846d2f5273387d732ff0acd77e74659",
+    "docs/screenshots/sheet-completion.png": "006534ea7d20657d90c991ce90dd8ceb3443b1de788f92115fa4fb54345035bc",
+    "docs/screenshots/presentation-paragraph-layout.png": "529d74e71b03477f336d519ca1f310ce36f198e255816f4043d4831f03af96b3",
+    "docs/screenshots/pdf-annotation-management.png": "c953cccede808b750a5d7018f2cc6cb839c0369c3c632ee13f0deb5391e2db5f",
+    "docs/screenshots/save-format-dialog.png": "c9a3f45b6531ba13aa0e2ecae6cc420b422bf5af333ad686485e03739afa4df5"
+  },
+  "limitations": [
+    "Word/Calc retain the existing WASM engine; no full independent engine replacement.",
+    "PDF editing requires the local backend; ordinary production web deployment is preview-only.",
+    "Advanced section layout, dynamic arrays, full presentation animations and PDF OCR/forms/certificate workflows remain incomplete.",
+    "No commit, release, or new desktop package in this pass."
+  ]
+}

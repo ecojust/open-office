@@ -1,6 +1,6 @@
 {
   "name": "open-office",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -29,6 +29,8 @@
     "test:browser:ppt": "node tests/browser/presentation-ui.cjs",
     "test:browser:ppt-independent": "node tests/browser/standalone-presentation.cjs",
     "test:browser:ppt-complex": "node tests/browser/standalone-presentation-complex.cjs",
+    "test:browser:ppt-smartart": "node tests/browser/smartart-preview.cjs",
+    "test:browser:ppt-rich-text": "node tests/browser/presentation-rich-text.cjs",
     "test:browser:impress": "node tests/browser/impress-engine.cjs",
     "test:browser:ppt-workbench": "node tests/browser/presentation-workbench.cjs",
     "test:browser:ppt-workbench-ui": "node tests/browser/presentation-workbench-ui.cjs",
@@ -43,7 +45,8 @@
     "test:browser:workbench-drafts": "node tests/browser/workbench-drafts.cjs",
     "test:browser:office-ui": "node tests/browser/word-sheet-ui.cjs",
     "test:browser:office-drafts": "node tests/browser/workbench-drafts.cjs",
-    "test:compatibility": "node tests/compatibility/run.cjs"
+    "test:compatibility": "node tests/compatibility/run.cjs",
+    "test:compatibility:onlyoffice": "node tests/compatibility/onlyoffice-desktop.mjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",

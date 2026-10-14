@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "id": "spacing-baseline",
+      "path": "spacing-baseline.pptx",
+      "sha256": "59454cd1a0f02259f2828bf98a63f747116737f8019a0420dc19e05e66226034",
+      "expected": {
+        "slides": 4
+      },
+      "provenance": {
+        "kind": "generated",
+        "license": "MIT",
+        "generator": "generate.py",
+        "producerDeclared": "Original python-pptx scaffold plus explicit OOXML; not reference-editor generated"
+      }
+    }
+  ]
+}

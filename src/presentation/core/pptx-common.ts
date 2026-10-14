@@ -1,5 +1,5 @@
 import type { SlideObject } from './types'
-import { PptxPackageError, PPTX_LIMITS } from '../pptx-package'
+import { PptxPackageError, PPTX_LIMITS } from '../pptx-package.ts'
 
 export const P = 'http://schemas.openxmlformats.org/presentationml/2006/main'
 export const A = 'http://schemas.openxmlformats.org/drawingml/2006/main'
@@ -58,5 +58,5 @@ export function relativePart(from: string, to: string): string {
 }
 /** JSON captures all editable state while ignoring the immutable import record. */
 export function objectFingerprint(object: SlideObject): string {
-  return JSON.stringify(object, (key, value) => ['sourceXml', 'sourceFingerprint', 'sourcePart', 'warning', 'locked'].includes(key) ? undefined : value)
+  return JSON.stringify(object, (key, value) => ['sourceXml', 'sourceFingerprint', 'sourcePart', 'warning', 'locked', 'diagramPreview', 'richText', 'tableCellText', 'tableLayout', 'smartArt'].includes(key) ? undefined : value)
 }

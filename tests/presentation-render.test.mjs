@@ -12,6 +12,30 @@ const model = slides => ({ width: 254, height: 142.875, slides, warnings: [] })
 const flatten = nodes => nodes.flatMap(node => node.kind === 'group' ? flatten(node.children) : [node])
 const fixedMetrics = (_text, _style, size) => ({ ascent: size * .88, descent: size * .12 })
 
+test('fill, stroke and text have independent opacity while legacy whole-object opacity still composes', () => {
+  for (const [whole, fill, stroke] of [[1,.5,.25],[1,0,1],[.4,.5,.25]]) {
+    const object=shape({fillColor:'#ff0000',lineColor:'#0000ff',lineWidth:2,fillOpacity:fill,lineOpacity:stroke,opacity:whole}),page=slide([object]);
+    const visible=[];
+    const inspect=(nodes,alpha=1)=>{for(const node of nodes)if(node.kind==='group')inspect(node.children,alpha*(node.opacity??1));else visible.push({node,alpha})};
+    inspect(buildSlideScene(model([page]),page));
+    assert.ok(visible.some(({node,alpha})=>node.kind==='rect'&&node.fill==='#ff0000'&&alpha===whole*fill));
+    assert.ok(visible.some(({node,alpha})=>node.kind==='rect'&&node.stroke==='#0000ff'&&alpha===whole*stroke));
+    assert.ok(visible.filter(({node})=>node.kind==='text').every(({alpha})=>alpha===whole));
+  }
+})
+
+test('run opacity includes bold and underline, preserves zero-alpha layout, and leaves other runs independent', () => {
+  const object = shape({text:'ABC',opacity:.8,fillColor:'#ff0000',fillOpacity:.25,richText:{sourceText:'ABC',sourceStyle:style,paragraphs:[{style,runs:[{text:'A',style:{...style,opacity:0}},{text:'B',style:{...style,opacity:.5,bold:true,underline:true}},{text:'C',style}]}]}})
+  const page=slide([object]),seen=[]
+  const inspect=(nodes,alpha=1)=>{for(const node of nodes)if(node.kind==='group')inspect(node.children,alpha*(node.opacity??1));else seen.push({node,alpha})}
+  inspect(buildSlideScene(model([page]),page))
+  assert.deepEqual(seen.filter(({node})=>node.kind==='text').map(({node,alpha})=>[node.text,alpha]),[['A',0],['B',.4],['C',.8]])
+  assert.ok(seen.find(({node})=>node.text==='B').node.bold)
+  assert.ok(seen.find(({node})=>node.text==='B').node.underline)
+  assert.ok(seen.find(({node})=>node.text==='A').node.width>0)
+  assert.equal(seen.find(({node})=>node.kind==='rect'&&node.fill==='#ff0000').alpha,.2)
+})
+
 test('SVG escapes text, font, IDs and labels and refuses executable paint, XML and image URLs', () => {
   const malicious = '" onload="alert(1)<script>evil()</script>'
   const page = slide([
@@ -34,7 +58,8 @@ test('SVG includes editable object IDs, group rotation, inherited decorations an
   assert.match(svg, /data-object-id="master" data-inherited="true"/)
   assert.match(svg, /data-object-id="group" transform="rotate\(30 85 30\)" opacity="0.5"/)
   assert.match(svg, /data-object-id="child"/)
-  assert.match(svg, /font-weight="700" font-style="italic" text-decoration="underline"/)
+  assert.match(svg, /font-weight="700" font-style="italic" text-decoration="none"/)
+  assert.match(svg, /data-text-decoration="underline"/)
   assert.doesNotMatch(svg, /clip-path="url| id="/)
   assert.doesNotMatch(slideSvg(model([page]), page, { omitObjectIds: ['child'] }), /data-object-id="child"/)
 })

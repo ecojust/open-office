@@ -14,6 +14,8 @@ export interface WriterTextStyle {
   underline: boolean
   color: string
   highlight: string | null
+  strikethrough?: boolean
+  baseline?: 'normal' | 'superscript' | 'subscript'
 }
 export interface WriterParagraph {
   styleName: string
@@ -45,13 +47,17 @@ export interface WriterPage {
 export interface WriterTable { name: string; rows: number; columns: number }
 export interface WriterOutlineItem { id: string; text: string; level: number }
 export interface WriterComment { index: number; author: string; text: string }
+export type WriterListOperation = 'bullet' | 'number' | 'remove' | 'promote' | 'demote' | 'restart'
+export interface WriterListState { kind: 'none' | 'number' | 'bullet' | 'mixed' | 'other'; level: number | null }
 export interface WriterState {
   documentId: string
   revision: number
   dirty: boolean
   selection: WriterSelection
   textStyle: WriterTextStyle
+  hyperlink?: { url: string; mixed: boolean }
   paragraph: WriterParagraph
+  list?: WriterListState
   styles: { name: string; label: string }[]
   outline: WriterOutlineItem[]
   outlineTruncated: boolean
@@ -67,6 +73,8 @@ export type WriterAction = Guard & (
   | { type: 'format-text' } & Partial<WriterTextStyle>
   | { type: 'format-paragraph' } & Partial<Omit<WriterParagraph, 'styleName'>>
   | { type: 'apply-style'; name: string }
+  | { type: 'list'; operation: WriterListOperation }
+  | { type: 'set-hyperlink'; url: string }
   | { type: 'insert-table'; rows: number; columns: number; cells?: string[][] }
   | { type: 'update-table'; name: string; cells: string[][]; expectedTableId?: string; expectedCells?: string[][]; expectedCellSignatures?: string[][] }
   | { type: 'set-page' } & Partial<Omit<WriterPage, 'styleName' | 'headerEnabled' | 'footerEnabled' | 'headerText' | 'footerText' | 'headerTruncated' | 'footerTruncated'>>

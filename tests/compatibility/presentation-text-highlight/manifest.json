@@ -1,0 +1,165 @@
+{
+  "scope": "Ordinary DrawingML highlight, text alpha independence, local inheritance and transparent override, baseline/space/break geometry; independent handwritten XML.",
+  "items": [
+    {
+      "id": "ordinary-highlight",
+      "path": "ordinary-highlight.pptx",
+      "sha256": "a02f657e3c906534f4b40d67398839ae6b97da6442bbd71f2e8ac49a19557020",
+      "expected": {
+        "slides": 1
+      },
+      "slideMm": [
+        338.6666666667,
+        190.5
+      ],
+      "objects": [
+        {
+          "id": "no-highlight",
+          "text": "H H",
+          "boxMm": [
+            15,
+            12,
+            88,
+            32
+          ]
+        },
+        {
+          "id": "yellow-opaque",
+          "text": "H H",
+          "highlight": "FFFF00",
+          "boxMm": [
+            120,
+            12,
+            88,
+            32
+          ]
+        },
+        {
+          "id": "yellow-half",
+          "text": "H H",
+          "highlight": "FFFF00",
+          "highlightAlpha": 0.5,
+          "boxMm": [
+            225,
+            12,
+            88,
+            32
+          ]
+        },
+        {
+          "id": "text-half",
+          "text": "H H",
+          "highlight": "FFFF00",
+          "textAlpha": 0.5,
+          "boxMm": [
+            15,
+            56,
+            88,
+            32
+          ]
+        },
+        {
+          "id": "text-zero",
+          "text": "H H",
+          "highlight": "FFFF00",
+          "textAlpha": 0,
+          "boxMm": [
+            120,
+            56,
+            88,
+            32
+          ]
+        },
+        {
+          "id": "inherited-yellow",
+          "text": "H H",
+          "defaultHighlight": "FFFF00",
+          "boxMm": [
+            225,
+            56,
+            88,
+            32
+          ]
+        },
+        {
+          "id": "explicit-cyan",
+          "text": "H H",
+          "defaultHighlight": "FFFF00",
+          "highlight": "00FFFF",
+          "boxMm": [
+            15,
+            100,
+            88,
+            32
+          ]
+        },
+        {
+          "id": "transparent-override",
+          "text": "H H",
+          "defaultHighlight": "FFFF00",
+          "highlight": "000000",
+          "highlightAlpha": 0,
+          "boxMm": [
+            120,
+            100,
+            88,
+            32
+          ]
+        },
+        {
+          "id": "mixed-baselines",
+          "text": "H H H",
+          "highlight": "FFEE88",
+          "mixed": true,
+          "boxMm": [
+            225,
+            100,
+            88,
+            32
+          ]
+        },
+        {
+          "id": "leading-trailing-spaces",
+          "text": " H H ",
+          "highlight": "FFFF00",
+          "boxMm": [
+            15,
+            144,
+            88,
+            32
+          ]
+        },
+        {
+          "id": "manual-break",
+          "text": "H\nH",
+          "highlight": "FFFF00",
+          "breaks": true,
+          "boxMm": [
+            120,
+            144,
+            88,
+            32
+          ]
+        },
+        {
+          "id": "theme-highlight",
+          "text": "H H",
+          "highlight": "accent2",
+          "theme": true,
+          "mods": [
+            [
+              "tint",
+              50000
+            ]
+          ],
+          "boxMm": [
+            225,
+            144,
+            88,
+            32
+          ]
+        }
+      ]
+    }
+  ]
+}

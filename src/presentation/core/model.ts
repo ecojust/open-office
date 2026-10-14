@@ -1,6 +1,14 @@
 import type { PresentationAction, PresentationChartData, PresentationGeometry, PresentationObjectData, PresentationObjectQuery, PresentationPage, PresentationState, PresentationTextStyle } from '../types'
 import type { NewPptxMedia, PptxPatch, PptxTransition } from '../pptx-package'
 import type { PresentationModel, SlideModel, SlideObject } from './types'
+import { commitSmartArtTextEdit, refreshSmartArtEditability, smartArtEditBlockReason, hasSmartArtBinding } from './smartart-text.ts'
+
+import { formatTextRange } from './text-range-format.ts'
+import { formatParagraphs } from './paragraph-format.ts'
+import { replaceTextContent } from './text-content-edit.ts'
+import { replaceTableText } from './table-text-content.ts'
+import { paintOpacityEditable } from './paint-opacity.ts'
+import { formatWholeTextPaint } from './format-text-paint.ts'
 
 export const PRESENTATION_LIMITS = Object.freeze({ slides: 500, objects: 2000, text: 20000, notes: 50000, history: 80, historyBytes: 32 * 1024 * 1024, imageBytes: 32 * 1024 * 1024, mediaBytes: 64 * 1024 * 1024 })
 export type PresentationPatch = Omit<PptxPatch['slides'][number], 'slideIndex'> & { expectedRevision?: number }
@@ -48,12 +56,25 @@ function weight(value: unknown): number {
 function textStyle(patch: Partial<PresentationTextStyle> = {}): Partial<PresentationTextStyle> {
   requireValue(patch && typeof patch === 'object' && !Array.isArray(patch), '文字样式无效。')
   const output: Partial<PresentationTextStyle> = {}
-  for (const key of Object.keys(patch)) requireValue(['fontName', 'fontSize', 'bold', 'italic', 'underline', 'color', 'align'].includes(key), `不支持的文字样式：${key}`)
+  for (const key of Object.keys(patch)) requireValue(['fontName', 'fontSize', 'bold', 'italic', 'underline', 'underlineStyle', 'strike', 'color', 'opacity', 'highlightColor', 'highlightOpacity', 'align'].includes(key), `不支持的文字样式：${key}`)
   if (patch.fontName !== undefined) output.fontName = string(patch.fontName, 120, '字体名称', false)
   if (patch.fontSize !== undefined) output.fontSize = number(patch.fontSize, 5, 300, '字号')
   if (patch.color !== undefined) output.color = color(patch.color)!
+  if (patch.opacity !== undefined) output.opacity = Math.round(number(patch.opacity, 0, 1, '文字不透明度') * 100000) / 100000
+  if (patch.highlightOpacity !== undefined) requireValue(patch.highlightColor !== undefined, '设置高亮透明度时，请同时明确选择高亮颜色。')
+  if (patch.highlightColor !== undefined) {
+    const alpha = patch.highlightOpacity === undefined ? patch.highlightColor === null ? 0 : 1 : Math.round(number(patch.highlightOpacity, 0, 1, '高亮不透明度') * 100000) / 100000
+    requireValue(patch.highlightColor !== null || alpha === 0, '清除高亮不能同时指定非零不透明度。')
+    const selected = patch.highlightColor === null ? null : color(patch.highlightColor)
+    output.highlightColor = alpha === 0 ? null : selected; output.highlightOpacity = alpha
+  }
   if (patch.align !== undefined) output.align = choice(patch.align, ['left', 'center', 'right', 'justify'], '文字对齐')
-  for (const key of ['bold', 'italic', 'underline'] as const) if (patch[key] !== undefined) output[key] = boolean(patch[key], key)
+  for (const key of ['bold', 'italic'] as const) if (patch[key] !== undefined) output[key] = boolean(patch[key], key)
+  if (patch.underlineStyle !== undefined) {
+    output.underlineStyle = choice(patch.underlineStyle, ['none', 'single', 'double'], '下划线样式'); output.underline = output.underlineStyle !== 'none'
+    if (patch.underline !== undefined) requireValue(boolean(patch.underline, '下划线') === output.underline, '下划线开关和样式相互冲突。')
+  } else if (patch.underline !== undefined) { output.underline = boolean(patch.underline, '下划线'); output.underlineStyle = output.underline ? 'single' : 'none' }
+  if (patch.strike !== undefined) output.strike = choice(patch.strike, ['none', 'single', 'double'], '删除线样式')
   return output
 }
 function geometry(patch: Partial<PresentationGeometry>): Partial<PresentationGeometry> {
@@ -77,6 +98,7 @@ function requireNoAnimation(objects: SlideObject[], operation: string) {
   requireValue(!allObjects(objects).some(object => object.hasAnimation), `所选对象参与原有动画或触发关系，${operation}可能破坏这些关系。请复制整张幻灯片以保留原动画。`)
 }
 function requireSafeObjectCopy(objects: SlideObject[]) {
+  requireValue(!allObjects(objects).some(object => object.smartArtEdits && Object.keys(object.smartArtEdits).length), '已编辑节点的 SmartArt 暂不能复制；请先保存并重新打开文稿。')
   requireNoAnimation(objects, '复制或粘贴')
   const sourceId = (object: SlideObject) => object.sourceXml?.match(/<(?:[\w.-]+:)?cNvPr\b[^>]*\bid\s*=\s*(["'])([^"']+)\1/)?.[2]
   const selected = new Set(allObjects(objects).filter(object => object.sourcePart && sourceId(object)).map(object => `${object.sourcePart}#${sourceId(object)}`))
@@ -237,6 +259,10 @@ export class PresentationController {
     this.model = clone(this.model)
     try {
       operation()
+      for (const object of this.model.slides.flatMap(slide => [...allObjects(slide.objects), ...allObjects(slide.inheritedObjects || [])])) if (object.smartArtEdits && Object.keys(object.smartArtEdits).length) {
+        const reason = smartArtEditBlockReason(this.model, object); requireValue(!reason, reason || '')
+      }
+      refreshSmartArtEditability(this.model)
       for (const slide of this.model.slides) { requireValue(allObjects(slide.objects).length <= PRESENTATION_LIMITS.objects, '当前页对象数量已达到上限。'); renumber(slide.objects) }
       if (!equal(before.model, this.model)) {
         this.history.push(before); this.trim(this.history); this.future = []
@@ -304,6 +330,7 @@ export class PresentationController {
       }
       case 'duplicate-page': {
         const pageIndex = this.pageIndex(action.pageIndex)
+        requireValue(!allObjects([...this.model.slides[pageIndex]!.objects, ...this.model.slides[pageIndex]!.inheritedObjects || []]).some(object => object.smartArtEdits && Object.keys(object.smartArtEdits).length), '含已编辑 SmartArt 节点的页面暂不能复制；请先保存并重新打开文稿。')
         requireValue(this.model.slides.length < PRESENTATION_LIMITS.slides, '幻灯片数量已达到上限。')
         const copy = clone(this.model.slides[pageIndex]!); copy.id = id('slide'); copy.objects = copy.objects.map(object => copyObject(object, false))
         if (copy.inheritedObjects) copy.inheritedObjects = copy.inheritedObjects.map(object => copyObject(object, false))
@@ -354,24 +381,84 @@ export class PresentationController {
       }
       case 'update-table': {
         const [object] = this.objects([action.id], true); requireValue(object?.table && object.type === 'table', '请选择可编辑表格对象。')
-        object.table = { cells: table(action.cells) }; break
+        replaceTableText(object, table(action.cells)); break
       }
       case 'insert-chart': this.add('chart', { width: 200, height: 110, ...geometry(action), chart: chart(action) }); break
       case 'update-chart': {
         const [object] = this.objects([action.id], true); requireValue(object?.chart && object.type === 'chart', '请选择可编辑图表对象。')
         object.chart = chart(action); break
       }
+      case 'update-smartart-text': {
+        commitSmartArtTextEdit(this.model, this.object(action.id), action)
+        break
+      }
+      case 'format-paragraphs': {
+        requireValue(Number.isSafeInteger(action.expectedRevision), '段落格式需要当前文稿版本，请重新打开排版设置。')
+        const [object] = this.objects([action.id], true); requireValue(object, '对象已不存在。')
+        requireValue(typeof action.expectedText === 'string' && action.expectedText === object.text, '正文已改变，请重新打开排版设置。')
+        formatParagraphs(object, action.paragraphIndices, action.paragraphStyle, action.spaceFirstLastParagraph)
+        break
+      }
+      case 'set-text-layout': {
+        const [object] = this.objects([action.id], true)
+        requireValue(object && object.capabilities.text && !['table', 'chart', 'group', 'image', 'unknown'].includes(object.type), '此对象不支持文本框排版。')
+        const patch = action.layout
+        requireValue(patch && typeof patch === 'object' && !Array.isArray(patch) && Object.keys(patch).length > 0 && Object.keys(patch).every(key => ['verticalAlign', 'wrap', 'rotation', 'insets'].includes(key)), '文本框排版设置无效。')
+        const layout = { ...object.textLayout }
+        let changed = false
+        if (patch.verticalAlign !== undefined) { layout.verticalAlign = choice(patch.verticalAlign, ['top', 'middle', 'bottom'], '垂直对齐'); changed = true }
+        if (patch.wrap !== undefined) { layout.wrap = boolean(patch.wrap, '自动换行'); changed = true }
+        if (patch.rotation !== undefined) { layout.rotation = Math.round(number(patch.rotation, -360, 360, '文字旋转') * 60000) / 60000; changed = true }
+        if (patch.insets !== undefined) {
+          requireValue(patch.insets && typeof patch.insets === 'object' && !Array.isArray(patch.insets) && Object.keys(patch.insets).length > 0 && Object.keys(patch.insets).every(key => ['left', 'right', 'top', 'bottom'].includes(key)), '文本框内边距无效。')
+          const insets = { left: 1.3, right: 1.3, top: 1.3, bottom: 1.3, ...layout.insets }
+          for (const key of ['left', 'right', 'top', 'bottom'] as const) if (patch.insets[key] !== undefined) { insets[key] = Math.round(number(patch.insets[key], 0, 1000, '内边距') * 36000) / 36000; changed = true }
+          layout.insets = insets
+        }
+        requireValue(changed, '请至少设置一项文本框排版属性。')
+        object.textLayout = layout
+        break
+      }
+      case 'format-text-range': {
+        requireValue(Number.isSafeInteger(action.expectedRevision), '选区格式需要当前文稿版本，请重新选择文字。')
+        const [object] = this.objects([action.id], true); requireValue(object, '对象已不存在。')
+        requireValue(typeof action.expectedText === 'string' && action.expectedText === object.text, '正文已改变，请重新选择文字后设置格式。')
+        const patch = textStyle(action.textStyle)
+        requireValue(!Object.hasOwn(action.textStyle || {}, 'align'), '选区格式仅设置字形，段落对齐请使用整框格式。')
+        requireValue(Object.keys(patch).length > 0, '请选择至少一项文字格式。')
+        // DrawingML stores sizes in hundredths of a point; use the same value
+        // in the preview so saving and reopening cannot change the size.
+        if (patch.fontSize !== undefined) patch.fontSize = Math.round(patch.fontSize * 100) / 100
+        formatTextRange(object, action.start, action.end, patch)
+        break
+      }
       case 'update-object': {
         const [object] = this.objects([action.id], true); requireValue(object, '对象已不存在。')
         const hasGeometry = geometryKeys.some(key => action[key] !== undefined)
         if (hasGeometry) { requireValue(object.capabilities.geometry, '此对象暂不支持几何编辑。'); transform(object, action) }
         if (action.text !== undefined || action.textStyle !== undefined) requireValue(object.capabilities.text, '此对象不支持文字编辑。')
-        if (action.text !== undefined) object.text = string(action.text, PRESENTATION_LIMITS.text, '文本')
-        if (action.textStyle !== undefined) object.textStyle = { ...object.textStyle, ...textStyle(action.textStyle) }
-        if (action.fillColor !== undefined) { requireValue(object.capabilities.fill, '此对象不支持填充编辑。'); object.fillColor = color(action.fillColor, true) }
+        if (action.text !== undefined) replaceTextContent(object, string(action.text, PRESENTATION_LIMITS.text, '文本'))
+        if (action.textStyle !== undefined) {
+          const patch = textStyle(action.textStyle)
+          formatWholeTextPaint(object, { ...(patch.color !== undefined ? { color: patch.color } : {}), ...(patch.opacity !== undefined ? { opacity: patch.opacity } : {}) })
+          object.textStyle = { ...object.textStyle, ...patch }
+          const { color: _color, opacity: _opacity, ...attributes } = patch
+          if ((object.richText || object.sourceXml && attributes.highlightColor !== undefined) && Object.keys(attributes).length) object.textStyleOverrides = { ...object.textStyleOverrides, ...attributes }
+        }
+        if (action.fillColor !== undefined) { requireValue(object.capabilities.fill, '此对象不支持填充编辑。'); object.fillColor = color(action.fillColor, true); if (object.sourceXml) object.fillColorOverride = true }
         if (action.lineColor !== undefined || action.lineWidth !== undefined) requireValue(object.capabilities.line, '此对象不支持线条编辑。')
-        if (action.lineColor !== undefined) object.lineColor = color(action.lineColor, true)
+        if (action.lineColor !== undefined) { object.lineColor = color(action.lineColor, true); if (object.sourceXml) object.lineColorOverride = true }
         if (action.lineWidth !== undefined) object.lineWidth = number(action.lineWidth, 0, 20, '线宽')
+        if (action.fillOpacity !== undefined) {
+          requireValue(['text', 'rectangle', 'ellipse'].includes(object.type) && object.capabilities.fill && object.fillColor !== null, '此对象没有可编辑的普通实色填充，请先选择填充颜色。')
+          requireValue(paintOpacityEditable(object, 'fill', action.fillColor !== undefined), '引用样式或复杂颜色变换暂不能单独调整不透明度，请先选择明确的填充颜色。')
+          object.fillOpacity = Math.round(number(action.fillOpacity, 0, 1, '填充不透明度') * 100000) / 100000
+        }
+        if (action.lineOpacity !== undefined) {
+          requireValue(['text', 'rectangle', 'ellipse', 'line'].includes(object.type) && object.capabilities.line && object.lineColor !== null, '此对象没有可编辑的普通实色边框，请先选择边框颜色。')
+          requireValue(paintOpacityEditable(object, 'line', action.lineColor !== undefined), '引用样式或复杂颜色变换暂不能单独调整不透明度，请先选择明确的边框颜色。')
+          object.lineOpacity = Math.round(number(action.lineOpacity, 0, 1, '边框不透明度') * 100000) / 100000
+        }
         break
       }
       case 'delete-objects': { requireNoAnimation(this.objects(action.ids), '删除'); const remove = new Set(this.objects(action.ids, true).map(object => object.id)); this.page.objects = this.page.objects.filter(object => !remove.has(object.id)); this.selectedObjectIds = this.selectedObjectIds.filter(value => !remove.has(value)); break }
@@ -399,6 +486,9 @@ export class PresentationController {
       requireValue(selected.every(object => object.type === 'group' && object.children), '请选择组合对象。')
       for (const group of selected) {
         const angle = group.rotation * Math.PI / 180, cos = Math.cos(angle), sin = Math.sin(angle)
+        // The original XML still has local coordinates. Even an unrotated
+        // ungroup operation must export the child's absolute model transform.
+        for (const child of group.children!) if (child.sourceXml) child.sourceTransformDetached = true
         if (!angle) continue
         for (const child of group.children!) {
           const cx = child.x + child.width / 2 - group.x - group.width / 2, cy = child.y + child.height / 2 - group.y - group.height / 2
@@ -431,6 +521,7 @@ export class PresentationController {
   pasteObjects(objects = this.clipboard): PresentationState {
     requireValue(Array.isArray(objects) && objects.length > 0 && allObjects(objects).length <= PRESENTATION_LIMITS.objects, '剪贴板没有可粘贴对象。')
     requireSafeObjectCopy(objects)
+    requireValue(!allObjects(objects).some(object => hasSmartArtBinding(object) && object.sourcePart !== this.page.sourcePart), 'SmartArt 暂不支持跨页对象粘贴；可以复制整张未编辑的幻灯片以保留图表关系。')
     return this.transact(() => {
       const copies = objects.map(object => copyObject(object))
       for (const object of copies) { if (!object.locked) transform(object, { x: object.x + 5, y: object.y + 5 }); this.page.objects.push(object) }

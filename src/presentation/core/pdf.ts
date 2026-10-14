@@ -1,7 +1,7 @@
 import type { PresentationModel } from './types'
 import { buildSlideScene, finite, PT_TO_MM, safeImageDataUrl } from './scene.ts'
 import type { SceneNode, ScenePaint } from './scene.ts'
-import type { PDFDocument, PDFImage, PDFPage, PDFOperator, PDFName } from 'pdf-lib'
+import type { PDFDocument, PDFImage, PDFPage, PDFOperator, PDFName, PDFRef } from 'pdf-lib'
 import { cjkFontkit } from './fontkit-compat.ts'
 
 export interface PresentationPdfOptions {
@@ -67,6 +67,10 @@ export async function exportPresentationPdf(model: PresentationModel, options: P
   let measuredFont: ReturnType<typeof adaptedFontkit.create> | undefined
   document.registerFontkit({ create(data: Uint8Array) { measuredFont = adaptedFontkit.create(data); return measuredFont } })
   const font = await document.embedFont(fontBytes, { subset: true })
+  // Fontkit's CID-CFF serializer cannot encode a subset with no used glyphs:
+  // blank/image-only decks otherwise throw asynchronously and leave save pending.
+  // Seed a space in the font resource without drawing anything on any page.
+  font.encodeText(' ')
   document.setTitle('演示文稿')
   document.setCreator('Open Office independent presentation editor')
   document.setProducer('Open Office / pdf-lib')
@@ -86,11 +90,16 @@ export async function exportPresentationPdf(model: PresentationModel, options: P
     const ascent = font.heightAtSize(size, { descender: false })
     return { ascent, descent: font.heightAtSize(size) - ascent }
   }
+  const measureFontMetrics = (_style: unknown, size: number) => ({
+    ascent: Math.max(0, measuredFont!.ascent) / measuredFont!.unitsPerEm * size,
+    descent: Math.max(0, -measuredFont!.descent) / measuredFont!.unitsPerEm * size,
+  })
 
   for (const slide of model.slides) {
     // Include hidden slides to preserve player page indices and the exported page count.
     const page: PDFPage = document.addPage([width * k, height * k])
     const fontName = page.node.newFontDictionary(font.name, font.ref)
+    let formOpacityResources: PDFRef | undefined
     const opacities = new Map<number, PDFName>()
     const opacityState = (alpha: number) => {
       let ref = opacities.get(alpha)
@@ -106,42 +115,69 @@ export async function exportPresentationPdf(model: PresentationModel, options: P
       return result
     }
     const finish = (node: ScenePaint) => node.fill && node.stroke && node.strokeWidth > 0 ? pdf.fillAndStroke() : node.fill ? pdf.fill() : node.stroke && node.strokeWidth > 0 ? pdf.stroke() : pdf.endPath()
-    async function render(node: SceneNode, inheritedOpacity = 1): Promise<void> {
+    async function render(node: SceneNode, inheritedOpacity = 1, push: (...operators: PDFOperator[]) => void = (...operators) => page.pushOperators(...operators), referencedObjects?: Map<PDFName, PDFRef>): Promise<void> {
       if (node.kind === 'group') {
-        page.pushOperators(pdf.pushGraphicsState())
+        push(pdf.pushGraphicsState())
         const alpha = inheritedOpacity * (node.opacity ?? 1)
-        if (alpha !== inheritedOpacity) page.pushOperators(pdf.setGraphicsState(opacityState(alpha)))
+        if (alpha !== inheritedOpacity) push(pdf.setGraphicsState(opacityState(alpha)))
         if (node.rotation) {
           const radians = node.rotation * Math.PI / 180, cos = Math.cos(radians), sin = Math.sin(radians), cx = node.x + node.width / 2, cy = node.y + node.height / 2
-          page.pushOperators(pdf.concatTransformationMatrix(cos, sin, -sin, cos, cx - cos * cx + sin * cy, cy - sin * cx - cos * cy))
+          push(pdf.concatTransformationMatrix(cos, sin, -sin, cos, cx - cos * cx + sin * cy, cy - sin * cx - cos * cy))
         }
-        if (node.clip) { const b = node.clip; page.pushOperators(pdf.rectangle(b.x, b.y, b.width, b.height), pdf.clip(), pdf.endPath()) }
-        for (const child of node.children) await render(child, alpha)
-        page.pushOperators(pdf.popGraphicsState())
+        if (node.clip) { const b = node.clip; push(pdf.rectangle(b.x, b.y, b.width, b.height), pdf.clip(), pdf.endPath()) }
+        if ((node.isolateTextPaint || node.isolateHighlightPaint) && alpha < 1) {
+          // Composite overlapping glyphs, marker rectangles and strike lines
+          // once at their inherited alpha, preserving child-local alpha.
+          const operators: PDFOperator[] = [pdf.setGraphicsState(opacityState(1))]
+          const objects = new Map<PDFName, PDFRef>()
+          for (const child of node.children) await render(child, 1, (...items) => operators.push(...items), objects)
+          const resources = page.node.Resources()!
+          // Share one indirect ExtGState dictionary instead of serializing
+          // every page alpha into every form (quadratic for varied run alpha).
+          formOpacityResources ||= document.context.register(resources.lookup(pdf.PDFName.of('ExtGState'))!)
+          // Only the existing outer text clip defines the visible edge. Give
+          // the form a 1 mm guard so a rotated edge is not antialiased twice.
+          const guard = 1
+          const bounds = node.clip || node
+          // Snapshot only XObjects referenced by this stream, before its own
+          // registration. Nested decorated forms stay acyclic and linear-size.
+          const xObjects = document.context.obj({})
+          for (const [name, reference] of objects) xObjects.set(name, reference)
+          const form = document.context.flateStream(operators.map(operator => operator.toString()).join('\n'), {
+            Type: 'XObject', Subtype: 'Form', FormType: 1,
+            BBox: [bounds.x - guard, bounds.y - guard, bounds.x + bounds.width + guard, bounds.y + bounds.height + guard],
+            Resources: { Font: resources.lookup(pdf.PDFName.of('Font')), ExtGState: formOpacityResources, XObject: xObjects },
+            Group: { S: 'Transparency', I: true, K: false },
+          })
+          const reference = document.context.register(form), key = page.node.newXObject('TextPaint', reference)
+          referencedObjects?.set(key, reference)
+          push(pdf.drawObject(key))
+        } else for (const child of node.children) await render(child, alpha, push, referencedObjects)
+        push(pdf.popGraphicsState())
       } else if (node.kind === 'text') {
         if (!node.text) return
-        page.pushOperators(pdf.pushGraphicsState(), pdf.setFillingRgbColor(...color(node.color)), pdf.setStrokingRgbColor(...color(node.color)), pdf.setLineWidth(node.size * .025), pdf.beginText(), pdf.setFontAndSize(fontName, node.size), pdf.setTextRenderingMode(node.bold ? pdf.TextRenderingMode.FillAndOutline : pdf.TextRenderingMode.Fill), pdf.setTextMatrix(1, 0, node.italic ? .2 : 0, -1, node.x, node.y), pdf.showText(font.encodeText(node.text)), pdf.endText())
-        if (node.underline) page.pushOperators(pdf.setLineWidth(Math.max(.1, node.size * .055)), pdf.moveTo(node.x, node.y + node.size * .1), pdf.lineTo(node.x + node.width, node.y + node.size * .1), pdf.stroke())
-        page.pushOperators(pdf.popGraphicsState())
+        push(pdf.pushGraphicsState(), pdf.setFillingRgbColor(...color(node.color)), pdf.setStrokingRgbColor(...color(node.color)), pdf.setLineWidth(node.size * .025), pdf.beginText(), pdf.setFontAndSize(fontName, node.size), pdf.setTextRenderingMode(node.bold ? pdf.TextRenderingMode.FillAndOutline : pdf.TextRenderingMode.Fill), pdf.setTextMatrix(1, 0, node.italic ? .2 : 0, -1, node.x, node.y), pdf.showText(font.encodeText(node.text)), pdf.endText())
+        push(pdf.popGraphicsState())
       } else if (node.kind === 'image') {
         let image = images.get(node.dataUrl)
         if (!image) { const source = await imageBytes(node.dataUrl); image = source.kind === 'png' ? await document.embedPng(source.bytes) : await document.embedJpg(source.bytes); images.set(node.dataUrl, image) }
         const key = page.node.newXObject('Image', image.ref)
-        page.pushOperators(pdf.pushGraphicsState(), pdf.concatTransformationMatrix(node.width, 0, 0, -node.height, node.x, node.y + node.height), pdf.drawObject(key), pdf.popGraphicsState())
+        referencedObjects?.set(key, image.ref)
+        push(pdf.pushGraphicsState(), pdf.concatTransformationMatrix(node.width, 0, 0, -node.height, node.x, node.y + node.height), pdf.drawObject(key), pdf.popGraphicsState())
       } else {
-        page.pushOperators(pdf.pushGraphicsState(), ...paint(node))
-        if (node.kind === 'rect') page.pushOperators(pdf.rectangle(node.x, node.y, node.width, node.height))
+        push(pdf.pushGraphicsState(), ...paint(node))
+        if (node.kind === 'rect') push(pdf.rectangle(node.x, node.y, node.width, node.height))
         else if (node.kind === 'ellipse') {
           const rx = node.width / 2, ry = node.height / 2, cx = node.x + rx, cy = node.y + ry, b = .552284749831
-          page.pushOperators(pdf.moveTo(cx + rx, cy), pdf.appendBezierCurve(cx + rx, cy + b * ry, cx + b * rx, cy + ry, cx, cy + ry), pdf.appendBezierCurve(cx - b * rx, cy + ry, cx - rx, cy + b * ry, cx - rx, cy), pdf.appendBezierCurve(cx - rx, cy - b * ry, cx - b * rx, cy - ry, cx, cy - ry), pdf.appendBezierCurve(cx + b * rx, cy - ry, cx + rx, cy - b * ry, cx + rx, cy), pdf.closePath())
+          push(pdf.moveTo(cx + rx, cy), pdf.appendBezierCurve(cx + rx, cy + b * ry, cx + b * rx, cy + ry, cx, cy + ry), pdf.appendBezierCurve(cx - b * rx, cy + ry, cx - rx, cy + b * ry, cx - rx, cy), pdf.appendBezierCurve(cx - rx, cy - b * ry, cx - b * rx, cy - ry, cx, cy - ry), pdf.appendBezierCurve(cx + b * rx, cy - ry, cx + rx, cy - b * ry, cx + rx, cy), pdf.closePath())
         } else {
-          node.points.forEach(([x, y], index) => page.pushOperators(index ? pdf.lineTo(x, y) : pdf.moveTo(x, y)))
-          if (node.closed) page.pushOperators(pdf.closePath())
+          node.points.forEach(([x, y], index) => push(index ? pdf.lineTo(x, y) : pdf.moveTo(x, y)))
+          if (node.closed) push(pdf.closePath())
         }
-        page.pushOperators(finish(node), pdf.popGraphicsState())
+        push(finish(node), pdf.popGraphicsState())
       }
     }
-    for (const node of buildSlideScene(model, slide, { measureText, measureTextMetrics })) await render(node)
+    for (const node of buildSlideScene(model, slide, { measureText, measureTextMetrics, measureFontMetrics })) await render(node)
     page.pushOperators(pdf.popGraphicsState())
   }
   return document.save()

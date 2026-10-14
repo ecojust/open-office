@@ -1,0 +1,214 @@
+{
+  "scope": "Ordinary single/double underline and strike; inheritance and explicit disable; alpha 0/50%; unsupported wavy/words preservation. Native reference may simplify some underline styles.",
+  "items": [
+    {
+      "id": "ordinary-decorations",
+      "path": "ordinary-decorations.pptx",
+      "sha256": "1a1f9d3ec2b319c65951105c12493def55c5b170a343c661c57b28423eaf2586",
+      "expected": {
+        "slides": 1
+      },
+      "slideMm": [
+        338.6666666667,
+        190.5
+      ],
+      "objects": [
+        {
+          "id": "none-control",
+          "u": "none",
+          "strike": "noStrike",
+          "expected": [
+            "none",
+            "none"
+          ],
+          "boxMm": [
+            15,
+            12,
+            88,
+            32
+          ],
+          "text": "H H"
+        },
+        {
+          "id": "single-underline",
+          "u": "sng",
+          "expected": [
+            "single",
+            "none"
+          ],
+          "boxMm": [
+            120,
+            12,
+            88,
+            32
+          ],
+          "text": "H H"
+        },
+        {
+          "id": "double-underline",
+          "u": "dbl",
+          "expected": [
+            "double",
+            "none"
+          ],
+          "boxMm": [
+            225,
+            12,
+            88,
+            32
+          ],
+          "text": "H H"
+        },
+        {
+          "id": "single-strike",
+          "strike": "sngStrike",
+          "expected": [
+            "none",
+            "single"
+          ],
+          "boxMm": [
+            15,
+            56,
+            88,
+            32
+          ],
+          "text": "H H"
+        },
+        {
+          "id": "double-strike",
+          "strike": "dblStrike",
+          "expected": [
+            "none",
+            "double"
+          ],
+          "boxMm": [
+            120,
+            56,
+            88,
+            32
+          ],
+          "text": "H H"
+        },
+        {
+          "id": "both-double",
+          "u": "dbl",
+          "strike": "dblStrike",
+          "expected": [
+            "double",
+            "double"
+          ],
+          "boxMm": [
+            225,
+            56,
+            88,
+            32
+          ],
+          "text": "H H"
+        },
+        {
+          "id": "inherited-double",
+          "default": {
+            "u": "dbl",
+            "strike": "dblStrike"
+          },
+          "expected": [
+            "double",
+            "double"
+          ],
+          "boxMm": [
+            15,
+            100,
+            88,
+            32
+          ],
+          "text": "H H"
+        },
+        {
+          "id": "explicit-disable",
+          "default": {
+            "u": "dbl",
+            "strike": "dblStrike"
+          },
+          "u": "none",
+          "strike": "noStrike",
+          "expected": [
+            "none",
+            "none"
+          ],
+          "boxMm": [
+            120,
+            100,
+            88,
+            32
+          ],
+          "text": "H H"
+        },
+        {
+          "id": "zero-alpha-double",
+          "u": "dbl",
+          "strike": "dblStrike",
+          "alpha": 0,
+          "expected": [
+            "double",
+            "double"
+          ],
+          "boxMm": [
+            225,
+            100,
+            88,
+            32
+          ],
+          "text": "H H"
+        },
+        {
+          "id": "half-alpha-double",
+          "u": "dbl",
+          "strike": "dblStrike",
+          "alpha": 0.5,
+          "expected": [
+            "double",
+            "double"
+          ],
+          "boxMm": [
+            15,
+            144,
+            88,
+            32
+          ],
+          "text": "H H"
+        },
+        {
+          "id": "wavy-preserved",
+          "u": "wavy",
+          "strike": "sngStrike",
+          "expected": [
+            "unsupported",
+            "single"
+          ],
+          "boxMm": [
+            120,
+            144,
+            88,
+            32
+          ],
+          "text": "H H"
+        },
+        {
+          "id": "words-preserved",
+          "u": "words",
+          "expected": [
+            "unsupported",
+            "none"
+          ],
+          "boxMm": [
+            225,
+            144,
+            88,
+            32
+          ],
+          "text": "H H"
+        }
+      ]
+    }
+  ]
+}

@@ -7,10 +7,10 @@ const fs = require('node:fs')
 const path = require('node:path')
 const http = require('node:http')
 const { chromium } = require('playwright')
-const { unzipSync, strFromU8 } = require('fflate')
+const { unzipSync, strFromU8, zipSync, strToU8 } = require('fflate')
 const project = path.resolve(__dirname, '../..')
 const publicRoot = path.join(project, 'public')
-const output = path.join(project, 'test-results/writer-workbench')
+const output = path.join(project, process.env.WRITER_TARGET === 'completion' ? 'test-results/writer-completion' : 'test-results/writer-workbench')
 fs.mkdirSync(output, { recursive: true })
 const html = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;height:100%}iframe{width:100%;height:100%;border:0}</style>
 <iframe id="office" src="office/host.html?smoke=1#session=writer-test"></iframe><script>
@@ -32,6 +32,14 @@ const server = http.createServer((req, res) => {
   const local = path.resolve(publicRoot, '.' + decodeURIComponent(url.pathname))
   if (!local.startsWith(publicRoot + path.sep) || !fs.existsSync(local) || !fs.statSync(local).isFile()) { res.writeHead(404); return res.end() }
   const mime = { '.js': 'application/javascript', '.html': 'text/html', '.css': 'text/css', '.wasm': 'application/wasm' }[path.extname(local)] || 'application/octet-stream'
+  if(process.env.WRITER_METADATA_DEBUG==='1'&&local.endsWith('/writer-tools.js')) {
+    const diagnostic=fs.readFileSync(local,'utf8').replace('const basicStyle =', `console.log('WRITER_METADATA '+JSON.stringify({target,name,visited,unvisited,events})); const basicStyle =`)
+    res.setHeader('Content-Type',mime);return res.end(diagnostic)
+  }
+  if(process.env.WRITER_UNDO_DEBUG==='1'&&local.endsWith('/writer-tools.js')) {
+    const diagnostic=fs.readFileSync(local,'utf8').replace('function state() { const e = env(); return', `function state() { const e = env(); console.log('WRITER_UNDO '+JSON.stringify(optional(()=>{const u=e.model.getUndoManager();return {undo:u.isUndoPossible(),redo:u.isRedoPossible(),titles:u.getAllUndoActionTitles().slice(0,5),text:selection(e).text,link:read(e.view,'HyperLinkURL','')}}))); return`)
+    res.setHeader('Content-Type',mime);return res.end(diagnostic)
+  }
   if(process.env.WRITER_SIGNATURE_DEBUG==='1'&&local.endsWith('/writer-tools.js')) {
     const diagnostic=fs.readFileSync(local,'utf8').replace('return names.map((name, index) => [name, safeFormatValue(values[index])]);',"return names.map((name,index) => {try{return [name,safeFormatValue(values[index])]}catch(error){console.warn('CAS_PROPERTY',name);throw error}});")
       .replace('values = names.map(name => object.getPropertyValue(name));',"values = names.map(name => {try{return object.getPropertyValue(name)}catch(error){console.warn('CAS_PROPERTY_READ',name);throw error}});")
@@ -52,6 +60,8 @@ async function run() {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
     page.on('pageerror', error => errors.push(error.message))
     if(process.env.WRITER_SIGNATURE_DEBUG==='1')page.on('console',message=>{if(message.text().includes('CAS_'))console.log(message.text())})
+    if(process.env.WRITER_UNDO_DEBUG==='1')page.on('console',message=>{if(message.text().startsWith('WRITER_UNDO '))console.log(message.text())})
+    if(process.env.WRITER_METADATA_DEBUG==='1')page.on('console',message=>{if(message.text().startsWith('WRITER_METADATA '))console.log(message.text())})
     await page.goto(`http://127.0.0.1:${server.address().port}/`)
     await page.waitForFunction(() => events.some(e => e.event === 'engine-ready' || e.event === 'error'), {}, { timeout: 180000 })
     const startup = await page.evaluate(() => ({ isolated: crossOriginIsolated, failure: events.find(e => e.event === 'error') }))
@@ -72,6 +82,111 @@ async function run() {
     console.log('ENGINE_OPENED')
     const initial = await call('word-state')
     assert.equal(initial.dirty, false); assert.ok(initial.selection.id); assert.ok(initial.styles.length)
+    if(process.env.WRITER_TARGET==='link-metadata') {
+      const target=path.join(project,'test-results/writer-link-metadata');fs.mkdirSync(target,{recursive:true})
+      const original=fs.readFileSync(path.join(project,'test-results/writer-completion/completion-formatted.odt'))
+      await call('open',{id:'writer-document',name:'plain.odt',kind:'word',extension:'odt',base64:original.toString('base64'),discard:true})
+      await act({type:'find-replace',search:'链接正文'});let state=await act({type:'set-hyperlink',url:'https://example.net/plain'});assert.equal(state.hyperlink.url,'https://example.net/plain')
+      await call('undo');state=await act({type:'find-replace',search:'链接正文'});assert.equal(state.hyperlink.url,'https://example.com/article?x=1&y=2')
+      const parts=unzipSync(original),changed=await page.evaluate(xml=>{const d=new DOMParser().parseFromString(xml,'application/xml'),a=d.getElementsByTagNameNS('urn:oasis:names:tc:opendocument:xmlns:text:1.0','a')[0];a.setAttributeNS('urn:oasis:names:tc:opendocument:xmlns:office:1.0','office:target-frame-name','_blank');a.setAttributeNS('urn:oasis:names:tc:opendocument:xmlns:office:1.0','office:name','KeepName');return new XMLSerializer().serializeToString(d)},strFromU8(parts['content.xml']))
+      parts['content.xml']=strToU8(changed);const fixture=zipSync(parts,{level:0});fs.writeFileSync(path.join(target,'advanced-link.odt'),fixture)
+      await call('open',{id:'writer-document',name:'advanced.odt',kind:'word',extension:'odt',base64:Buffer.from(fixture).toString('base64'),discard:true})
+      await act({type:'find-replace',search:'链接正文'})
+      const readLinks=async file=>page.evaluate(xml=>{const d=new DOMParser().parseFromString(xml,'application/xml');return Array.from(d.getElementsByTagNameNS('urn:oasis:names:tc:opendocument:xmlns:text:1.0','a')).map(a=>({text:a.textContent,attributes:Array.from(a.attributes).map(v=>[v.namespaceURI,v.localName,v.value]).sort()}))},strFromU8(unzipSync(Buffer.from(file.base64,'base64'))['content.xml']))
+      const beforeFile=await call('export',{format:'odt'}),before=await readLinks(beforeFile)
+      assert.ok(before.some(link=>link.attributes.some(a=>a[1]==='target-frame-name'&&a[2]==='_blank')))
+      await assert.rejects(act({type:'set-hyperlink',url:'https://example.net/must-not-overwrite'}),/普通链接|混合/)
+      const afterFile=await call('export',{format:'odt'}),after=await readLinks(afterFile);assert.deepEqual(after,before)
+      fs.writeFileSync(path.join(target,'after-rejected-edit.odt'),Buffer.from(afterFile.base64,'base64'))
+      await act({type:'set-hyperlink',url:''});await call('undo');const restored=await readLinks(await call('export',{format:'odt'}));assert.deepEqual(restored,before)
+      fs.writeFileSync(path.join(target,'report.json'),JSON.stringify({ok:true,checks:['Ordinary link edit and undo still work with strict metadata preflight','Advanced target/name link edit rejected without changing native ODT XML','Explicit removal undo restores target/name and the original link'],before,after,restored},null,2));console.log('Writer link metadata checks passed: 3');return
+    }
+    if(process.env.WRITER_TARGET==='link-undo') {
+      const source=path.join(project,'test-results/writer-completion/completion-formatted.odt'),target=path.join(project,'test-results/writer-link-undo');fs.mkdirSync(target,{recursive:true})
+      await call('open',{id:'writer-document',name:'link.odt',kind:'word',extension:'odt',base64:fs.readFileSync(source).toString('base64'),discard:true})
+      const before=await act({type:'find-replace',search:'链接正文'});const removed=await act({type:'set-hyperlink',url:''});await call('undo')
+      const undoExport=await call('export',{format:'docx'});fs.writeFileSync(path.join(target,'after-undo.docx'),Buffer.from(undoExport.base64,'base64'))
+      const after=await act({type:'find-replace',search:'链接正文'});await page.waitForTimeout(500);const later=await call('word-state')
+      fs.writeFileSync(path.join(target,'diagnostic.json'),JSON.stringify({before,removed,after,later},null,2));console.log('LINK_UNDO',JSON.stringify({before:before.hyperlink,after:after.hyperlink,later:later.hyperlink}));return
+    }
+    if(process.env.WRITER_TARGET==='completion') {
+      const checks=[],guarded=async data=>{const current=await call('word-state');return act({...data,expectedRevision:current.revision,expectedSelectionId:current.selection.id})}
+      await act({type:'insert-text',text:'Alpha Alpha Cat caterpillar CAT\n链接正文 高亮文字 删除文字 上标2 下标2 清除格式 保留正文'})
+      let state=await act({type:'find-replace',search:'Alpha',matchCase:true,wholeWords:true})
+      assert.equal(state.selection.text,'Alpha')
+      state=await act({type:'find-replace',search:'Alpha',replace:'Beta',matchCase:true,wholeWords:true})
+      const replaceProof=await inspectDocx(await call('export',{format:'docx'}),'completion-replace')
+      assert.match(replaceProof.bodyText,/Beta Alpha/);checks.push('replace selected repeated match first')
+      await act({type:'find-replace',search:'caterpillar',matchCase:true})
+      await act({type:'find-replace',search:'cat',replace:'DOG',wholeWords:true})
+      const wordProof=await inspectDocx(await call('export',{format:'docx'}),'completion-whole-word')
+      assert.match(wordProof.bodyText,/Cat caterpillar DOG/);checks.push('Whole-word replacement skips a partial selected word and respects case-insensitive native matching')
+      state=await act({type:'find-replace',search:'链接正文'})
+      await act({type:'format-text',bold:true,fontSize:18,fontName:'Liberation Serif',color:'#2356A0'})
+      state=await guarded({type:'set-hyperlink',url:'https://example.com/article?x=1&y=2'})
+      assert.equal(state.hyperlink.url,'https://example.com/article?x=1&y=2');assert.equal(state.textStyle.bold,true)
+      await call('undo');state=await act({type:'find-replace',search:'链接正文'});assert.equal(state.hyperlink.url,'');assert.equal(state.textStyle.bold,true);assert.equal(state.textStyle.fontSize,18)
+      await call('redo');state=await act({type:'find-replace',search:'链接正文'});assert.equal(state.hyperlink.url,'https://example.com/article?x=1&y=2')
+      await act({type:'find-replace',search:'接正'});await guarded({type:'set-hyperlink',url:''})
+      const partial=await call('export',{format:'docx'}),partialParts=unzipSync(Buffer.from(partial.base64,'base64'))
+      fs.writeFileSync(path.join(output,'completion-partial-link.docx'),Buffer.from(partial.base64,'base64'))
+      const remainingLinks=await page.evaluate(xml=>{const d=new DOMParser().parseFromString(xml,'application/xml');return Array.from(d.getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main','hyperlink')).map(n=>n.textContent)},strFromU8(partialParts['word/document.xml']))
+      assert.deepEqual(remainingLinks,['链','文'],'Removing the middle of a hyperlink must preserve both unselected linked sides')
+      await call('undo');state=await act({type:'find-replace',search:'链接正文'});assert.equal(state.hyperlink.url,'https://example.com/article?x=1&y=2')
+      checks.push('Partial link removal preserves both unselected linked sides and undo restores the complete link')
+      await guarded({type:'set-hyperlink',url:'https://example.net/revised'});await call('undo');state=await act({type:'find-replace',search:'链接正文'});assert.equal(state.hyperlink.url,'https://example.com/article?x=1&y=2')
+      await call('redo');state=await act({type:'find-replace',search:'链接正文'});assert.equal(state.hyperlink.url,'https://example.net/revised')
+      await call('undo');state=await act({type:'find-replace',search:'链接正文'});assert.equal(state.hyperlink.url,'https://example.com/article?x=1&y=2')
+      checks.push('Link insertion and address change each support one-step undo and redo')
+      await assert.rejects(guarded({type:'set-hyperlink',url:'javascript:alert(1)'}),/仅支持/)
+      const stale=await call('word-state')
+      await act({type:'find-replace',search:'保留正文'})
+      await assert.rejects(act({type:'set-hyperlink',url:'https://example.com/wrong',expectedRevision:stale.revision,expectedSelectionId:stale.selection.id}),/选区已改变|文档已变化/)
+      checks.push('link attributes preserve text formatting; unsafe and stale writes rejected')
+      for(const [search,format] of [['高亮文字',{highlight:'#FFF1A6'}],['删除文字',{strikethrough:true}],['上标2',{baseline:'superscript'}],['下标2',{baseline:'subscript'}],['清除格式',{strikethrough:true,baseline:'superscript',highlight:'#FFFF00'}]]) {
+        await act({type:'find-replace',search});state=await act({type:'format-text',...format})
+        for(const [key,value] of Object.entries(format))assert.equal(state.textStyle[key],value)
+      }
+      await call('undo');state=await act({type:'find-replace',search:'清除格式'});assert.equal(state.textStyle.strikethrough,false);assert.equal(state.textStyle.baseline,'normal');assert.equal(state.textStyle.highlight,null)
+      await call('redo');state=await act({type:'find-replace',search:'清除格式'});assert.equal(state.textStyle.strikethrough,true);assert.equal(state.textStyle.baseline,'superscript');assert.equal(state.textStyle.highlight,'#FFFF00')
+      checks.push('Character format group supports one-step native undo and redo')
+      await act({type:'format-text',strikethrough:false,baseline:'normal',highlight:null})
+      const saved=await call('export',{format:'docx'}),parts=unzipSync(Buffer.from(saved.base64,'base64'))
+      fs.writeFileSync(path.join(output,'completion-formatted.docx'),Buffer.from(saved.base64,'base64'))
+      const xmlProof=await page.evaluate(({xml,rels})=>{
+        const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main',rns='http://schemas.openxmlformats.org/package/2006/relationships'
+        const doc=new DOMParser().parseFromString(xml,'application/xml'),rel=new DOMParser().parseFromString(rels,'application/xml')
+        const runs=Array.from(doc.getElementsByTagNameNS(ns,'r')).map(run=>({text:Array.from(run.getElementsByTagNameNS(ns,'t')).map(n=>n.textContent).join(''),properties:Array.from(run.getElementsByTagNameNS(ns,'rPr')).map(n=>new XMLSerializer().serializeToString(n)).join('')}))
+        return {runs,links:Array.from(doc.getElementsByTagNameNS(ns,'hyperlink')).map(n=>n.textContent),targets:Array.from(rel.getElementsByTagNameNS(rns,'Relationship')).filter(n=>n.getAttribute('Type').endsWith('/hyperlink')).map(n=>({target:n.getAttribute('Target'),mode:n.getAttribute('TargetMode')}))}
+      },{xml:strFromU8(parts['word/document.xml']),rels:strFromU8(parts['word/_rels/document.xml.rels'])})
+      assert.ok(xmlProof.links.includes('链接正文'));assert.ok(xmlProof.targets.some(r=>r.target==='https://example.com/article?x=1&y=2'&&r.mode==='External'))
+      assert.ok(xmlProof.runs.some(r=>r.text==='删除文字'&&/<w:strike/.test(r.properties)))
+      assert.ok(xmlProof.runs.some(r=>r.text.startsWith('上标')&&/superscript/.test(r.properties)))
+      assert.ok(xmlProof.runs.some(r=>r.text.startsWith('下标')&&/subscript/.test(r.properties)))
+      assert.ok(xmlProof.runs.some(r=>r.text==='高亮文字'&&/FFF1A6/i.test(r.properties)))
+      checks.push('DOCX hyperlink relationship and character run XML verified')
+      const odt=await call('export',{format:'odt'});fs.writeFileSync(path.join(output,'completion-formatted.odt'),Buffer.from(odt.base64,'base64'))
+      for(const [format,file] of [['docx',saved],['odt',odt]]) {
+        await call('open',{id:'writer-document',name:'completion.'+format,kind:'word',extension:format,base64:file.base64,discard:true})
+        state=await act({type:'find-replace',search:'链接正文'});assert.equal(state.hyperlink.url,'https://example.com/article?x=1&y=2');assert.equal(state.textStyle.bold,true);assert.equal(state.textStyle.fontSize,18)
+        for(const [search,expected] of [['高亮文字',{highlight:'#FFF1A6'}],['删除文字',{strikethrough:true}],['上标2',{baseline:'superscript',fontSize:12}],['下标2',{baseline:'subscript',fontSize:12}],['清除格式',{strikethrough:false,baseline:'normal',highlight:null}]]) {
+          state=await act({type:'find-replace',search});for(const [key,value] of Object.entries(expected)) assert.equal(state.textStyle[key],value,format+' '+search+' '+key)
+        }
+        checks.push(format+' reopens with links, formatting and explicit resets')
+      }
+      await act({type:'find-replace',search:'链接正文'});state=await guarded({type:'set-hyperlink',url:''});assert.equal(state.hyperlink.url,'');assert.equal(state.textStyle.bold,true);assert.equal(state.textStyle.fontSize,18);assert.equal(state.textStyle.fontName,'Liberation Serif');assert.equal(state.textStyle.color,'#2356A0')
+      await call('undo');state=await act({type:'find-replace',search:'链接正文'});assert.equal(state.hyperlink.url,'https://example.com/article?x=1&y=2')
+      await call('redo');state=await act({type:'find-replace',search:'链接正文'});assert.equal(state.hyperlink.url,'')
+      const removed=await call('export',{format:'docx'}),removedParts=unzipSync(Buffer.from(removed.base64,'base64'))
+      fs.writeFileSync(path.join(output,'completion-link-removed.docx'),Buffer.from(removed.base64,'base64'))
+      assert.ok(!strFromU8(removedParts['word/document.xml']).includes('<w:hyperlink'))
+      await call('open',{id:'writer-document',name:'removed.docx',kind:'word',extension:'docx',base64:removed.base64,discard:true})
+      state=await act({type:'find-replace',search:'链接正文'});assert.equal(state.hyperlink.url,'');assert.equal(state.selection.text,'链接正文');assert.equal(state.textStyle.bold,true);assert.equal(state.textStyle.fontSize,18);assert.equal(state.textStyle.fontName,'Liberation Serif');assert.equal(state.textStyle.color,'#2356A0')
+      checks.push('explicit link removal supports undo/redo and DOCX reopen without losing text')
+      await page.screenshot({path:path.join(output,'completion.png')})
+      fs.writeFileSync(path.join(output,'completion-proof.json'),JSON.stringify({ok:true,checks,xmlProof,errors,totalMilliseconds:Date.now()-runStarted},null,2))
+      assert.deepEqual(errors,[]);console.log('Writer completion native checks passed: '+checks.length);return
+    }
     if(['table','cas'].includes(process.env.WRITER_TARGET)) {
       await act({type:'insert-text',text:'表格定位前的正文'})
       await act({type:'insert-break',kind:'paragraph'})

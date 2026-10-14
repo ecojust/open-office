@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "completedAt": "2026-10-14T01:24:53.870176+00:00",
+  "scope": "Fourth iteration: conservative SmartArt node text editing, atomic preview/history, package preservation and real reference desktop mutual editing",
+  "checks": {
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "nodeTests": 466,
+    "pythonPdfTests": 28,
+    "wholeEditorBrowserChecks": 24,
+    "smartArtFixtures": 3,
+    "editReopenCycles": 9,
+    "adversarialCases": 21,
+    "nodeEditingUiChecks": 5,
+    "productionBundleUiChecks": 3,
+    "nativeOpenChecks": 6,
+    "nativeReturnReadbackChecks": 3,
+    "complexFixtures": 12,
+    "complexNoopCycles": 36,
+    "complexExports": 65,
+    "complexAudits": 41
+  },
+  "reports": [
+    {
+      "path": "test-results/smartart-text-final/report.json",
+      "sha256": "7cf58bdf7c1f955fbbd4ab4f87c1e42d63889849485efdaf3123921100e3c652"
+    },
+    {
+      "path": "test-results/smartart-text-final/native-input-equivalence.json",
+      "sha256": "ce49cbcbe062f15c2544ef8d6e5ae9d1d973d4a82d6c36fdaabf6bad9845a8bd"
+    },
+    {
+      "path": "test-results/smartart-text-final/full-ui.json",
+      "sha256": "917df1a28f9a764122792586009a5211db4e7d28d4d1a29013f74be5455dfe36"
+    },
+    {
+      "path": "test-results/smartart-text-ui/report.json",
+      "sha256": "55f47e47ee0f6ce61f64ec72d69b9b08b1fbf8eb8fceee822c3051a498114f7f"
+    },
+    {
+      "path": "test-results/smartart-text-production/report.json",
+      "sha256": "444ab8e2e09ad8545ef51436425b488ff1cb80cb232380e082b36a59f19f9739"
+    },
+    {
+      "path": "test-results/smartart-text-native/report.json",
+      "sha256": "cf51658c511d76559db7572cd9802d965a527cced71f0fdc1906f1fb41ed8016"
+    },
+    {
+      "path": "test-results/smartart-text-bidirectional/report.json",
+      "sha256": "4f35aa31f0992a708d5a3a69db27dcc7702431e8dfe985fb9d7efd08cfed3228"
+    },
+    {
+      "path": "test-results/smartart-text-complex-regression/report.json",
+      "sha256": "8323e9927c7d9aaaa5e02f8f004df5b940eaa6bf344a10260fed4aaed208bfd9"
+    }
+  ],
+  "logs": [
+    {
+      "path": "/tmp/open-office-smartart-tests-final.log",
+      "sha256": "369e3f1cbed87331d69a839c41cb268bfdff4c5b95ecfc587bf97a6de1426d0b"
+    },
+    {
+      "path": "/tmp/open-office-smartart-build.log",
+      "sha256": "e74e096e69e4a21ff14af2d6122028556c2bd9e0fbfcfd99b990fbde029a27bb"
+    }
+  ],
+  "research": {
+    "tool": "rea-agents@6.4.0",
+    "reference": "ONLYOFFICE Desktop Editors 10.0.0-169",
+    "sdkjsCommit": "72b0421c0bbf9d01eed9cf14834ae47eb2df1b50",
+    "evidenceId": "ev_98c492583acb0847526cb2e1ec27449241081aca4a3b9914647247db48116d26",
+    "files": 4,
+    "functions": 17,
+    "astNodes": 3118,
+    "parseFailures": 0,
+    "nativeReturnSha256": "2ab0494119fe2f6b8762787ec85f58bb97cb6f48abdcc114614efbd8fda5be7e"
+  },
+  "implementationFingerprints": [
+    {
+      "path": "src/components/StandalonePresentationEditor.vue",
+      "sha256": "9980c56c306693e685c212fb6584b09b4012a3d16899579e808cc0ac56a45430"
+    },
+    {
+      "path": "src/presentation/types.ts",
+      "sha256": "268f44e7fa8e360f26de55ee5d327bf7c1d86b15a23d5e604a85793d30a31d89"
+    },
+    {
+      "path": "src/presentation/core/types.ts",
+      "sha256": "f9b8fe6bfad05fd42f0926cfaa8fbb7a6794042c61ab368a871a4bc560e131ba"
+    },
+    {
+      "path": "src/presentation/core/editor.css",
+      "sha256": "764c50e3e05e6bd26dc3834581c50f2a04d92d5370c6219db00ccd6a9804735a"
+    },
+    {
+      "path": "src/presentation/core/smartart-text.ts",
+      "sha256": "3416661049d8782d321c5d64e89018dcb7d5f5776167c50a9f803e7c2d0f50bc"
+    },
+    {
+      "path": "src/presentation/core/model.ts",
+      "sha256": "b63a966f2ada6bbc70da7598887a5b177c5f81303e6770524ac1c47f630a1d69"
+    },
+    {
+      "path": "src/presentation/core/pptx-common.ts",
+      "sha256": "535c8a05d9800d24f93ce9dc5ddcf2a4ff7ed125fade78b75d059e9ca734e530"
+    },
+    {
+      "path": "src/presentation/core/pptx-import.ts",
+      "sha256": "4ae35a9118f7d1322e2a560b98e95834797be1aff7d9ae9dbdf578264573b00e"
+    },
+    {
+      "path": "src/presentation/core/pptx-export.ts",
+      "sha256": "85b24ef9b2e0fbeb0f1b5f47dfb47e9b7ce27c2a36295fbad910a77a62441b3a"
+    },
+    {
+      "path": "src/presentation/core/smartart-preview.ts",
+      "sha256": "622c60fdcab60abf479504b8928b33a3533b6f97ea10829bb78f48649df7e049"
+    },
+    {
+      "path": "tests/browser/smartart-text.cjs",
+      "sha256": "4d1cb3c8392d3840f6f5833fbf73ec013ce635be8c28196ee94e2cf78c9f27ad"
+    },
+    {
+      "path": "tests/browser/smartart-text-ui.cjs",
+      "sha256": "cd571e0f18611cf891b1e84bb6c3afb89386e0f065ae62ae84571798f27339f8"
+    },
+    {
+      "path": "tests/browser/smartart-production.cjs",
+      "sha256": "733d2c782cb0c21e1e1820d6df7fb4704a613913d309168e42358e4ba6bb4d4f"
+    },
+    {
+      "path": "tests/browser/smartart-native-return.cjs",
+      "sha256": "9921029be6cd180100ab6f8623db7a2bb1648bceebe04851a51cdc64eff09e3b"
+    }
+  ],
+  "limitations": [
+    "Only unambiguous owned single-paragraph simple text nodes; shared, image, field and complex nodes stay read-only.",
+    "No SmartArt layout regeneration, node insertion/deletion or full formatting editor.",
+    "Package preservation and successful native opening are separate from pixel fidelity.",
+    "Word and spreadsheet engines remain unchanged.",
+    "Windows/macOS application builds were not tested or published in this iteration."
+  ]
+}

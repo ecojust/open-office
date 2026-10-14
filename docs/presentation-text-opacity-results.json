@@ -1,0 +1,357 @@
+{
+  "recordedAt": "2026-10-14T06:01:51.136975+00:00",
+  "scope": "Ordinary text opacity and bounded editing; legacy whole-frame recolor preservation; Calc guarded content writes; PDF form shared-style preservation. Source iteration only, not all-feature parity.",
+  "reference": {
+    "tool": "REA 6.4.0",
+    "desktop": "ONLYOFFICE Desktop 10.0.0-169 Linux",
+    "sourceCommit": "72b0421c0bbf9d01eed9cf14834ae47eb2df1b50",
+    "reaEvidence": "ev_83a4bc9482cfc3007ca90537fd30393ef8ce35251b39a9e3c5b9782631bf09eb",
+    "files": 11,
+    "functions": 37,
+    "astNodes": 13948,
+    "parseFailures": 0,
+    "semanticCoverage": "unknown"
+  },
+  "results": {
+    "nodeTests": 560,
+    "pythonTests": 56,
+    "failures": 0,
+    "cancelled": 0,
+    "typecheck": true,
+    "productionBuild": true,
+    "buildSeconds": 9.35,
+    "targetedBrowserChecks": 49,
+    "initialIndependentBrowserChecks": 88,
+    "finalIndependentColorChecks": 20,
+    "independentFixturePdfChecks": 23,
+    "finalUiPdfChecks": 120,
+    "devUiGroups": 9,
+    "productionUiGroups": 9,
+    "productionPptxIdenticalToDev": 6,
+    "productionPdfIdenticalStateAndPixels": 2,
+    "nativeFilesOpened": 3,
+    "nativePages": 3,
+    "unchangedNativeObjectRegions": 21,
+    "editedNativeGlyphSamples": 5,
+    "complexFixtures": 12,
+    "complexExports": 65,
+    "complexPackageAudits": 41,
+    "complexReopens": 36,
+    "rangeRegressionChecks": 449,
+    "textRegressionChecks": 92,
+    "tableTextRegressionChecks": 86,
+    "shapeOpacityRegressionChecks": 43,
+    "rangeUiGroups": 5,
+    "calcWasmChecks": 33,
+    "pdfFormChecks": 17
+  },
+  "verificationTiming": [
+    "Initial 88 independent browser and 23 fixture-PDF checks preceded the legacy whole-color repair; final 20 focused color checks cover changed behavior, followed by 49 targeted checks and full complex regression.",
+    "Complex initial failure exposed the real whole-color regression plus semantically equivalent missing-versus-one opacity defaults. The product regression was fixed; optional-default test comparisons were normalized without weakening zero-opacity checks.",
+    "Old shape test used a wrong text-array index because one line has no text. The oracle now identifies the source object; initial failure logs are retained.",
+    "The final UI-only zero-value fix adds a ninth actual UI group. Core source hashes remained unchanged. Final UI PDFs were independently re-audited; PPTX hashes still exactly match native-opened files.",
+    "Final full tests and build ran serially. Production UI ran after the build. All six production PPTX downloads are byte-identical to audited dev downloads; production PDFs have identical text state, drawing state and rendered pixels."
+  ],
+  "limitations": [
+    "No arbitrary-document lossless compatibility or complete editor feature parity claim.",
+    "Background alpha, full theme paints, advanced text effects and SmartArt cached text alpha remain bounded or protected.",
+    "Alpha-only/range edits protect complex text structures; whole-frame RGB changes preserve existing fields and links.",
+    "STOP validation cells require native canvas editing even for valid input; no new general formula-validation engine.",
+    "Dashed PDF text fields remain readonly because the current appearance generator cannot reproduce their border.",
+    "Word whole-footer replacement still removes fields, with the existing visible warning.",
+    "No new macOS/Windows package or native platform validation in this iteration."
+  ],
+  "reports": {
+    "targeted": {
+      "path": "test-results/presentation-text-opacity/report.json",
+      "sha256": "97ef206ead79e0193b07843996693eff39c7114eb9d3da0947456d068489519c"
+    },
+    "ui": {
+      "path": "test-results/presentation-text-opacity-ui/report.json",
+      "sha256": "c2e23f7d77e13287b6a9af2f28072688fcbb434dff4ce56bc2c6313236650ca8"
+    },
+    "uiPdf": {
+      "path": "test-results/presentation-text-opacity-ui/independent-pdf.json",
+      "sha256": "d3fdd9f72e486980af4dc12c8884f20eace3e0c65732b3254ec39501b3a88300"
+    },
+    "productionUi": {
+      "path": "test-results/text-opacity-production-ui/report.json",
+      "sha256": "c2e23f7d77e13287b6a9af2f28072688fcbb434dff4ce56bc2c6313236650ca8"
+    },
+    "productionPdf": {
+      "path": "test-results/text-opacity-production-ui/pdf-equivalence.json",
+      "sha256": "f60a7dc95dc5be45f52eb61477486cc00c1f4be8650e363806a2f14609a42c28"
+    },
+    "complex": {
+      "path": "test-results/text-opacity-complex/report.json",
+      "sha256": "eb207643ef8b0f07fbf297d8ac818b2ddd7737e021e463a17218e2fcb5222edd"
+    },
+    "rangeRegression": {
+      "path": "test-results/text-opacity-range-regression/report.json",
+      "sha256": "9af1e827490aaabd56a8345bb9fd065da73c35772352399e59eeb1b0f2b96915"
+    },
+    "textRegression": {
+      "path": "test-results/text-opacity-content-regression/report.json",
+      "sha256": "7a7381af4429a14a1a2489fdc369865e4cd291b3e881b8ade218602bfc15cb66"
+    },
+    "tableTextRegression": {
+      "path": "test-results/text-opacity-table-regression/report.json",
+      "sha256": "59f5c4be8c02fb50c0b32aee87eff96e08a7b7f6183ab20590570a6303daaf53"
+    },
+    "shapeOpacityRegression": {
+      "path": "test-results/text-opacity-shape-regression/report.json",
+      "sha256": "bf595385c8551810238f0e04dd3c2bf050b6ca7039ad1f874daf8b2934c03984"
+    },
+    "rangeUiRegression": {
+      "path": "test-results/text-opacity-range-ui/report.json",
+      "sha256": "82cb895cfa86a4b02ed09d20024302f2431f5f338b24f4c8b0d718064eaea41e"
+    },
+    "calc": {
+      "path": "test-results/text-opacity-calc-regression/report.json",
+      "sha256": "f0ca010ca2966be70969f6b6d06a538ea219354ad62f61f5b5939e597be0b221"
+    },
+    "pdfPreservation": {
+      "path": "test-results/pdf-preservation-followup/report.json",
+      "sha256": "449ac30633ceb59063a7b2a17293101fc4a87857a9f4397f39a6b534da07a814"
+    },
+    "nativeOriginal": {
+      "path": "test-results/text-opacity-native-baseline/report.json",
+      "sha256": "1a8ee16eeda4037341fcd51c4f474d51975a4ae97fa3a95766d07a7dc80bba00"
+    },
+    "nativeExports": {
+      "path": "test-results/text-opacity-native-exports/report.json",
+      "sha256": "c48b2ca09850b1d218abb25f66a7ca461b7b41e37c567091df6aaed3d1002b0c"
+    },
+    "nativePixels": {
+      "path": "test-results/text-opacity-native-exports/pixel-observations.json",
+      "sha256": "c36c6e37d5d2e8fee1d272ea0d5fd75569d42b6eddb5c8ffaa5c10f773bf364a"
+    },
+    "review": {
+      "path": "/workspace/open-office-research/onlyoffice/text-opacity-review/final-review.json",
+      "sha256": "a90c4b81c0252b5893a3400900585de95169322e95f01cb547c56ad80fc6a1c1"
+    },
+    "reviewInitial": {
+      "path": "/workspace/open-office-research/onlyoffice/text-opacity-review/initial-report.json",
+      "sha256": "474169b4528526f08227ddc9dbc7b75c9170780987e7bf2e6ba81ff3e56c2b1f"
+    },
+    "reviewFinalColor": {
+      "path": "/workspace/open-office-research/onlyoffice/text-opacity-review/complex-color-report.json",
+      "sha256": "0dd04e5d084f1ba037930b8ed6e00209bfa8cbdc4ad530cb5a6573df9928841d"
+    },
+    "reviewPdf": {
+      "path": "/workspace/open-office-research/onlyoffice/text-opacity-review/pdf-report.json",
+      "sha256": "a0edccfd57eb9962a7cb1c51f8fff0a1370bf4a42be1bca9c3e3afd218c559bf"
+    },
+    "research": {
+      "path": "/workspace/open-office-research/onlyoffice/rea-text-alpha-summary.json",
+      "sha256": "1f16d62e16f2b96be2d1e01c8b8b259859e604dc7f58c514b3628c9456e80fc9"
+    },
+    "researchFindings": {
+      "path": "/workspace/open-office-research/onlyoffice/rea-text-alpha-findings.md",
+      "sha256": "88454585483a43e0ceeda9fc628569fdc9851dba274949b49440a732b1a9ce02"
+    },
+    "researchNative": {
+      "path": "/workspace/open-office-research/onlyoffice/text-alpha-targeted/native-observation-summary.json",
+      "sha256": "645a8222e1952fabd79cb92dc918eda9f1e1d16108dca205f43e49d3ca5f0f53"
+    },
+    "tests": {
+      "path": "test-results/text-opacity-final/tests.log",
+      "sha256": "05f70ce1a95f00e2f6dae21db94d3684f3a6f46f02dc549ec7f7ec488a322df7"
+    },
+    "build": {
+      "path": "test-results/text-opacity-final/build.log",
+      "sha256": "d03eed906ee65060cb4d8ecbe00c7c54ae1396baef1eaaddc7078efeda921118"
+    },
+    "initialComplexFailure": {
+      "path": "test-results/text-opacity-complex-initial/report.json",
+      "sha256": "72b9c687503366c96596ae4478574dada79d6184d3dec1034036e3f6cf4eb8ee"
+    },
+    "initialRangeOracle": {
+      "path": "test-results/text-opacity-final/range-initial.log",
+      "sha256": "4ccfabecd5c567549b2519fa469f0c6cb3717a4f1f474d07c944809a24f09c87"
+    },
+    "initialShapeOracle": {
+      "path": "test-results/text-opacity-final/shape-opacity-initial.log",
+      "sha256": "e0f35d82aa7768adc06091fc4d6299b8ed637c9ae2343019a8f3a6752e1c8b58"
+    }
+  },
+  "sources": {
+    "pdf-backend/engine.py": "bc44dc13f2fc4a86cea94fa6660c4e9f566a2687c6cf12c24283db92c6e138ee",
+    "public/office/calc-tools.js": "05ced799444ca764ed816c552b204e27c6145a333d1d3467ddf27f5b11b77078",
+    "public/office/clipboard-compat.js": "1da01796ffd5073481d00cf7f990433fe2718af52411c2e4dbfb4eae512e6ff4",
+    "public/office/host.js": "9abeddea4362212c6e9e3ba5dd25048f124f6c36b5dc24a2e2771e68fbfc5430",
+    "public/office/office-worker.js": "791d90f54c1baaaea10f84e41dc7bf684b171da2614af228ba8477eb0c21f043",
+    "public/office/offline-audit.js": "9027d9a6167204ba54a79f8688ffd2aba4e352059690ce58de5ca3f0dfd79ace",
+    "public/office/offline-policy.js": "d8b9d8974eb4082256edb7340e75f586e55fb963e79a32b1108546596f9af548",
+    "public/office/presentation-objects.js": "c713083fbec71f5506859c66fd5c6cb639441dce99db45b9c72fe25b880808e4",
+    "public/office/writer-tools.js": "4802680d529c70a204776dcf829f0ae32e6aa825f62c3816a3ae1dbfee15468c",
+    "public/office/zeta.js": "7bdfa389a1d220c279f60602b2e0724b2280fa91d68d5237d1bce3bf0dedbf32",
+    "src/App.vue": "7be3d8f5ec62fbd0e8f8720276d3a6232c6a8a161e188f2cdbd265b26d5a6e90",
+    "src/components/Icon.vue": "7903dc708c3ebd5fda8135d1193a6236be599c50b80dfa38f16453cc788cae95",
+    "src/components/OfficeEditor.vue": "a2e6314f0edeaefc02f79c277116784bddf5adbc733faeb392ab576bb87dfed4",
+    "src/components/PdfEditor.vue": "fea030a94d4473063df17934e69dab76d6437301dafa03313c6b058704fdcfbf",
+    "src/components/PresentationEffects.vue": "434b7ee67acb2755c9f356a9bafde25c4f41d4f6f6231cde0214588b002d1807",
+    "src/components/PresentationFontNotice.vue": "5637e75dd8c6e0a7892f038989676687db1469681d168329334221e6cdd74daa",
+    "src/components/PresentationWorkbench.vue": "6fe46199d04382421cfdb2aa6abcf47bf4ef9225a09714d97632fcb60e6c11a0",
+    "src/components/SheetWorkbench.vue": "d6c3cb43f092045181a1b51fd1e11a01e6ddf23993e2b1c16f309f25f6a79f4a",
+    "src/components/SlidePreview.vue": "52df4b40230bdfbd5d842ec6d5d848ecdd04989262aae82f80902bec69c67ed8",
+    "src/components/StandalonePresentationEditor.vue": "802ceba035efda4bf0c61c40a4ebeda5f243dbc8b300201440adcc809664d5bf",
+    "src/components/WordWorkbench.vue": "b0b47d8d73b91807256448c424732de15e1b5c7752e46ff0dfb3dd73280a1602",
+    "src/env.d.ts": "5853f72b58c661647c5f3e9cdfbe2478d5501904ced4e11116564b1941744b19",
+    "src/main.ts": "bdbe20b0b723d281d98897e0f40de48a9a804c89b71242e4a317096d45cbff01",
+    "src/native.ts": "36622b32f6dac79abda2f6daec3fd7dfea0c1ae8882e77fdab6fc5ef57e749e8",
+    "src/office/bridge.ts": "ee1f8fe2e43c3d67028015ac198810f4e24da3aa445e37a989eaac9a72b5f4b8",
+    "src/office/docx-embedded.ts": "ffa1bc90c0841822e2a1564f25ca6f719cedd03ad99172a5276f14f8e08df3c6",
+    "src/office/import-review.ts": "7eec8da33107ea47fcd425d7077822f738c5cade52700294d3dfc90a6c7f093a",
+    "src/office/native-workbench-smoke.ts": "b7d0f34385876c0e6c486d67f80aa13756c635eeffd538b6d13d97d3a1e10ddd",
+    "src/office/pdf-readback.ts": "2bc56f680c250ff7521d443d54be2e4e3ddfd8f3080f19ba711d38c413ae6490",
+    "src/office/types.ts": "043c5248dc64d2a3e7541774cfb5df0d09314a987dc3f96101ef0df7f7c54183",
+    "src/office/workbench.css": "914b324110573722e0eb73b0b12e4f4ed5af8b3c2b4583676bed16907e882b75",
+    "src/pdf/backend.ts": "8f4158c2d142b033c378ae1a4353fa8dee4e93e5f9c195b682bc9178f78dfa6c",
+    "src/pdf/pdf.css": "5c9743db45e6185b7e25f7f98489293e67fbc336474b411d29a5c97c5794ac6e",
+    "src/pdf/protocol.ts": "73a0737ca4739dfc51acaa6e43d7f213a46a9dd8577048bc2a42aa8829d19afa",
+    "src/pdf/resources.ts": "56c08e99a1e3b7c07c4f351e55558da45eb11a5374a47230769752b056151676",
+    "src/presentation/chart-workbook.ts": "b7c7ac784bae3f4e8bf4704740b566439535e11cb9d86f4eda8013ba41de7bfa",
+    "src/presentation/core/color-transforms.ts": "91c01b02179807ddd7171fb0605b689d263648901a453b22260e0fa28513c4e2",
+    "src/presentation/core/editor.css": "e5c5dfa54563e79487f1d8e8acb5af9d3458596fa30f90ea810739fc6ba7d21d",
+    "src/presentation/core/font-diagnostics.ts": "94d988f5b0e7c1138886922fe9f012723dc434bd6543fd1f46a8f888af39768c",
+    "src/presentation/core/fontkit-compat.ts": "bef23fc51f6796e59380e3f8d8a4c4bb12ecc83e3fcd812dc7fb5d5d0d68aed2",
+    "src/presentation/core/format-text-paint.ts": "32e576a19abe2783e1432a6a8ab06db4694de94529e12157a5beaf5c1a5772d2",
+    "src/presentation/core/model.ts": "c27fe47cf732fef333766b38e527329d1af4e96a3f0abebb691b56ca890d32b6",
+    "src/presentation/core/paint-opacity.ts": "b3ffe27f92ef009f4d5eb2cfedc43da84b245a557b9f51f42c7b08089699ea4a",
+    "src/presentation/core/paragraph-format.ts": "5897311735cb28677702aed9675776273c0065a9444ef2898c463d7b9f1dd198",
+    "src/presentation/core/pdf.ts": "2d3dbd9ec01ed863caa14b41aa4c6317a2fd57131917cb482e479f8a19a88519",
+    "src/presentation/core/pptx-common.ts": "67b09b0bd29d897acd4b9c40f7e92346f9932a14d0d5182ce21f232a1bcd48d5",
+    "src/presentation/core/pptx-export.ts": "b8e6010169b42884b8772104e977d8aed5a24d07203f45f47926e58ee4787fbd",
+    "src/presentation/core/pptx-import.ts": "f1df94a82123341b4391dd1b0a16e9a2ec0990e6098d20d10631ea179ed0da97",
+    "src/presentation/core/pptx-notes.ts": "7057a1d5d6122dc23484079d904abff244c72075af46b73c513f178a7df3b53e",
+    "src/presentation/core/pptx-rich-text.ts": "744c8d45d4e8d5c10db8b86072c827faf2d3cce890371e27f0d5c7aa7b5bf31b",
+    "src/presentation/core/pptx-text.ts": "e1931a46f0f49356bbaaad8cf846a50687637cd22bec8d64055c8a754f7c23a3",
+    "src/presentation/core/pptx.ts": "dc7d4a62add2f6db0a84efef6f099423358badf55a9760ade20740c35c52c42b",
+    "src/presentation/core/render.ts": "5f3ade70c213f4e3c60f264727fd682f0657b41d14c9b6442f17524569411728",
+    "src/presentation/core/rich-text-layout.ts": "6a1f1a594cf28894e8caa61f017ae65208534eafd577466d8cdcb666d3f436c2",
+    "src/presentation/core/rich-text.ts": "13c439b00e33155128238b9aeac0bb9556d99baf69a28daef68ebcf281ac7bea",
+    "src/presentation/core/scene.ts": "ad0884c3d0f2e8a4a149827fd48846892307c51370b71a9c7a19e921f37b63d2",
+    "src/presentation/core/smartart-preview.ts": "cd4f7108f0a92e3af7197764d4fb71186a23adb09599a4ab9d75371edff8209e",
+    "src/presentation/core/smartart-text.ts": "45f72c0fe4594cde09e53f258319b91f917ba3339e11d8f4b982054a44759ca3",
+    "src/presentation/core/table-layout.ts": "afb7814b1161ab5df1f57075e78d165dcfb6c80d6164dd89322073b6c043fb55",
+    "src/presentation/core/table-text-content.ts": "c7f13efd80dde66248ff08c1de48affa595375b9943202a0aed60f1331ebca66",
+    "src/presentation/core/text-content-edit.ts": "b68d3a39a7c3bd2d4af7ecaa0c45f1f10ab3c415d25ef2489820cd5d7f1ce98b",
+    "src/presentation/core/text-diff.ts": "a8f8b0faca1ecb54fb9ed52e0fce65f1e8e506ac03a345a33b518015b47aab62",
+    "src/presentation/core/text-paint.ts": "5ab0843b5a8d21b74ea7aff7db05219d73af5595d5532903e089f0fd7822c5a2",
+    "src/presentation/core/text-range-format.ts": "1b95b98561fc9b23505c63a73f24313490180aac68f6494fb0e53dd02cad0531",
+    "src/presentation/core/types.ts": "405b3c6514b43cf9854a6e3dbb64bf3f28a60a238f576b387bf413445139609e",
+    "src/presentation/native-smoke.ts": "647a90814196fa9a7d70d8b9276619ddf4ea61debe2894d16727848932e47f6a",
+    "src/presentation/pptx-package.ts": "705c35a8503efb7328150f326574c6905a57e73569b49904957b04fbb5eaaa7d",
+    "src/presentation/session.ts": "67c5d89176b81cb57de4f785b5cff4c67b4a7a752af7317bc9896a5fce10ec5d",
+    "src/presentation/types.ts": "a8f5ec6923a43a21fa4f8980df73aa541a9a64dd12b6593aaf9003941d717da5",
+    "src/presentation/workbench.css": "7741faf066a069f0867610c9846e25effc20dbac5cf7e7a8141d098c0c6ecdbb",
+    "src/shared/dialog-focus.ts": "5541cc0c23c7e9d7828915ad7ca210d6d4c20f9714e2b2e03a476b4815cc97ea",
+    "src/shared/document.ts": "67d808d00bf4300a178cfdfe57b2f5b45748d3b1729f63e5eb202917e0792e62",
+    "src/sheet/types.ts": "0af734aa326471352a27ad77bc6cc6d29496b9b997ea1c55d0b62beb161f7d2f",
+    "src/smoke.ts": "48cdab1bd13bf6d3259a1ecf45be07308428fa0dd561cead0bb9bda1da453d45",
+    "src/style.css": "b2db1a9b20fba2ac08e0aef5fdc732bf5b6dcf280b11cfc9537d3614fed63247",
+    "src/types.ts": "da14e0f998a83c9a2881a4fdcc6c8b8739a144d9ec8a2059ad2f699f8b54ae0e",
+    "src/word/draft-review.ts": "f6e3944e6babd67660100c11aea42319dcb5046e2de8694f1459fb0ef4a4982f",
+    "src/word/types.ts": "94e18e06cac7abbfc9b5ccde651effe045f837f27676e01b72810d4738b855b4"
+  },
+  "fixtures": {
+    "tests/compatibility/presentation-text-opacity/README.md": "b0f32a155d5ee72320a7e80b648deb1139b7e23550023506d1fc1fc2569bd0c0",
+    "tests/compatibility/presentation-text-opacity/audit-native.py": "520725b9f2cf50e9084493806a9c452c5474d0a3b438e67ebc3aacd8dff533c1",
+    "tests/compatibility/presentation-text-opacity/make-fixtures.py": "ac432ebffaf2e84b504a1d060e9712f8f3d01f0b12d39fcbc0f708fb61645b70",
+    "tests/compatibility/presentation-text-opacity/manifest.json": "362066671d185e76f2860966bc022d46ad5410df1fbdb99492db7f135c7235da",
+    "tests/compatibility/presentation-text-opacity/native-observations.json": "c814de891d78dcbfdbc82f2c25198c09d7d75fc7a8cc602d0ea4ea827d20769b",
+    "tests/compatibility/presentation-text-opacity/ordinary-text-alpha.pptx": "fe8a376a332ba9902b387e500227045d36b11aa5f46ce28f8b9df28379be3aae"
+  },
+  "testFiles": {
+    "tests/browser/calc-completion.cjs": "94d080929063060863c362fbea7af91edf6182adb1d40e8e2ea09d58d8918a64",
+    "tests/browser/presentation-opacity.cjs": "37fda45414e62440008556afcaf6fd8c9b77335e78e3e723a7315a3024edea78",
+    "tests/browser/presentation-range-format.cjs": "1b6fdbdc2b4e9a591f058f3313d04e0474c73d0759607a482595b74ec921dde8",
+    "tests/browser/presentation-range-ui.cjs": "7f05171bae9b8070cf1f61459435fa94a175562ede7bd5fcc024403bd308df18",
+    "tests/browser/presentation-table-text.cjs": "9cd669c88d1e163f55274008c15dea0671b044c2febb1dd5fedae8ed04920918",
+    "tests/browser/presentation-text-content.cjs": "be004d6b255f000a2f52502bf41891bc13ab4e25c0020889e3d88c2597cecb29",
+    "tests/browser/presentation-text-opacity-ui.cjs": "83032a16e0a6b7aaae7ba3237348328a971f2cd07e372bfc7aca444c38807b59",
+    "tests/browser/presentation-text-opacity.cjs": "2822a1c6be92c072ef5b3ce79c3ee25478dc79f3dc2f12516339e9eeac33b3d4",
+    "tests/browser/standalone-presentation-complex.cjs": "a9b1cdbe2be05fdd54ae4f89a56ddc151b0e8c1fb8c8af91e4be16f3a9298b6e"
+  },
+  "artifacts": [
+    {
+      "path": "test-results/presentation-text-opacity-ui/text-opacity-colored.pptx",
+      "sha256": "0d82b14048a65b7ec10823ea9170e78d2f4bd0d4bf40089676c53adcf82b1b62"
+    },
+    {
+      "path": "test-results/presentation-text-opacity-ui/text-opacity-edited.pdf",
+      "sha256": "82ca6c47f5b97dc067e237629c539a6086fa02b8c3c85a9581c04df273954d9b"
+    },
+    {
+      "path": "test-results/presentation-text-opacity-ui/text-opacity-edited.pptx",
+      "sha256": "269b2793bd0707a3b83dfd1298cf7a233489dae862344353bcc2ca7873c8b1c4"
+    },
+    {
+      "path": "test-results/presentation-text-opacity-ui/text-opacity-mobile.pptx",
+      "sha256": "e58010e0de9b0ed080358b746c78b374b532107257b4f03dc7e4cf9a98245180"
+    },
+    {
+      "path": "test-results/presentation-text-opacity-ui/text-opacity-noop.pptx",
+      "sha256": "fb7d15a4fc10dbe655aa449338985dd057d28dd23cb3b9cfb52f2b17f3af62b6"
+    },
+    {
+      "path": "test-results/presentation-text-opacity-ui/text-opacity-range-zero.pptx",
+      "sha256": "3a862675843414ddd6ea8701e933bddb46e5f4036f88e094fb7bbe93ec42c5da"
+    },
+    {
+      "path": "test-results/presentation-text-opacity-ui/text-opacity-source.pdf",
+      "sha256": "88f70abd3a88a350709cd296f06dd8e621533a1343bf9506a2a98cf894cb78ec"
+    },
+    {
+      "path": "test-results/presentation-text-opacity-ui/text-opacity-text.pptx",
+      "sha256": "7e8e9d5d39970cec767739cce356924dc7f7d27b46a04dcd6b70eb6cff87062b"
+    },
+    {
+      "path": "test-results/text-opacity-production-ui/text-opacity-colored.pptx",
+      "sha256": "0d82b14048a65b7ec10823ea9170e78d2f4bd0d4bf40089676c53adcf82b1b62"
+    },
+    {
+      "path": "test-results/text-opacity-production-ui/text-opacity-edited.pdf",
+      "sha256": "4de400aa903301d6d2e63264afebecb0ff67b989f67a7877a5290f3c94525c0f"
+    },
+    {
+      "path": "test-results/text-opacity-production-ui/text-opacity-edited.pptx",
+      "sha256": "269b2793bd0707a3b83dfd1298cf7a233489dae862344353bcc2ca7873c8b1c4"
+    },
+    {
+      "path": "test-results/text-opacity-production-ui/text-opacity-mobile.pptx",
+      "sha256": "e58010e0de9b0ed080358b746c78b374b532107257b4f03dc7e4cf9a98245180"
+    },
+    {
+      "path": "test-results/text-opacity-production-ui/text-opacity-noop.pptx",
+      "sha256": "fb7d15a4fc10dbe655aa449338985dd057d28dd23cb3b9cfb52f2b17f3af62b6"
+    },
+    {
+      "path": "test-results/text-opacity-production-ui/text-opacity-range-zero.pptx",
+      "sha256": "3a862675843414ddd6ea8701e933bddb46e5f4036f88e094fb7bbe93ec42c5da"
+    },
+    {
+      "path": "test-results/text-opacity-production-ui/text-opacity-source.pdf",
+      "sha256": "1ad70938e1ea2c01a8712e23a0a5dc69eac28a3e117507fd5bc17b4b9375778f"
+    },
+    {
+      "path": "test-results/text-opacity-production-ui/text-opacity-text.pptx",
+      "sha256": "7e8e9d5d39970cec767739cce356924dc7f7d27b46a04dcd6b70eb6cff87062b"
+    }
+  ],
+  "buildFiles": {
+    "dist/assets/fontkit.es-B5CoPyR6.js": "9560e0bcc3637bb13bd872649f2c3a34a0163b707541443a88df93803c4401af",
+    "dist/assets/index-2STMY3KT.js": "afd4d146b6b3bbbc9f8fd1c86aaa0543f968b06009aba64b1a577dd8794114f1",
+    "dist/assets/index-DnVB7SM3.js": "0419a22c4c02abec9fcf563cd3153bb6de9125d1917472a1edc7b7ebfb661480",
+    "dist/assets/index-q0GMiG5F.js": "32f84c7e0a31776b6d077c74cefe9fd8011da95671344d02f77f0ec08956fb73",
+    "dist/assets/index-uJiVqNie.css": "6190fb5c4a75cddd4ef3442b02ec50ccb3dc5bd1244d39fd697d478dc63a39b1",
+    "dist/assets/native-smoke-RGFxlyl5.js": "669dd78adf1d7addfaa29dbfec7366c2d2e95da9f1b070e5c4f3b07f065d49b9",
+    "dist/assets/native-workbench-smoke-DS-p_aKh.js": "2c63d470c9ba6614c9349415a40bc5f073f3b5520b332b4e3b614e59f4acb2cc",
+    "dist/index.html": "1a58028541cc10c8b6f53acc9fc1997207b945aa9dbcd3cb5b13165f2d5001d7"
+  },
+  "screenshot": {
+    "path": "docs/screenshots/text-opacity-preserved.png",
+    "sha256": "583a7f3fe55a22a95ebd8a77631722871048cebae49e86d80418476f6a00d318"
+  }
+}

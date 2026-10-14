@@ -325,6 +325,9 @@ Module.zetajs.then(zetajs => {
     try { if (document.pageListener) document.controller.removePropertyChangeListener('CurrentPage', document.pageListener); } catch (error) { recoverOptional(error); }
     try { document.frame.releaseDispatchProviderInterceptor(document.interceptor); } catch (error) { recoverOptional(error); }
     document.model.setModified(false); document.model.close(true);
+    // Release temporary numbering owners only after the native document closed.
+    // A vetoed close must keep the live document and its redo resources intact.
+    if (document.kind === 'word') writerTools?.releaseDocument?.(document.model);
   }
   function open(data) {
     const type = documentTypes[data.kind];

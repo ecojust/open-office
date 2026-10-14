@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import Icon from './Icon.vue'
-import type { WriterState, WriterAction, WriterCommand, WriterQuery, WriterTableData, WriterTextStyle, WriterParagraph } from '../word/types'
+import type { WriterState, WriterAction, WriterCommand, WriterQuery, WriterTableData, WriterTextStyle, WriterParagraph, WriterListOperation } from '../word/types'
 import { canIssueWriterCommand, writerCommandTarget } from '../word/types'
 import { createWriterDraftReview, writerDraftReviewMatches } from '../word/draft-review'
 import type { WriterDraftOrigin, WriterDraftReview } from '../word/draft-review'
@@ -12,12 +12,14 @@ const tabs = ['开始','插入','布局','审阅'] as const
 const tab = ref<(typeof tabs)[number]>('开始'), panel = ref(''), problem = ref(''), confirmingRemoval=ref(false)
 const draft = reactive<Record<string,string>>({}), baseline = ref(''), origin = ref<WriterDraftOrigin>()
 const draftReview=ref<WriterDraftReview>(), reviewLoading=ref(false)
-let reviewToken=0
+const listLoading=ref(false)
+let reviewToken=0,listToken=0
 const pending = computed(() => !!panel.value && JSON.stringify(draft) !== baseline.value)
-const ready = computed(() => props.active && !!props.state && !props.disabled && !props.busy && !reviewLoading.value)
+const ready = computed(() => props.active && !!props.state && !props.disabled && !props.busy && !reviewLoading.value && !listLoading.value)
 const locked = computed(() => !ready.value || pending.value)
-const stale = computed(() => pending.value && !!origin.value && (origin.value.id !== props.state?.documentId || (panel.value!=='table' && origin.value.revision !== props.state.revision) || (['text','paragraph','comment','footnote','insertTable','toc'].includes(panel.value) && origin.value.selection !== props.state.selection.id)))
-const titles: Record<string,string> = { text:'文字输入', paragraph:'段落设置', page:'纸张与页边距', header:'页眉', footer:'页脚', insertTable:'插入表格', table:'表格数据', outline:'文档大纲', find:'查找与替换', review:'批注与修订', comment:'添加批注', footnote:'插入脚注', toc:'文档目录' }
+const stale = computed(() => pending.value && !!origin.value && (origin.value.id !== props.state?.documentId || (panel.value!=='table' && origin.value.revision !== props.state.revision) || (['text','paragraph','comment','footnote','insertTable','toc','hyperlink'].includes(panel.value) && origin.value.selection !== props.state.selection.id)))
+const titles: Record<string,string> = { text:'文字输入', hyperlink:'超链接', paragraph:'段落设置', list:'列表', page:'纸张与页边距', header:'页眉', footer:'页脚', insertTable:'插入表格', table:'表格数据', outline:'文档大纲', find:'查找与替换', review:'批注与修订', comment:'添加批注', footnote:'插入脚注', toc:'文档目录' }
+const listSummary=computed(()=>{const value=props.state?.list;if(!value||value.kind==='other')return '复杂或未知列表';if(value.kind==='none')return '普通段落';if(value.kind==='mixed')return '混合列表选区';return `${value.kind==='bullet'?'项目符号':'数字编号'} · 第 ${(value.level??0)+1} 级`})
 const canReview=computed(()=>stale.value&&['page','header','footer'].includes(panel.value)&&!!props.refreshState)
 const tableVersion=ref<{documentId:string;revision:number}>()
 const table = ref<WriterTableData>(), tableLoading = ref(false), tableName = ref('')
@@ -27,6 +29,7 @@ function resetValues(state:WriterState|null|undefined=props.state) {
   reviewToken++;draftReview.value=undefined;reviewLoading.value=false
   const s=state, values:Record<string,string>={}
   if(panel.value==='text') values.text=s?.selection.text || ''
+  else if(panel.value==='hyperlink') values.url=s?.hyperlink?.url||''
   else if(panel.value==='paragraph') for(const key of ['leftIndent','rightIndent','firstLineIndent','spaceAbove','spaceBelow','lineSpacingPercent'] as const) values[key]=String(s?.paragraph[key] ?? 0)
   else if(panel.value==='page') for(const key of ['width','height','marginLeft','marginRight','marginTop','marginBottom'] as const) values[key]=String(s?.page[key] ?? 0)
   else if(panel.value==='header'||panel.value==='footer') { values.text=s?.page[panel.value==='header'?'headerText':'footerText'] || ''; values.enabled=String(s?.page[panel.value==='header'?'headerEnabled':'footerEnabled'] ?? false) }
@@ -65,9 +68,40 @@ function send(action:WriterAction,fromDraft=false) {
 }
 function format(update:Partial<WriterTextStyle>) {send({type:'format-text',...update})}
 function paragraph(update:Partial<WriterParagraph>) {send({type:'format-paragraph',...update})}
+async function editList(operation:WriterListOperation){
+  if(!ready.value||pending.value||!props.state)return
+  if(!props.refreshState){send({type:'list',operation});return}
+  const snapshot=(value:WriterState)=>JSON.stringify({documentId:value.documentId,selection:value.selection,list:value.list,paragraph:value.paragraph})
+  const clicked=snapshot(props.state),clickedPanel=panel.value,request=++listToken
+  listLoading.value=true;problem.value=''
+  try{
+    let current:WriterState|undefined,previousRevision:number|undefined
+    // Native layout can publish a late Modify notification after a state read.
+    // Wait for two matching read-only snapshots; never retry a rejected write.
+    for(let attempt=0;attempt<4;attempt++){
+      if(attempt)await new Promise(resolve=>setTimeout(resolve,60))
+      if(disposed||request!==listToken)return
+      const next=await props.refreshState();await nextTick()
+      if(disposed||request!==listToken)return
+      if(!props.active||props.disabled||props.busy||pending.value||panel.value!==clickedPanel)throw Error('当前编辑目标已改变，请重新确认列表操作。')
+      if(!props.state||clicked!==snapshot(next)||clicked!==snapshot(props.state))throw Error('段落或列表选区已改变，请重新确认后操作。')
+      if(previousRevision===next.revision){current=next;break}
+      previousRevision=next.revision
+    }
+    if(!current)throw Error('文档仍在更新，请稍后重新点击；本次没有修改列表。')
+    // A single explicit click gets a fresh guard; a rejected write is never
+    // replayed. The worker still checks the exact revision and full list rules.
+    emit('action',{type:'list',operation,expectedRevision:current.revision,expectedSelectionId:current.selection.id})
+  }catch(error){if(request===listToken)problem.value=error instanceof Error?error.message:String(error)}
+  finally{if(request===listToken)listLoading.value=false}
+}
 function apply(confirmRemoval=false) {
   if(!pending.value || !props.state) return
   if(panel.value==='text') {if(draft.text.length>20000){problem.value='单次输入不能超过 2 万字。';return} send({type:'insert-text',text:draft.text,replaceSelection:!props.state.selection.collapsed},true)}
+  else if(panel.value==='hyperlink') {
+    if(props.state.selection.collapsed||props.state.selection.truncated){problem.value='请先在画布中选中要设置链接的文字。';return}
+    send({type:'set-hyperlink',url:draft.url.trim()},true)
+  }
   else if(panel.value==='paragraph') {
     const values=Object.fromEntries(Object.entries(draft).map(([key,value])=>[key,Number(value)]))
     if(Object.values(values).some(value=>!Number.isFinite(value))||['leftIndent','rightIndent','spaceAbove','spaceBelow'].some(key=>values[key]<0||values[key]>200)||values.firstLineIndent< -100||values.firstLineIndent>200||values.lineSpacingPercent<80||values.lineSpacingPercent>300){problem.value='缩进与间距为 0–200 毫米，首行缩进为 −100–200 毫米，行距为 80%–300%。';return}
@@ -154,7 +188,7 @@ watch(()=>props.state,(state,previous)=>{
 },{deep:true,immediate:true})
 watch(()=>props.active,active=>{if(!active&&!pending.value){panel.value='';token++;resetValues()}})
 watch(pending,value=>emit('draft-change',value),{immediate:true})
-onBeforeUnmount(()=>{disposed=true;token++;reviewToken++})
+onBeforeUnmount(()=>{disposed=true;token++;reviewToken++;listToken++})
 defineExpose({hasPendingEdits:()=>pending.value,assertNoPendingEdits,discardDrafts,actionSucceeded,actionFailed})
 </script>
 <template>
@@ -167,11 +201,13 @@ defineExpose({hasPendingEdits:()=>pending.value,assertNoPendingEdits,discardDraf
     <select aria-label="字体" :value="state?.textStyle.fontName" :disabled="locked" @change="format({fontName:($event.target as HTMLSelectElement).value})"><option v-if="state?.textStyle.fontName" :value="state.textStyle.fontName">{{state.textStyle.fontName}}</option><option>Noto Sans CJK SC</option><option>Carlito</option><option>Liberation Serif</option><option>Liberation Mono</option></select>
     <select aria-label="字号（磅）" :value="state?.textStyle.fontSize" :disabled="locked" @change="format({fontSize:Number(($event.target as HTMLSelectElement).value)})"><option v-for="size in [9,10,10.5,11,12,14,16,18,20,24,28,32,36,48,72]" :key="size">{{size}}</option></select>
     <button class="ow-command ow-square" aria-label="加粗" :aria-pressed="state?.textStyle.bold" :disabled="locked" @click="format({bold:!state?.textStyle.bold})"><b>B</b></button><button class="ow-command ow-square" aria-label="斜体" :aria-pressed="state?.textStyle.italic" :disabled="locked" @click="format({italic:!state?.textStyle.italic})"><i>I</i></button><button class="ow-command ow-square" aria-label="下划线" :aria-pressed="state?.textStyle.underline" :disabled="locked" @click="format({underline:!state?.textStyle.underline})"><u>U</u></button>
+    <button class="ow-command ow-square" aria-label="删除线" :aria-pressed="state?.textStyle.strikethrough" :disabled="locked" @click="format({strikethrough:!state?.textStyle.strikethrough})"><s>S</s></button><button class="ow-command ow-square" aria-label="上标" :aria-pressed="state?.textStyle.baseline==='superscript'" :disabled="locked" @click="format({baseline:state?.textStyle.baseline==='superscript'?'normal':'superscript'})">x<sup>2</sup></button><button class="ow-command ow-square" aria-label="下标" :aria-pressed="state?.textStyle.baseline==='subscript'" :disabled="locked" @click="format({baseline:state?.textStyle.baseline==='subscript'?'normal':'subscript'})">x<sub>2</sub></button>
+    <button class="ow-command" aria-label="应用文字高亮" :aria-pressed="!!state?.textStyle.highlight" :disabled="locked" @click="format({highlight:state?.textStyle.highlight||'#FFF1A6'})">高亮</button><input type="color" aria-label="高亮颜色" title="文字高亮" :value="state?.textStyle.highlight||'#FFF1A6'" :disabled="locked" @change="format({highlight:($event.target as HTMLInputElement).value})"/><button class="ow-command" aria-label="取消文字高亮" :disabled="locked||!state?.textStyle.highlight" @click="format({highlight:null})">取消高亮</button>
     <input type="color" aria-label="文字颜色" :value="state?.textStyle.color||'#000000'" :disabled="locked" @change="format({color:($event.target as HTMLInputElement).value})"/><span class="ow-divider"/>
     <select aria-label="段落对齐" :value="state?.paragraph.align" :disabled="locked" @change="paragraph({align:($event.target as HTMLSelectElement).value as WriterParagraph['align']})"><option value="left">左对齐</option><option value="center">居中</option><option value="right">右对齐</option><option value="justify">两端对齐</option></select>
-    <button class="ow-command" :disabled="!ready" @click="openPanel('paragraph')">段落</button><button class="ow-command" :disabled="!ready" @click="openPanel('text')">编辑选中文字</button>
+    <button class="ow-command" :disabled="!ready" @click="openPanel('paragraph')">段落</button><button class="ow-command" :aria-pressed="panel==='list'" :disabled="!ready" @click="openPanel('list')">列表</button><button class="ow-command" :disabled="!ready" @click="openPanel('text')">编辑选中文字</button>
    </template>
-   <template v-else-if="tab==='插入'"><button class="ow-command" :disabled="!ready" @click="openPanel('text')"><Icon name="file" :size="16"/>文字</button><button class="ow-command" :disabled="locked" @click="emit('insert-image')"><Icon name="image" :size="16"/>图片</button><button class="ow-command" :disabled="!ready" @click="openPanel('insertTable')"><Icon name="sheet" :size="16"/>表格</button><span class="ow-divider"/><button class="ow-command" :disabled="!ready" @click="openPanel('toc')">目录</button><button class="ow-command" :disabled="locked" @click="send({type:'insert-break',kind:'page'})">分页符</button><button class="ow-command" :disabled="!ready" @click="openPanel('header')">页眉</button><button class="ow-command" :disabled="!ready" @click="openPanel('footer')">页脚</button><button class="ow-command" :disabled="locked" @click="send({type:'insert-page-number',target:'footer',align:'center'})">页码</button></template>
+   <template v-else-if="tab==='插入'"><button class="ow-command" :disabled="!ready" @click="openPanel('text')"><Icon name="file" :size="16"/>文字</button><button class="ow-command" :disabled="locked" @click="emit('insert-image')"><Icon name="image" :size="16"/>图片</button><button class="ow-command" :disabled="!ready||state?.selection.collapsed||state?.selection.truncated" @click="openPanel('hyperlink')">超链接</button><button class="ow-command" :disabled="!ready" @click="openPanel('insertTable')"><Icon name="sheet" :size="16"/>表格</button><span class="ow-divider"/><button class="ow-command" :disabled="!ready" @click="openPanel('toc')">目录</button><button class="ow-command" :disabled="locked" @click="send({type:'insert-break',kind:'page'})">分页符</button><button class="ow-command" :disabled="!ready" @click="openPanel('header')">页眉</button><button class="ow-command" :disabled="!ready" @click="openPanel('footer')">页脚</button><button class="ow-command" :disabled="locked" @click="send({type:'insert-page-number',target:'footer',align:'center'})">页码</button></template>
    <template v-else-if="tab==='布局'"><button class="ow-command" :disabled="locked" @click="send({type:'set-page',width:210,height:297,landscape:false})">A4 纵向</button><button class="ow-command" :disabled="locked" @click="send({type:'set-page',width:297,height:210,landscape:true})">A4 横向</button><button class="ow-command" :disabled="!ready" @click="openPanel('page')">纸张与页边距</button><span class="ow-divider"/><button class="ow-command" :disabled="!ready" @click="openPanel('paragraph')">缩进与间距</button></template>
    <template v-else><button class="ow-command" :disabled="!ready" @click="openPanel('find')"><Icon name="search" :size="16"/>查找与替换</button><button class="ow-command" :disabled="!ready" @click="openPanel('table')">表格数据</button><span class="ow-divider"/><button class="ow-command" :disabled="!ready" @click="openPanel('comment')">添加批注</button><button class="ow-command" :disabled="!ready" @click="openPanel('review')">批注与修订</button><button class="ow-command" :disabled="!ready" @click="openPanel('footnote')">脚注 / 尾注</button></template>
   </div>
@@ -181,18 +217,25 @@ defineExpose({hasPendingEdits:()=>pending.value,assertNoPendingEdits,discardDraf
  <div class="ow-body"><div class="ow-canvas"><slot/></div>
   <aside v-if="active&&panel" class="ow-panel" :aria-label="titles[panel]">
    <div class="ow-panel-heading"><h3>{{titles[panel]}}</h3><button class="ow-command ow-square" aria-label="关闭文字面板" :disabled="pending" @click="panel=''">×</button></div>
-   <p v-if="reviewLoading" role="status">正在读取当前文档，保留你的输入…</p>
+   <p v-if="reviewLoading||listLoading" role="status">正在读取当前文档…</p>
    <section v-if="draftReview" class="ow-draft-review" data-testid="word-draft-review" aria-label="重新核对保留输入">
     <strong>请确认新的应用目标</strong><p>当前页面样式：{{draftReview.styleName}} · 版本 {{draftReview.revision}}。确认会按下列保留输入设置此页面样式，不会自动重试上一次操作。</p>
     <dl><template v-for="row in draftReview.rows" :key="row.label"><dt>{{row.label}}</dt><dd><span>当前：{{row.current||'（空）'}}</span><span>保留输入：{{row.proposed||'（空）'}}</span></dd></template></dl>
     <div class="ow-actions"><button class="ow-primary" :disabled="!ready" @click="confirmDraftReview">按当前文档应用</button><button :disabled="busy" @click="cancelDraftReview">取消核对</button></div>
    </section>
    <template v-if="panel==='text'"><p>{{state?.selection.collapsed?'在画布内放置光标，再输入要插入的文字。':'应用会替换画布中当前选中的文字。'}}</p><label class="ow-field">文字内容<textarea aria-label="文字内容" :value="draft.text" :disabled="!ready||state?.selection.truncated" rows="9" @input="input('text',$event)"/><small>单次最多 20,000 字；长文可直接在画布内编辑。</small></label><p v-if="state?.selection.truncated">选区过大，请在画布内缩小选区后编辑。</p></template>
+   <template v-else-if="panel==='hyperlink'"><p>为画布中选中的文字添加或修改链接，不替换文字内容。</p><p v-if="state?.hyperlink?.mixed">选区包含不同链接，请分别选中后改址；可统一移除所选链接。</p><label class="ow-field">链接地址<input aria-label="链接地址" :value="draft.url" :disabled="!ready||state?.selection.collapsed" maxlength="2048" placeholder="https://example.com" @input="input('url',$event)"/></label><p>支持普通 http、https 和 mailto 链接；复杂链接请在画布中编辑。清空后应用可移除链接，链接自带样式也会取消，手动文字格式保留。</p><div v-if="!pending" class="ow-actions"><button :disabled="locked||state?.selection.collapsed||(!state?.hyperlink?.url&&!state?.hyperlink?.mixed)" @click="send({type:'set-hyperlink',url:''})">移除链接</button></div></template>
    <template v-else-if="panel==='paragraph'"><div class="ow-field-row"><label v-for="item in [{key:'leftIndent',label:'左缩进'},{key:'rightIndent',label:'右缩进'},{key:'firstLineIndent',label:'首行缩进'},{key:'spaceAbove',label:'段前间距'},{key:'spaceBelow',label:'段后间距'}]" :key="item.key" class="ow-field">{{item.label}} · 毫米<input type="number" step="0.5" :value="draft[item.key]" :disabled="!ready" @input="input(item.key,$event)"/></label><label class="ow-field">行距 · %<input type="number" min="80" max="300" :value="draft.lineSpacingPercent" :disabled="!ready" @input="input('lineSpacingPercent',$event)"/></label></div></template>
    <template v-else-if="panel==='page'"><p>设置作用于当前页面样式。</p><div class="ow-field-row"><label v-for="item in [{key:'width',label:'纸张宽度'},{key:'height',label:'纸张高度'},{key:'marginTop',label:'上边距'},{key:'marginBottom',label:'下边距'},{key:'marginLeft',label:'左边距'},{key:'marginRight',label:'右边距'}]" :key="item.key" class="ow-field">{{item.label}} · 毫米<input type="number" step="1" min="0" :value="draft[item.key]" :disabled="!ready" @input="input(item.key,$event)"/></label></div></template>
-   <template v-else-if="panel==='header'||panel==='footer'"><label class="ow-check"><input type="checkbox" :checked="draft.enabled==='true'" :disabled="!ready" @change="edit('enabled',String(($event.target as HTMLInputElement).checked))"/>启用{{panel==='header'?'页眉':'页脚'}}</label><label class="ow-field">{{panel==='header'?'页眉':'页脚'}}文字<textarea :value="draft.text" :disabled="!ready||draft.enabled!=='true'||(panel==='header'?state?.page.headerTruncated:state?.page.footerTruncated)" rows="5" @input="input('text',$event)"/></label><p v-if="panel==='header'?state?.page.headerTruncated:state?.page.footerTruncated">内容较长，仅显示摘要。请在画布中编辑，开关仍可单独设置。</p><p>文字内容会替换当前样式已有的{{panel==='header'?'页眉':'页脚'}}，包括其中的字段。</p></template>
+   <template v-else-if="panel==='header'||panel==='footer'"><label class="ow-check"><input type="checkbox" :checked="draft.enabled==='true'" :disabled="!ready" @change="edit('enabled',String(($event.target as HTMLInputElement).checked))"/>启用{{panel==='header'?'页眉':'页脚'}}</label><label class="ow-field">{{panel==='header'?'页眉':'页脚'}}文字<textarea :value="draft.text" :disabled="!ready||draft.enabled!=='true'||(panel==='header'?state?.page.headerTruncated:state?.page.footerTruncated)" rows="5" @input="input('text',$event)"/></label><p v-if="panel==='header'?state?.page.headerTruncated:state?.page.footerTruncated">内容较长，仅显示摘要。请在画布中编辑，开关仍可单独设置。</p><p>同一普通文字片段内的修改会保留字段、链接和格式。跨格式或涉及字段、链接的改动请在画布中编辑。关闭{{panel==='header'?'页眉':'页脚'}}仍会删除其中全部内容，包括字段和图片。</p></template>
    <template v-else-if="panel==='insertTable'"><div class="ow-field-row"><label class="ow-field">行数<input type="number" min="1" max="30" :value="draft.rows" :disabled="!ready" @input="input('rows',$event)"/></label><label class="ow-field">列数<input type="number" min="1" max="20" :value="draft.columns" :disabled="!ready" @input="input('columns',$event)"/></label></div><p>在当前光标处插入可编辑表格。可以直接在画布内输入单元格内容。</p><div v-if="!pending" class="ow-actions"><button class="ow-primary" :disabled="locked" @click="insertTable">插入表格</button></div></template>
    <template v-else-if="panel==='table'"><p>只写入修改的单元格，其他单元格保持原样。多段文字或复杂字段请在画布中编辑。</p><label class="ow-field">选择表格<select v-model="tableName" :disabled="!ready||pending||tableLoading" @change="readTable(tableName)"><option value="">请选择</option><option v-for="item in state?.tables||[]" :key="item.name" :value="item.name">{{item.name}} · {{item.rows}} × {{item.columns}}</option></select></label><button class="ow-command" :disabled="!ready||pending||tableLoading||!tableName" @click="readTable(tableName)">重新读取表格</button><p v-if="tableLoading" role="status">正在读取表格…</p><p v-else-if="!state?.tables.length">文档中暂无表格。</p><div v-if="table&&tableCells.length" class="ow-table-grid"><table><tbody><tr v-for="(row,r) in tableCells" :key="r"><td v-for="(cell,c) in row" :key="c"><textarea :aria-label="`第 ${r+1} 行第 ${c+1} 列`" :value="cell" :disabled="!ready||tableLoading" rows="2" @input="editCell(r,c,$event)"/></td></tr></tbody></table></div></template>
+   <template v-else-if="panel==='list'">
+    <p data-testid="word-list-summary">{{listSummary}}</p><p>在画布中定位段落，或选中同一列表的连续条目。</p>
+    <div class="ow-actions"><button :disabled="locked" @click="editList('bullet')">项目符号</button><button :disabled="locked" @click="editList('number')">数字编号</button><button :disabled="locked" @click="editList('remove')">取消列表</button></div>
+    <div class="ow-actions"><button :disabled="locked" @click="editList('promote')">提升一级</button><button :disabled="locked" @click="editList('demote')">降低一级</button><button :disabled="locked" @click="editList('restart')">从 1 重新编号</button></div>
+    <p>支持普通项目符号和独立逐级数字编号。更换列表类型需先取消；重新编号从选区首段开始。章节编号、图片符号及混合列表请在画布中编辑。</p>
+   </template>
    <template v-else-if="panel==='outline'"><p>使用标题样式组织文档；点击标题跳转。</p><ul class="ow-panel-list"><li v-for="item in state?.outline||[]" :key="item.id"><button :style="{paddingLeft:`${10+Math.min(item.level,6)*9}px`}" :disabled="locked" @click="send({type:'goto-outline',id:item.id})">{{item.text||'未命名标题'}}</button></li></ul><p v-if="!state?.outline.length">文档中暂无标题。选中段落后选择“标题”样式即可生成大纲。</p><p v-if="state?.outlineTruncated">仅显示部分标题。</p></template>
    <template v-else-if="panel==='find'"><label class="ow-field">查找内容<input v-model="search.text" :disabled="!ready" @keydown.enter="find()"/></label><label class="ow-field">替换为<input v-model="search.replace" :disabled="!ready"/></label><label class="ow-check"><input v-model="search.matchCase" type="checkbox"/>区分大小写</label><label class="ow-check"><input v-model="search.wholeWords" type="checkbox"/>全字匹配</label><div class="ow-actions"><button :disabled="locked||!search.text" @click="find()">查找下一处</button><button :disabled="locked||!search.text" @click="find(true,false)">替换</button><button :disabled="locked||!search.text" @click="find(true,true)">全部替换</button></div></template>
    <template v-else-if="panel==='comment'"><p>批注关联当前选区或光标位置。</p><label class="ow-field">作者<input :value="draft.author" :disabled="!ready" maxlength="100" @input="input('author',$event)"/></label><label class="ow-field">批注内容<textarea :value="draft.text" :disabled="!ready" rows="7" @input="input('text',$event)"/></label></template>

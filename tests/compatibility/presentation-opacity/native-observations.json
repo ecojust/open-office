@@ -1,0 +1,456 @@
+{
+  "scope": "Native center text, interior fill, and outer half of 2mm stroke. No whole-image pixel parity. Alpha chains and text-alpha are explicit reference/implementation boundaries.",
+  "screenshotSha256": "a255881b4f8993bf6950271a9a985616a53f528214704404708903d6cc5dc89b",
+  "slidePixelBounds": [
+    329,
+    164,
+    780,
+    439
+  ],
+  "samples": [
+    {
+      "id": "fill-half",
+      "fill": {
+        "pixel": [
+          408,
+          218
+        ],
+        "rgb": [
+          255,
+          127,
+          127
+        ],
+        "hex": "#FF7F7F"
+      },
+      "outerStroke": {
+        "pixel": [
+          430,
+          190
+        ],
+        "rgb": [
+          0,
+          0,
+          255
+        ],
+        "hex": "#0000FF"
+      },
+      "center": {
+        "pixel": [
+          465,
+          229
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "hex": "#000000"
+      }
+    },
+    {
+      "id": "fill-zero",
+      "fill": {
+        "pixel": [
+          650,
+          218
+        ],
+        "rgb": [
+          255,
+          255,
+          255
+        ],
+        "hex": "#FFFFFF"
+      },
+      "outerStroke": {
+        "pixel": [
+          672,
+          190
+        ],
+        "rgb": [
+          0,
+          0,
+          255
+        ],
+        "hex": "#0000FF"
+      },
+      "center": {
+        "pixel": [
+          707,
+          229
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "hex": "#000000"
+      }
+    },
+    {
+      "id": "line-quarter",
+      "fill": {
+        "pixel": [
+          892,
+          218
+        ],
+        "rgb": [
+          255,
+          0,
+          0
+        ],
+        "hex": "#FF0000"
+      },
+      "outerStroke": {
+        "pixel": [
+          914,
+          190
+        ],
+        "rgb": [
+          191,
+          191,
+          255
+        ],
+        "hex": "#BFBFFF"
+      },
+      "center": {
+        "pixel": [
+          949,
+          229
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "hex": "#000000"
+      }
+    },
+    {
+      "id": "independent",
+      "fill": {
+        "pixel": [
+          408,
+          320
+        ],
+        "rgb": [
+          255,
+          127,
+          127
+        ],
+        "hex": "#FF7F7F"
+      },
+      "outerStroke": {
+        "pixel": [
+          430,
+          291
+        ],
+        "rgb": [
+          191,
+          191,
+          255
+        ],
+        "hex": "#BFBFFF"
+      },
+      "center": {
+        "pixel": [
+          465,
+          330
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "hex": "#000000"
+      }
+    },
+    {
+      "id": "line-zero",
+      "fill": {
+        "pixel": [
+          650,
+          320
+        ],
+        "rgb": [
+          255,
+          0,
+          0
+        ],
+        "hex": "#FF0000"
+      },
+      "outerStroke": {
+        "pixel": [
+          707,
+          291
+        ],
+        "rgb": [
+          255,
+          255,
+          255
+        ],
+        "hex": "#FFFFFF"
+      },
+      "center": {
+        "pixel": [
+          707,
+          330
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "hex": "#000000"
+      }
+    },
+    {
+      "id": "ellipse-independent",
+      "fill": {
+        "pixel": [
+          892,
+          320
+        ],
+        "rgb": [
+          255,
+          127,
+          127
+        ],
+        "hex": "#FF7F7F"
+      },
+      "outerStroke": {
+        "pixel": [
+          949,
+          291
+        ],
+        "rgb": [
+          191,
+          191,
+          255
+        ],
+        "hex": "#BFBFFF"
+      },
+      "center": {
+        "pixel": [
+          949,
+          330
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "hex": "#000000"
+      }
+    },
+    {
+      "id": "line-only",
+      "lineCenter": {
+        "pixel": [
+          465,
+          431
+        ],
+        "rgb": [
+          191,
+          191,
+          255
+        ],
+        "hex": "#BFBFFF"
+      }
+    },
+    {
+      "id": "fill-chain",
+      "fill": {
+        "pixel": [
+          650,
+          421
+        ],
+        "rgb": [
+          255,
+          51,
+          51
+        ],
+        "hex": "#FF3333"
+      },
+      "outerStroke": {
+        "pixel": [
+          672,
+          393
+        ],
+        "rgb": [
+          0,
+          0,
+          255
+        ],
+        "hex": "#0000FF"
+      },
+      "center": {
+        "pixel": [
+          707,
+          431
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "hex": "#000000"
+      }
+    },
+    {
+      "id": "line-chain",
+      "fill": {
+        "pixel": [
+          892,
+          421
+        ],
+        "rgb": [
+          255,
+          0,
+          0
+        ],
+        "hex": "#FF0000"
+      },
+      "outerStroke": {
+        "pixel": [
+          914,
+          393
+        ],
+        "rgb": [
+          51,
+          51,
+          255
+        ],
+        "hex": "#3333FF"
+      },
+      "center": {
+        "pixel": [
+          949,
+          431
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "hex": "#000000"
+      }
+    },
+    {
+      "id": "text-alpha-limitation",
+      "fill": {
+        "pixel": [
+          408,
+          522
+        ],
+        "rgb": [
+          255,
+          127,
+          127
+        ],
+        "hex": "#FF7F7F"
+      },
+      "outerStroke": {
+        "pixel": [
+          430,
+          494
+        ],
+        "rgb": [
+          191,
+          191,
+          255
+        ],
+        "hex": "#BFBFFF"
+      },
+      "center": {
+        "pixel": [
+          465,
+          533
+        ],
+        "rgb": [
+          127,
+          63,
+          63
+        ],
+        "hex": "#7F3F3F"
+      }
+    },
+    {
+      "id": "theme-fill",
+      "fill": {
+        "pixel": [
+          650,
+          522
+        ],
+        "rgb": [
+          155,
+          185,
+          229
+        ],
+        "hex": "#9BB9E5"
+      },
+      "outerStroke": {
+        "pixel": [
+          672,
+          494
+        ],
+        "rgb": [
+          234,
+          147,
+          97
+        ],
+        "hex": "#EA9361"
+      },
+      "center": {
+        "pixel": [
+          707,
+          533
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "hex": "#000000"
+      }
+    },
+    {
+      "id": "theme-line",
+      "fill": {
+        "pixel": [
+          892,
+          522
+        ],
+        "rgb": [
+          56,
+          117,
+          203
+        ],
+        "hex": "#3875CB"
+      },
+      "outerStroke": {
+        "pixel": [
+          914,
+          494
+        ],
+        "rgb": [
+          250,
+          228,
+          215
+        ],
+        "hex": "#FAE4D7"
+      },
+      "center": {
+        "pixel": [
+          949,
+          533
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "hex": "#000000"
+      }
+    }
+  ]
+}

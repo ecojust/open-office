@@ -2,18 +2,25 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import type { NativeDocument } from '../types'
 import type { OfficeExportRequest, OfficeExportResult } from '../office/types'
-import type { PresentationAction, PresentationArrangeOperation, PresentationChartType, PresentationObjectQuery, PresentationTextStyle } from '../presentation/types'
+import type { PresentationAction, PresentationArrangeOperation, PresentationChartType, PresentationObjectQuery, PresentationTextStyle, PresentationParagraphStyle, PresentationTextLayoutPatch } from '../presentation/types'
 import { PRESENTATION_LAYOUTS } from '../presentation/types'
 import type { PresentationModel, SlideObject } from '../presentation/core/types'
 import { createPresentation, PresentationController } from '../presentation/core/model'
 import { importPresentation, exportPresentation } from '../presentation/core/pptx'
 import { slideSvg } from '../presentation/core/render'
 import { textLayoutFor } from '../presentation/core/scene'
+import { prepareSmartArtTextEdit, discardPreparedSmartArtTextEdit } from '../presentation/core/smartart-text'
+import { effectiveRichText } from '../presentation/core/rich-text'
+import { textRangeBlockedReason } from '../presentation/core/text-range-format'
+import { textOpacityBlockedReason } from '../presentation/core/format-text-paint'
+import { tableCellBlockedReasons, tableResizeBlockedReason } from '../presentation/core/table-text-content'
+import { textContentBlockedReason } from '../presentation/core/text-content-edit'
 import { exportPresentationPdf } from '../presentation/core/pdf'
 import { base64ToBytes, bytesToBase64 } from '../shared/document'
 import { parsePptxPackage, type PptxPatch, type PptxPresentation, type PptxSlide } from '../presentation/pptx-package'
 import SlidePreview from './SlidePreview.vue'
 import PresentationEffects from './PresentationEffects.vue'
+import PresentationFontNotice from './PresentationFontNotice.vue'
 import '../presentation/core/editor.css'
 
 const props = withDefaults(defineProps<{ document: NativeDocument; active?: boolean; disabled?: boolean }>(), { active: true, disabled: false })
@@ -24,8 +31,21 @@ const root = ref<HTMLElement>(), viewport = ref<HTMLElement>(), stage = ref<HTML
 const imageInput = ref<HTMLInputElement>(), effects = ref<InstanceType<typeof PresentationEffects>>()
 const propertiesOpen = ref(true), notesOpen = ref(false), fit = ref(true), zoom = ref(1), fitScale = ref(2)
 const notesDraft = ref(''), nameDraft = ref(''), effectsPending = ref(false)
-const textEdit = ref<{ id: string; text: string } | null>(null), propertyDraft = ref<Record<string, string>>({})
-const dataDialog = ref<null | { kind: 'table' | 'chart'; id?: string; text: string; title: string; chartType: PresentationChartType }>(null)
+const textEdit = ref<{ id: string; text: string; initialText: string; revision: number } | null>(null), propertyDraft = ref<Record<string, string>>({})
+const dataDialog = ref<null | { kind: 'table' | 'chart'; id?: string; text: string; title: string; chartType: PresentationChartType; cells?: string[][]; revision?: number; cellReasons?: Array<Array<string | undefined>>; resizeReason?: string }>(null)
+const smartArtDialog = ref<null | { id: string; nodeId: string; text: string; initialText: string; revision: number }>(null)
+const smartArtInput = ref<HTMLInputElement>()
+type RangeFormatDraft = { fontName: string; fontSize: string; opacity: string | number; color: string; colorEnabled: boolean; bold: string; italic: string; underline: string; strike: string; highlightMode: string; highlightColor: string }
+const rangeFormatDialog = ref<null | { id: string; text: string; start: number; end: number; revision: number; format: RangeFormatDraft }>(null)
+const rangeFormatInput = ref<HTMLTextAreaElement>()
+const rangeFormatChanged = computed(() => { const value = rangeFormatDialog.value?.format; return !!value && !!(value.fontName || value.fontSize || String(value.opacity).trim() || value.colorEnabled || value.bold || value.italic || value.underline || value.strike || value.highlightMode) })
+const rangeFormatSelection = computed(() => { const value = rangeFormatDialog.value; return value ? Array.from(value.text.slice(value.start, value.end)) : [] })
+type ParagraphDialog = { id: string; text: string; revision: number; paragraphs: string[]; indices: number[]; page: number; blocked?: string;
+  align: string; lineUnit: string; lineValue: string; beforeUnit: string; beforeValue: string; afterUnit: string; afterValue: string; outer: string;
+  vertical: string; wrap: string; left: string; right: string; top: string; bottom: string }
+const paragraphDialog = ref<ParagraphDialog | null>(null)
+const paragraphChanged = computed(() => { const d = paragraphDialog.value; return !!d && ['align','lineUnit','beforeUnit','afterUnit','outer','vertical','wrap','left','right','top','bottom'].some(key => String(d[key as keyof ParagraphDialog] ?? '').trim()) })
+const paragraphRows = computed(() => paragraphDialog.value?.paragraphs.map((text, index) => ({ text, index })).slice(paragraphDialog.value.page * 100, (paragraphDialog.value.page + 1) * 100) || [])
 const preview = shallowRef<{ base64: string; presentation: PptxPresentation; startPage: number } | null>(null)
 const dragPreview = ref<Record<string, Partial<SlideObject>>>({}), marquee = ref<null | { x: number; y: number; width: number; height: number }>(null)
 let disposed = false, generation = 0, observer: ResizeObserver | undefined, opening: Promise<void> = Promise.resolve()
@@ -40,9 +60,39 @@ const model = computed(() => { version.value; return controller.value?.model })
 const slide = computed(() => model.value?.slides[state.value?.currentPageIndex ?? 0])
 const selected = computed(() => slide.value?.objects.filter(object => state.value?.selectedObjectIds.includes(object.id)) || [])
 const primary = computed(() => selected.value[0])
+const textOpacityReason = computed(() => selected.value.map(item => textOpacityBlockedReason(item)).find(Boolean))
+const primaryTextOpacity = computed(() => {
+  const item = primary.value
+  if (!item) return ''
+  const paragraphs = effectiveRichText(item)
+  const values = new Set(paragraphs?.flatMap(paragraph => paragraph.runs.length ? paragraph.runs.map(run => run.style.opacity ?? 1) : [paragraph.style.opacity ?? 1]) || [item.textStyle.opacity ?? 1])
+  return values.size === 1 ? Math.round([...values][0]! * 10000) / 100 : ''
+})
+function selectedTextDecoration(key: 'underlineStyle' | 'strike') {
+  const values = new Set(selected.value.flatMap(item => {
+    const paragraphs = effectiveRichText(item)
+    const styles = paragraphs?.flatMap(p => p.runs.length ? p.runs.map(r => r.style) : [p.style]) || [item.textStyle]
+    return styles.map(style => key === 'underlineStyle' ? (style.underlineStyle ?? (style.underline ? 'single' : 'none')) : (style.strike ?? 'none'))
+  }))
+  return values.size === 1 ? [...values][0]! : ''
+}
+const selectedUnderlineStyle = computed(() => selectedTextDecoration('underlineStyle'))
+const selectedStrike = computed(() => selectedTextDecoration('strike'))
+const selectedHighlight = computed(() => {
+  const paints = selected.value.flatMap(item => {
+    const paragraphs = effectiveRichText(item)
+    const styles = paragraphs?.flatMap(p => p.runs.length ? p.runs.map(r => r.style) : [p.style]) || [item.textStyle]
+    return styles.map(style => ({ color: style.highlightColor || '', opacity: style.highlightOpacity ?? 1 }))
+  })
+  const colors = new Set(paints.map(paint => !paint.color || paint.opacity === 0 ? '' : `${paint.color.toLowerCase()}@${paint.opacity}`))
+  if (colors.size !== 1) return { color: '#fff176', label: '混合高亮' }
+  const paint = paints[0]
+  if (!paint?.color || !paint.opacity) return { color: '#fff176', label: '无高亮' }
+  return { color: paint.color, label: paint.opacity === 1 ? '已设置高亮' : `高亮不透明度 ${Math.round(paint.opacity * 100)}%` }
+})
 const scale = computed(() => fit.value ? fitScale.value : 3.7795275591 * zoom.value)
 const stageStyle = computed(() => ({ width: `${(model.value?.width || 254) * scale.value}px`, height: `${(model.value?.height || 142.875) * scale.value}px` }))
-const changedDraft = computed(() => !!textEdit.value && textEdit.value.text !== slide.value?.objects.find(item => item.id === textEdit.value?.id)?.text || notesDraft.value !== slide.value?.notes || nameDraft.value !== slide.value?.name || !!Object.keys(propertyDraft.value).length || effectsPending.value || !!dataDialog.value)
+const changedDraft = computed(() => !!textEdit.value && textEdit.value.text !== slide.value?.objects.find(item => item.id === textEdit.value?.id)?.text || notesDraft.value !== slide.value?.notes || nameDraft.value !== slide.value?.name || !!Object.keys(propertyDraft.value).length || effectsPending.value || !!dataDialog.value || !!smartArtDialog.value && smartArtDialog.value.text !== smartArtDialog.value.initialText || rangeFormatChanged.value || paragraphChanged.value)
 const dirty = computed(() => !!state.value?.dirty || !!state.value && changedDraft.value)
 const currentSvg = computed(() => {
   if (!model.value || !slide.value) return ''
@@ -69,8 +119,8 @@ function resetFit() {
 }
 async function load() {
   const token = ++generation
-  loading.value = true; problem.value = ''; savedExport = undefined; preview.value = null; compatibilityCopySaved = false
-  controller.value = undefined; textEdit.value = null; dataDialog.value = null; propertyDraft.value = {}; effectsPending.value = false
+  loading.value = true; busy.value = false; problem.value = ''; savedExport = undefined; preview.value = null; compatibilityCopySaved = false
+  controller.value = undefined; textEdit.value = null; dataDialog.value = null; smartArtDialog.value = null; rangeFormatDialog.value = null; paragraphDialog.value = null; propertyDraft.value = {}; effectsPending.value = false
   // Imported objects refer to parts in their own package. This clipboard is
   // document-local; reusing it after a load could bind to another file's rIds.
   copiedObjects.value = []
@@ -95,6 +145,12 @@ function applyPropertyDrafts() {
   for (const [key, value] of entries) {
     if (key === 'fontName') { if (!value.trim()) throw Error('字体名称不能为空。'); textStyle.fontName = value.trim(); continue }
     const number = Number(value)
+    if (key === 'fillOpacity' || key === 'lineOpacity' || key === 'textOpacity') {
+      if (!value.trim() || !Number.isFinite(number) || number < 0 || number > 100) throw Error('不透明度请输入 0 到 100；当前输入已保留。')
+      if (key === 'textOpacity') textStyle.opacity = number / 100
+      else changes[key] = number / 100
+      continue
+    }
     if (!value.trim() || !Number.isFinite(number)) throw Error('位置、大小和字号必须填写有效数字；当前输入已保留。')
     if (['width', 'height', 'fontSize'].includes(key) && number <= 0) throw Error('宽高和字号必须大于零；当前输入已保留。')
     if (key === 'fontSize') textStyle.fontSize = number
@@ -109,18 +165,27 @@ function commitText() {
   const draft = textEdit.value
   const item = slide.value?.objects.find(object => object.id === draft.id)
   if (!item) throw Error('文字对应的对象已变化，输入已保留。')
-  if (item.text !== draft.text) current().action({ type: 'update-object', id: draft.id, text: draft.text })
+  if (item.text !== draft.initialText || current().revision !== draft.revision) throw Error('正文或文稿已改变，输入已保留；请复制输入后按 Esc 重新打开编辑。')
+  if (item.text !== draft.text) current().action({ type: 'update-object', id: draft.id, text: draft.text, expectedRevision: draft.revision })
   textEdit.value = null; refresh()
+}
+function textKeydown(event: KeyboardEvent) {
+  if (event.isComposing) return
+  if (event.key === 'Escape') {
+    event.preventDefault(); textEdit.value = null; refresh(); void nextTick(() => root.value?.focus())
+  } else if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+    event.preventDefault(); safely(commitText)
+  }
 }
 function applyData() {
   const draft = dataDialog.value
   if (!draft) return
-  const rows = draft.text.replace(/\r/g, '').split('\n').map(row => row.split('\t'))
-  if (!draft.text.trim()) throw Error('请至少填写一行数据。')
+  const rows = draft.cells || draft.text.replace(/\r/g, '').split('\n').map(row => row.split('\t'))
+  if (!draft.cells && !draft.text.trim()) throw Error('请至少填写一行数据。')
   if (draft.kind === 'table') {
     if (rows.length > 30 || Math.max(...rows.map(row => row.length)) > 20) throw Error('表格最多 30 行、20 列。')
     const columns = Math.max(...rows.map(row => row.length)), cells = rows.map(row => Array.from({ length: columns }, (_, index) => row[index] || ''))
-    current().action(draft.id ? { type: 'update-table', id: draft.id, cells } : { type: 'insert-table', rows: cells.length, columns, cells })
+    current().action(draft.id ? { type: 'update-table', id: draft.id, cells, expectedRevision: draft.revision } : { type: 'insert-table', rows: cells.length, columns, cells })
   } else {
     if (rows.length < 2 || (rows[0]?.length || 0) < 2) throw Error('图表第一行需包含类别标题和至少一个系列；下方至少一行数值。')
     const series = rows[0]!.slice(1), categories = rows.slice(1).map(row => row[0] || ''), values = rows.slice(1).map(row => series.map((_, column) => {
@@ -135,20 +200,146 @@ function applyData() {
 }
 function dataCell(row: number, column: number, event: Event) {
   if (!dataDialog.value) return
-  const rows = dataDialog.value.text.split('\n').map(line => line.split('\t'))
+  const rows = dataDialog.value.cells || dataDialog.value.text.split('\n').map(line => line.split('\t'))
   while (rows[row]!.length <= column) rows[row]!.push('')
   rows[row]![column] = (event.target as HTMLInputElement).value
-  dataDialog.value.text = rows.map(line => line.join('\t')).join('\n')
+  if (!dataDialog.value.cells) dataDialog.value.text = rows.map(line => line.join('\t')).join('\n')
 }
 function addDataDimension(dimension: 'row' | 'column') {
   if (!dataDialog.value) return
-  const draft = dataDialog.value, rows = draft.text.split('\n').map(line => line.split('\t')), columns = Math.max(...rows.map(row => row.length))
+  const draft = dataDialog.value, rows = draft.cells || draft.text.split('\n').map(line => line.split('\t')), columns = Math.max(...rows.map(row => row.length))
   if (dimension === 'row') rows.push(Array.from({ length: columns }, (_, column) => draft.kind === 'table' ? '' : column === 0 ? `类别 ${rows.length}` : '0'))
   else rows.forEach((row, index) => { while (row.length < columns) row.push(''); row.push(draft.kind === 'table' ? '' : index === 0 ? `系列 ${columns}` : '0') })
-  draft.text = rows.map(line => line.join('\t')).join('\n')
+  if (!draft.cells) draft.text = rows.map(line => line.join('\t')).join('\n')
+}
+function openParagraphFormat(item: SlideObject) {
+  safely(() => {
+    commitDrafts()
+    item = current().model.slides[current().currentPageIndex]!.objects.find(object => object.id === item.id) || item
+    const paragraphs = effectiveRichText(item)?.map(paragraph => paragraph.runs.map(run => run.text).join('')) || item.text.split('\n')
+    paragraphDialog.value = { id: item.id, text: item.text, revision: current().revision, paragraphs, indices: paragraphs.map((_, index) => index), page: 0, blocked: textRangeBlockedReason(item),
+      align: '', lineUnit: '', lineValue: '', beforeUnit: '', beforeValue: '', afterUnit: '', afterValue: '', outer: '', vertical: '', wrap: '', left: '', right: '', top: '', bottom: '' }
+    void nextTick(() => root.value?.querySelector<HTMLElement>('[data-testid="presentation-paragraph-dialog"] button')?.focus())
+  })
+}
+function closeParagraphFormat() {
+  paragraphDialog.value = null
+  void nextTick(() => root.value?.querySelector<HTMLElement>('[data-testid="presentation-paragraph-format"]')?.focus())
+}
+function applyParagraphFormat() {
+  const d = paragraphDialog.value
+  if (!d) return
+  if (current().revision !== d.revision) throw Error('文稿已经变化，请取消并重新打开段落与文本框设置。')
+  const paragraphStyle: PresentationParagraphStyle = {}, layout: PresentationTextLayoutPatch = {}, actions: PresentationAction[] = []
+  if (d.align) paragraphStyle.align = d.align as PresentationTextStyle['align']
+  for (const [prefix, key] of [['line', 'lineSpacing'], ['before', 'spaceBefore'], ['after', 'spaceAfter']] as const) {
+    const unit = d[`${prefix}Unit`], raw = String(d[`${prefix}Value`])
+    if (!unit) continue
+    if (!raw.trim() || !Number.isFinite(Number(raw))) throw Error('请填写有效的行距或段距数值；0 表示明确设置为零。')
+    paragraphStyle[key] = { unit: unit as 'percent' | 'points', value: Number(raw) / (unit === 'percent' ? 100 : 1) }
+  }
+  if (Object.keys(paragraphStyle).length || d.outer) {
+    if (d.blocked) throw Error(d.blocked)
+    actions.push({ type: 'format-paragraphs', id: d.id, paragraphIndices: [...d.indices], paragraphStyle,
+      ...(d.outer ? { spaceFirstLastParagraph: d.outer === 'true' } : {}), expectedText: d.text, expectedRevision: d.revision })
+  }
+  if (d.vertical) layout.verticalAlign = d.vertical as 'top' | 'middle' | 'bottom'
+  if (d.wrap) layout.wrap = d.wrap === 'true'
+  for (const key of ['left','right','top','bottom'] as const) if (String(d[key]).trim()) {
+    if (!Number.isFinite(Number(d[key]))) throw Error('文本框内边距必须填写有效数字。')
+    layout.insets ||= {}; layout.insets[key] = Number(d[key])
+  }
+  if (Object.keys(layout).length) actions.push({ type: 'set-text-layout', id: d.id, layout, expectedRevision: d.revision })
+  if (!actions.length) throw Error('请选择至少一项要修改的排版属性。')
+  current().batch(actions); paragraphDialog.value = null; refresh()
+  emit('status', '段落与文本框排版已更新')
+  void nextTick(() => root.value?.focus())
+}
+function openRangeFormat(item: SlideObject) {
+  safely(() => {
+    commitDrafts()
+    item = current().model.slides[current().currentPageIndex]!.objects.find(object => object.id === item.id) || item
+    const reason = textRangeBlockedReason(item)
+    if (reason) throw Error(reason)
+    rangeFormatDialog.value = { id: item.id, text: item.text, start: 0, end: 0, revision: current().revision,
+      format: { fontName: '', fontSize: '', opacity: '', color: item.textStyle.color, colorEnabled: false, bold: '', italic: '', underline: '', strike: '', highlightMode: '', highlightColor: '#fff176' } }
+    void nextTick(() => { rangeFormatInput.value?.focus(); rangeFormatInput.value?.setSelectionRange(0, 0) })
+  })
+}
+function selectRangeFormat() {
+  if (!rangeFormatDialog.value || !rangeFormatInput.value) return
+  rangeFormatDialog.value.start = rangeFormatInput.value.selectionStart
+  rangeFormatDialog.value.end = rangeFormatInput.value.selectionEnd
+}
+function closeRangeFormat() {
+  rangeFormatDialog.value = null
+  void nextTick(() => { const button = root.value?.querySelector<HTMLButtonElement>('[data-testid="presentation-range-format"]'); (button || root.value)?.focus() })
+}
+function applyRangeFormat() {
+  const draft = rangeFormatDialog.value
+  if (!draft) return
+  if (rangeFormatInput.value?.value !== draft.text) throw Error('文本显示与原文不一致，请取消并重新打开局部文字格式。')
+  if (draft.start === draft.end) throw Error('请先选中需要设置格式的文字。')
+  if (current().revision !== draft.revision) throw Error('文稿已经变化，请取消并重新打开局部文字格式。当前输入已保留。')
+  const patch: Partial<PresentationTextStyle> = {}, format = draft.format
+  if (format.fontName.trim()) patch.fontName = format.fontName.trim()
+  if (String(format.fontSize).trim()) patch.fontSize = Number(format.fontSize)
+  if (String(format.opacity).trim()) {
+    const opacity = Number(format.opacity)
+    if (!Number.isFinite(opacity) || opacity < 0 || opacity > 100) throw Error('文字不透明度请输入 0 到 100；当前输入已保留。')
+    patch.opacity = opacity / 100
+  }
+  if (format.colorEnabled) patch.color = format.color
+  for (const key of ['bold', 'italic'] as const) if (format[key]) patch[key] = format[key] === 'true'
+  if (format.underline) patch.underlineStyle = format.underline === 'true' ? 'single' : format.underline === 'false' ? 'none' : 'double'
+  if (format.strike) patch.strike = format.strike as PresentationTextStyle['strike']
+  if (format.highlightMode) { patch.highlightColor = format.highlightMode === 'none' ? null : format.highlightColor; if (format.highlightMode === 'color') patch.highlightOpacity = 1 }
+  if (!Object.keys(patch).length) throw Error('请选择至少一项要修改的格式。')
+  // The core action validates the range and commits XML/style changes atomically.
+  current().action({ type: 'format-text-range', id: draft.id, start: draft.start, end: draft.end, textStyle: patch, expectedText: draft.text, expectedRevision: draft.revision })
+  rangeFormatDialog.value = null; refresh()
+  emit('status', '选中文字的格式已更新')
+  void nextTick(() => root.value?.focus())
+}
+function openSmartArtNode(item: SlideObject, nodeId: string) {
+  safely(() => {
+    commitDrafts()
+    if (item.smartArt?.blockedReason) throw Error(item.smartArt.blockedReason)
+    const node = item.smartArt?.nodes.find(value => value.id === nodeId)
+    if (!node?.editable) throw Error(node?.reason || '此节点暂不支持安全编辑。')
+    smartArtDialog.value = { id: item.id, nodeId, text: node.text, initialText: node.text, revision: current().revision }
+    void nextTick(() => { smartArtInput.value?.focus(); smartArtInput.value?.select() })
+  })
+}
+function closeSmartArtDialog() {
+  smartArtDialog.value = null
+  void nextTick(() => { const button = root.value?.querySelector<HTMLButtonElement>('[data-testid="presentation-smartart-node"]:not(:disabled)'); (button || root.value)?.focus() })
+}
+async function applySmartArtText() {
+  const draft = smartArtDialog.value
+  if (!draft || busy.value) return
+  if (draft.text === draft.initialText) { closeSmartArtDialog(); return }
+  const active = current(), token = generation
+  if (active.revision !== draft.revision) throw Error('文稿已经变化，请取消并重新打开此节点。当前输入已保留。')
+  busy.value = true
+  let prepared: PresentationAction | undefined
+  try {
+    prepared = await prepareSmartArtTextEdit(active.model, draft.id, draft.nodeId, draft.text, draft.revision)
+    if (disposed || token !== generation || controller.value !== active || smartArtDialog.value !== draft || !props.active || props.disabled) return
+    active.action(prepared)
+    smartArtDialog.value = null; refresh()
+    emit('status', '节点文字已更新，原图布局保持不变')
+    void nextTick(() => root.value?.focus())
+  } finally {
+    if (prepared?.type === 'update-smartart-text') discardPreparedSmartArtTextEdit(prepared)
+    if (!disposed && token === generation) busy.value = false
+  }
 }
 function commitDrafts() {
-  if (busy.value) throw Error('正在准备放映，请稍候再编辑或保存。')
+  if (busy.value) throw Error('正在处理演示文稿，请稍候再编辑或保存。')
+  if (paragraphDialog.value) throw Error('段落与文本框还有未确认的输入。请点击“应用排版”或“取消”，再继续。')
+  if (rangeFormatDialog.value) throw Error('局部文字格式还有未确认的输入。请点击“应用格式”或“取消”，再继续。')
+  if (smartArtDialog.value) throw Error('节点文字还有未确认的输入。请点击“应用文字”或“取消”，再继续。')
   if (effectsPending.value) throw Error('切换效果还有未应用的输入。请在右侧点击“应用切换”或“还原”，再继续。')
   commitText(); applyPropertyDrafts(); applyData()
   const page = slide.value
@@ -178,7 +369,11 @@ async function beginText(item: SlideObject) {
   if (!item.capabilities.text || item.type === 'table' || item.type === 'chart') return
   try {
     commitDrafts(); current().action({ type: 'select-objects', ids: [item.id] }); refresh()
-    textEdit.value = { id: item.id, text: item.text }; await nextTick(); textInput.value?.focus(); textInput.value?.select()
+    const selected = slide.value?.objects.find(object => object.id === item.id)
+    if (!selected) throw Error('文字对应的对象已变化。')
+    const reason = textContentBlockedReason(selected); if (reason) throw Error(reason)
+    textEdit.value = { id: selected.id, text: selected.text, initialText: selected.text, revision: current().revision }
+    await nextTick(); textInput.value?.focus(); textInput.value?.select()
   } catch (cause) { error(cause) }
 }
 async function insertText() {
@@ -187,10 +382,11 @@ async function insertText() {
 function openData(kind: 'table' | 'chart', item?: SlideObject) {
   safely(() => {
     commitDrafts()
-    if (item?.table) dataDialog.value = { kind, id: item.id, text: item.table.cells.map(row => row.join('\t')).join('\n'), title: '', chartType: 'column' }
-    else if (item?.chart) dataDialog.value = { kind, id: item.id, text: [['类别', ...item.chart.series], ...item.chart.categories.map((name, index) => [name, ...(item.chart!.values[index] || [])])].map(row => row.join('\t')).join('\n'), title: item.chart.title, chartType: item.chart.type }
+    const selected = item ? current().model.slides[current().currentPageIndex]!.objects.find(object => object.id === item.id) || item : undefined
+    if (selected?.table) dataDialog.value = { kind, id: selected.id, text: '', cells: selected.table.cells.map(row => [...row]), revision: current().revision, cellReasons: tableCellBlockedReasons(selected), resizeReason: tableResizeBlockedReason(selected), title: '', chartType: 'column' }
+    else if (selected?.chart) dataDialog.value = { kind, id: selected.id, text: [['类别', ...selected.chart.series], ...selected.chart.categories.map((name, index) => [name, ...(selected.chart!.values[index] || [])])].map(row => row.join('\t')).join('\n'), title: selected.chart.title, chartType: selected.chart.type }
     else dataDialog.value = { kind, text: kind === 'table' ? '项目\t负责人\t进度\n方案\t设计组\t完成\n交付\t产品组\t进行中' : '类别\t本期\t上期\n第一季度\t42\t30\n第二季度\t68\t48\n第三季度\t85\t62', title: '季度对比', chartType: 'column' }
-    void nextTick(() => root.value?.querySelector<HTMLTextAreaElement>('[data-testid="presentation-data-input"]')?.focus())
+    void nextTick(() => root.value?.querySelector<HTMLTextAreaElement>('[data-testid="presentation-data-input"], .pe-data-preview textarea:not([readonly])')?.focus())
   })
 }
 async function insertImage(image: { name: string; base64: string; mimeType?: string }) { await opening; commitDrafts(); const result = current().insertImage(image); refresh(); return result }
@@ -219,7 +415,7 @@ async function exportFile(options: OfficeExportRequest = {}): Promise<OfficeExpo
   return { base64: bytesToBase64(bytes), extension: format, name: props.document.name.replace(/\.[^.]+$/, '') + (saveAs ? ' 副本' : '') + '.' + format, revision, dirty: active.dirty, ...(saveAs ? { saveAs: true } : {}) }
 }
 async function markSaved() { if (savedExport?.generation === generation) { current().markSaved(savedExport.revision); compatibilityCopySaved = true; refresh() } }
-function discardDrafts() { textEdit.value = null; dataDialog.value = null; propertyDraft.value = {}; effectsPending.value = false; refresh(true); effects.value?.discardDrafts() }
+function discardDrafts() { textEdit.value = null; dataDialog.value = null; smartArtDialog.value = null; rangeFormatDialog.value = null; paragraphDialog.value = null; propertyDraft.value = {}; effectsPending.value = false; refresh(true); effects.value?.discardDrafts() }
 function assertNoPendingEdits() { commitDrafts() }
 async function discardChanges(options: { force?: boolean } = {}) {
   await opening
@@ -266,6 +462,10 @@ function objectStyle(object: SlideObject) {
   const geometry = { ...object, ...dragPreview.value[object.id] }
   return { left: `${geometry.x * scale.value}px`, top: `${geometry.y * scale.value}px`, width: `${Math.max(geometry.width, 1) * scale.value}px`, height: `${Math.max(geometry.height, 1) * scale.value}px`, transform: `rotate(${geometry.rotation}deg)` }
 }
+const richTextEditing = computed(() => {
+  const paragraphs = slide.value?.objects.find(object => object.id === textEdit.value?.id)?.richText?.paragraphs
+  return !!paragraphs && (paragraphs.length > 1 || paragraphs.some(paragraph => paragraph.runs.length > 1 || paragraph.runs.some(run => run.text.includes('\n'))))
+})
 const textStyle = computed(() => {
   const item = slide.value?.objects.find(object => object.id === textEdit.value?.id)
   if (!item) return {}
@@ -351,6 +551,9 @@ function keydown(event: KeyboardEvent) {
   if (event.defaultPrevented || props.disabled || busy.value || !props.active || preview.value || loading.value || !controller.value || root.value?.closest('[inert]')) return
   const target = event.target as HTMLElement, typing = !!target?.closest('input,textarea,select,[contenteditable="true"]')
   if (target?.closest('[role="dialog"]') && !root.value?.contains(target)) return
+  if (paragraphDialog.value) { if (event.key === 'Escape') { event.preventDefault(); closeParagraphFormat() } return }
+  if (rangeFormatDialog.value) { if (event.key === 'Escape') { event.preventDefault(); closeRangeFormat() } return }
+  if (smartArtDialog.value) { if (event.key === 'Escape') { event.preventDefault(); closeSmartArtDialog() } return }
   if (dataDialog.value) { if (event.key === 'Escape') { event.preventDefault(); dataDialog.value = null; root.value?.focus() } return }
   if (event.key === 'F5') { event.preventDefault(); event.stopImmediatePropagation(); safely(() => present(event.shiftKey ? current().currentPageIndex : 0)); return }
   if (event.key === 'Escape') { textEdit.value = null; propertyDraft.value = {}; if (!typing) safely(() => action({ type: 'select-objects', ids: [] })); return }
@@ -420,6 +623,7 @@ defineExpose({ exportFile, markSaved, discardChanges, assertNoPendingEdits, disc
       </nav>
       <div v-if="problem" class="pe-notice pe-error" role="alert"><span>{{ problem }}</span><button aria-label="关闭错误提示" @click="problem=''">×</button></div>
       <details v-if="warnings.length" class="pe-notice pe-warning"><summary>此文稿有 {{ warnings.length }} 项兼容提示</summary><p v-for="message in warnings" :key="message">{{ message }}</p></details>
+      <PresentationFontNotice :key="document.id" :model="model" :active="active" />
       <div class="pe-workspace" :class="{'pe-properties-hidden':!propertiesOpen}">
         <aside class="pe-filmstrip" aria-label="幻灯片列表">
           <div class="pe-panel-heading"><strong>幻灯片</strong><span>{{ state.pageCount }}</span></div>
@@ -438,6 +642,7 @@ defineExpose({ exportFile, markSaved, discardChanges, assertNoPendingEdits, disc
           </div>
         </aside>
         <main class="pe-canvas-column">
+          <div v-if="textEdit && richTextEditing" class="pe-notice pe-warning" role="status" data-testid="presentation-rich-text-edit-notice">按文字差异保留格式，重复文字请核对样式；混合格式或手动换行正文请在原有行内修改。Esc 取消。</div>
           <div ref="viewport" class="pe-viewport" @pointerdown.self="safely(() => action({type:'select-objects',ids:[]}))">
             <div class="pe-stage-spacing" :style="stageStyle">
               <div ref="stage" class="pe-stage" :style="stageStyle" data-testid="presentation-stage" role="group" :aria-label="`第 ${state.currentPageIndex+1} 页编辑画布`" @pointerdown.self="startDrag($event)" @pointermove="moveDrag" @pointerup="endDrag($event)" @pointercancel="endDrag($event,true)">
@@ -448,7 +653,7 @@ defineExpose({ exportFile, markSaved, discardChanges, assertNoPendingEdits, disc
                     <button class="pe-rotate-handle" data-testid="presentation-rotate" :aria-label="`旋转${item.name}`" @pointerdown.stop="startDrag($event,item,'rotate')">↻</button>
                   </template>
                 </div>
-                <textarea v-if="textEdit" ref="textInput" v-model="textEdit.text" class="pe-text-editor" :style="textStyle" data-testid="presentation-text-editor" aria-label="编辑对象文字" spellcheck="false" @pointerdown.stop @blur="safely(commitText)" @keydown.stop="($event.ctrlKey||$event.metaKey)&&$event.key==='Enter' ? safely(commitText) : undefined"></textarea>
+                <textarea v-if="textEdit" ref="textInput" v-model="textEdit.text" class="pe-text-editor" :style="textStyle" data-testid="presentation-text-editor" aria-label="编辑对象文字" spellcheck="false" @pointerdown.stop @blur="safely(commitText)" @keydown.stop="textKeydown"></textarea>
                 <div v-if="marquee" class="pe-marquee" :style="{left:`${marquee.x*scale}px`,top:`${marquee.y*scale}px`,width:`${marquee.width*scale}px`,height:`${marquee.height*scale}px`}"></div>
               </div>
             </div>
@@ -460,18 +665,38 @@ defineExpose({ exportFile, markSaved, discardChanges, assertNoPendingEdits, disc
           <div class="pe-panel-heading"><strong>{{ primary ? '对象属性' : '幻灯片属性' }}</strong><button title="收起属性" @click="toggleProperties">×</button></div>
           <template v-if="primary">
             <p class="pe-selection-name">{{ primary.name }}<span v-if="selected.length>1">等 {{ selected.length }} 个对象</span></p>
-            <section class="pe-property-section"><h3>位置与大小 <small>毫米</small></h3><div class="pe-property-grid"><label v-for="entry in [{key:'x',label:'X'},{key:'y',label:'Y'},{key:'width',label:'宽度'},{key:'height',label:'高度'},{key:'rotation',label:'旋转 °'}]" :key="entry.key">{{ entry.label }}<input type="number" step="0.5" :data-testid="'presentation-'+entry.key" :value="propertyValue(entry.key,Math.round(Number(primary[entry.key as keyof SlideObject])*100)/100)" @input="setDraft(entry.key,$event)" @change="safely(applyPropertyDrafts)" /></label></div></section>
+            <section v-if="primary.smartArt" class="pe-property-section pe-smartart-nodes" aria-label="图示节点文字">
+              <h3>图示节点文字</h3>
+              <p>{{ primary.smartArt.blockedReason || '可修改受支持节点的文字，保留原图布局。' }}</p>
+              <div v-for="(node,index) in primary.smartArt.nodes" :key="node.id">
+                <button class="pe-wide-button" data-testid="presentation-smartart-node" :data-node-id="node.id" :disabled="!!primary.smartArt.blockedReason || !node.editable" :title="primary.smartArt.blockedReason || node.reason || '编辑节点文字'" @click="openSmartArtNode(primary,node.id)">{{ node.text || `空白节点 ${index+1}` }}<span v-if="node.editable && !primary.smartArt.blockedReason"> · 编辑</span></button>
+                <p v-if="!node.editable && !primary.smartArt.blockedReason">{{ node.reason || '此节点暂为只读。' }}</p>
+              </div>
+            </section>
+            <section class="pe-property-section"><h3>位置与大小 <small>毫米</small></h3><div class="pe-property-grid"><label v-for="entry in [{key:'x',label:'X'},{key:'y',label:'Y'},{key:'width',label:'宽度'},{key:'height',label:'高度'},{key:'rotation',label:'旋转 °'}]" :key="entry.key">{{ entry.label }}<input type="number" step="0.5" :data-testid="'presentation-'+entry.key" :disabled="primary.locked || !primary.capabilities.geometry" :value="propertyValue(entry.key,Math.round(Number(primary[entry.key as keyof SlideObject])*100)/100)" @input="setDraft(entry.key,$event)" @change="safely(applyPropertyDrafts)" /></label></div></section>
             <section v-if="primary.capabilities.text" class="pe-property-section"><h3>文字</h3>
               <label>字体<input list="pe-fonts" :value="propertyValue('fontName',primary.textStyle.fontName)" @input="setDraft('fontName',$event)" @change="safely(applyPropertyDrafts)" /></label>
               <datalist id="pe-fonts"><option>Arial</option><option>Noto Sans SC</option><option>Microsoft YaHei</option><option>SimSun</option><option>Georgia</option><option>Times New Roman</option></datalist>
               <div class="pe-property-grid"><label>字号<input type="number" min="5" max="300" data-testid="presentation-font-size" :value="propertyValue('fontSize',primary.textStyle.fontSize)" @input="setDraft('fontSize',$event)" @change="safely(applyPropertyDrafts)" /></label><label>文字颜色<input type="color" data-testid="presentation-font-color" :value="primary.textStyle.color" @input="changeStyle({color:($event.target as HTMLInputElement).value})" /></label></div>
+              <label>文字不透明度 %<input type="number" min="0" max="100" step="1" data-testid="presentation-text-opacity" placeholder="混合" :disabled="!!textOpacityReason" :title="textOpacityReason || '0% 完全透明，100% 不透明；填写后应用于所选对象的全部文字'" :value="propertyValue('textOpacity',primaryTextOpacity)" @input="setDraft('textOpacity',$event)" @change="safely(applyPropertyDrafts)" /></label>
+              <p v-if="textOpacityReason" class="pe-property-hint">{{ textOpacityReason }}</p>
+              <div class="pe-property-grid">
+                <label>下划线<select data-testid="presentation-underline-style" :value="selectedUnderlineStyle" @change="changeStyle({underlineStyle:($event.target as HTMLSelectElement).value as PresentationTextStyle['underlineStyle']})"><option value="" disabled>混合</option><option value="none">无</option><option value="single">单下划线</option><option value="double">双下划线</option></select></label>
+                <label>删除线<select data-testid="presentation-strike" :value="selectedStrike" @change="changeStyle({strike:($event.target as HTMLSelectElement).value as PresentationTextStyle['strike']})"><option value="" disabled>混合</option><option value="none">无</option><option value="single">单删除线</option><option value="double">双删除线</option></select></label>
+              </div>
+              <label>文字高亮<span class="pe-highlight-control"><input type="color" data-testid="presentation-highlight-color" :value="selectedHighlight.color" title="选择颜色后应用不透明高亮" @input="changeStyle({highlightColor:($event.target as HTMLInputElement).value,highlightOpacity:1})" /><button type="button" data-testid="presentation-highlight-clear" @click="changeStyle({highlightColor:null})">清除</button></span></label>
+              <p class="pe-property-hint" data-testid="presentation-highlight-status">{{ selectedHighlight.label }}</p>
               <div class="pe-button-row"><button v-for="entry in [{value:'left',label:'左'},{value:'center',label:'中'},{value:'right',label:'右'},{value:'justify',label:'两端'}]" :key="entry.value" :aria-pressed="primary.textStyle.align===entry.value" :title="entry.label+'对齐文字'" @click="changeStyle({align:entry.value as PresentationTextStyle['align']})">{{ entry.label }}</button></div>
               <button v-if="primary.type!=='table'&&primary.type!=='chart'" class="pe-wide-button" @click="beginText(primary)">编辑文字</button>
+              <button v-if="!primary.locked&&primary.type!=='table'&&primary.type!=='chart'" class="pe-wide-button" data-testid="presentation-range-format" @click="openRangeFormat(primary)">局部文字格式</button>
+              <button v-if="!primary.locked&&primary.type!=='table'&&primary.type!=='chart'" class="pe-wide-button" data-testid="presentation-paragraph-format" @click="openParagraphFormat(primary)">段落与文本框</button>
             </section>
             <section v-if="primary.capabilities.fill || primary.capabilities.line" class="pe-property-section"><h3>填充与边框</h3><div class="pe-property-grid">
               <label v-if="primary.capabilities.fill">填充<input type="color" :value="primary.fillColor||'#ffffff'" @input="updateSelected({fillColor:($event.target as HTMLInputElement).value})" /></label>
               <label v-if="primary.capabilities.line">边框<input type="color" :value="primary.lineColor||'#334155'" @input="updateSelected({lineColor:($event.target as HTMLInputElement).value})" /></label>
               <label v-if="primary.capabilities.line">线宽<input type="number" min="0" max="20" step="0.1" :value="propertyValue('lineWidth',primary.lineWidth)" @input="setDraft('lineWidth',$event)" @change="safely(applyPropertyDrafts)" /></label>
+              <label v-if="primary.capabilities.fill && ['text','rectangle','ellipse'].includes(primary.type)">填充不透明度 %<input type="number" min="0" max="100" step="1" data-testid="presentation-fill-opacity" :disabled="!primary.fillColor" :title="primary.fillColor ? '0% 完全透明，100% 不透明' : '请先设置明确的填充颜色'" :value="propertyValue('fillOpacity',Math.round((primary.fillOpacity ?? 1)*10000)/100)" @input="setDraft('fillOpacity',$event)" @change="safely(applyPropertyDrafts)" /></label>
+              <label v-if="primary.capabilities.line && ['text','rectangle','ellipse','line'].includes(primary.type)">边框不透明度 %<input type="number" min="0" max="100" step="1" data-testid="presentation-line-opacity" :disabled="!primary.lineColor" :title="primary.lineColor ? '0% 完全透明，100% 不透明' : '请先设置明确的边框颜色'" :value="propertyValue('lineOpacity',Math.round((primary.lineOpacity ?? 1)*10000)/100)" @input="setDraft('lineOpacity',$event)" @change="safely(applyPropertyDrafts)" /></label>
             </div><div class="pe-button-row"><button v-if="primary.capabilities.fill" @click="updateSelected({fillColor:null})">无填充</button><button v-if="primary.capabilities.line" @click="updateSelected({lineWidth:0})">无线条</button></div></section>
             <section class="pe-property-section"><h3>排列</h3><div class="pe-button-row"><button @click="arrange('front')">置顶</button><button @click="arrange('back')">置底</button><button @click="arrange('forward')">上移</button><button @click="arrange('backward')">下移</button></div><select aria-label="对齐对象" value="" @change="arrange(($event.target as HTMLSelectElement).value as PresentationArrangeOperation); ($event.target as HTMLSelectElement).value=''"><option value="" disabled>对齐与分布…</option><option value="align-left">左对齐</option><option value="align-center">水平居中</option><option value="align-right">右对齐</option><option value="align-top">顶端对齐</option><option value="align-middle">垂直居中</option><option value="align-bottom">底端对齐</option><option value="distribute-horizontal">水平分布</option><option value="distribute-vertical">垂直分布</option></select><div class="pe-button-row"><button :disabled="selected.length<2" @click="arrange('group')">组合</button><button :disabled="primary.type!=='group'" @click="arrange('ungroup')">取消组合</button></div></section>
             <button v-if="primary.type==='table'||primary.type==='chart'" class="pe-wide-button" data-testid="presentation-edit-data" @click="openData(primary.type,primary)">编辑{{ primary.type==='table'?'表格':'图表' }}数据</button>
@@ -481,14 +706,59 @@ defineExpose({ exportFile, markSaved, discardChanges, assertNoPendingEdits, disc
           <PresentationEffects ref="effects" :slide="featureSlide" :page-id="slide.id" :enabled="true" :busy="busy||props.disabled" @edit="safely(() => presentationEdit($event))" @draft-change="effectsPending=$event" @error="error" />
         </aside>
       </div>
+      <div v-if="paragraphDialog" class="pe-modal-backdrop">
+        <section class="pe-data-dialog pe-paragraph-dialog" role="dialog" aria-modal="true" aria-label="段落与文本框" data-testid="presentation-paragraph-dialog" @keydown="modalKey">
+          <header><h2>段落与文本框</h2><button aria-label="取消段落与文本框设置" @click="closeParagraphFormat">×</button></header>
+          <p>只应用明确设置的属性。手动换行仍属于同一段落。</p>
+          <p v-if="paragraphDialog.blocked" role="status">此文字的段落设置暂不可用：{{ paragraphDialog.blocked }} 仍可设置文本框。</p>
+          <fieldset :disabled="!!paragraphDialog.blocked">
+            <legend>段落</legend>
+            <div class="pe-paragraph-picker-actions"><span>已选 {{ paragraphDialog.indices.length }} / {{ paragraphDialog.paragraphs.length }} 段</span><button data-testid="presentation-paragraph-all" @click="paragraphDialog.indices=paragraphDialog.paragraphs.map((_,index)=>index)">全选</button><button data-testid="presentation-paragraph-none" @click="paragraphDialog.indices=[]">清空</button></div>
+            <div class="pe-paragraph-picker" aria-label="选择段落"><label v-for="row in paragraphRows" :key="row.index"><input v-model="paragraphDialog.indices" type="checkbox" :value="row.index" :data-testid="'presentation-paragraph-'+row.index" /><span>{{ row.index+1 }}. {{ row.text.replace(/\n/g,' ↵ ') || '（空段落）' }}</span></label></div>
+            <div v-if="paragraphDialog.paragraphs.length>100" class="pe-button-row"><button :disabled="!paragraphDialog.page" @click="paragraphDialog.page--">上一组</button><span>{{ paragraphDialog.page+1 }} / {{ Math.ceil(paragraphDialog.paragraphs.length/100) }}</span><button :disabled="(paragraphDialog.page+1)*100>=paragraphDialog.paragraphs.length" @click="paragraphDialog.page++">下一组</button></div>
+            <div class="pe-dialog-fields"><label>水平对齐<select v-model="paragraphDialog.align" data-testid="presentation-paragraph-align"><option value="">保留原样</option><option value="left">左对齐</option><option value="center">居中</option><option value="right">右对齐</option><option value="justify">两端对齐</option></select></label><label>首尾段距<select v-model="paragraphDialog.outer" data-testid="presentation-paragraph-outer"><option value="">保留原样</option><option value="true">应用首尾段距</option><option value="false">忽略首尾段距</option></select></label></div>
+            <div v-for="entry in [{prefix:'line',label:'行距'},{prefix:'before',label:'段前间距'},{prefix:'after',label:'段后间距'}] as const" :key="entry.prefix" class="pe-spacing-row"><label>{{ entry.label }}<select v-model="paragraphDialog[`${entry.prefix}Unit`]" :data-testid="'presentation-paragraph-'+entry.prefix+'-unit'"><option value="">保留原样</option><option value="percent">百分比（%）</option><option value="points">固定值（磅）</option></select></label><label>{{ paragraphDialog[`${entry.prefix}Unit`]==='percent'?'百分比':'磅值' }}<input v-model="paragraphDialog[`${entry.prefix}Value`]" :disabled="!paragraphDialog[`${entry.prefix}Unit`]" :data-testid="'presentation-paragraph-'+entry.prefix+'-value'" type="number" min="0" max="1000" step="0.01" placeholder="填写数值" /></label></div>
+            <p>100% 等于本行最大字号；固定行距较小时文字可重叠。首尾段距对整个文本框生效。</p>
+          </fieldset>
+          <details class="pe-layout-details"><summary>文本框</summary><div class="pe-dialog-fields"><label>垂直对齐<select v-model="paragraphDialog.vertical" data-testid="presentation-layout-vertical"><option value="">保留原样</option><option value="top">顶部</option><option value="middle">居中</option><option value="bottom">底部</option></select></label><label>自动换行<select v-model="paragraphDialog.wrap" data-testid="presentation-layout-wrap"><option value="">保留原样</option><option value="true">开启</option><option value="false">关闭</option></select></label></div><div class="pe-insets-fields"><label v-for="entry in [{key:'left',label:'左'},{key:'right',label:'右'},{key:'top',label:'上'},{key:'bottom',label:'下'}] as const" :key="entry.key">{{ entry.label }}内边距（毫米）<input v-model="paragraphDialog[entry.key]" :data-testid="'presentation-layout-'+entry.key" type="number" min="0" max="1000" step="0.1" placeholder="保留原值" /></label></div></details>
+          <footer><button data-testid="presentation-paragraph-cancel" @click="closeParagraphFormat">取消</button><button class="pe-primary" data-testid="presentation-paragraph-apply" :disabled="!paragraphChanged" @click="safely(applyParagraphFormat)">应用排版</button></footer>
+        </section>
+      </div>
+      <div v-if="rangeFormatDialog" class="pe-modal-backdrop">
+        <section class="pe-data-dialog" role="dialog" aria-modal="true" aria-label="局部文字格式" @keydown="modalKey">
+          <header><h2>局部文字格式</h2><button aria-label="取消局部文字格式" @click="closeRangeFormat">×</button></header>
+          <label class="pe-data-label">选择需要修改格式的文字<textarea ref="rangeFormatInput" :value="rangeFormatDialog.text" readonly data-testid="presentation-range-input" spellcheck="false" @select="selectRangeFormat" @keyup="selectRangeFormat" @mouseup="selectRangeFormat"></textarea></label>
+          <p aria-live="polite">{{ rangeFormatSelection.length ? `已选中 ${rangeFormatSelection.length} 个字符：${rangeFormatSelection.slice(0,80).join('')}${rangeFormatSelection.length>80?'…':''}` : '在上方拖动或用键盘选中文字，然后选择要修改的格式。' }}</p>
+          <div class="pe-dialog-fields"><label>字体<input v-model="rangeFormatDialog.format.fontName" data-testid="presentation-range-font" placeholder="保留原字体" /></label><label>字号<input v-model="rangeFormatDialog.format.fontSize" data-testid="presentation-range-size" type="number" min="5" max="300" placeholder="保留原字号" /></label></div>
+          <label>文字不透明度 %<input v-model="rangeFormatDialog.format.opacity" data-testid="presentation-range-opacity" type="number" min="0" max="100" step="1" placeholder="保留原样" /></label>
+          <div class="pe-dialog-fields"><label v-for="entry in [{key:'bold',label:'粗体'},{key:'italic',label:'斜体'}] as const" :key="entry.key">{{ entry.label }}<select v-model="rangeFormatDialog.format[entry.key]" :data-testid="'presentation-range-'+entry.key"><option value="">保留原样</option><option value="true">启用</option><option value="false">关闭</option></select></label><label>文字颜色<span class="pe-range-color"><input v-model="rangeFormatDialog.format.colorEnabled" type="checkbox" data-testid="presentation-range-color-enabled" aria-label="修改选中文字颜色" /><input v-model="rangeFormatDialog.format.color" type="color" :disabled="!rangeFormatDialog.format.colorEnabled" data-testid="presentation-range-color" aria-label="选中文字颜色" /></span></label></div>
+          <div class="pe-dialog-fields">
+            <label>下划线<select v-model="rangeFormatDialog.format.underline" data-testid="presentation-range-underline"><option value="">保留原样</option><option value="false">无</option><option value="true">单下划线</option><option value="double">双下划线</option></select></label>
+            <label>删除线<select v-model="rangeFormatDialog.format.strike" data-testid="presentation-range-strike"><option value="">保留原样</option><option value="none">无</option><option value="single">单删除线</option><option value="double">双删除线</option></select></label>
+          </div>
+          <div class="pe-dialog-fields"><label>文字高亮<select v-model="rangeFormatDialog.format.highlightMode" data-testid="presentation-range-highlight-mode"><option value="">保留原样</option><option value="color">设置颜色</option><option value="none">清除高亮</option></select></label><label>高亮颜色<input v-model="rangeFormatDialog.format.highlightColor" data-testid="presentation-range-highlight-color" type="color" :disabled="rangeFormatDialog.format.highlightMode!=='color'" /></label></div>
+          <p>这里只修改选中文字的格式，不改变文字内容。未选择的格式和其他文字保持原样。</p>
+          <footer><button data-testid="presentation-range-cancel" @click="closeRangeFormat">取消</button><button class="pe-primary" data-testid="presentation-range-apply" :disabled="!rangeFormatSelection.length||!rangeFormatChanged" @click="safely(applyRangeFormat)">应用格式</button></footer>
+        </section>
+      </div>
+      <div v-if="smartArtDialog" class="pe-modal-backdrop">
+        <section class="pe-data-dialog" role="dialog" aria-modal="true" aria-label="编辑图示节点文字" @keydown="modalKey">
+          <header><h2>编辑节点文字</h2><button aria-label="取消节点文字编辑" @click="closeSmartArtDialog">×</button></header>
+          <label class="pe-data-label">节点文字<input ref="smartArtInput" v-model="smartArtDialog.text" maxlength="1000" data-testid="presentation-smartart-input" @keydown.enter.prevent="safely(applySmartArtText)" /></label>
+          <p>保留此节点的字体、颜色与布局。建议使用简短文字，过长内容可能超出原有图形。</p>
+          <footer><button data-testid="presentation-smartart-cancel" @click="closeSmartArtDialog">取消</button><button class="pe-primary" data-testid="presentation-smartart-apply" @click="safely(applySmartArtText)">应用文字</button></footer>
+        </section>
+      </div>
       <div v-if="dataDialog" class="pe-modal-backdrop">
         <section class="pe-data-dialog" role="dialog" aria-modal="true" :aria-label="dataDialog.kind==='table'?'编辑表格数据':'编辑图表数据'" @keydown="modalKey">
           <header><h2>{{ dataDialog.id?'编辑':'插入' }}{{ dataDialog.kind==='table'?'表格':'图表' }}</h2><button data-testid="presentation-data-close" aria-label="放弃此次数据输入" @click="dataDialog=null;root?.focus()">×</button></header>
           <template v-if="dataDialog.kind==='chart'"><div class="pe-dialog-fields"><label>图表标题<input v-model="dataDialog.title" data-testid="presentation-chart-title" /></label><label>图表类型<select v-model="dataDialog.chartType" data-testid="presentation-chart-type"><option value="column">柱状图</option><option value="bar">条形图</option><option value="line">折线图</option><option value="pie">饼图</option></select></label></div></template>
-          <label class="pe-data-label">{{ dataDialog.kind==='table'?'表格单元格':'类别和系列数据' }}<textarea v-model="dataDialog.text" data-testid="presentation-data-input" spellcheck="false"></textarea></label>
-          <p>每行一条记录，以制表符分隔列。可直接从电子表格复制粘贴。{{ dataDialog.kind==='chart'?'第一行填写“类别”和系列名称，后续行填写类别与数值。':'' }}</p>
-          <div class="pe-button-row"><button @click="addDataDimension('row')">＋ 添加行</button><button @click="addDataDimension('column')">＋ 添加列</button></div>
-          <div class="pe-data-preview" aria-label="可编辑数据网格"><table><tbody><tr v-for="(row,index) in dataDialog.text.split('\n').slice(0,101)" :key="index"><td v-for="(cell,column) in row.split('\t').slice(0,21)" :key="column"><input :value="cell" :aria-label="`第 ${index+1} 行第 ${column+1} 列`" @input="dataCell(index,column,$event)" /></td></tr></tbody></table></div>
+          <label v-if="!dataDialog.cells" class="pe-data-label">{{ dataDialog.kind==='table'?'表格单元格':'类别和系列数据' }}<textarea v-model="dataDialog.text" data-testid="presentation-data-input" spellcheck="false"></textarea></label>
+          <p v-if="!dataDialog.cells">每行一条记录，以制表符分隔列。可直接从电子表格复制粘贴。{{ dataDialog.kind==='chart'?'第一行填写“类别”和系列名称，后续行填写类别与数值。':'' }}</p>
+          <p v-else>逐格编辑，可在单元格内换行。保留原有混合文字与段落格式；复杂格只读。重复文字按最终差异匹配，独立格式文字暂不能增删换行。</p>
+          <p v-if="dataDialog.resizeReason">{{ dataDialog.resizeReason }}</p>
+          <div class="pe-button-row"><button :disabled="!!dataDialog.resizeReason" @click="addDataDimension('row')">＋ 添加行</button><button :disabled="!!dataDialog.resizeReason" @click="addDataDimension('column')">＋ 添加列</button><template v-if="dataDialog.cells"><button :disabled="!!dataDialog.resizeReason||dataDialog.cells.length<=1" @click="dataDialog.cells.pop()">－ 末行</button><button :disabled="!!dataDialog.resizeReason||(dataDialog.cells[0]?.length||0)<=1" @click="dataDialog.cells.forEach(row=>row.pop())">－ 末列</button></template></div>
+          <div class="pe-data-preview" :class="{'pe-data-cells':!!dataDialog.cells}" aria-label="可编辑数据网格"><table><tbody><tr v-for="(row,index) in (dataDialog.cells || dataDialog.text.split('\n').map(line=>line.split('\t'))).slice(0,101)" :key="index"><td v-for="(cell,column) in row.slice(0,21)" :key="column"><template v-if="dataDialog.cells"><textarea :value="cell" :readonly="!!dataDialog.cellReasons?.[index]?.[column]" :aria-label="`第 ${index+1} 行第 ${column+1} 列`" :title="dataDialog.cellReasons?.[index]?.[column]" @input="dataCell(index,column,$event)" /><small v-if="dataDialog.cellReasons?.[index]?.[column]">{{ dataDialog.cellReasons[index]![column] }}</small></template><input v-else :value="cell" :aria-label="`第 ${index+1} 行第 ${column+1} 列`" @input="dataCell(index,column,$event)" /></td></tr></tbody></table></div>
           <footer><button @click="dataDialog=null;root?.focus()">取消</button><button class="pe-primary" data-testid="presentation-data-apply" @click="safely(applyData)">应用数据</button></footer>
         </section>
       </div>

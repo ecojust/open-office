@@ -1,0 +1,805 @@
+{
+  "recordedAtUtc": "2026-10-14T08:56:59.687677+00:00",
+  "status": "Current bounded iteration verified; full-suite feature parity is incomplete.",
+  "scope": "Ordinary Writer lists and Calc mixed/rich formatting; actual UI, native engine, undo, files, independent readers and reference desktop opening.",
+  "allOfficeParity": false,
+  "desktopPackageBuiltOrPublished": false,
+  "wordOrCalcEngineChangedThisIteration": false,
+  "referenceSoftwareBundledAsProductDependency": false,
+  "validation": {
+    "fullNode": {
+      "passed": 680,
+      "failed": 0,
+      "skipped": 0
+    },
+    "fullPython": {
+      "passed": 68,
+      "failed": 0
+    },
+    "typecheck": true,
+    "productionBuild": true,
+    "productionWordUi": {
+      "groups": 12,
+      "errors": 0,
+      "xmlAssertions": 350
+    },
+    "productionCalcUi": {
+      "groups": 9,
+      "errors": 0,
+      "openpyxlAssertions": 300
+    },
+    "productionWordHeaderFooterRegression": {
+      "groups": 12,
+      "xmlAssertions": 62
+    },
+    "calcContentGuardRegression": {
+      "groups": 17
+    },
+    "calcFinalNativeXmlAssertions": 252,
+    "officialDesktop": {
+      "version": "10.0.0-169",
+      "productionFiles": 2,
+      "pages": 2,
+      "records": [
+        {
+          "id": "production-lists-docx",
+          "variant": "original",
+          "source": "test-results/list-production-word-final/ui-lists.docx",
+          "sha256": "0a1b498b97ea2ab746fb2b47a812ad685b3a9ee21c5234344546f4a28effe57f",
+          "ok": true,
+          "pageCount": 1,
+          "canvases": [
+            {
+              "id": "id_viewer",
+              "width": 1081,
+              "height": 500
+            },
+            {
+              "id": "id_viewer_overlay",
+              "width": 1081,
+              "height": 500
+            }
+          ],
+          "editorType": "object",
+          "title": "ONLYOFFICE Documents",
+          "screenshotSettled": true,
+          "renderWaitMs": 16970,
+          "screenshotSha256": "3b48b4f71a09604108902552b8b9fac3b2a45f84fa57418cdc9a43cbf2c341f9",
+          "screenshot": "production-lists-docx/original/editor.png",
+          "pageScreenshots": [
+            {
+              "index": 0,
+              "path": "production-lists-docx/original/editor.png",
+              "sha256": "3b48b4f71a09604108902552b8b9fac3b2a45f84fa57418cdc9a43cbf2c341f9"
+            }
+          ]
+        },
+        {
+          "id": "production-lists-odt",
+          "variant": "original",
+          "source": "test-results/list-production-word-final/ui-lists.odt",
+          "sha256": "1ba8c7008c5f3412db11a06439670c23ef616f289f66cb9ff82ba1c19ddc996e",
+          "ok": true,
+          "pageCount": 1,
+          "canvases": [
+            {
+              "id": "id_viewer",
+              "width": 1081,
+              "height": 500
+            },
+            {
+              "id": "id_viewer_overlay",
+              "width": 1081,
+              "height": 500
+            }
+          ],
+          "editorType": "object",
+          "title": "ONLYOFFICE Documents",
+          "screenshotSettled": false,
+          "renderWaitMs": 20161,
+          "screenshotSha256": "782f0f473f6776e722b476b4990aab2114d4be75f882074f595eac4419d05bc2",
+          "screenshot": "production-lists-odt/original/editor.png",
+          "pageScreenshots": [
+            {
+              "index": 0,
+              "path": "production-lists-odt/original/editor.png",
+              "sha256": "782f0f473f6776e722b476b4990aab2114d4be75f882074f595eac4419d05bc2"
+            }
+          ]
+        }
+      ],
+      "nativeResaved": false,
+      "pixelEqualityClaimed": false
+    },
+    "realUiMethod": "Visible UI writes and downloads; strictly validated read-only word-state/sheet-state protocol observations. No injected worker mutations or original-file patch-back."
+  },
+  "stages": {
+    "earlierWordCore": {
+      "browserSteps": 59,
+      "operationChecks": 42,
+      "xmlAssertions": 2922,
+      "sameAsFinalSource": false
+    },
+    "wordOwnerCandidate": {
+      "browserSteps": 34,
+      "operationChecks": 17,
+      "historyAssertions": 68,
+      "xmlAssertions": 332,
+      "diagnosticHooks": [
+        "owner count read",
+        "forced garbage collection"
+      ],
+      "beforeFinalOdtGuardNormalization": true
+    },
+    "wordFinalDev": {
+      "uiGroups": 12,
+      "xmlAssertions": 350,
+      "targetedNode": 131
+    },
+    "calcFinalDev": {
+      "uiGroups": 9,
+      "nativeXmlAssertions": 252,
+      "independentNativeOpenpyxl": 148,
+      "independentUiOpenpyxl": 300
+    },
+    "production": "Final product hashes checked. Test-only state reader was adapted after build, without product modifications.",
+    "previousPptPdf": "Cumulative earlier work is recorded in presentation-text-highlight-results.json; no new PPT/PDF product edits in this bounded iteration."
+  },
+  "research": {
+    "rea": "rea-agents@6.4.0",
+    "sourceCommit": "72b0421c0bbf9d01eed9cf14834ae47eb2df1b50",
+    "evidenceId": "ev_eb0a6c92d6060dfa51a1d7267774e2cea53b800e0e49cc8038b2b21d854cea48",
+    "files": 6,
+    "functions": 35,
+    "astNodes": 5963,
+    "parseFailures": 0,
+    "nativeSourceSnapshot": "dced3bc711d18407a2cc2400eb46e8261b663d95",
+    "nativeSourceScope": "Fixed public branch used for reasoning, not proven byte-identical to bundled WASM; C++ inspection is not REA parsing."
+  },
+  "resolvedFindings": [
+    "Writer ordinary list create/remove/promote/demote/restart uses native list model and preserves unrelated content.",
+    "Native level slots replace non-undoable direct NumberingLevel writes.",
+    "Internal initialized numbering creation is excluded from history, while actual binding remains undoable; bounded document-owned references survive undo and release after successful close.",
+    "Known ordinary DOCX Symbol and ODT current-level list representations remain editable after reopening, without permitting arbitrary templates.",
+    "Calc mixed/unknown formatting is distinct from anchor formatting; an explicit same-color action works.",
+    "Rich cell character properties are written to actual native text ranges, preserving unmodified properties and content.",
+    "General number format resets after native locale normalization within the same undo group."
+  ],
+  "retainedFailureEvidence": [
+    "test-results/list-final/tests-sandbox-denied.log",
+    "test-results/list-production-word-ui/ui-report.json",
+    "test-results/list-production-calc-ui/ui-report.json",
+    "test-results/word-list-iteration/ui-final/",
+    "test-results/word-list-iteration/ui-owner-final/",
+    "/workspace/open-office-research/onlyoffice/word-list-review/initial",
+    "/workspace/open-office-research/onlyoffice/word-list-review/nullable-fixed",
+    "/workspace/open-office-research/onlyoffice/word-list-review/cursor-level-fixed",
+    "/workspace/open-office-research/onlyoffice/word-list-review/grouped-factory-redo-failure.json",
+    "test-results/list-native-baseline-initial/",
+    "test-results/list-native-baseline-blink/"
+  ],
+  "limits": [
+    "Writer list sidebar is bounded to ordinary body lists; complex shared templates, linked parent numbering, outline headings, picture bullets and mixed lists are refused.",
+    "No continue-previous-list action. New-rule owners cap at 512; save/reopen resets resources. Vetoed native-close retention is statically checked, not end-to-end exercised.",
+    "No completed controlled reproduction proves the exact garbage-collection causal timing of the old redo failure.",
+    "Calc formatting checks at most 10,000 cells and writes character attributes to at most 256 rich cells. Noncontiguous-selection protection has contract tests, not a mouse multi-select end-to-end capture.",
+    "Conditional-format final appearance and complete style inheritance are not exhaustively merged by the toolbar.",
+    "Native menus remain embedded. The earlier narrow screenshots captured transient resize frames; persistent distortion was not confirmed. Stable viewport follow-up supersedes that interpretation. Complete mobile support is not established.",
+    "Original native numbering samples show filter-specific continuation; exported reference opening proves readability and recorded rendering only.",
+    "Unedited and edited ODT both show cross-style continuation numbering differently in the reference desktop. Original continue-list chains and list definitions are preserved; this existing interoperability difference remains unresolved.",
+    "Known engine formula/type differences, full animations, SmartArt structural editing, advanced layout, OCR and certificate signing remain incomplete; no arbitrary-document lossless guarantee."
+  ],
+  "reports": [
+    {
+      "path": "test-results/word-list-iteration/final-summary.json",
+      "bytes": 3210,
+      "sha256": "2c35a40253f20177acbcfee59b6bf139d4eb29bc9405c44ffc8ec5b769346077"
+    },
+    {
+      "path": "test-results/word-list-iteration/ui-final-complete/ui-report.json",
+      "bytes": 39444,
+      "sha256": "8b5059d623102faeda25350eab730854920878a7f6489a841a9e7f03ddd45c97"
+    },
+    {
+      "path": "test-results/list-production-word-final/ui-report.json",
+      "bytes": 40420,
+      "sha256": "da98c993527375bd191b7819c818557027a50c119b590d11058fd372f2967607"
+    },
+    {
+      "path": "test-results/list-production-calc-final/ui-report.json",
+      "bytes": 1105,
+      "sha256": "8701739be4cf41684bbc9eef3c8fbd42a0df28ab98c3c8d0959ba8279fdced74"
+    },
+    {
+      "path": "test-results/calc-format-iteration/final-native/native-report.json",
+      "bytes": 290702,
+      "sha256": "1cd81c5c0991ad7e06e3cd725c4e20710315c84db23d58b7b7269e22d4cde315"
+    },
+    {
+      "path": "test-results/calc-format-iteration/final-native/export-audit.json",
+      "bytes": 9139,
+      "sha256": "e9941ed0d6c2cdb2248c2a93b2d3a71afaf101d920bfe06ce73906d85d273309"
+    },
+    {
+      "path": "test-results/list-calc-guards/report.json",
+      "bytes": 9224,
+      "sha256": "e8fffb022ff8e29f67b872645fb76146864a6e7c6180464a704b267fb2a97331"
+    },
+    {
+      "path": "test-results/list-word-decorations/ui-report.json",
+      "bytes": 2636,
+      "sha256": "143b0e2398a6deca047c5da92bf858ad6ed54c172cc43b34afa21d5481c0a13a"
+    },
+    {
+      "path": "test-results/list-word-decorations/independent-decoration-audit.json",
+      "bytes": 434894,
+      "sha256": "e759ff8eeb5b2d71cf9a8ef8464f19a4d52adf836185f927e0a69e61fb0e871c"
+    },
+    {
+      "path": "test-results/list-native-exports/report.json",
+      "bytes": 3116,
+      "sha256": "46711f9d2b08fa08055b49f33fc34dcc3f043587c7b11efa1e2f4c14a5ccb94c"
+    },
+    {
+      "path": "test-results/list-native-baseline/report.json",
+      "bytes": 1934,
+      "sha256": "b3f4ea49d6acd9e73856c1c488d5e640a9a383250c80319d81b381eaaf1011bb"
+    },
+    {
+      "path": "test-results/list-native-start-baseline/report.json",
+      "bytes": 1974,
+      "sha256": "3d0d353a728569763621748f1c12c6313821a3df557d4c575d9a5acbd7fb6f93"
+    },
+    {
+      "path": "test-results/list-native-odt-baseline/report.json",
+      "bytes": 1933,
+      "sha256": "074c440af6d158e4cdda9d76297b9367d63cf21f51feff1f98afd81e394c6ce5"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/word-list-review/production-ui-final/independent-xml-report.json",
+      "bytes": 44675,
+      "sha256": "8d47a4d26f4a1e3e7b1ec2683ec7e09b7294270128f70f92864ea07a75679aaa"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/calc-mixed-review/independent-production-ui-xlsx-report.json",
+      "bytes": 27687,
+      "sha256": "750ac32eb301ad48037dec54a7d87996f3c89ce630228730b348abcc457a4283"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/word-list-and-calc-final-review.json",
+      "bytes": 2645,
+      "sha256": "a2516e335c20dff6d410fc440fe3d855336e658ff79960ae6816657129d3c1aa"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/word-list-review/final/browser-report.json",
+      "bytes": 592947,
+      "sha256": "0a3d0290c55dc2f4e542e1a36e073148b903192935af6d6a2ed12acab6cc6d5c"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/word-list-review/final/independent-xml-report.json",
+      "bytes": 289298,
+      "sha256": "c2e58ce8d688635a2f5821e8098afc671a6f403daa347bee6218c64f326c6b66"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/word-list-review/owner-candidate/browser-report.json",
+      "bytes": 195793,
+      "sha256": "3ed6dc66a910c973152c3a28f832cf42a1a3b303d315a1681169a9e6cc0e629f"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/word-list-review/owner-candidate/independent-xml-report.json",
+      "bytes": 44878,
+      "sha256": "582d77013a421725af11b141c915f2210bc5b4d64b7afe6b789c3a17bc017a4a"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/word-list-review/owner-candidate/independent-native-history-report.json",
+      "bytes": 8661,
+      "sha256": "c1a68da9c2199996bfba391b298886958fb00666fe2046e25a6677bd95163814"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/word-list-review/ui-final-complete/independent-xml-report.json",
+      "bytes": 44763,
+      "sha256": "42e35f0b6af75900d1ed0d5a785f35c88b744f588e31b3f107f4d9a7f38b9f36"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/calc-mixed-review/independent-xlsx-report.json",
+      "bytes": 14316,
+      "sha256": "9eb04a002cff9d84e20bbfad7012109dbeb22f888900bb8122afd9c50111efd7"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/calc-mixed-review/independent-ui-xlsx-report.json",
+      "bytes": 27687,
+      "sha256": "3a1d81b5c0b4875ff4e0e3d5ea474a58c1b8db2ed89ea7e5a76388a89477c5ca"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/calc-mixed-review/independent-public-api-review.json",
+      "bytes": 4216,
+      "sha256": "431aef7ac811ab20d27afb28c71faf1c1d3d1b82e3f26c8ca5b60dc0b635a53e"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/rea-word-list-evidence.json",
+      "bytes": 5459598,
+      "sha256": "ed2923998cc0eeed06f942655c59a6ede7da5e81dbad1f1f72fcb551fc51f4da"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/rea-word-list-summary.json",
+      "bytes": 25657,
+      "sha256": "a38f5168ed42c18486aad106c9efe8ce500d56d4891963b096f928558f6b3700"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/word-list-native/native-observations.json",
+      "bytes": 1689,
+      "sha256": "570df4a524914afcbf584d179568875c0fc6869cfdba2831ebbd9474c541ecfb"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/word-list-native/production-observations.json",
+      "bytes": 3165,
+      "sha256": "2df12e3d5767ff62bab40c61528e47a679bda553c04b79226702d9e3b9ef479f"
+    },
+    {
+      "path": "/workspace/open-office-research/onlyoffice/word-list-native/odt-continuation-audit.json",
+      "bytes": 1607,
+      "sha256": "b82fa9dd4d971669c4a54687177d016fde4142fd59ec4c9175186a0d956328a8"
+    },
+    {
+      "path": "/workspace/open-office-research/libreoffice/word-list-undo/findings.md",
+      "bytes": 9677,
+      "sha256": "b854cf1dd837cfebf43739a1411ec2aab190ff61454c315fd688c8c07faf2d99"
+    },
+    {
+      "path": "/workspace/open-office-research/libreoffice/word-dispatch-sync/findings.md",
+      "bytes": 8663,
+      "sha256": "a224a659b1006bb325ecb9c2191a2c1151d89fda563a87987293078358aaccfa"
+    },
+    {
+      "path": "/workspace/open-office-research/libreoffice/word-rule-initialization/findings.md",
+      "bytes": 7320,
+      "sha256": "a3429842132b7b462d76151a829021157eccc3e8f29279e53d12607325418157"
+    }
+  ],
+  "sourceFingerprints": [
+    {
+      "path": "public/office/writer-tools.js",
+      "bytes": 76132,
+      "sha256": "22d72bd3af835a8ebe78837d61a3ef7542210dd276f98521de3f728b897e146f"
+    },
+    {
+      "path": "public/office/office-worker.js",
+      "bytes": 53849,
+      "sha256": "e7d6c159dcac2cfbed40d4ab40a47eb6a0f903680fe4d566ca1627036530bf19"
+    },
+    {
+      "path": "src/components/WordWorkbench.vue",
+      "bytes": 38852,
+      "sha256": "53993da7eb520705788ea03855b45400df1c30732df4876e4bd9fbec0eb2e4c2"
+    },
+    {
+      "path": "src/word/types.ts",
+      "bytes": 5947,
+      "sha256": "21ae3b4f70fadaab9f788d0ac47f527457ab9d237a3effb6064eda1d1fba1b74"
+    },
+    {
+      "path": "public/office/calc-tools.js",
+      "bytes": 53639,
+      "sha256": "5781d70f0b1734032507aa746b8390ccd482e2b905d4eb0e9a969799663870dd"
+    },
+    {
+      "path": "src/components/SheetWorkbench.vue",
+      "bytes": 51834,
+      "sha256": "38eba2fa6422ab0ab29a9d77f99c314416b6cb1ccc7010e29ada279a1c096b2e"
+    },
+    {
+      "path": "src/sheet/types.ts",
+      "bytes": 5448,
+      "sha256": "81cf884c88cfbfb1b9d491775668ab4aa9f45438e0a4ec398861c12620fc4c56"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5483,
+      "sha256": "bcd15bf2c9974becb990c17aaae7e760d94e947e205d45abd696e67de7fb90a1"
+    },
+    {
+      "path": "docs/office-feature-coverage.md",
+      "bytes": 10224,
+      "sha256": "22db2909dacf425d40f76db075bcaa0c4f75449480a99ea4bf9602d28db93c59"
+    },
+    {
+      "path": "docs/rea-compatibility-progress.md",
+      "bytes": 10563,
+      "sha256": "c5ddb0014279dea20de9eb71de59b6038f89bd987dc8056ee7d3e082fe0b70df"
+    },
+    {
+      "path": "docs/word-list-and-sheet-format.md",
+      "bytes": 7764,
+      "sha256": "db715277928dbea946df6e607f2325bc194f31dd5124d7da5ea7d3d357bdf188"
+    },
+    {
+      "path": "docs/word-list-editing.md",
+      "bytes": 7541,
+      "sha256": "8d9ee5ee39cbb6f5f9ee3a3bc69f5d8311d2eb741ecae327b185ad601f62c698"
+    },
+    {
+      "path": "docs/calc-formatting.md",
+      "bytes": 5332,
+      "sha256": "4f7733b9a7e744914b9b3d500eea3f3a71d4cf4a5c94f8aa4e9b146595ae1a76"
+    },
+    {
+      "path": "src/presentation/core/text-highlight.ts",
+      "bytes": 2173,
+      "sha256": "65d41a2b18abc956b76d3a6e8eabdcfff0207f31f05aad1fb3a0dab31d2c702b"
+    },
+    {
+      "path": "src/presentation/core/pdf.ts",
+      "bytes": 12853,
+      "sha256": "e7c8fb5c465a42107cc0fe522fc0c26dc2d40443b488be4c9351286a988bd16a"
+    },
+    {
+      "path": "pdf-backend/engine.py",
+      "bytes": 55756,
+      "sha256": "8ca37a39f793882e6612aea5fffd8e93132f0902017cee25a0e12a6ae881b9d2"
+    }
+  ],
+  "testFingerprints": [
+    {
+      "path": "tests/writer-lists.test.mjs",
+      "bytes": 48050,
+      "sha256": "f0775b11a9270b03d5ce900e8996a231525684b7616763b05e66dc8e6e236137"
+    },
+    {
+      "path": "tests/writer-list-ui-state.test.mjs",
+      "bytes": 18111,
+      "sha256": "b1ed597045c49880f3dace41ac52106ff3897c2a8131978395da17af19b98cc8"
+    },
+    {
+      "path": "tests/writer-tools.test.mjs",
+      "bytes": 34106,
+      "sha256": "a925e018f476dbcb5ee9599c47ddabaf808167551ac7ee56a6f58638ac3dea58"
+    },
+    {
+      "path": "tests/calc-tools.test.mjs",
+      "bytes": 36721,
+      "sha256": "51e513d92ef559dd5f9c54241091acda3e14c11cbf39060a149e8703eaaa5f80"
+    },
+    {
+      "path": "tests/browser/office-state-reader.cjs",
+      "bytes": 4371,
+      "sha256": "e1bcf487fb473f270f6ec8c6946e6e0cfc94aa26691437469883c4088e9f0b0c"
+    },
+    {
+      "path": "tests/browser/word-lists-ui.cjs",
+      "bytes": 8565,
+      "sha256": "f2960b106119b63c1fecce3ec04c24a44d719a00d0fb0ad9aa668433c58fbcd3"
+    },
+    {
+      "path": "tests/browser/calc-formatting-ui.cjs",
+      "bytes": 7760,
+      "sha256": "b685d8a2c35e8f965ca7c2a9ba12b9593400ef235e4d579f50c96b14a14f8acb"
+    },
+    {
+      "path": "tests/browser/word-decoration-ui.cjs",
+      "bytes": 8171,
+      "sha256": "14e1691073e06647e39e30104ee6a3df5b79f4d67120e2bdc99c795b7a520b2e"
+    },
+    {
+      "path": "tests/browser/calc-merged-write-guards.cjs",
+      "bytes": 14224,
+      "sha256": "fe8955a23041a517454fdc59b27b0db73971e851817955b30c1f3962491fe926"
+    },
+    {
+      "path": "tests/browser/word-lists-ui-audit-plan.py",
+      "bytes": 884,
+      "sha256": "1329ab57a1dd850c37f1d5ff9fa4fa128828d6dbef5dd4ee945932cfc153fdf5"
+    },
+    {
+      "path": "tests/browser/audit-word-lists.py",
+      "bytes": 3887,
+      "sha256": "0a38252ee57200cee718bc5378727ce8ebba756e32c9e20d75cda709628a04c6"
+    },
+    {
+      "path": "tests/browser/audit-word-decorations.py",
+      "bytes": 12998,
+      "sha256": "c7f9a013a0008c9443cb882c49be8822425cf31978906ffad87085a5cd88af72"
+    },
+    {
+      "path": "tests/browser/audit-calc-formatting.py",
+      "bytes": 2534,
+      "sha256": "eb06191dbeb81a4090a21f72d70f7a150b3505722dc316ffdec8dfe4e3a5ec66"
+    },
+    {
+      "path": "tests/browser/inspect-calc-formatting.py",
+      "bytes": 1927,
+      "sha256": "8419ab76d782eca85cd362c1a19deb5ff3b961d54c796aec08981d7fedf430cc"
+    }
+  ],
+  "fixtures": [
+    {
+      "path": "tests/compatibility/word-lists/independent-lists.docx",
+      "bytes": 2524,
+      "sha256": "32e7d56b7afd9603f26270f503116007aefa0718e8ea277d8d4c15b481bf2896"
+    },
+    {
+      "path": "tests/compatibility/calc-formatting/mixed-format-source.xlsx",
+      "bytes": 5473,
+      "sha256": "390d91b288be721c0547767a12dcf7a5693d7fcb1ea46fa3e5a498445911398b"
+    }
+  ],
+  "actualArtifacts": [
+    {
+      "path": "test-results/list-production-calc-final/baseline.xlsx",
+      "bytes": 6938,
+      "sha256": "1007a040eb7cd88fe688e019b6f077ac06b90819fea37f6c33c24040cb28e5d0"
+    },
+    {
+      "path": "test-results/list-production-calc-final/bold.xlsx",
+      "bytes": 6980,
+      "sha256": "d35302c64168a940ea59c7e43b3464746f03a3e24fe213ae19e9b363e49d2cdf"
+    },
+    {
+      "path": "test-results/list-production-calc-final/edited.xlsx",
+      "bytes": 7206,
+      "sha256": "4b97545d0bdf99a182347be721c2fc02b1782c99a17bfa01647dde7dd5d01938"
+    },
+    {
+      "path": "test-results/list-production-calc-final/font-size.xlsx",
+      "bytes": 7126,
+      "sha256": "80a09b39367e7a32c20122ddbc5e844ac8c663da569b4aa6bb7415fd1cf1ea8f"
+    },
+    {
+      "path": "test-results/list-production-calc-final/general.xlsx",
+      "bytes": 7252,
+      "sha256": "ddfd851c66aa51268d57d839515e14faa1f99ae3413de0c29f70ca3cc30bc590"
+    },
+    {
+      "path": "test-results/list-production-calc-final/redo.xlsx",
+      "bytes": 7124,
+      "sha256": "258b4cf0933e3d0fc5150992ca416092f042632aed9a2aa0f34428c70cbcd309"
+    },
+    {
+      "path": "test-results/list-production-calc-final/reopened.xlsx",
+      "bytes": 7257,
+      "sha256": "46146dc1cab18694bf783f153b2627d644bd48e553affe6b9b2700e3c9d22762"
+    },
+    {
+      "path": "test-results/list-production-calc-final/same-color.xlsx",
+      "bytes": 7043,
+      "sha256": "85401a3aa5a70dab01f4d73562625babfc8cd284b7ac59274d921434f556a83f"
+    },
+    {
+      "path": "test-results/list-production-calc-final/undo.xlsx",
+      "bytes": 7044,
+      "sha256": "c1b815ab5ac6c9b0296cb67175f09d21e1dec2fe0944706f9cbb01ce8f71ff88"
+    },
+    {
+      "path": "test-results/list-production-word-final/ui-baseline.docx",
+      "bytes": 6365,
+      "sha256": "a9b5d0d5ea7707aa653afac1cf3e1e46750874cfacbe00a18e996ae37c74be7f"
+    },
+    {
+      "path": "test-results/list-production-word-final/ui-baseline.odt",
+      "bytes": 13917,
+      "sha256": "7ed3b37539e107f93b67eaee10894f48ee5dab9ef92c0b16b204f212e97a4824"
+    },
+    {
+      "path": "test-results/list-production-word-final/ui-from-odt-baseline.docx",
+      "bytes": 6520,
+      "sha256": "9bb3e41468956d833f2e10dbf6b233f872ce32a2573b64a63a900e41bf7d83e9"
+    },
+    {
+      "path": "test-results/list-production-word-final/ui-from-odt.docx",
+      "bytes": 6563,
+      "sha256": "0dbe0d5b74030a024a6fd88a501f3afbf7cf5fbda3046ea16a4c953ea63055e5"
+    },
+    {
+      "path": "test-results/list-production-word-final/ui-lists.docx",
+      "bytes": 6558,
+      "sha256": "0a1b498b97ea2ab746fb2b47a812ad685b3a9ee21c5234344546f4a28effe57f"
+    },
+    {
+      "path": "test-results/list-production-word-final/ui-lists.odt",
+      "bytes": 14421,
+      "sha256": "1ba8c7008c5f3412db11a06439670c23ef616f289f66cb9ff82ba1c19ddc996e"
+    },
+    {
+      "path": "test-results/list-production-word-final/ui-reopened-baseline.docx",
+      "bytes": 6939,
+      "sha256": "8e7e680f434e3d3428ebf286332e0145d038d1f567d5f47310e6c090ff22e897"
+    },
+    {
+      "path": "test-results/list-production-word-final/ui-reopened.docx",
+      "bytes": 6940,
+      "sha256": "25673cd975e9867d11b09a0324eeab0629fb52e0ece5817e4c8e8d09b7c70887"
+    },
+    {
+      "path": "test-results/list-word-decorations/ui-baseline.docx",
+      "bytes": 10630,
+      "sha256": "bfaaeaf71974e01d670e821494113f18328eb7d1b83204d8043cf594a60139ae"
+    },
+    {
+      "path": "test-results/list-word-decorations/ui-edited.docx",
+      "bytes": 10630,
+      "sha256": "17943c6af3708394924fff656da144fe4b8b0ac891f8ea18cdf9a5d9f4e65bbc"
+    },
+    {
+      "path": "test-results/list-word-decorations/ui-edited.odt",
+      "bytes": 11682,
+      "sha256": "71a7bf30cb8ae1f0b0122fb75aa32e0840ca26078d2976421c9a268ca0e84578"
+    },
+    {
+      "path": "test-results/list-word-decorations/ui-from-odt.docx",
+      "bytes": 7631,
+      "sha256": "e997a1c18f88c44ba091073ea8deb704bcea7dfc3c895f8555382c18a66dcd4d"
+    },
+    {
+      "path": "test-results/list-word-decorations/ui-rejected.docx",
+      "bytes": 10630,
+      "sha256": "1a2c32397b4f71e3f104fa7227e27237b9e583fb3d3a7fbbc29cd5a4b150adbd"
+    },
+    {
+      "path": "test-results/list-word-decorations/ui-reopened.docx",
+      "bytes": 10631,
+      "sha256": "6b306273f9412b6518ee1d2a67d96985be9778dfeddc36b520916254156b05a0"
+    }
+  ],
+  "logs": [
+    {
+      "path": "test-results/list-final/build.log",
+      "bytes": 2224,
+      "sha256": "8cd594c57f8459e6b4871f7bd4ed84c5866c8085051e0af29374118c901eabd9"
+    },
+    {
+      "path": "test-results/list-final/calc-guards.log",
+      "bytes": 1068,
+      "sha256": "8c9472216ffabc22b40124f0212db83343c2cd6d007bebeeed3a9e53b24a9b44"
+    },
+    {
+      "path": "test-results/list-final/native-baseline-blink.log",
+      "bytes": 305,
+      "sha256": "1b4504762b1197f70ccf9cdcd2e945a63acdf0ed906ef7e59efb98c4f37bd511"
+    },
+    {
+      "path": "test-results/list-final/native-baseline-initial.log",
+      "bytes": 778,
+      "sha256": "0d0dc6426f4dc9042a658928f7f11e708784a6b80215658da040e5ee3194dbfe"
+    },
+    {
+      "path": "test-results/list-final/native-baseline.log",
+      "bytes": 172,
+      "sha256": "0aeacb5472fd1682ab209786c731c921a32a9055d385a772305eb4269f01fde3"
+    },
+    {
+      "path": "test-results/list-final/native-exports.log",
+      "bytes": 216,
+      "sha256": "5f31f9ba7531b6c8f0d3c381840a5eb1d777830e5abb64c018f1955ababb6ff9"
+    },
+    {
+      "path": "test-results/list-final/native-odt-baseline.log",
+      "bytes": 182,
+      "sha256": "09f97f30726a7fbc1da26669afdfb7dc4a9d316ac282e1310d892355febf1556"
+    },
+    {
+      "path": "test-results/list-final/native-start-baseline.log",
+      "bytes": 187,
+      "sha256": "0aaae7040378bdba9d5b68fc41d364fd435d0b25b00ef672675bc3bd06523751"
+    },
+    {
+      "path": "test-results/list-final/production-calc-final.log",
+      "bytes": 843,
+      "sha256": "71a5fe67c32e407741a5f6f0f3938020c695a40726e583ec9cff87841f31e98d"
+    },
+    {
+      "path": "test-results/list-final/production-calc.log",
+      "bytes": 499,
+      "sha256": "a6214ed2f2f89d9d077da18c3f61d5005a8bb9e42d815fe123130efd5f6b2bd0"
+    },
+    {
+      "path": "test-results/list-final/production-word-final.log",
+      "bytes": 958,
+      "sha256": "9d2efb222e78219ae64236127e09e37feb41197c973a6b6ee5b533fc7be43b84"
+    },
+    {
+      "path": "test-results/list-final/production-word.log",
+      "bytes": 494,
+      "sha256": "9129a59721d6f9783ad13589c80f20e0e21501f7c773a6c5bed9536106774be3"
+    },
+    {
+      "path": "test-results/list-final/tests-sandbox-denied.log",
+      "bytes": 69565,
+      "sha256": "45c285ae2bffed8e4cddb88adfc64200fcfdbdcd94a79e509a8c83e5d5a1a64b"
+    },
+    {
+      "path": "test-results/list-final/tests.log",
+      "bytes": 79292,
+      "sha256": "0365b29267bc48c375fc6c9009f24ca530129b7557ae32aae098b78c1e61f46c"
+    },
+    {
+      "path": "test-results/list-final/word-decorations.log",
+      "bytes": 995,
+      "sha256": "814cdd88128035779e0a431c2000de4875d821e06f73e1d0abcf9b72be1d012e"
+    }
+  ],
+  "productionAssets": [
+    {
+      "path": "dist/index.html",
+      "bytes": 592,
+      "sha256": "27cde89817ad315452103ec852b37555a9aa2c01284264768751bff98b26acbd"
+    },
+    {
+      "path": "dist/build-info.json",
+      "bytes": 51,
+      "sha256": "143f88332d54603ac917005d808a46a257e2fbd7ede947c4438ca9e5b0f21a7c"
+    },
+    {
+      "path": "dist/assets/index-77otdaIp.css",
+      "bytes": 78368,
+      "sha256": "5400910c79026c08b29a699f91345969d2b4cb5a9848380563def4d6d41e65f8"
+    },
+    {
+      "path": "dist/assets/index-DnVB7SM3.js",
+      "bytes": 46137,
+      "sha256": "0419a22c4c02abec9fcf563cd3153bb6de9125d1917472a1edc7b7ebfb661480"
+    },
+    {
+      "path": "dist/assets/index-DtK1cdLL.js",
+      "bytes": 1156781,
+      "sha256": "263cc897c4b13622e1dc97aebdb9f634dcf4649aec234c9cd43c4c19af82f342"
+    },
+    {
+      "path": "dist/assets/index-q0GMiG5F.js",
+      "bytes": 390770,
+      "sha256": "32f84c7e0a31776b6d077c74cefe9fd8011da95671344d02f77f0ec08956fb73"
+    },
+    {
+      "path": "dist/office/writer-tools.js",
+      "bytes": 76132,
+      "sha256": "22d72bd3af835a8ebe78837d61a3ef7542210dd276f98521de3f728b897e146f"
+    },
+    {
+      "path": "dist/office/calc-tools.js",
+      "bytes": 53639,
+      "sha256": "5781d70f0b1734032507aa746b8390ccd482e2b905d4eb0e9a969799663870dd"
+    },
+    {
+      "path": "dist/office/office-worker.js",
+      "bytes": 53849,
+      "sha256": "e7d6c159dcac2cfbed40d4ab40a47eb6a0f903680fe4d566ca1627036530bf19"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "docs/screenshots/word-list-editing.png",
+      "bytes": 140786,
+      "sha256": "4d8dbabfddde6476b3508f0f1d2b7a0aa60d1e34b026462bcfc9e732025e45fa"
+    },
+    {
+      "path": "docs/screenshots/sheet-mixed-format.png",
+      "bytes": 193966,
+      "sha256": "c6f54d484c9f6376f63ad987ae72069914bbc030dac74ec0873e766150b08710"
+    },
+    {
+      "path": "test-results/list-production-word-final/word-lists-narrow.png",
+      "bytes": 125624,
+      "sha256": "34ec8cdab90a00dfb98a438050aff3afe17e54a4ee0c83c44e3ba8d15c888594"
+    },
+    {
+      "path": "test-results/list-production-calc-final/mobile.png",
+      "bytes": 83578,
+      "sha256": "76bc93e0ed91dc1386d5960be661bdcba640faa18c18959fd9df6a77fc179f12"
+    },
+    {
+      "path": "test-results/list-native-exports/production-lists-docx/original/editor.png",
+      "bytes": 68876,
+      "sha256": "3b48b4f71a09604108902552b8b9fac3b2a45f84fa57418cdc9a43cbf2c341f9"
+    },
+    {
+      "path": "test-results/list-native-exports/production-lists-odt/original/editor.png",
+      "bytes": 65672,
+      "sha256": "782f0f473f6776e722b476b4990aab2114d4be75f882074f595eac4419d05bc2"
+    }
+  ],
+  "followupCorrection": {
+    "recordedAtUtc": "2026-10-14T09:10:52.366904+00:00",
+    "priorReportArchive": "test-results/list-final/results-before-viewport-correction.json",
+    "priorReportSha256": "13aa01c71f7550f13ff9754a83066b575ecc158f43ea61da2e2bbeaa6525dfe7",
+    "finding": "Earlier narrow screenshots were captured before normal native resize finished. Matching backing/CSS dimensions and stable subsequent screenshots refute the persistent-distortion interpretation. Original stage/source fingerprints remain historical, not updated to newer documentation.",
+    "details": "docs/office-viewport-validation.md"
+  }
+}
