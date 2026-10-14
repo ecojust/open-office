@@ -135,6 +135,19 @@
       const view=nativeView(env);if(view)return {columns:Number(view.fields[2])===2?Number(view.fields[4]):0,rows:Number(view.fields[3])===2?Number(view.fields[5]):0};
       return {columns:env.controller.getSplitColumn(),rows:env.controller.getSplitRow()}
     }
+    function freezeFailureDiagnostic(env,record,fields,expected,actual){
+      // Smoke-host diagnostics only: fixed-size numeric view metadata, never
+      // cell contents. Optional UNO reads must not prevent the existing rollback.
+      const attempt=read=>{try{return read()}catch(error){recover(error);return null}};
+      const numericFields=value=>value?.slice(0,11).map(item=>{const number=Number(item);return Number.isSafeInteger(number)?number:null})??null;
+      const after=attempt(()=>nativeView(env)),frame=attempt(()=>env.controller.getFrame());
+      const rectangle=method=>attempt(()=>{
+        const window=frame?.[method]?.();if(!window||typeof window.getPosSize!=='function')return null;
+        const value=window.getPosSize();if(!value)return null;
+        return ['X','Y','Width','Height'].map(key=>Number.isSafeInteger(value[key])?value[key]:null);
+      });
+      return {expected,actual,activeSheet:env.activeIndex,before:numericFields(record.fields),target:numericFields(fields),afterCheck:numericFields(after?.fields),container:rectangle('getContainerWindow'),component:rectangle('getComponentWindow')};
+    }
     function formulaInput(cell){const value=cell.getFormula();return enumValue(cell.getType())===2&&value.startsWith('=')?"'"+value:value}
     const formatProperties={fontName:['CharFontName','CharFontNameAsian','CharFontNameComplex'],fontSize:['CharHeight','CharHeightAsian','CharHeightComplex'],bold:['CharWeight','CharWeightAsian','CharWeightComplex'],italic:['CharPosture','CharPostureAsian','CharPostureComplex'],textColor:['CharColor'],backgroundColor:['IsCellBackgroundTransparent','CellBackColor'],align:['HoriJustify'],verticalAlign:['VertJustify'],wrap:['IsTextWrapped'],numberFormat:['NumberFormat']};
     const textFormatKeys=['fontName','fontSize','bold','italic','textColor'];
@@ -203,7 +216,12 @@
         record.parts[record.index]=fields.join(record.separator);view.restoreViewData(record.parts.join(';'));view.select(selected);
         // Scroll only the bottom/right body, never a selected frozen header.
         const body=view.getByIndex(view.getCount()-1);body.setFirstVisibleColumn(Math.max(column,data.columns));body.setFirstVisibleRow(Math.max(row,data.rows));
-        const actual=frozenState(env);if(actual.columns!==data.columns||actual.rows!==data.rows){view.restoreViewData(record.value);view.select(selected);throw Error('原生表格未能应用指定冻结位置，已恢复原视图。')}
+        const actual=frozenState(env);if(actual.columns!==data.columns||actual.rows!==data.rows){
+          let diagnostic='';
+          try{if(typeof globalThis.auditOfficeOfflinePolicy==='function')diagnostic=' [freeze-diagnostic '+JSON.stringify(freezeFailureDiagnostic(env,record,fields,{columns:data.columns,rows:data.rows},actual))+']'}
+          finally{view.restoreViewData(record.value);view.select(selected)}
+          throw Error('原生表格未能应用指定冻结位置，已恢复原视图。'+diagnostic)
+        }
         if(typeof env.model.isReadonly!=='function'||!env.model.isReadonly())env.model.setModified(true);
         return
       }
