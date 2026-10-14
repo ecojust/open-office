@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import vm from 'node:vm'
 import { readFile } from 'node:fs/promises'
 import ts from 'typescript'
+import * as fflate from 'fflate'
 
 // Load the actual release helper AND its production command eligibility/target
 // module. Only unrelated PDF/export dependencies are doubles; none of the
@@ -16,6 +17,7 @@ function moduleFromSource(source, require) {
 const unexpectedDependency = name => { throw Error(`Unexpected test dependency: ${name}`) }
 const writerTypes = moduleFromSource(await readFile(new URL('../src/word/types.ts', import.meta.url), 'utf8'), unexpectedDependency)
 const exports = moduleFromSource(await readFile(new URL('../src/office/native-workbench-smoke.ts', import.meta.url), 'utf8'), name => {
+  if (name === 'fflate') return fflate
   if (name === '../word/types') return writerTypes
   if (name === '../shared/document') return { base64ToBytes: () => { throw Error('This test must not export a document') } }
   if (name === './pdf-readback') return { pdfReadbackText: () => { throw Error('This test must not open a PDF') } }
