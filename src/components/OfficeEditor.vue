@@ -264,7 +264,9 @@ defineExpose({ exportFile, markSaved, discardChanges, loadDocument, undo, redo, 
 
 <template>
   <section class="office-editor" aria-label="Word、Excel 与 PPT 完整编辑器">
-    <iframe ref="frame" title="完整办公编辑画布" class="office-frame" :class="{ 'is-loading': loading }" allow="clipboard-read; clipboard-write" />
+    <div class="office-viewport">
+      <iframe ref="frame" title="完整办公编辑画布" class="office-frame" :class="{ 'is-loading': loading }" allow="clipboard-read; clipboard-write" />
+    </div>
     <div v-if="loading || problem" class="office-loading" role="status">
       <div class="office-loading-card">
         <span class="office-loading-emblem" :class="props.document.kind">{{ {word:'W',sheet:'X',presentation:'P'}[props.document.kind] }}</span>
@@ -294,11 +296,22 @@ defineExpose({ exportFile, markSaved, discardChanges, loadDocument, undo, redo, 
   background: var(--ui-bg, #f5f6f8);
 }
 
+.office-viewport {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
 .office-frame {
   display: block;
   flex: 1;
   width: 100%;
-  min-height: 0;
+  /* Short windows scroll this editor instead of squeezing the native view.
+     This is usable canvas space, not a guarantee for arbitrarily large freezes. */
+  min-height: 360px;
   border: 0;
   background: var(--ui-bg, #f5f6f8);
 }
