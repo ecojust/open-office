@@ -1,0 +1,296 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-14",
+  "scope": "Browser evidence for the short-window editor viewport and the strict Calc freeze/save/reopen regression. These results do not replace the installed macOS release gate or establish first-ready correctness.",
+  "releaseSourceCommit": "6a16f7f6ffa6d758e01cc00d36618a5f163a7bc9",
+  "sourceSummary": {
+    "path": "test-results/calc-height-protocol/2026-10-14T11-19-26-676Z-570917/short-viewport-summary.json",
+    "sha256": "94722e9defc0a8be7cf25bad51149eda366d38a2636fb0d844b0fd882d7c4b00",
+    "note": "Summary copied without changing the original raw reports or their pass/fail results."
+  },
+  "reports": {
+    "uiLayoutBaseline": {
+      "path": "test-results/calc-height-layout/2026-10-14T11-12-56-889Z-569661/report.json",
+      "sha256": "791e7a2e4022966c72943ff2631c71b7b152769981d671feb465bc6bb8a8b412"
+    },
+    "protocolEarlierBaseline": {
+      "path": "test-results/calc-height-protocol/2026-10-14T11-16-46-498Z-570303/report.json",
+      "sha256": "94af22eae5da8d9f8ae00d9d1bec68f7553512682eb37ffb3fd24db278067f33"
+    },
+    "protocolSameBuild": {
+      "path": "test-results/calc-height-protocol/2026-10-14T11-19-26-676Z-570917/report.json",
+      "sha256": "4d3cb55b69403b9b663ff02d5c2992c35cac9156d3140d810467e8aaa6fd50ed"
+    },
+    "hiddenScrollbarFailure": {
+      "path": "test-results/calc-short-viewport-ui/2026-10-14T11-23-07-347Z-571626/report.json",
+      "sha256": "4ec8aeccfd2a0fbceb922f5b4fc6a6ff29545979b28da8123fbb467ee63340b9"
+    },
+    "visibleScrollbarUi": {
+      "path": "test-results/calc-short-viewport-ui/2026-10-14T11-25-09-300Z-571985/report.json",
+      "sha256": "f4c82ba9020914ab7095d3c730bb91840a81ddeed762d4e6981977ba7f1de310"
+    },
+    "injectedErrorMask": {
+      "path": "test-results/calc-short-viewport-ui/2026-10-14T11-28-20-922Z-572295/report.json",
+      "sha256": "dfb7b8e66374c97849778e20bcd70a4ac58ad6ecfdb6fc49bd81f0ae1b569234"
+    }
+  },
+  "servedAssets": [
+    {
+      "url": "http://127.0.0.1:4300/office/office-worker.js",
+      "bytes": 54388,
+      "sha256": "0b39752ea134f48901f44b36b514563ea5c0de0d81e74f89abfab3e762182af9"
+    },
+    {
+      "url": "http://127.0.0.1:4300/office/host.js",
+      "bytes": 23406,
+      "sha256": "9abeddea4362212c6e9e3ba5dd25048f124f6c36b5dc24a2e2771e68fbfc5430"
+    },
+    {
+      "url": "http://127.0.0.1:4300/office-runtime/soffice.wasm",
+      "bytes": 161667499,
+      "sha256": "9ebd9a487e849a24b9c69f843ebdb451709c27b7722c010e36846433474a5bd4"
+    }
+  ],
+  "protocolCases": [
+    {
+      "name": "control-600",
+      "rawOk": false,
+      "contract": {
+        "wrapperCount": 1,
+        "frameMinHeight": "0px",
+        "wrapperOverflow": "auto",
+        "outerOverflow": "hidden"
+      },
+      "iframeHeightRange": [
+        161,
+        203.5
+      ],
+      "wrapperHeightRange": [
+        161,
+        203.5
+      ],
+      "exports": [
+        {
+          "file": "control-600/1-export.xlsx",
+          "sha256": "d0be7372054ea2f80c54ddb6d3efc4ad386365acd2601980e30cb6f51ecb2983",
+          "bytes": 13459,
+          "panes": [
+            {
+              "xSplit": "1",
+              "ySplit": "0",
+              "topLeftCell": "B2",
+              "activePane": "topRight",
+              "state": "frozen"
+            }
+          ]
+        },
+        {
+          "file": "control-600/2-export.xlsx",
+          "sha256": "ae6cc73384defa626c3f87bb7f8963c3770382ad2987bad6599b2c2780316cb5",
+          "bytes": 13805,
+          "panes": [
+            {
+              "xSplit": "1",
+              "ySplit": "0",
+              "topLeftCell": "B2",
+              "activePane": "topRight",
+              "state": "frozen"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "candidate-600",
+      "rawOk": true,
+      "contract": {
+        "wrapperCount": 1,
+        "frameMinHeight": "360px",
+        "wrapperOverflow": "auto",
+        "outerOverflow": "hidden"
+      },
+      "iframeHeightRange": [
+        360,
+        360
+      ],
+      "wrapperHeightRange": [
+        161,
+        203.5
+      ],
+      "exports": [
+        {
+          "file": "candidate-600/1-export.xlsx",
+          "sha256": "fe1c82ddf4d04f09fa2c8552f71951e42b4add77e2ec6345faa4646edeba9489",
+          "bytes": 13476,
+          "panes": [
+            {
+              "xSplit": "1",
+              "ySplit": "1",
+              "topLeftCell": "B2",
+              "activePane": "bottomRight",
+              "state": "frozen"
+            }
+          ]
+        },
+        {
+          "file": "candidate-600/2-export.xlsx",
+          "sha256": "9f324b1607f9ae4312d729faaa5e306c0367e6db368908134cc5948b78172bb2",
+          "bytes": 13825,
+          "panes": [
+            {
+              "xSplit": "1",
+              "ySplit": "1",
+              "topLeftCell": "B2",
+              "activePane": "bottomRight",
+              "state": "frozen"
+            }
+          ]
+        },
+        {
+          "file": "candidate-600/3-export.pdf",
+          "sha256": "6e3b02a28009ca2936ebc70941b23839de2fcbc34378b358b5673bded45eea1e",
+          "bytes": 38628,
+          "panes": null
+        }
+      ]
+    },
+    {
+      "name": "candidate-640",
+      "rawOk": true,
+      "contract": {
+        "wrapperCount": 1,
+        "frameMinHeight": "360px",
+        "wrapperOverflow": "auto",
+        "outerOverflow": "hidden"
+      },
+      "iframeHeightRange": [
+        360,
+        360
+      ],
+      "wrapperHeightRange": [
+        201,
+        243.5
+      ],
+      "exports": [
+        {
+          "file": "candidate-640/1-export.xlsx",
+          "sha256": "38929791a82649a8f990e3001426571c011a9f09467aafbd40385e979d0670a5",
+          "bytes": 13479,
+          "panes": [
+            {
+              "xSplit": "1",
+              "ySplit": "1",
+              "topLeftCell": "B2",
+              "activePane": "bottomRight",
+              "state": "frozen"
+            }
+          ]
+        },
+        {
+          "file": "candidate-640/2-export.xlsx",
+          "sha256": "59a580638b4b5f444c18c1bd9768e330d507a2b0477a70b191fcdb0fda3e805e",
+          "bytes": 13823,
+          "panes": [
+            {
+              "xSplit": "1",
+              "ySplit": "1",
+              "topLeftCell": "B2",
+              "activePane": "bottomRight",
+              "state": "frozen"
+            }
+          ]
+        },
+        {
+          "file": "candidate-640/3-export.pdf",
+          "sha256": "1a4b207573431b75f09c6ac85a5a065a6471de87944ff97416d23d67e173f9bf",
+          "bytes": 38628,
+          "panes": null
+        }
+      ]
+    }
+  ],
+  "causalFinding": "Within one release build, removing only the iframe minimum height permits its height to fall to161px and loses the frozen row. The unmodified wrapper candidate keeps the native iframe at360px while scrolling a161–243.5px visible region, and the unchanged release Calc helper passes at1024x600 and1024x640.",
+  "uiChecks": {
+    "rawRunOk": false,
+    "rawFailureRetained": "The final malformed-file test used8bytes, below the application ZIP signature minimum30bytes. It was rejected before engine loading, so waiting for an engine error overlay timed out.",
+    "scrollbarConfiguration": "The first UI run used default Playwright headless --hide-scrollbars and could not drag a nonexistent scrollbar. A new run explicitly omitted that flag; no product CSS was added.",
+    "realScrollbar": {
+      "passed": true,
+      "gutterWidth": 15,
+      "bottomScrollTop": 156,
+      "captionRemainedFixed": true
+    },
+    "coordinateInputAndSave": {
+      "passed": true,
+      "singleScreenshotDerivedClick": "B2=25",
+      "actualKeyboardEdit": "79 then Enter",
+      "independentXlsx": "B2 is numeric79; A1 ORIGIN, A4 KEEP, C5 SHEET_SENTINEL and pane1/1 preserved"
+    },
+    "resize": {
+      "passed": true,
+      "iframeHeights": {
+        "1024x600": 360,
+        "1024x768": 371.5,
+        "1024x1000": 603.5,
+        "backTo1024x600": 360
+      }
+    },
+    "normalLoadingMaskAfterScroll": {
+      "passed": true,
+      "scrollTop": 155,
+      "overlayEqualsEditor": true,
+      "coveredHitTestPoints": 5
+    },
+    "errorMask": {
+      "passed": true,
+      "testOnlyInjectedErrorEvent": true,
+      "scrollTop": 156,
+      "overlayEqualsEditor": true,
+      "coveredHitTestPoints": 5,
+      "doesNotVerifyMalformedFileParsing": true
+    }
+  },
+  "portableRegression": {
+    "path": "tests/browser/calc-short-viewport.cjs",
+    "sha256": "b035e583be2b71101d72066f9ac43bd3a09cd735a28cf1ea0cf0ac74f85c9cbe",
+    "default": "Two fresh cases at heights 600 and 640 against OFFICE_WORKBENCH_URL (default http://127.0.0.1:4198); no CSS injection. Failures exit 1.",
+    "optionalNegativeControl": "CALC_SHORT_NEGATIVE_CONTROL=1 explicitly adds the min-height: 0 case and retains its raw false result while checking an expected freeze failure.",
+    "validation": "node --check and independent comparison with the executed script; the identical matrix was not rerun after portability-only changes.",
+    "beforeEnvironmentSelectionSha256": "e3775013aab77484320285a2474f48a197ca2189d633ec6b42558d36c0cdf184",
+    "environmentSelectionChange": "Only Python virtual-environment / environment-variable discovery and Chromium executable discovery changed after the reviewed portable copy. The operation sequence and assertions are unchanged; historical executed script and report fingerprints are retained."
+  },
+  "componentSource": {
+    "path": "src/components/OfficeEditor.vue",
+    "sha256": "015f0d4db5aba7f6db87847c1c86cce87f43f2fe1903445457e05a1914540435"
+  },
+  "independentReview": {
+    "reviewer": "table_layout_review",
+    "fourCandidateXlsxPanesAndTwoPdfsVerified": true,
+    "normalUiExportAndGeometryVerified": true,
+    "injectedErrorMask": "verified: one labeled valid iframe error event; only overlay coverage is claimed"
+  },
+  "limits": [
+    "Protocol sheet actions use the public engine API rather than individual Vue controls; real UI create/save/reopen and strict helper assertions remain in the chain.",
+    "The protocol chain retains default headless hidden scrollbars; the real scrollbar UI run explicitly exposes them, so widths should not be treated as the same configuration.",
+    "360px is a minimum editing area, not proof that arbitrarily many frozen rows fit.",
+    "Earlier raw failures are preserved and are not reclassified as passing runs."
+  ],
+  "nativeArmVerification": {
+    "runUrl": "https://github.com/ecojust/open-office/actions/runs/38556139101",
+    "jobUrl": "https://github.com/ecojust/open-office/actions/runs/38556139101/job/115825682832",
+    "headSha": "6a16f7f6ffa6d758e01cc00d36618a5f163a7bc9",
+    "job": "macos-arm64 native build and verification",
+    "conclusion": "success",
+    "nativeValidationStep": {
+      "name": "Verify final desktop GUI, Writer/Calc/Impress round trips, and real PDF edits",
+      "conclusion": "success"
+    },
+    "evidence": {
+      "path": "/tmp/open-office-0.5.0-verification/arm-success-job.json",
+      "sha256": "3cfdb2395e2e9be29d8c5dff0d718cebfb49f6335ede0edf2d39d99ccb8c34a5",
+      "type": "GitHub Actions job API record, independently reviewed"
+    },
+    "nativeFrozenValuesInspected": false,
+    "limitation": "The artifact was unavailable for download at this checkpoint. Native frozen values are not asserted here. This does not claim the complete multi-platform release or Rosetta gate has finished."
+  }
+}

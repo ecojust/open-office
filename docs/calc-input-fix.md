@@ -35,3 +35,5 @@ CALC_INPUT_SCENARIOS=A,B,C,D,E,F,G node tests/browser/calc-input-focus.cjs
 ```
 
 The [patched run report](../test-results/calc-input-followup/2026-10-14T10-08-27-086Z-559947/matrix-report.json) and [original causal summary](../test-results/calc-input-followup/2026-10-14T09-46-28-079Z-556182/causal-summary.json) remain separate evidence records.
+
+The subsequent [first-frame investigation](calc-first-frame-investigation.md) records eight unsuccessful isolated readiness experiments, including the independently reviewed ResizeObserver failure. It does not change this run's historical results.
