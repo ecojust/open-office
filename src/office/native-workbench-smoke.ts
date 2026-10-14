@@ -152,6 +152,10 @@ export async function verifyNativeWord(options: Lifecycle<WriterEditor>) {
 export async function verifyNativeCalc(options: Lifecycle<CalcEditor>) {
   let editor = await options.create(), state = await editor.getCalcState()
   const action = async (input: CalcAction) => { state = await submitNativeCalcAction(editor, state, input); return state }
+  // Copy only states already returned by the existing operations. These are
+  // checkpoints, not extra native reads or proof of the state during export.
+  const frozenCheckpoints: Array<{ stage: string; activeSheetIndex: number; frozen: CalcState['frozen'] }> = []
+  const checkpoint = (stage: string) => frozenCheckpoints.push({ stage, activeSheetIndex: state.activeSheetIndex, frozen: { ...state.frozen } })
   await action({ type: 'rename-sheet', sheetIndex: 0, name: 'Native data 中文' })
   await action({ type: 'add-sheet', name: 'Native summary' })
   await action({ type: 'select-sheet', sheetIndex: 0 })
@@ -165,13 +169,20 @@ export async function verifyNativeCalc(options: Lifecycle<CalcEditor>) {
   await action({ type: 'sort', sheetIndex: 0, range: 'A1:C4', column: 1, ascending: false, header: true })
   await action({ type: 'freeze', columns: 1, rows: 1 })
   const frozenAfterAction = { ...state.frozen }
+  checkpoint('afterFreeze')
   await action({ type: 'insert-chart', sheetIndex: 0, range: 'A1:B4', name: 'NativeSalesChart', chartType: 'column', headerRow: true, headerColumn: true })
+  checkpoint('afterInsertChart')
   await action({ type: 'insert-pivot', sheetIndex: 0, range: 'A1:C4', name: 'NativeSalesPivot', rowField: 0, dataField: 1, operation: 'sum', outputSheetIndex: 1, outputAddress: 'A1' })
+  checkpoint('afterInsertPivot')
   await action({ type: 'select-sheet', sheetIndex: 0 })
+  checkpoint('afterSelectSheet0')
   await action({ type: 'filter', sheetIndex: 0, range: 'A1:C4', column: 0, operator: 'equal', value: '北', header: true })
+  checkpoint('afterFilter')
+  checkpoint('beforeFirstExportLastKnown')
   const first = await editor.exportFile({ format: 'xlsx' }); outputBytes(first, 'xlsx')
   editor = await options.reopen(first.base64); state = await editor.getCalcState()
   const frozenAfterFirstReopen = { ...state.frozen }
+  checkpoint('firstReopen')
   const before = await editor.calcData({ type: 'range', sheetIndex: 0, range: 'G1:G3' }) as CalcRangeData
   check(before.values[2]?.[0] === 42 && before.formulas[2]?.[0] === '=SUM(G1:G2)', 'Calc formula did not reopen')
   const firstRules = await editor.calcData({ type: 'rules', sheetIndex: 0, range: 'A1:C4' }) as CalcRulesData
@@ -179,16 +190,20 @@ export async function verifyNativeCalc(options: Lifecycle<CalcEditor>) {
     && firstRules.filter.fields[0]?.column === 0 && firstRules.filter.fields[0]?.operator === 'equal' && firstRules.filter.fields[0]?.value === '北', 'Calc saved filter criteria did not reopen')
   await action({ type: 'clear-filter', sheetIndex: 0, range: 'A1:C4' })
   await action({ type: 'patch-cells', sheetIndex: 0, cells: [{ address: 'G1', kind: 'number', value: 41 }] })
+  checkpoint('beforeSecondExportLastKnown')
   const second = await editor.exportFile({ format: 'xlsx' }), xlsxBytes = outputBytes(second, 'xlsx')
   editor = await options.reopen(second.base64); state = await editor.getCalcState()
   const frozenAfterSecondReopen = { ...state.frozen }
+  checkpoint('secondReopen')
   check(state.sheets.length === 2 && state.sheets[0]?.name === 'Native data 中文' && state.sheets[1]?.name === 'Native summary', 'Calc sheet names/order did not survive two saves')
   await action({ type: 'select-sheet', sheetIndex: 0 })
   await action({ type: 'select-range', sheetIndex: 0, range: 'A1' })
+  checkpoint('finalSelection')
   check(state.format.bold && state.format.textColor.toUpperCase() === '#203A5D', 'Calc header formatting did not reopen')
   if (!(state.frozen.rows === 1 && state.frozen.columns === 1)) {
     check(false, 'Calc frozen panes did not reopen; ' + JSON.stringify({ final: state.frozen,
       afterFreeze: frozenAfterAction, firstReopen: frozenAfterFirstReopen, secondReopen: frozenAfterSecondReopen,
+      checkpoints: frozenCheckpoints,
       firstXlsx: savedCalcPane(first.base64), secondXlsx: savedCalcPane(second.base64) }))
   }
   const matrix = await editor.calcData({ type: 'range', sheetIndex: 0, range: 'A1:C4' }) as CalcRangeData
