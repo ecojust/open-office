@@ -295,6 +295,69 @@ test('Unknown native view formats reject freezing before any mutation',()=>{
  const f=fixture(),view=f.model.getCurrentController();view.getViewData=()=> 'unknown format';assert.throws(()=>f.api.action({type:'freeze',columns:0,rows:1}),/不支持精确冻结/);assert.deepEqual(f.changes,[]);
 });
 
+function failedFreezeFixture({smoke=false,fail=true}={}){
+ const f=fixture(),view=f.model.getCurrentController(),original='100/60/0;0;tw:1024;0/0/0/0/0/0/2/0/0/0/0',calls=[];let record=original;
+ if(smoke)f.context.auditOfficeOfflinePolicy=()=>{};
+ view.getViewData=()=>{calls.push('getViewData');return record};
+ view.hasFrozenPanes=()=>{const fields=record.split(';')[3].split('/');return fields[2]==='2'||fields[3]==='2'};
+ view.restoreViewData=value=>{calls.push(value===original?'rollback':'restore');record=value};
+ view.setFirstVisibleColumn=()=>calls.push('scroll-column');
+ view.setFirstVisibleRow=()=>{calls.push('scroll-row');if(fail){const parts=record.split(';'),fields=parts[3].split('/');fields[3]='0';fields[5]='0';parts[3]=fields.join('/');record=parts.join(';')}};
+ const select=view.select;view.select=value=>{calls.push('select');select(value)};
+ const rect=(name,value)=>({getPosSize:()=>{calls.push(name);return value}});
+ view.getFrame=()=>{calls.push('frame');return {getContainerWindow:()=>rect('container',{X:0,Y:0,Width:1280,Height:800}),getComponentWindow:()=>rect('component',{X:0,Y:115,Width:1280,Height:52})}};
+ f.model.setModified=()=>calls.push('modified');
+ return {...f,view,calls,original,get record(){return record}};
+}
+test('Freeze mismatch details are smoke-only, numeric, bounded and captured before the original rollback',()=>{
+ const f=failedFreezeFixture({smoke:true}),selected=f.selection;let failure;
+ try{f.api.action({type:'freeze',columns:1,rows:1})}catch(error){failure=error}
+ assert.match(failure.message,/原生表格未能应用指定冻结位置，已恢复原视图。 \[freeze-diagnostic /);
+ const detail=JSON.parse(failure.message.match(/\[freeze-diagnostic (.*)\]$/)[1]);
+ assert.deepEqual(detail.expected,{columns:1,rows:1});assert.deepEqual(detail.actual,{columns:1,rows:0});
+ assert.deepEqual(detail.before,[0,0,0,0,0,0,2,0,0,0,0]);assert.deepEqual(detail.target,[0,0,2,2,1,1,2,0,1,0,1]);
+ assert.deepEqual(detail.afterCheck,[0,0,2,0,1,0,2,0,1,0,1]);
+ assert.deepEqual(detail.container,[0,0,1280,800]);assert.deepEqual(detail.component,[0,115,1280,52]);
+ assert.ok(failure.message.length<1500);assert.equal(f.record,f.original);assert.equal(f.selection,selected);
+ assert.deepEqual(f.calls.slice(-6),['getViewData','frame','container','component','rollback','select']);assert.ok(!f.calls.includes('modified'));
+});
+test('Ordinary freeze failures retain the original message and successful smoke actions perform no extra native reads',()=>{
+ const user=failedFreezeFixture();assert.throws(()=>user.api.action({type:'freeze',columns:1,rows:1}),error=>error.message==='原生表格未能应用指定冻结位置，已恢复原视图。');
+ assert.equal(user.calls.filter(x=>x==='getViewData').length,2);assert.ok(!user.calls.includes('frame'));assert.equal(user.record,user.original);
+ const normal=failedFreezeFixture({fail:false}),smoke=failedFreezeFixture({smoke:true,fail:false});
+ for(const f of [normal,smoke])f.api.action({type:'freeze',columns:1,rows:1});
+ assert.deepEqual(smoke.calls,normal.calls);assert.ok(!smoke.calls.includes('frame'));assert.ok(smoke.calls.includes('modified'));
+});
+test('Optional freeze diagnostics consume UNO errors without replacing the mismatch or preventing rollback',()=>{
+ const f=failedFreezeFixture({smoke:true}),native={uno:'diagnostic window unavailable'};
+ f.view.getFrame=()=>{throw native};
+ assert.throws(()=>f.api.action({type:'freeze',columns:1,rows:1}),error=>{
+   assert.match(error.message,/原生表格未能应用指定冻结位置/);const detail=JSON.parse(error.message.match(/\[freeze-diagnostic (.*)\]$/)[1]);assert.equal(detail.container,null);assert.equal(detail.component,null);return true;
+ });
+ assert.deepEqual(f.caught,[native]);assert.equal(f.record,f.original);assert.deepEqual(f.calls.slice(-2),['rollback','select']);
+});
+test('Failed diagnostic view and window reads stay bounded and never include native text payloads',()=>{
+ for(const failure of ['view','container','component']){
+   const f=failedFreezeFixture({smoke:true}),native={uno:'private text must not enter logs'},read=f.view.getViewData;let reads=0;
+   f.view.getViewData=()=>{if(++reads===3&&failure==='view')throw native;return read()};
+   const rectangle=name=>({getPosSize:()=>{if(failure===name)throw native;return {X:'private cell text',Y:Infinity,Width:1280,Height:52}}});
+   f.view.getFrame=()=>({getContainerWindow:()=>rectangle('container'),getComponentWindow:()=>rectangle('component')});
+   assert.throws(()=>f.api.action({type:'freeze',columns:1,rows:1}),error=>{
+     const detail=JSON.parse(error.message.match(/\[freeze-diagnostic (.*)\]$/)[1]);
+     assert.equal(detail[failure==='view'?'afterCheck':failure],null);
+     if(failure!=='container')assert.deepEqual(detail.container,[null,null,1280,52]);
+     if(failure!=='component')assert.deepEqual(detail.component,[null,null,1280,52]);
+     assert.doesNotMatch(error.message,/private/);assert.ok(error.message.length<1500);return true;
+   });
+   assert.equal(reads,3);assert.deepEqual(f.caught,[native]);assert.equal(f.record,f.original);assert.deepEqual(f.calls.slice(-2),['rollback','select']);
+ }
+});
+test('Freeze diagnostic WASM traps remain fatal after the original view is restored',()=>{
+ const f=failedFreezeFixture({smoke:true}),trap=vm.runInContext('new WebAssembly.RuntimeError("diagnostic memory trap")',f.context);
+ f.view.getFrame=()=>{throw trap};assert.throws(()=>f.api.action({type:'freeze',columns:1,rows:1}),error=>error===trap);
+ assert.deepEqual(f.caught,[]);assert.equal(f.record,f.original);assert.deepEqual(f.calls.slice(-2),['rollback','select']);
+});
+
 
 test('Native range fill validates direction and target extent before invoking the engine',()=>{
  const f=fixture();for(const input of [{type:'fill',range:'A1',direction:'down'},{type:'fill',range:'A1:A5',direction:'right'},{type:'fill',range:'A1:B2',direction:'diagonal'},{type:'fill',range:'A1:XFD1048576',direction:'down'}])assert.throws(()=>f.api.action(input));assert.deepEqual(f.changes,[]);
