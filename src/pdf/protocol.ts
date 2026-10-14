@@ -38,6 +38,9 @@ export interface PdfFormField {
   type: string
   rect: PdfRect
   value: string | boolean
+  choices?: { value: string; label: string }[]
+  displayValue?: string
+  selectedIndex?: number | null
   maxLength: number
   multiline: boolean
   required: boolean

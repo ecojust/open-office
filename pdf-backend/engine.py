@@ -29,6 +29,8 @@ MAX_TEXT_LENGTH = 20_000
 MAX_TEXT_BLOCKS = 6_000
 MAX_ANNOTATION_RELATIONS = 5000
 MAX_FORM_FIELDS = 2000
+MAX_CHOICE_OPTIONS = 250
+MAX_CHOICE_TEXT = 40_000
 OPERATIONS = {
     'inspect', 'new', 'replace_text', 'add_text', 'add_image', 'highlight',
     'ink', 'rotate', 'delete', 'reorder', 'extract', 'merge',
@@ -460,6 +462,102 @@ def preserve_merge_form_defaults(doc):
                 doc.xref_set_key(widget.xref, 'Q', default_q[1] if default_q[0] == 'int' else '0')
 
 
+def choice_options(doc, widget):
+    """Keep PDF export values distinct from the labels shown to the user."""
+    if doc.xref_get_key(widget.xref, 'Opt')[0] not in ('array', 'xref'):
+        return [], '此选择字段没有可验证的选项列表，暂时只读。'
+    raw = widget.choice_values
+    if not isinstance(raw, (list, tuple)) or not 1 <= len(raw) <= MAX_CHOICE_OPTIONS:
+        return [], '选项为空或超过 250 项，暂时只读。'
+    result, seen, size = [], set(), 0
+    for item in raw:
+        if isinstance(item, str):
+            value = label = item
+        elif isinstance(item, (tuple, list)) and len(item) == 2 and all(isinstance(text, str) for text in item):
+            value, label = item
+        else:
+            return [], '选择字段的选项结构异常，暂时只读。'
+        size += len(value) + len(label)
+        if value in seen or not label or max(len(value), len(label)) > 1000 or size > MAX_CHOICE_TEXT or any(ord(char) < 32 or ord(char) == 127 for char in value + label):
+            return [], '选项包含重复值、空名称、控制字符或过长内容，暂时只读。'
+        seen.add(value)
+        result.append({'value': value, 'label': label})
+    return result, ''
+
+
+def choice_label_supported(label):
+    # These scripts require shaping / bidi layouts that the current choice AP
+    # generator does not reliably handle. Non-BMP values are truncated there.
+    # Keep export strings unrestricted: only the rendered label is constrained.
+    unsupported = ((0x0590, 0x109F), (0x1780, 0x1CFF), (0xA800, 0xABFF),
+                   (0xD800, 0xDFFF), (0xFB1D, 0xFDFF), (0xFE70, 0xFEFF),
+                   (0x200B, 0x200F), (0x202A, 0x202E), (0x2066, 0x2069))
+    return all(ord(char) <= 0xFFFF and not any(low <= ord(char) <= high for low, high in unsupported) for char in label)
+
+
+def choice_readonly_reason(doc, widget):
+    allowed = 2 | 4 | pymupdf.PDF_CH_FIELD_IS_COMBO | pymupdf.PDF_CH_FIELD_IS_DO_NOT_SPELL_CHECK
+    if widget.field_flags & ~allowed:
+        return '多选、可自由输入、自动排序或提交动作的选择字段暂时只读。'
+    options, reason = choice_options(doc, widget)
+    if reason:
+        return reason
+    if any(not choice_label_supported(item['label']) for item in options):
+        return '选项包含当前引擎不能可靠绘制的复杂文字或扩展字符，暂时只读。'
+    if any(has_pdf_key(doc, widget.xref, 'AP/N/Resources/' + key) for key in ('XObject', 'ExtGState', 'Pattern', 'Shading', 'ColorSpace')) or has_pdf_key(doc, widget.xref, 'AP/N/Group'):
+        return '此选择字段含自定义图形或透明外观，暂时只读以保留原显示。'
+    matrix = doc.xref_get_key(widget.xref, 'AP/N/Matrix')
+    if matrix[0] != 'null' and (matrix[0] != 'array' or not re.fullmatch(r'\[\s*1(?:\.0*)?\s+0(?:\.0*)?\s+0(?:\.0*)?\s+1(?:\.0*)?\s+0(?:\.0*)?\s+0(?:\.0*)?\s*\]', matrix[1])):
+        return '此选择字段使用自定义外观变换，暂时只读。'
+    border_kind, border_width = doc.xref_get_key(widget.xref, 'BS/W')
+    if border_kind not in ('null', 'int', 'float') or border_kind != 'null' and not 0 <= float(border_width) <= 20 or border_kind == 'null' and has_pdf_key(doc, widget.xref, 'Border'):
+        return '此选择字段使用特殊边框，暂时只读以保留原外观。'
+    kind, value = doc.xref_get_key(widget.xref, 'V')
+    values = [item['value'] for item in options]
+    if kind not in ('string', 'null') or kind == 'string' and value not in values and value != '':
+        return '选择字段的当前值不属于选项或含多选数据，暂时只读。'
+    indices_kind, selected = doc.xref_get_key(widget.xref, 'I')
+    if indices_kind != 'null':
+        match = re.fullmatch(r'\[\s*(\d+)\s*\]', selected) if indices_kind == 'array' else None
+        if not match or int(match[1]) >= len(values) or kind != 'string' or values[int(match[1])] != value:
+            return '选择字段的索引与当前值不一致，暂时只读。'
+    top_kind, top = doc.xref_get_key(widget.xref, 'TI')
+    if top_kind != 'null' and (top_kind != 'int' or not 0 <= int(top) < len(values)):
+        return '列表的滚动位置异常，暂时只读。'
+    rotation = doc.xref_get_key(widget.xref, 'MK/R')
+    if rotation not in (('null', 'null'), ('int', '0')):
+        return '旋转的选择字段暂时只读，以保留原排版。'
+    if widget.field_type == pymupdf.PDF_WIDGET_TYPE_LISTBOX and widget.rect.height < (widget.text_fontsize or 12) * 1.8:
+        return '列表高度不足以显示一个完整选项，暂时只读。'
+    return ''
+
+
+def highlight_choice_appearance(doc, appearance_xref, expected_rows):
+    """Tint the selected first visible row in the freshly generated native AP.
+
+    MuPDF 1.28.2 draws list labels but no selected background. Validate its small
+    generated text layout before adding a vector highlight inside its clip. This
+    never parses or patches an appearance supplied by the input document.
+    """
+    stream = doc.xref_stream(appearance_xref)
+    numeric = rb'[-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)'
+    moves = re.findall(rb'(' + numeric + rb')\s+(' + numeric + rb')\s+Td\b', stream)
+    clip = re.search(rb'(' + numeric + rb') (' + numeric + rb') (' + numeric + rb') (' + numeric + rb') re\s+W\s+n\s+BT\b', stream)
+    if stream.count(b'BT\n') != 1 or stream.count(b'ET\n') != 1 or re.search(rb'\bTm\b|T\*', stream) or not clip or len(moves) != expected_rows + 1:
+        fail('FORM_APPEARANCE_FAILED', '无法验证列表选项的显示位置，原文件未修改。')
+    x, y, width, height = map(float, clip.groups())
+    start_x, start_y = map(float, moves[0])
+    steps = [tuple(map(float, item)) for item in moves[1:]]
+    step = -steps[0][1]
+    if step <= 0 or any(dx != 0 or abs(dy + step) > 0.001 for dx, dy in steps) or height < step * 1.2 or width <= 0 or not x <= start_x <= x + width:
+        fail('FORM_APPEARANCE_FAILED', '无法可靠生成列表的选中外观，原文件未修改。')
+    bottom = start_y - step * 1.22
+    if bottom < y or bottom + step > y + height:
+        fail('FORM_APPEARANCE_FAILED', '列表选中项超出可显示区域，原文件未修改。')
+    highlight = f'q 0.78 0.87 0.98 rg {x:g} {bottom:g} {width:g} {step:g} re f Q\n'.encode('ascii')
+    doc.update_stream(appearance_xref, stream.replace(b'BT\n', highlight + b'BT\n', 1))
+
+
 def form_readonly_reason(doc, widget, names, global_reason):
     if global_reason:
         return global_reason
@@ -472,45 +570,50 @@ def form_readonly_reason(doc, widget, names, global_reason):
         return '此字段含父子关联，暂时只读。'
     if not widget.field_name or names.get(widget.field_name) != 1:
         return '字段名称为空或在文档中重复，暂时只读。'
-    if widget.field_type not in (pymupdf.PDF_WIDGET_TYPE_TEXT, pymupdf.PDF_WIDGET_TYPE_CHECKBOX):
-        return '此字段类型暂时只读；当前支持普通文本框和独立复选框。'
+    if widget.field_type not in (pymupdf.PDF_WIDGET_TYPE_TEXT, pymupdf.PDF_WIDGET_TYPE_CHECKBOX, pymupdf.PDF_WIDGET_TYPE_COMBOBOX, pymupdf.PDF_WIDGET_TYPE_LISTBOX):
+        return '此字段类型暂时只读；当前支持普通文本框、独立复选框和单选下拉/列表。'
     if has_pdf_key(doc, widget.xref, 'RV'):
         return '此字段包含富文本值，暂时保留原格式。'
     try:
         rectangle(list(widget.rect), widget.parent)
     except PdfError:
         return '字段区域不完整地位于页面内，暂时只读。'
-    if widget.field_type == pymupdf.PDF_WIDGET_TYPE_TEXT:
+    choice = widget.field_type in (pymupdf.PDF_WIDGET_TYPE_COMBOBOX, pymupdf.PDF_WIDGET_TYPE_LISTBOX)
+    if choice:
+        reason = choice_readonly_reason(doc, widget)
+        if reason:
+            return reason
+    if widget.field_type == pymupdf.PDF_WIDGET_TYPE_TEXT or choice:
         if not has_pdf_key(doc, widget.xref, 'DA') and has_pdf_key(doc, doc.pdf_catalog(), 'AcroForm/DA'):
-            return '此文本框继承文档级文字外观，暂时只读以保留原排版。'
+            return '此字段继承文档级文字外观，暂时只读以保留原排版。'
         allowed = 2 | 4 | pymupdf.PDF_TX_FIELD_IS_MULTILINE | pymupdf.PDF_TX_FIELD_IS_DO_NOT_SCROLL | pymupdf.PDF_TX_FIELD_IS_DO_NOT_SPELL_CHECK
-        if widget.field_flags & ~allowed:
+        if not choice and widget.field_flags & ~allowed:
             return '密码、分格、文件选择、富文本或特殊文本框暂时只读。'
         if any(has_pdf_key(doc, widget.xref, key) for key in ('AP/R', 'AP/D')):
-            return '此文本框含交互外观，暂时只读以保留显示状态。'
+            return '此字段含交互外观，暂时只读以保留显示状态。'
         if doc.xref_get_key(widget.xref, 'BS/S') == ('name', '/D'):
-            return '此文本框使用虚线边框，暂时只读以保留原外观。'
+            return '此字段使用虚线边框，暂时只读以保留原外观。'
         if len(str(widget.field_value or '')) > MAX_TEXT_LENGTH:
             return '字段文字超过安全编辑上限。'
         if widget.text_maxlen < 0 or doc.xref_get_key(widget.xref, 'V')[0] not in ('string', 'null'):
-            return '此文本框的值或长度限制格式异常，暂时只读。'
+            return '此字段的值或长度限制格式异常，暂时只读。'
         font = widget.text_font or ''
         expected = {'Helv': '/Helvetica', 'Cour': '/Courier', 'TiRo': '/Times-Roman'}.get(font)
         # Widget.update silently substitutes other names with Helv. Never do that
         # to a user font or a custom font disguised under a standard resource name.
         if not expected:
-            return '此文本框使用自定义字体，暂时只读以保留原外观。'
+            return '此字段使用自定义字体，暂时只读以保留原外观。'
         resources = [(doc.pdf_catalog(), f'AcroForm/DR/Font/{font}'), (widget.xref, f'AP/N/Resources/Font/{font}')]
         resources = [(xref, path) for xref, path in resources if has_pdf_key(doc, xref, path)]
         if not resources or any(doc.xref_get_key(xref, path + '/BaseFont') != ('name', expected)
                                 or doc.xref_get_key(xref, path + '/Subtype') != ('name', '/Type1')
                                 or doc.xref_get_key(xref, path + '/Encoding') not in (('name', '/WinAnsiEncoding'), ('null', 'null'))
                                 for xref, path in resources):
-            return '此文本框字体资源无法可靠保留，暂时只读。'
+            return '此字段字体资源无法可靠保留，暂时只读。'
         if any(has_pdf_key(doc, xref, path + '/FontDescriptor') for xref, path in resources):
-            return '此文本框使用嵌入字体，暂时只读以保留原外观。'
+            return '此字段使用嵌入字体，暂时只读以保留原外观。'
         if doc.xref_get_key(widget.xref, 'AP/N')[0] != 'xref':
-            return '此文本框没有可验证的普通外观，暂时只读。'
+            return '此字段没有可验证的普通外观，暂时只读。'
     else:
         if widget.field_flags & ~(2 | 4):
             return '此复选框包含特殊行为，暂时只读。'
@@ -549,11 +652,18 @@ def read_forms(doc, options, context):
         for widget in page.widgets() or []:
             if len(output) >= 500 or text_size > 250_000:
                 return {'formFields': output, 'formPages': selected, 'formsTruncated': True}
-            protected = bool(widget.field_flags & pymupdf.PDF_TX_FIELD_IS_PASSWORD)
+            protected = widget.field_type == pymupdf.PDF_WIDGET_TYPE_TEXT and bool(widget.field_flags & pymupdf.PDF_TX_FIELD_IS_PASSWORD)
+            choices, _ = choice_options(doc, widget) if widget.field_type in (pymupdf.PDF_WIDGET_TYPE_COMBOBOX, pymupdf.PDF_WIDGET_TYPE_LISTBOX) else ([], '')
             value = '' if protected else str(widget.field_value or '')[:MAX_TEXT_LENGTH]
-            text_size += len(value)
+            value_kind = doc.xref_get_key(widget.xref, 'V')[0]
+            multiple_choice = widget.field_type in (pymupdf.PDF_WIDGET_TYPE_COMBOBOX, pymupdf.PDF_WIDGET_TYPE_LISTBOX) and value_kind == 'array'
+            selected_index = next((index for index, item in enumerate(choices) if item['value'] == value), None) if value_kind == 'string' else None
+            text_size += len(value) + sum(len(item['value']) + len(item['label']) for item in choices)
+            if text_size > 250_000:
+                return {'formFields': output, 'formPages': selected, 'formsTruncated': True}
             output.append({'id': widget.xref, 'pageIndex': index, 'name': (widget.field_label or widget.field_name or '未命名字段')[:500],
-                           'type': widget.field_type_string, 'rect': list(widget.rect),
+                           'type': widget.field_type_string, 'rect': list(widget.rect), 'choices': choices,
+                           'selectedIndex': selected_index, 'displayValue': '多选值（只读）' if multiple_choice else choices[selected_index]['label'] if selected_index is not None else value,
                            'value': isinstance(checkbox_on_state(widget), str) and widget.field_value == checkbox_on_state(widget) if widget.field_type == pymupdf.PDF_WIDGET_TYPE_CHECKBOX else value,
                            'maxLength': min(widget.text_maxlen or MAX_TEXT_LENGTH, MAX_TEXT_LENGTH),
                            'multiline': bool(widget.field_flags & pymupdf.PDF_TX_FIELD_IS_MULTILINE),
@@ -582,6 +692,13 @@ def fill_field(doc, options, context):
         doc.xref_set_key(xref, 'V', state)
         doc.xref_set_key(xref, 'AS', state)
     else:
+        choice = widget.field_type in (pymupdf.PDF_WIDGET_TYPE_COMBOBOX, pymupdf.PDF_WIDGET_TYPE_LISTBOX)
+        selected_index = None
+        if choice:
+            choices, _ = choice_options(doc, widget)
+            selected_index = next((index for index, item in enumerate(choices) if item['value'] == value), None) if isinstance(value, str) else None
+            if selected_index is None:
+                fail('INVALID_OPTIONS', '请选择字段已有的选项，不能填写选项之外的值。')
         value = annotation_text(value, '字段内容', min(widget.text_maxlen or MAX_TEXT_LENGTH, MAX_TEXT_LENGTH))
         if any(ord(char) < 32 and char not in '\r\n' for char in value):
             fail('INVALID_OPTIONS', '字段内容不能含不可见控制字符。')
@@ -600,7 +717,18 @@ def fill_field(doc, options, context):
         # An appearance stream/dictionary may be shared with another widget.
         # Detach it before regeneration so the other field is never overwritten.
         doc.xref_set_key(xref, 'AP', 'null')
-        widget.field_value = value
+        if choice and widget.field_type == pymupdf.PDF_WIDGET_TYPE_LISTBOX:
+            # Scroll the selected option into the first visible row.
+            doc.xref_set_key(xref, 'TI', str(selected_index))
+        if choice:
+            # Options are immutable. Avoid PyMuPDF rewriting /Opt (including
+            # its inability to serialize a valid empty export string).
+            widget.choice_values = None
+            border_kind, border_width = doc.xref_get_key(xref, 'BS/W')
+            # PyMuPDF reports a zero PDF border width as one. Use the actual
+            # numeric width so filling a borderless field does not add a line.
+            widget.border_width = float(border_width) if border_kind in ('int', 'float') else 1
+        widget.field_value = choices[selected_index]['label'] if choice and widget.field_type == pymupdf.PDF_WIDGET_TYPE_COMBOBOX else value
         # This operation changes only the value. PyMuPDF's widget properties
         # round dash lengths to integers; rewriting them would also change the
         # generated border. Let the original PDF style drive the appearance.
@@ -612,6 +740,8 @@ def fill_field(doc, options, context):
         if generated['AP/N'][0] != 'xref' or not doc.xref_is_stream(int(generated['AP/N'][1].split()[0])):
             fail('FORM_APPEARANCE_FAILED', '未能生成表单外观，原文件未修改。')
         new_appearance = int(generated['AP/N'][1].split()[0])
+        if choice and widget.field_type == pymupdf.PDF_WIDGET_TYPE_LISTBOX:
+            highlight_choice_appearance(doc, new_appearance, len(choices) - selected_index)
         font_path = f'Resources/Font/{widget.text_font}'
         # All-CJK text uses Song in its AP; retain the original DA font resource
         # too, so later edits (including Latin text) can still validate it.
@@ -626,6 +756,10 @@ def fill_field(doc, options, context):
             doc.xref_set_key(xref, 'AP', doc.xref_object(int(original_ap[1].split()[0])))
         doc.xref_set_key(xref, 'V', pymupdf.get_pdf_str(value))
         doc.xref_set_key(xref, 'AP/N', generated['AP/N'][1])
+        if choice:
+            doc.xref_set_key(xref, 'I', f'[{selected_index}]')
+            if widget.field_type == pymupdf.PDF_WIDGET_TYPE_LISTBOX:
+                doc.xref_set_key(xref, 'TI', str(selected_index))
 
 
 def cjk_font(page):

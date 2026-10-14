@@ -90,6 +90,7 @@ const formFields = ref<PdfFormField[]>([])
 const formsTruncated = ref(false)
 const selectedFormField = ref<PdfFormField | null>(null)
 const formValue = ref<string | boolean>('')
+const formChoiceIndex = ref('')
 const formTextValue = computed({ get: () => String(formValue.value), set: (value: string) => { formValue.value = value } })
 const outline = ref<{ level: number; title: string; pageIndex: number | null }[]>([])
 const stampMode = ref<'page_numbers' | 'watermark' | null>(null)
@@ -173,7 +174,11 @@ const currentFormFields = computed(() => formFields.value.filter(item => item.pa
 const propertyPanelVisible = computed(() => !!selectedText.value || !!selectedAnnotation.value || !!selectedFormField.value || tool.value !== 'select')
 const hasPendingEdits = computed(() => {
   if (stampChanged.value) return true
-  if (selectedFormField.value) return formValue.value !== selectedFormField.value.value
+  if (selectedFormField.value) {
+    const field = selectedFormField.value
+    if (field.type === 'ComboBox' || field.type === 'ListBox') return formChoiceIndex.value !== (field.selectedIndex == null ? '' : String(field.selectedIndex))
+    return formValue.value !== field.value
+  }
   if (selectedAnnotation.value) return annotationContent.value !== selectedAnnotation.value.content || annotationAuthor.value !== selectedAnnotation.value.author
   if (tool.value === 'note') return !!annotationContent.value || !!annotationAuthor.value || !!pendingRect.value
   if (selectedText.value) {
@@ -232,7 +237,7 @@ function clearEditorSelection() {
   selectedAnnotation.value = null
   selectedFormField.value = null
   formRevision = -1
-  formValue.value = ''
+  formValue.value = ''; formChoiceIndex.value = ''
   annotationRevision = -1
   annotationContent.value = ''; annotationAuthor.value = ''
   editText.value = ''
@@ -722,7 +727,7 @@ async function chooseFormField(item: PdfFormField) {
   if (isBusy.value) return
   if (hasPendingEdits.value) { setStatus('请先应用或清除当前编辑，再选择表单字段。'); return }
   clearEditorSelection(); tool.value = 'select'
-  selectedFormField.value = item; formValue.value = item.value; formRevision = documentRevision
+  selectedFormField.value = item; formValue.value = item.value; formChoiceIndex.value = item.selectedIndex == null ? '' : String(item.selectedIndex); formRevision = documentRevision
   await nextTick()
   pageSurface.value?.querySelector(`[data-field-id="${item.id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 }
@@ -730,7 +735,10 @@ function applyFormField() {
   const item = selectedFormField.value
   if (!item || item.readonlyReason || !canFillForms.value || isBusy.value || !hasPendingEdits.value) return
   if (formRevision !== documentRevision) { fail(new PdfOperationError('STALE_FIELD', '文档已改变，请重新选择表单字段。')); return }
-  runOperation('fill_field', { pageIndex: item.pageIndex, fieldId: item.id, expectedToken: item.token, value: formValue.value }, '正在保存表单内容…')
+  const choice = item.type === 'ComboBox' || item.type === 'ListBox'
+  const value = choice ? item.choices?.[Number(formChoiceIndex.value)]?.value : formValue.value
+  if (choice && (formChoiceIndex.value === '' || value === undefined)) return
+  runOperation('fill_field', { pageIndex: item.pageIndex, fieldId: item.id, expectedToken: item.token, value }, '正在保存表单内容…')
 }
 async function chooseAnnotation(item: PdfAnnotation) {
   if (isBusy.value) return
@@ -1111,7 +1119,7 @@ onBeforeUnmount(() => {
           <p v-if="!engineAvailable" class="pdf-outline-empty">浏览器可预览已有表单外观；请在桌面应用中填写并保存。</p>
           <p v-else-if="!currentFormFields.length" class="pdf-outline-empty">本页没有可读取的表单字段。扫描件或普通文字不属于交互表单。</p>
           <p v-if="formsTruncated" class="pdf-outline-empty">文档字段较多，仅显示安全范围内的条目；未完整检查的字段只读。</p>
-          <button v-for="item in currentFormFields" :key="item.id" :class="{selected:selectedFormField?.id===item.id}" :disabled="isBusy" data-testid="pdf-form-item" @click="chooseFormField(item)"><strong>{{ item.name }}</strong><span>{{ item.type==='CheckBox' ? (item.value ? '已勾选' : '未勾选') : item.value || '未填写' }}</span><small>{{ formLabel(item) }}{{ item.required ? ' · 必填' : '' }}{{ item.readonlyReason || !canFillForms ? ' · 只读' : '' }}</small></button>
+          <button v-for="item in currentFormFields" :key="item.id" :class="{selected:selectedFormField?.id===item.id}" :disabled="isBusy" data-testid="pdf-form-item" @click="chooseFormField(item)"><strong>{{ item.name }}</strong><span>{{ item.type==='CheckBox' ? (item.value ? '已勾选' : '未勾选') : item.displayValue || item.value || '未填写' }}</span><small>{{ formLabel(item) }}{{ item.required ? ' · 必填' : '' }}{{ item.readonlyReason || !canFillForms ? ' · 只读' : '' }}</small></button>
         </nav>
       </aside>
 
@@ -1142,10 +1150,11 @@ onBeforeUnmount(() => {
         <template v-if="selectedFormField">
           <p class="pdf-form-name">{{ selectedFormField.name }}{{ selectedFormField.required ? ' · 必填' : '' }}</p>
           <label v-if="selectedFormField.type==='CheckBox'" class="pdf-form-checkbox"><input v-model="formValue" type="checkbox" data-testid="pdf-form-checkbox" :disabled="isBusy || !canFillForms || !!selectedFormField.readonlyReason" />勾选此项</label>
+          <label v-else-if="selectedFormField.type==='ComboBox' || selectedFormField.type==='ListBox'" class="pdf-field">选择选项<span :class="selectedFormField.type==='ComboBox' ? 'pdf-select-wrap' : ''"><select v-model="formChoiceIndex" :size="selectedFormField.type==='ListBox' ? Math.min(6, Math.max(2, selectedFormField.choices?.length || 2)) : undefined" aria-label="表单选项" data-testid="pdf-form-choice" :disabled="isBusy || !canFillForms || !!selectedFormField.readonlyReason"><option v-if="selectedFormField.selectedIndex == null" value="" disabled>{{ selectedFormField.displayValue || selectedFormField.value || '请选择' }}</option><option v-for="(option, index) in selectedFormField.choices" :key="index" :value="String(index)">{{ option.label }}</option></select></span></label>
           <label v-else class="pdf-field">字段内容<textarea v-if="selectedFormField.multiline" v-model="formTextValue" rows="5" :maxlength="selectedFormField.maxLength" data-testid="pdf-form-value" :disabled="isBusy || !canFillForms || !!selectedFormField.readonlyReason" /><input v-else v-model="formTextValue" :maxlength="selectedFormField.maxLength" data-testid="pdf-form-value" :disabled="isBusy || !canFillForms || !!selectedFormField.readonlyReason" /></label>
           <p v-if="!canFillForms" class="pdf-property-hint">{{ signedLocked ? '请先选择编辑签名副本。' : !engineAvailable ? '填写表单需要桌面应用的本地 PDF 引擎。' : '此文件未授予填写表单权限。' }}</p>
           <button class="pdf-primary-button" :disabled="isBusy || !canFillForms || !!selectedFormField.readonlyReason || !hasPendingEdits" data-testid="pdf-form-apply" @click="applyFormField">应用填写</button>
-          <p class="pdf-property-hint">不执行表单脚本或自动计算。长文字可能超出原框，请检查保存后的外观。</p>
+          <p class="pdf-property-hint">{{ selectedFormField.type==='ComboBox' || selectedFormField.type==='ListBox' ? '选择显示名称，保存对应的原始导出值。列表会滚动到所选项；多选和自由输入字段暂时只读。' : '不执行表单脚本或自动计算。长文字可能超出原框，请检查保存后的外观。' }}</p>
         </template>
         <template v-else-if="selectedAnnotation || tool === 'note'">
           <label class="pdf-field">备注<textarea v-model="annotationContent" rows="5" maxlength="20000" data-testid="pdf-annotation-content" :disabled="isBusy || !canAnnotate || !!selectedAnnotation?.readonlyReason" /></label>

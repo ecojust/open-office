@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-14T10:04:23.990826+00:00",
+  "scope": "Ordinary independent PDF ComboBox and single-choice ListBox; no general form or desktop package parity claim.",
+  "validation": {
+    "pythonPdfTests": 83,
+    "newChoiceTestGroups": 15,
+    "realVueUiGroups": 8,
+    "uiRuntimeErrors": 0,
+    "pypdfBackendChecks": 59,
+    "pypdfUiExportChecks": 59,
+    "vueTemplateScriptCompiled": true,
+    "fullNpmTestOrBuildRun": false,
+    "desktopInstallerTested": false,
+    "independentReviewRegressions": 13
+  },
+  "limitations": [
+    "Multi-select, editable combos, sorted/commit-on-change choices, scripts, calculated or associated fields remain read-only.",
+    "Custom fonts, declared custom graphics/transparency resources, nonidentity appearance matrices, complex shaping labels and non-BMP labels remain read-only; this is not an arbitrary custom vector appearance detector.",
+    "Original choice normal appearance is regenerated for supported fields; this is not arbitrary appearance artwork preservation.",
+    "Selected list item is scrolled to the first visible row.",
+    "Browser UI validated against local development backend; release 0.5.0 does not include this follow-up."
+  ],
+  "evidence": {
+    "python": "test-results/pdf-choices/backend-final/tests.log",
+    "targetedPython": "test-results/pdf-choices/backend-final/choice-tests.log",
+    "ui": "test-results/pdf-choices/ui-reviewed/ui-report.json",
+    "backendAudit": "test-results/pdf-choices/backend-final/independent-audit.json",
+    "uiAudit": "test-results/pdf-choices/ui-reviewed/independent-ui-audit.json",
+    "nativeProbe": "test-results/pdf-choices/backend-final/native-capability-probe.json"
+  },
+  "fingerprints": [
+    {
+      "path": "docs/pdf-choice-fields.md",
+      "sha256": "48cab3d212ef96794b30040271119ab34440376e591f9ae179d69b1292fe1054",
+      "bytes": 4147
+    },
+    {
+      "path": "docs/screenshots/pdf-choice-fields-mobile.png",
+      "sha256": "9753dba8f9382b21f3d836a7fa5169f58cbe428d8f2cca6ef69e8ef0b2b7814c",
+      "bytes": 50026
+    },
+    {
+      "path": "docs/screenshots/pdf-choice-fields.png",
+      "sha256": "4ba66197a7e214d30aa0c7ce0d34ed96a5d0b377380fa4cb477687db3a8238eb",
+      "bytes": 113037
+    },
+    {
+      "path": "pdf-backend/engine.py",
+      "sha256": "d1a980a8626a227e89c78304e1ba973850d621570c2b673d0e733382c5dff28e",
+      "bytes": 65238
+    },
+    {
+      "path": "pdf-backend/tests/test_choices.py",
+      "sha256": "7e402708b36cff7e434cccf02acaf34ed0f8294871745d132caf6a3827ca0ce0",
+      "bytes": 15729
+    },
+    {
+      "path": "src/components/PdfEditor.vue",
+      "sha256": "905e1156e299b38fe69ca91f1ae5c7f071f6412d39ac897ddb4180801bc0d157",
+      "bytes": 83397
+    },
+    {
+      "path": "src/pdf/protocol.ts",
+      "sha256": "a30291288281604493e559fd249679777cd390bfb8d626a33637bdb917306d14",
+      "bytes": 5375
+    },
+    {
+      "path": "test-results/pdf-choices/backend-final/choice-empty-source.pdf",
+      "sha256": "2d5b4528f8cccff71dc844684bdb38b473ead20ac6f4b9ec5417f33ca115ba17",
+      "bytes": 5427
+    },
+    {
+      "path": "test-results/pdf-choices/backend-final/choice-filled.pdf",
+      "sha256": "6d17519ff0e0668641a50c562d5a058eca5828f17f886b06dded46a27ca07e0f",
+      "bytes": 6051
+    },
+    {
+      "path": "test-results/pdf-choices/backend-final/choice-source.pdf",
+      "sha256": "e86cb972ca79c92fa9c216f888036f00e5345d849451a6945761333aa4a9d7d1",
+      "bytes": 5526
+    },
+    {
+      "path": "test-results/pdf-choices/backend-final/choice-tests.log",
+      "sha256": "6f420ab1f0053b34ffdd6b8cfd664df53c4bbf84510826adfa2b6b85dfb00db6",
+      "bytes": 114
+    },
+    {
+      "path": "test-results/pdf-choices/backend-final/generation.json",
+      "sha256": "2ff81d5b3710e420beb21e9853566ba22364da0a85dcf96f863caed7a4ee92cb",
+      "bytes": 3151
+    },
+    {
+      "path": "test-results/pdf-choices/backend-final/independent-audit.json",
+      "sha256": "8b322203c3a68c886c4653af2e0ac78b708afc1401797cea71458a3ac87ae7d8",
+      "bytes": 2655
+    },
+    {
+      "path": "test-results/pdf-choices/backend-final/mupdf-filled.png",
+      "sha256": "1ac3a55155da16328f43ecd363054ab54a0e0d83406a3f43b4bc21ab42c44404",
+      "bytes": 25898
+    },
+    {
+      "path": "test-results/pdf-choices/backend-final/native-capability-probe.json",
+      "sha256": "40e6fe820bc4027315f554862e29a40c1867c26560b776c7526cfa49538b4606",
+      "bytes": 1163
+    },
+    {
+      "path": "test-results/pdf-choices/backend-final/poppler-filled.png",
+      "sha256": "af0607cb5676c06a0138301bd6ecf8ff79e483abb17e7dd93074e89246f37d5f",
+      "bytes": 27164
+    },
+    {
+      "path": "test-results/pdf-choices/backend-final/poppler.log",
+      "sha256": "1e76d1d3b48dd052799de9c12cd4c7df264442cf363c530c55e63065b1678227",
+      "bytes": 2016
+    },
+    {
+      "path": "test-results/pdf-choices/backend-final/tests.log",
+      "sha256": "e1bd0b5d4b161495225b3b562259b9168747160b1cc3a939e5e0c3fe8244c4b3",
+      "bytes": 507
+    },
+    {
+      "path": "test-results/pdf-choices/ui-reviewed/choice-empty-source.pdf",
+      "sha256": "46f3f1f2498db5f7a914106bc44506bbe52749292e9c2792d7379605dc8f265d",
+      "bytes": 5427
+    },
+    {
+      "path": "test-results/pdf-choices/ui-reviewed/choice-empty-ui-filled.pdf",
+      "sha256": "624620a76b6bae64271d6fb69350f396f5296dceb23c4aad947a3194f119a79d",
+      "bytes": 5430
+    },
+    {
+      "path": "test-results/pdf-choices/ui-reviewed/choice-filled.pdf",
+      "sha256": "cfe2203322df1a0e17c3d98deac422489a5db19318ef56f2a4ce5899f9007b9a",
+      "bytes": 6051
+    },
+    {
+      "path": "test-results/pdf-choices/ui-reviewed/choice-source.pdf",
+      "sha256": "6b4e5b78750ba2d308880b0919592aa77a620e514b8acd92c6cfbe78740d985f",
+      "bytes": 5526
+    },
+    {
+      "path": "test-results/pdf-choices/ui-reviewed/choice-ui-filled.pdf",
+      "sha256": "313e4dd02ffbe100c883dcdb92f2a335345449eae37d9bb11871f3a66ee2399f",
+      "bytes": 6051
+    },
+    {
+      "path": "test-results/pdf-choices/ui-reviewed/generation.json",
+      "sha256": "41f8f17ef283f60bb8568f4bb22e54fec61d2cd1eb4c61c7650f56d097c77b25",
+      "bytes": 3151
+    },
+    {
+      "path": "test-results/pdf-choices/ui-reviewed/independent-ui-audit.json",
+      "sha256": "7701b9d694ac12023eb6cbadb4edaa06aa4f8f34d1d55e3110333ee6ddeaf8c7",
+      "bytes": 2654
+    },
+    {
+      "path": "test-results/pdf-choices/ui-reviewed/pdf-choice-fields.png",
+      "sha256": "4ba66197a7e214d30aa0c7ce0d34ed96a5d0b377380fa4cb477687db3a8238eb",
+      "bytes": 113037
+    },
+    {
+      "path": "test-results/pdf-choices/ui-reviewed/pdf-choices-320.png",
+      "sha256": "a15cc019d844eac1c95c50eda8ed951e65ae0728ad28b07829111c5017b4593b",
+      "bytes": 47756
+    },
+    {
+      "path": "test-results/pdf-choices/ui-reviewed/pdf-choices-390.png",
+      "sha256": "9753dba8f9382b21f3d836a7fa5169f58cbe428d8f2cca6ef69e8ef0b2b7814c",
+      "bytes": 50026
+    },
+    {
+      "path": "test-results/pdf-choices/ui-reviewed/ui-report.json",
+      "sha256": "d661c2fcca5d7773d85b7aada8058ea587f20524c0ba16e9bce909f0300622be",
+      "bytes": 901
+    },
+    {
+      "path": "tests/browser/pdf-choices.cjs",
+      "sha256": "6984a3d918884df0c8235a5ff94ec94ed09ec667a9c24cf0d5efbaf0d14e8bd0",
+      "bytes": 8032
+    },
+    {
+      "path": "tests/compatibility/pdf-choices/audit.py",
+      "sha256": "c93e6c4bea4ad4b2282781bdc7cb0ebe7510d6419c9ae76b1cd4c2ef7104e50a",
+      "bytes": 3605
+    },
+    {
+      "path": "tests/compatibility/pdf-choices/make-fixture.py",
+      "sha256": "7a2e8ad8232f2d469d44ec94c9f765ef559a61f56d73e765e397bd006f4eb37c",
+      "bytes": 1480
+    },
+    {
+      "path": "tests/compatibility/pdf-choices/probe-pymupdf.py",
+      "sha256": "86fa949d29a1250224f546ab3a7797c0ca29f817462c052a556b496d8e58036a",
+      "bytes": 2001
+    }
+  ],
+  "independentReview": {
+    "method": "Independent read-only in-memory PDF probes and separate unittest invocation; stdout results reported by reviewer, no additional report file.",
+    "regressionChecks": 13,
+    "choiceUnitTests": 15,
+    "engineSha256": "d1a980a8626a227e89c78304e1ba973850d621570c2b673d0e733382c5dff28e",
+    "findings": "No new blocker; confirmed custom resource refusal, null versus empty export distinction, Unicode guard and supported-script readback. Not an arbitrary vector appearance audit."
+  }
+}
