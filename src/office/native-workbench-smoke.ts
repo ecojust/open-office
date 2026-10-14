@@ -1,4 +1,5 @@
 import { base64ToBytes } from '../shared/document'
+import { unzipSync } from 'fflate'
 export { pdfReadbackText } from './pdf-readback'
 import type { OfficeExportRequest, OfficeExportResult } from './types'
 import { canIssueWriterCommand, writerCommandTarget, type WriterAction, type WriterCommand, type WriterQuery, type WriterState, type WriterTableData } from '../word/types'
@@ -33,6 +34,32 @@ function outputBytes(output: OfficeExportResult, format: string) {
   if (format === 'pdf') check(new TextDecoder().decode(bytes.subarray(0, 5)) === '%PDF-', 'PDF header is invalid')
   else check(bytes[0] === 0x50 && bytes[1] === 0x4b, `${format} export is not an OOXML package`)
   return bytes.length
+}
+
+// Failure-only evidence from the exact exported package, independently of UNO's
+// view-state reader. This never changes the workbook, repeats an action or
+// requests another native state. Keep diagnostics bounded for native logs.
+function savedCalcPane(base64: string) {
+  try {
+    if (base64.length > 28_000_000) return { error: 'package diagnostic limit' }
+    const part = 'xl/worksheets/sheet1.xml'
+    let oversized = false
+    const files = unzipSync(base64ToBytes(base64), { filter(entry) {
+      if (entry.name !== part) return false
+      if (entry.originalSize > 2_000_000) { oversized = true; return false }
+      return true
+    } })
+    if (oversized) return { error: 'worksheet diagnostic limit' }
+    if (!files[part]) return { error: 'sheet1.xml missing' }
+    const xml = new TextDecoder().decode(files[part])
+    if (/<!DOCTYPE|<!ENTITY/i.test(xml)) return { error: 'XML declarations not supported' }
+    const document = new DOMParser().parseFromString(xml, 'application/xml')
+    if (document.getElementsByTagName('parsererror').length) return { error: 'invalid worksheet XML' }
+    const panes = Array.from(document.getElementsByTagNameNS('*', 'pane'))
+    return { count: panes.length, panes: panes.slice(0, 2).map(pane => Object.fromEntries(
+      ['xSplit', 'ySplit', 'topLeftCell', 'activePane', 'state'].map(name => [name, pane.getAttribute(name)?.slice(0, 80) ?? null]),
+    )) }
+  } catch (error) { return { error: String(error instanceof Error ? error.message : error).slice(0, 120) } }
 }
 
 // Each fixed smoke-test step is a new intent, not an old user draft. Writer
@@ -137,12 +164,14 @@ export async function verifyNativeCalc(options: Lifecycle<CalcEditor>) {
   await action({ type: 'format', sheetIndex: 0, range: 'A1:C1', bold: true, textColor: '#203A5D' })
   await action({ type: 'sort', sheetIndex: 0, range: 'A1:C4', column: 1, ascending: false, header: true })
   await action({ type: 'freeze', columns: 1, rows: 1 })
+  const frozenAfterAction = { ...state.frozen }
   await action({ type: 'insert-chart', sheetIndex: 0, range: 'A1:B4', name: 'NativeSalesChart', chartType: 'column', headerRow: true, headerColumn: true })
   await action({ type: 'insert-pivot', sheetIndex: 0, range: 'A1:C4', name: 'NativeSalesPivot', rowField: 0, dataField: 1, operation: 'sum', outputSheetIndex: 1, outputAddress: 'A1' })
   await action({ type: 'select-sheet', sheetIndex: 0 })
   await action({ type: 'filter', sheetIndex: 0, range: 'A1:C4', column: 0, operator: 'equal', value: '北', header: true })
   const first = await editor.exportFile({ format: 'xlsx' }); outputBytes(first, 'xlsx')
   editor = await options.reopen(first.base64); state = await editor.getCalcState()
+  const frozenAfterFirstReopen = { ...state.frozen }
   const before = await editor.calcData({ type: 'range', sheetIndex: 0, range: 'G1:G3' }) as CalcRangeData
   check(before.values[2]?.[0] === 42 && before.formulas[2]?.[0] === '=SUM(G1:G2)', 'Calc formula did not reopen')
   const firstRules = await editor.calcData({ type: 'rules', sheetIndex: 0, range: 'A1:C4' }) as CalcRulesData
@@ -152,11 +181,16 @@ export async function verifyNativeCalc(options: Lifecycle<CalcEditor>) {
   await action({ type: 'patch-cells', sheetIndex: 0, cells: [{ address: 'G1', kind: 'number', value: 41 }] })
   const second = await editor.exportFile({ format: 'xlsx' }), xlsxBytes = outputBytes(second, 'xlsx')
   editor = await options.reopen(second.base64); state = await editor.getCalcState()
+  const frozenAfterSecondReopen = { ...state.frozen }
   check(state.sheets.length === 2 && state.sheets[0]?.name === 'Native data 中文' && state.sheets[1]?.name === 'Native summary', 'Calc sheet names/order did not survive two saves')
   await action({ type: 'select-sheet', sheetIndex: 0 })
   await action({ type: 'select-range', sheetIndex: 0, range: 'A1' })
   check(state.format.bold && state.format.textColor.toUpperCase() === '#203A5D', 'Calc header formatting did not reopen')
-  check(state.frozen.rows === 1 && state.frozen.columns === 1, 'Calc frozen panes did not reopen')
+  if (!(state.frozen.rows === 1 && state.frozen.columns === 1)) {
+    check(false, 'Calc frozen panes did not reopen; ' + JSON.stringify({ final: state.frozen,
+      afterFreeze: frozenAfterAction, firstReopen: frozenAfterFirstReopen, secondReopen: frozenAfterSecondReopen,
+      firstXlsx: savedCalcPane(first.base64), secondXlsx: savedCalcPane(second.base64) }))
+  }
   const matrix = await editor.calcData({ type: 'range', sheetIndex: 0, range: 'A1:C4' }) as CalcRangeData
   check(JSON.stringify(matrix.values) === JSON.stringify([['地区', '销量', '成本'], ['南', 24, 8], ['北', 18, 6], ['北', 12, 5]]), 'Calc saved row order/data differs from the actual sort')
   const sum = await editor.calcData({ type: 'range', sheetIndex: 0, range: 'G1:G3' }) as CalcRangeData
