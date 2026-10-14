@@ -146,3 +146,66 @@ test('Calc verifies sheet/range/cell semantics before using a newly read revisio
     assert.equal(writes, 0)
   }
 })
+
+test('Calc final-freeze diagnostics retain existing action snapshots and sheet identity without extra reads', async () => {
+  const actualHelper = moduleFromSource(await readFile(new URL('../src/office/native-workbench-smoke.ts', import.meta.url), 'utf8'), name => {
+    if (name === 'fflate') return fflate
+    if (name === '../word/types') return writerTypes
+    if (name === '../shared/document') return { base64ToBytes: value => new Uint8Array(Buffer.from(value, 'base64')) }
+    if (name === './pdf-readback') return { pdfReadbackText: () => { throw Error('Unexpected PDF read') } }
+    return unexpectedDependency(name)
+  })
+  const calls = [], current = sheet()
+  let reopens = 0, exports = 0
+  const bytes = fflate.zipSync({ 'xl/worksheets/sheet1.xml': fflate.strToU8('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane xSplit="1" ySplit="0" state="frozen"/></sheetView></sheetViews></worksheet>') })
+  const base64 = Buffer.from(bytes).toString('base64')
+  const editor = {
+    async getCalcState() { calls.push('state'); return current },
+    async calcAction(action) {
+      calls.push(action.type)
+      assert.equal(action.expectedRevision, current.revision)
+      current.revision++
+      if (action.type === 'rename-sheet') current.sheets[0].name = action.name
+      if (action.type === 'add-sheet') { current.sheets.push({ index: 1, name: action.name, visible: true }); current.activeSheetIndex = 1 }
+      if (action.type === 'select-sheet') { current.activeSheetIndex = action.sheetIndex; if (!reopens) Object.assign(current.frozen, { columns: 1, rows: 3 }) }
+      if (action.type === 'format') current.format = { bold: true, textColor: '#203A5D' }
+      if (action.type === 'freeze') Object.assign(current.frozen, { columns: 1, rows: 1 })
+      if (action.type === 'insert-chart') Object.assign(current.frozen, { columns: 1, rows: 2 })
+      if (action.type === 'insert-pivot') { current.activeSheetIndex = 1; Object.assign(current.frozen, { columns: 0, rows: 0 }) }
+      if (action.type === 'filter') Object.assign(current.frozen, { columns: 1, rows: 4 })
+      if (action.type === 'patch-cells' && reopens) Object.assign(current.frozen, { columns: 1, rows: 6 })
+      // Deliberately reuse and mutate the same native-state double. Earlier
+      // evidence must remain a snapshot, not become the final state's aliases.
+      return current
+    },
+    async calcData(query) {
+      calls.push(`data:${query.type}`)
+      if (query.type === 'range') return { values: [[40], [2], [42]], formulas: [['40'], ['2'], ['=SUM(G1:G2)']] }
+      if (query.type === 'rules') return { filter: { enabled: true, header: true, fields: [{ column: 0, operator: 'equal', value: '北' }] } }
+      throw Error(`Unexpected query: ${query.type}`)
+    },
+    async exportFile(options) { calls.push(`export:${options.format}`); assert.equal(options.format, 'xlsx'); exports++; return { extension: 'xlsx', base64 } },
+  }
+  let failure
+  try {
+    await actualHelper.verifyNativeCalc({
+      async create() { calls.push('create'); return editor },
+      async reopen(saved) { assert.equal(saved, base64); calls.push('reopen'); reopens++; current.documentId = `sheet-${reopens + 1}`; current.activeSheetIndex = 0; Object.assign(current.frozen, { columns: 1, rows: reopens === 1 ? 5 : 7 }); return editor },
+      async inspectPdf() { throw Error('Failed frozen-pane check must not proceed to PDF') },
+    })
+  } catch (error) { failure = error }
+  assert.match(failure?.message || '', /^Office workbench: Calc frozen panes did not reopen;/)
+  const detail = JSON.parse(failure.message.slice(failure.message.indexOf('{')))
+  assert.deepEqual(detail.checkpoints, [
+    ['afterFreeze', 0, 1, 1], ['afterInsertChart', 0, 1, 2], ['afterInsertPivot', 1, 0, 0],
+    ['afterSelectSheet0', 0, 1, 3], ['afterFilter', 0, 1, 4], ['beforeFirstExportLastKnown', 0, 1, 4],
+    ['firstReopen', 0, 1, 5], ['beforeSecondExportLastKnown', 0, 1, 6], ['secondReopen', 0, 1, 7], ['finalSelection', 0, 1, 7],
+  ].map(([stage, activeSheetIndex, columns, rows]) => ({ stage, activeSheetIndex, frozen: { columns, rows } })))
+  assert.deepEqual(detail.afterFreeze, { columns: 1, rows: 1 })
+  assert.deepEqual(detail.firstReopen, { columns: 1, rows: 5 })
+  assert.deepEqual(detail.secondReopen, { columns: 1, rows: 7 })
+  assert.deepEqual(detail.final, { columns: 1, rows: 7 })
+  const actions = ['rename-sheet', 'add-sheet', 'select-sheet', 'set-matrix', 'set-matrix', 'set-cell', 'patch-cells', 'format', 'sort', 'freeze', 'insert-chart', 'insert-pivot', 'select-sheet', 'filter']
+  assert.deepEqual(calls, ['create', 'state', ...actions.flatMap(type => ['state', type]), 'export:xlsx', 'reopen', 'state', 'data:range', 'data:rules', 'state', 'clear-filter', 'state', 'patch-cells', 'export:xlsx', 'reopen', 'state', 'state', 'select-sheet', 'state', 'select-range'])
+  assert.equal(reopens, 2); assert.equal(exports, 2)
+})
