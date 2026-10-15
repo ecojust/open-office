@@ -163,7 +163,7 @@ function readBoot(): Boot {
 function identity(mount: EditingSmokeMount, state: Snapshot): Identity { return { key: mount.key, kind: mount.kind, sessionId: state.sessionId, documentId: state.documentId } }
 type Cell = { value: unknown; input: string; style: { font: { bold: boolean } } }
 const cell = (mount: EditingSmokeMount, name: string) => bounded((mount.editor as GridcraftSmokeEditor).query('cell.get', { cell: name }), `read ${name}`) as Promise<Cell>
-type SheetUi = { visibleCells?: Array<{ cell: string; rect: number[] }>; drawnChrome?: Array<{ id: string; rect: number[] }>; editor?: { cell: string } | null }
+type SheetUi = { visibleCells?: Array<{ cell: string; rect: number[] }>; drawnChrome?: Array<{ id: string; rect: number[] }>; editor?: { cell: string } | null; mode?: string }
 function point(canvas: HTMLCanvasElement, rect: number[]) {
   assert(rect.length === 4 && rect.every(Number.isFinite), 'invalid canvas target bounds')
   const bounds = canvas.getBoundingClientRect()
@@ -276,6 +276,24 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
     report.observations.singleClickValue = (await until(() => cell(sheet, 'A1'), value => value.value === 42, 'single-click edit committed')).value
     assert((await cell(first, 'A1')).value === null, 'editing second workbook changed first workbook')
     report.checks.push(MACOS_EDITING_CHECKS[1])
+    // Temporary diagnostic control: observe delayed termination after commit
+    // before sending any D6 input. Never move focus or read document text here.
+    const postCommitState = async () => {
+      const ui = (await bounded(sheet.editor.inspect(), 'post-commit idle state')).ui as SheetUi
+      const active = document.activeElement
+      const focus = !active ? 'none' : active === sheet.element.querySelector('[data-testid="gridcraft-canvas"]') ? 'canvas'
+        : active === sheet.element.querySelector('[data-testid="gridcraft-input"]') ? 'input'
+          : active === document.body ? 'body' : sheet.element.contains(active) ? 'sheet' : 'outside'
+      return { editor: ui.editor ? { cell: ui.editor.cell } : null, mode: ui.mode ?? null, focus }
+    }
+    const idleBefore = await postCommitState()
+    const idleStarted = performance.now()
+    smokeStage('editing-postcommit-idle-before', JSON.stringify({ waitMs: 2500, ...idleBefore }))
+    await new Promise(resolve => setTimeout(resolve, 2500))
+    const idleAfter = await postCommitState()
+    const idleElapsedMs = Math.round(performance.now() - idleStarted)
+    smokeStage('editing-postcommit-idle-after', JSON.stringify({ elapsedMs: idleElapsedMs, ...idleAfter }))
+    report.observations.postCommitIdle = { waitMs: 2500, elapsedMs: idleElapsedMs, before: idleBefore, after: idleAfter }
     if (f2Control) {
       await input('single-d6', 'sheet:D6', { kind: 'click', ...await sheetPoint(sheet, 'D6') })
       await input('f2-d6', 'sheet:D6', { kind: 'key', key: 'F2' })
