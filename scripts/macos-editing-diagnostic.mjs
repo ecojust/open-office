@@ -235,16 +235,43 @@ export function validateEditingReport(frontend, diagnostics, sent) {
   return true;
 }
 
-function captureStream(child, path, limit) {
-  let chunks = [], bytes = 0, truncated = false, stderr = Buffer.alloc(0);
+export function captureStream(child, path, limit) {
+  assert(Number.isSafeInteger(limit) && limit > 0, 'Log capture limit must be a positive byte count');
+  // A fixed ring keeps the crash tail without repeatedly copying an 8 MiB log
+  // while the application is running. Keep raw bytes, including at most one
+  // leading partial line when the byte limit cuts through a log record.
+  const tail = Buffer.alloc(limit);
+  let offset = 0, bytes = 0, totalBytes = 0, startsMidLine = false, stderr = Buffer.alloc(0);
   child.stdout.on('data', chunk => {
-    const remaining = limit - bytes;
-    if (chunk.length > remaining) truncated = true;
-    if (remaining > 0) { const kept = chunk.subarray(0, remaining); chunks.push(kept); bytes += kept.length; }
+    const incoming = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    const dropped = Math.max(0, bytes + incoming.length - limit);
+    if (dropped > 0) {
+      const fromIncoming = dropped - bytes;
+      const lastDroppedByte = fromIncoming > 0 ? incoming[fromIncoming - 1]
+        : tail[(offset - bytes + dropped - 1 + limit) % limit];
+      startsMidLine = lastDroppedByte !== 0x0a;
+    }
+    if (incoming.length >= limit) {
+      incoming.copy(tail, 0, incoming.length - limit);
+      offset = 0;
+    } else {
+      const first = Math.min(incoming.length, limit - offset);
+      incoming.copy(tail, offset, 0, first);
+      incoming.copy(tail, 0, first);
+      offset = (offset + incoming.length) % limit;
+    }
+    bytes = Math.min(limit, bytes + incoming.length);
+    totalBytes += incoming.length;
   });
   child.stderr.on('data', chunk => { stderr = appendLogTail(stderr, chunk); });
   child.on('error', error => { stderr = appendLogTail(stderr, Buffer.from(error.message)); });
-  return () => { writeFileSync(path, Buffer.concat(chunks)); return { file: basename(path), bytes, truncated, stderr: decodeLogTail(stderr) }; };
+  return () => {
+    const start = (offset - bytes + limit) % limit;
+    const first = Math.min(bytes, limit - start);
+    writeFileSync(path, Buffer.concat([tail.subarray(start, start + first), tail.subarray(0, bytes - first)], bytes));
+    return { file: basename(path), mode: 'tail', limitBytes: limit, bytes, totalBytes,
+      droppedBytes: totalBytes - bytes, truncated: totalBytes > bytes, startsMidLine, stderr: decodeLogTail(stderr) };
+  };
 }
 function collectCrashReports(started, directory) {
   const evidence = { files: [], gaps: [] };

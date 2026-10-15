@@ -1,8 +1,81 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { EventEmitter } from 'node:events';
 import { checkInputPreflight, parseInputRequest, inputForWindow, checkLifecycle,
-  validateEditingReport, viewportMapping, geometryForRequest, EDITING_ACTIONS, EDITING_CHECKS } from '../scripts/macos-editing-diagnostic.mjs';
+  validateEditingReport, viewportMapping, geometryForRequest, captureStream, EDITING_ACTIONS, EDITING_CHECKS } from '../scripts/macos-editing-diagnostic.mjs';
+
+function logCapture(t, limit) {
+  const directory = mkdtempSync(join(tmpdir(), 'macos-editing-log-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const child = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter() });
+  const path = join(directory, 'system-webkit.ndjson');
+  return { child, path, finish: captureStream(child, path, limit) };
+}
+
+test('log capture retains the final crash record after exceeding the real 8 MiB limit', t => {
+  const limit = 8 * 1024 * 1024;
+  const capture = logCapture(t, limit);
+  const prefix = Buffer.alloc(limit + 1024, 0x61);
+  const crash = Buffer.from('\n' + JSON.stringify({ message: 'WebContent terminated 演示😀', generation: 2 }) + '\n');
+  capture.child.stdout.emit('data', prefix);
+  // Split UTF-8 and JSON records across data events, as a pipe may do.
+  for (const byte of crash) capture.child.stdout.emit('data', Buffer.from([byte]));
+  const report = capture.finish();
+  const expected = Buffer.concat([prefix, crash]);
+  assert.deepEqual(readFileSync(capture.path), expected.subarray(-limit));
+  assert.deepEqual(report, { file: 'system-webkit.ndjson', mode: 'tail', limitBytes: limit, bytes: limit,
+    totalBytes: expected.length, droppedBytes: expected.length - limit, truncated: true, startsMidLine: true, stderr: '' });
+  const completeLines = readFileSync(capture.path, 'utf8').split('\n').slice(1).filter(Boolean);
+  assert.deepEqual(completeLines.map(line => JSON.parse(line)), [{ message: 'WebContent terminated 演示😀', generation: 2 }]);
+});
+
+test('log tail preserves byte order and line-boundary metadata through repeated wraps', t => {
+  const capture = logCapture(t, 73);
+  let expected = Buffer.alloc(0);
+  const records = Array.from({ length: 18 }, (_, index) => Buffer.from(JSON.stringify({ index, text: '中文😀' }) + '\n'));
+  const source = Buffer.concat(records);
+  for (let position = 0; position < source.length;) {
+    const chunk = source.subarray(position, position + (position % 97) + 1);
+    position += chunk.length;
+    capture.child.stdout.emit('data', chunk);
+    expected = Buffer.concat([expected, chunk]);
+    const report = capture.finish();
+    const dropped = Math.max(0, expected.length - 73);
+    assert.deepEqual(readFileSync(capture.path), expected.subarray(dropped));
+    assert.equal(report.droppedBytes, dropped);
+    assert.equal(report.startsMidLine, dropped > 0 && expected[dropped - 1] !== 0x0a);
+  }
+});
+
+test('log capture distinguishes a complete retained line from a truncated first fragment', t => {
+  const capture = logCapture(t, 8);
+  capture.child.stdout.emit('data', Buffer.from('old\nnew\n'));
+  assert.equal(capture.finish().truncated, false);
+  capture.child.stdout.emit('data', Buffer.from('end\n'));
+  const report = capture.finish();
+  assert.equal(readFileSync(capture.path, 'utf8'), 'new\nend\n');
+  assert.equal(report.startsMidLine, false);
+  assert.equal(report.droppedBytes, 4);
+  assert.equal(report.totalBytes, 12);
+});
+
+test('log capture keeps stderr bounded and records stream failures without enlarging stdout', t => {
+  const capture = logCapture(t, 32);
+  capture.child.stderr.emit('data', Buffer.from('演示😀'.repeat(20000)));
+  capture.child.emit('error', new Error('log stream stopped'));
+  const report = capture.finish();
+  assert.equal(report.bytes, 0);
+  assert.equal(report.totalBytes, 0);
+  assert.equal(report.droppedBytes, 0);
+  assert.equal(report.startsMidLine, false);
+  assert.equal(report.truncated, false);
+  assert.equal(readFileSync(capture.path).length, 0);
+  assert(Buffer.byteLength(report.stderr) <= 32 * 1024);
+  assert(report.stderr.endsWith('log stream stopped'));
+});
 
 const geometry = { actionId: 'single-a1', viewport: { width: 1200, height: 800 }, pid: 1234, windowId: 92, x: 40, y: 70,
   width: 1200, height: 800, scaleFactor: 2, coordinateSpace: 'quartz-screen-points', candidates: {
