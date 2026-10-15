@@ -398,6 +398,101 @@ export function debuggerTargetPid(geometry, appPid) {
   return process.pid;
 }
 
+/** Cleanup failures must never hide the input/lifecycle failure which brought
+ * us here, or leave the earlier preflight report masquerading as this run. */
+export async function finalizeMacosEditingDiagnostic({ report, directory, started, app, log, temporary,
+  finishLog, debuggerControl, processState }, { kill = killGroup, wait = delay, collectReports = collectCrashReports } = {}) {
+  const failure = (stage, error) => {
+    const detail = `${stage}: ${String(error?.code ? `${error.code}: ${error.message}` : error?.message || error).slice(0, 500)}`;
+    report.gaps.push(detail);
+    report.ok = false; report.status = 'failed';
+    report.error ??= `Diagnostic cleanup failed: ${detail}`;
+  };
+  const attempt = async (stage, work) => {
+    try { await work(); return true; }
+    catch (error) { failure(stage, error); return false; }
+  };
+  let retainedTemporary = false;
+  const copyEvidence = async () => {
+    if (!temporary) return;
+    for (const [source, target, field] of [['diagnostics.json', 'native-diagnostics.json', 'nativeDiagnostics'], ['frontend.json', 'frontend-report.json', 'frontend']]) {
+      if (!await attempt(target, () => {
+        const path = join(temporary, source);
+        if (!existsSync(path)) return;
+        const value = readJson(path, 12 * 1024 * 1024);
+        report[field] = value;
+        writeJson(join(directory, target), value);
+      })) retainedTemporary = true;
+    }
+  };
+  // Save the evidence before any cleanup call, then refresh it after cleanup.
+  // A denied signal or a broken LLDB/log process cannot suppress these files.
+  await copyEvidence();
+  if (report.nativeDiagnostics?.terminations > 0 && finishLog) {
+    await attempt('system-log-checkpoint', () => { report.systemLog = finishLog(undefined, { reset: true }); });
+  }
+  if (debuggerControl) await attempt('debugger-cleanup', async () => {
+    await debuggerControl.stop();
+    assert.ok(['not-started', 'not-attached', 'detached', 'target-exited'].includes(report.debugger.cleanup),
+      'WebContent debugger detach was not confirmed');
+  });
+  if (app && !processState().closed) {
+    await attempt('application-SIGTERM', () => kill(app));
+    await wait(300);
+    if (!processState().closed) await attempt('application-SIGKILL', () => kill(app, 'SIGKILL'));
+    await wait(100);
+    if (!processState().closed) {
+      failure('application-cleanup', 'Application exit was not observed; no further signals were sent');
+      retainedTemporary = true;
+    }
+  }
+  if (app) {
+    const terminated = report.nativeDiagnostics?.terminations > 0;
+    if (!report.ok && !terminated) await wait(1500);
+    await attempt('crash-report-collection', async () => { report.crashReports = await collectReports(started, directory, { terminated }); });
+  }
+  if (log) {
+    const exited = () => Number.isInteger(log.exitCode) || typeof log.signalCode === 'string';
+    const signal = async (name, waitMs) => {
+      if (exited()) return;
+      let sent;
+      const attempted = await attempt(`system-log-${name}`, () => { sent = log.kill(name); });
+      // ChildProcess.kill emits an error and returns false for some failures;
+      // captureStream records that error without throwing it. A false return
+      // can also race an already-exiting process, so observe exit first.
+      await wait(waitMs);
+      if (attempted && sent === false && !exited()) failure(`system-log-${name}`, 'Signal was not sent and process exit was not observed');
+    };
+    await signal('SIGTERM', 150);
+    await signal('SIGKILL', 100);
+    if (!exited()) failure('system-log-cleanup', 'Log process exit was not observed; no further signals were sent');
+  }
+  if (finishLog) await attempt('system-log-save', () => {
+    if (report.systemLog) report.reportCrashLog = finishLog(join(directory, 'system-reportcrash.ndjson'));
+    else report.systemLog = finishLog();
+  });
+  await copyEvidence();
+  if (temporary) {
+    if (retainedTemporary) report.retainedEvidenceDirectory = temporary;
+    else if (!await attempt('temporary-evidence-cleanup', () => rmSync(temporary, { recursive: true, force: true }))) report.retainedEvidenceDirectory = temporary;
+  }
+  if (app) {
+    const state = processState();
+    Object.assign(report.process, { exitCode: state.exitCode, signal: state.exitSignal, closed: state.closed,
+      stdoutTail: decodeLogTail(state.stdout), stderrTail: decodeLogTail(state.stderr) });
+  }
+  // EPERM can leave a fixture process alive. Stop holding its pipes open so the
+  // harness can finish with the recorded failure, without escalating signals.
+  for (const [name, child] of [['application', app], ['system-log', log]]) {
+    if (!child) continue;
+    await attempt(`${name}-handles-cleanup`, () => {
+      child.stdout?.destroy?.(); child.stderr?.destroy?.(); child.unref?.();
+    });
+  }
+  report.finishedAt = new Date().toISOString(); report.durationMs = Date.now() - started;
+  writeJson(join(directory, 'report.json'), report);
+}
+
 export async function runMacosEditingDiagnostic(args = process.argv.slice(2), env = process.env, root = ROOT) {
   const started = Date.now(), directory = join(root, 'artifacts', 'macos-editing');
   mkdirSync(directory, { recursive: true });
@@ -501,46 +596,8 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
     report.status = 'passed'; report.ok = true;
   } catch (error) { report.error = String(error?.message || error).slice(0, 4000); }
   finally {
-    if (report.nativeDiagnostics?.terminations > 0 && finishLog) report.systemLog = finishLog(undefined, { reset: true });
-    // Detach before the harness terminates its fixture application so cleanup
-    // signals cannot be mistaken for the editing failure under investigation.
-    if (debuggerControl) {
-      try {
-        await debuggerControl.stop();
-        assert.ok(['not-started', 'not-attached', 'detached', 'target-exited'].includes(report.debugger.cleanup),
-          'WebContent debugger detach was not confirmed');
-      }
-      catch (error) { report.gaps.push(`debugger-cleanup: ${String(error?.message || error).slice(0, 500)}`); report.ok = false; report.status = 'failed'; }
-    }
-    if (app && !closed) { killGroup(app); await delay(300); if (!closed) killGroup(app, 'SIGKILL'); await delay(100); }
-    if (app) {
-      Object.assign(report.process, { exitCode, signal: exitSignal, stdoutTail: decodeLogTail(stdout), stderrTail: decodeLogTail(stderr) });
-      // ReportCrash publishes asynchronously. Only a recorded termination gets
-      // the longer stable-file polling window; keep system logs running through it.
-      const terminated = report.nativeDiagnostics?.terminations > 0;
-      // Preserve the crash-time tail before the waiting period can evict it.
-      // The reset ring records only the waiting phase, under the same 8 MiB cap.
-      if (terminated && finishLog && !report.systemLog) report.systemLog = finishLog(undefined, { reset: true });
-      if (!report.ok && !terminated) await delay(1500);
-      report.crashReports = await collectCrashReports(started, directory, { terminated });
-    }
-    if (log) { log.kill('SIGTERM'); await delay(150); if (log.exitCode === null) log.kill('SIGKILL'); }
-    if (finishLog) {
-      if (report.systemLog) report.reportCrashLog = finishLog(join(directory, 'system-reportcrash.ndjson'));
-      else report.systemLog = finishLog();
-    }
-    if (temporary) {
-      for (const [source, target] of [['diagnostics.json', 'native-diagnostics.json'], ['frontend.json', 'frontend-report.json']]) {
-        const path = join(temporary, source);
-        if (existsSync(path)) {
-          try { const value = readJson(path, 12 * 1024 * 1024); writeJson(join(directory, target), value); if (source === 'diagnostics.json') report.nativeDiagnostics = value; else report.frontend = value; }
-          catch (error) { report.gaps.push(`${target}: ${error.message}`); }
-        }
-      }
-      rmSync(temporary, { recursive: true, force: true });
-    }
-    report.finishedAt = new Date().toISOString(); report.durationMs = Date.now() - started;
-    writeJson(join(directory, 'report.json'), report);
+    await finalizeMacosEditingDiagnostic({ report, directory, started, app, log, temporary, finishLog, debuggerControl,
+      processState: () => ({ closed, exitCode, exitSignal, stdout, stderr }) });
   }
   return report;
 }

@@ -1,12 +1,138 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readdirSync, utimesSync, truncateSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readdirSync, utimesSync, truncateSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { checkInputPreflight, parseInputRequest, inputForWindow, checkLifecycle,
   validateEditingReport, viewportMapping, geometryForRequest, captureStream, collectCrashReports,
-  parseArgs, debuggerTargetPid, EDITING_ACTIONS, EDITING_CHECKS, EDITING_F2_ACTIONS, EDITING_F2_CHECKS } from '../scripts/macos-editing-diagnostic.mjs';
+  finalizeMacosEditingDiagnostic, parseArgs, debuggerTargetPid, EDITING_ACTIONS, EDITING_CHECKS, EDITING_F2_ACTIONS, EDITING_F2_CHECKS } from '../scripts/macos-editing-diagnostic.mjs';
+
+function finalizationFixture(t) {
+  const directory = mkdtempSync(join(tmpdir(), 'macos-final-evidence-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const temporary = join(directory, 'temporary'); mkdirSync(temporary);
+  const native = { schemaVersion: 1, generation: 2, terminations: 1, events: [{ phase: 'web-content-terminated' }] };
+  const frontend = { ok: false, editing: { actions: [{ actionId: 'f2-d6', completed: false }] } };
+  writeFileSync(join(temporary, 'diagnostics.json'), JSON.stringify(native));
+  writeFileSync(join(temporary, 'frontend.json'), JSON.stringify(frontend));
+  writeFileSync(join(directory, 'report.json'), JSON.stringify({ status: 'preflight-passed', actions: [] }));
+  const report = { ok: false, status: 'failed', error: 'Original WebContent failure', gaps: [], process: { pid: 1234 },
+    actions: [{ request: { actionId: 'f2-d6' }, result: { ok: true } }] };
+  const processState = () => ({ closed: false, exitCode: null, exitSignal: null, stdout: Buffer.from('app started'), stderr: Buffer.from('original failure detail') });
+  const state = { report, directory, temporary, started: Date.now() - 5000, processState, app: { pid: 1234 } };
+  return { state, native, frontend, read: () => JSON.parse(readFileSync(join(directory, 'report.json'), 'utf8')) };
+}
+
+test('EPERM during app cleanup cannot hide the original failure, OS receipts or native/frontend evidence behind preflight', async t => {
+  const fixture = finalizationFixture(t), { state } = fixture;
+  const signals = [], handles = [];
+  state.app.stdout = { destroy: () => handles.push('stdout') };
+  state.app.stderr = { destroy: () => handles.push('stderr') };
+  state.app.unref = () => handles.push('process');
+  const log = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), exitCode: null,
+    kill() { this.exitCode = 0; } });
+  state.log = log;
+  state.finishLog = captureStream(log, join(state.directory, 'system-webkit.ndjson'), 1024);
+  log.stdout.emit('data', Buffer.from('WebContent crash before cleanup\n'));
+  await finalizeMacosEditingDiagnostic(state, {
+    wait: async () => {},
+    kill: (_app, signal = 'SIGTERM') => { signals.push(signal); throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' }); },
+    collectReports: async (_started, _directory, options) => {
+      assert.equal(options.terminated, true, 'Native evidence must be loaded despite the failed cleanup');
+      log.stdout.emit('data', Buffer.from('ReportCrash after cleanup\n'));
+      return { files: [], gaps: ['no-stable-crash-report-within-deadline'] };
+    },
+  });
+  const report = fixture.read();
+  assert.equal(report.status, 'failed'); assert.equal(report.ok, false);
+  assert.equal(report.error, 'Original WebContent failure', 'Cleanup must not replace the original failure cause');
+  assert.deepEqual(report.actions, state.report.actions);
+  assert.deepEqual(report.nativeDiagnostics, fixture.native); assert.deepEqual(report.frontend, fixture.frontend);
+  assert.deepEqual(JSON.parse(readFileSync(join(state.directory, 'native-diagnostics.json'))), fixture.native);
+  assert.deepEqual(JSON.parse(readFileSync(join(state.directory, 'frontend-report.json'))), fixture.frontend);
+  assert.equal(report.process.closed, false); assert.equal(report.process.stderrTail, 'original failure detail');
+  assert(report.gaps.some(gap => gap.startsWith('application-SIGTERM: EPERM:')));
+  assert(report.gaps.some(gap => gap.startsWith('application-SIGKILL: EPERM:')));
+  assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']); assert.deepEqual(handles, ['stdout', 'stderr', 'process']);
+  assert.equal(readFileSync(join(state.directory, 'system-webkit.ndjson'), 'utf8'), 'WebContent crash before cleanup\n');
+  assert.equal(readFileSync(join(state.directory, 'system-reportcrash.ndjson'), 'utf8'), 'ReportCrash after cleanup\n');
+  assert.ok(report.finishedAt); assert(report.durationMs >= 5000);
+  assert.equal(existsSync(state.temporary), true, 'A fixture still running must retain its evidence directory');
+  assert.equal(report.retainedEvidenceDirectory, state.temporary);
+});
+
+test('debugger, crash-report and log cleanup errors are independent and cannot suppress the final report', async t => {
+  const fixture = finalizationFixture(t), { state } = fixture;
+  state.report.ok = true; state.report.status = 'passed'; delete state.report.error;
+  state.processState = () => ({ closed: true, exitCode: 0, exitSignal: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) });
+  state.debuggerControl = { stop: async () => { throw new Error('detach failed'); } };
+  state.log = { exitCode: null, kill: () => { throw new Error('log kill denied'); } };
+  const savedLogs = [];
+  state.finishLog = destination => { savedLogs.push(destination || 'checkpoint'); return { file: destination || 'system-webkit.ndjson' }; };
+  await finalizeMacosEditingDiagnostic(state, { wait: async () => {}, collectReports: async () => { throw new Error('crash directory failed'); } });
+  const report = fixture.read();
+  assert.equal(report.ok, false); assert.equal(report.status, 'failed');
+  for (const stage of ['debugger-cleanup', 'crash-report-collection', 'system-log-SIGTERM', 'system-log-SIGKILL']) {
+    assert(report.gaps.some(gap => gap.startsWith(`${stage}:`)), `Missing ${stage} evidence`);
+  }
+  assert.match(report.error, /detach failed/);
+  assert.deepEqual(report.nativeDiagnostics, fixture.native); assert.deepEqual(report.frontend, fixture.frontend);
+  assert.equal(savedLogs.length, 2, 'The log save must still run after log termination fails');
+});
+
+test('a failed evidence copy retains its source and still publishes the other evidence and final failure', async t => {
+  const fixture = finalizationFixture(t), { state } = fixture;
+  delete state.app;
+  mkdirSync(join(state.directory, 'native-diagnostics.json'));
+  await finalizeMacosEditingDiagnostic(state, { wait: async () => {} });
+  const report = fixture.read();
+  assert.equal(report.error, 'Original WebContent failure'); assert.equal(report.status, 'failed');
+  assert(report.gaps.some(gap => gap.startsWith('native-diagnostics.json:')));
+  assert.equal(report.retainedEvidenceDirectory, state.temporary);
+  assert.equal(existsSync(join(state.temporary, 'diagnostics.json')), true);
+  assert.deepEqual(JSON.parse(readFileSync(join(state.directory, 'frontend-report.json'))), fixture.frontend);
+});
+
+test('log kill error events and false returns fail cleanup while retaining their evidence', async t => {
+  const fixture = finalizationFixture(t), { state } = fixture;
+  state.report.ok = true; state.report.status = 'passed'; delete state.report.error;
+  state.processState = () => ({ closed: true, exitCode: 0, exitSignal: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) });
+  const signals = [];
+  const log = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), exitCode: null, signalCode: null,
+    kill(signal) { signals.push(signal); this.emit('error', Object.assign(new Error('kill EPERM'), { code: 'EPERM' })); return false; } });
+  state.log = log;
+  state.finishLog = captureStream(log, join(state.directory, 'system-webkit.ndjson'), 1024);
+  await finalizeMacosEditingDiagnostic(state, { wait: async () => {}, collectReports: async () => ({ files: [] }) });
+  const report = fixture.read();
+  assert.equal(report.ok, false); assert.equal(report.status, 'failed');
+  assert.match(report.error, /system-log-SIGTERM: Signal was not sent/);
+  assert(report.gaps.some(gap => gap.startsWith('system-log-SIGKILL:')));
+  assert(report.gaps.some(gap => gap.startsWith('system-log-cleanup:')));
+  assert.match(report.reportCrashLog.stderr, /kill EPERM/);
+  assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
+  assert.deepEqual(report.nativeDiagnostics, fixture.native); assert.deepEqual(report.frontend, fixture.frontend);
+});
+
+test('a false log kill return racing an observed exit does not fail or send another signal', async t => {
+  for (const exit of [{ exitCode: 0, signalCode: null }, { exitCode: null, signalCode: 'SIGTERM' }]) await t.test(JSON.stringify(exit), async t => {
+    const fixture = finalizationFixture(t), { state } = fixture;
+    state.report.ok = true; state.report.status = 'passed'; delete state.report.error;
+    state.processState = () => ({ closed: true, exitCode: 0, exitSignal: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) });
+    const signals = [];
+    const log = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), exitCode: null, signalCode: null,
+      kill(signal) { signals.push(signal); return false; } });
+    state.log = log;
+    state.finishLog = captureStream(log, join(state.directory, 'system-webkit.ndjson'), 1024);
+    await finalizeMacosEditingDiagnostic(state, {
+      wait: async milliseconds => { if (milliseconds === 150) Object.assign(log, exit); },
+      collectReports: async () => ({ files: [] }),
+    });
+    const report = fixture.read();
+    assert.equal(report.ok, true); assert.equal(report.status, 'passed'); assert.equal(report.error, undefined);
+    assert.deepEqual(report.gaps, []); assert.deepEqual(signals, ['SIGTERM']);
+  });
+});
 
 function crashFixture(t) {
   const directory = mkdtempSync(join(tmpdir(), 'macos-editing-crash-'));
