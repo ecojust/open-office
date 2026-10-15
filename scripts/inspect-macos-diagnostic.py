@@ -306,6 +306,34 @@ def parse_context(time, pids):
     return {"time": time, "anchor": anchor, "pids": selected}
 
 
+def read_system_logs(read, report):
+    """Read both bounded capture phases, deduplicating only their overlap.
+
+    The collector checkpoints its initial buffer before waiting for ReportCrash.
+    That second buffer can contain the first explanation of a WebContent exit.
+    Both phases use the same PID/time filters and share the annotation quota.
+    """
+    sources, chunks, previous, duplicates = [], [], set(), 0
+    for filename, key in (("system-webkit.ndjson", "systemLog"), ("system-reportcrash.ndjson", "reportCrashLog")):
+        data = read(filename, 8 * 1024 * 1024, False)
+        sources.append({"file": filename, "available": data is not None, "bytesRead": len(data or b""),
+            **pick(report.get(key), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine"])})
+        if data is None:
+            continue
+        lines = data.splitlines()
+        retained = []
+        for line in lines:
+            if line in previous:
+                duplicates += 1
+            else:
+                retained.append(line)
+        chunks.append(b"\n".join(retained))
+        previous.update(lines)
+    # A buffer checkpoint can split a record; never concatenate its fragments
+    # into a fabricated event. The existing parsers count invalid fragments.
+    return b"\n".join(chunks), {"sources": sources, "duplicateLines": duplicates}
+
+
 def context_log_summary(data, report, samples, context):
     """Exact-PID messages near one instant, without the normal keyword filter.
 
@@ -395,6 +423,7 @@ def system_log_summary(data, report, samples, max_lines=20, native=None):
     owned = owned_webcontent_pids(native or report.get("nativeDiagnostics") or {})
     keywords = re.compile(r"\b(crash(?:ed|ing)?|terminat\w*|kill(?:ed|ing)?|exit(?:ed)?|signal|SIG[A-Z]+|memory|memorystatus|jetsam|GPU|assert\w*|exception|fatal|abort(?:ed)?|error|fault)\b", re.I)
     invalid_message = re.compile(r"\b(?:received\s+(?:an?\s+)?invalid\s+(?:IPC\s+)?message|didReceiveInvalidMessage|invalid\s+IPC\s+message)\b", re.I)
+    failed_assertion = re.compile(r"\bassert(?:ion)?\s+(?:failed|failure)\b|\bfailed\s+assertion\b", re.I)
     severe = re.compile(r"\b(crash\w*|terminat\w*|kill\w*|jetsam|exception|fatal|abort\w*)\b|\bassert(?:ion)?\s+(?:failed|failure)\b|\bfailed\s+assertion\b", re.I)
     exit_reason = re.compile(r"\b(?:exit(?:ed)?|SIG[A-Z]+|signal|jetsam|memorystatus|crash\w*)\b", re.I)
     selected, parsed_count, skipped = [], 0, 0
@@ -443,7 +472,8 @@ def system_log_summary(data, report, samples, max_lines=20, native=None):
         # 20 KB output budget, even when messages contain multibyte characters.
         while len(json.dumps(item, ensure_ascii=False).encode("utf-8")) > 630:
             item["message"] = item["message"][:-20]
-        priority = 2 if correlation == "message references WKWebView WebContent pid" and exit_reason.search(message) else int(bool(severe.search(message) or invalid_message.search(message)))
+        exact_failure = correlation in ("launched-app-pid", "WKWebView WebContent pid") and (invalid_message.search(message) or failed_assertion.search(message))
+        priority = 3 if exact_failure else 2 if correlation == "message references WKWebView WebContent pid" and exit_reason.search(message) else int(bool(severe.search(message) or invalid_message.search(message)))
         selected.append((priority, timestamp, item))
     # Actual failures and invalid IPC messages outrank normal assertion lifecycle
     # or verbose GPU logs; retain chronology among the selected messages.
@@ -626,10 +656,10 @@ def summarize(read, files, run, artifact, expected_sha, context=None):
     require(not host.get("commit") or host["commit"] == expected_sha, "Host commit mismatch")
     if context:
         samples = process_rows((report.get("processSamples") or [])[-200:])
-        log = read("system-webkit.ndjson", 8 * 1024 * 1024, False)
-        summary = context_log_summary(log or b"", report, samples, context)
+        log, capture = read_system_logs(read, report)
+        summary = context_log_summary(log, report, samples, context)
         notice("context", {"runId": run["id"], "headSha": expected_sha, "artifactId": artifact["id"],
-            "establishesFix": False, "available": log is not None,
+            "establishesFix": False, "available": any(source["available"] for source in capture["sources"]), **capture,
             "systemLog": pick(report.get("systemLog"), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine"]),
             **{key: value for key, value in summary.items() if key != "lines"}})
         # One context notice plus at most seven excerpts stays below GitHub's
@@ -662,12 +692,12 @@ def summarize(read, files, run, artifact, expected_sha, context=None):
     notice("process", {**pick(process, ["pid", "exitCode", "signal", "spawnError"]), "stderrTail": compact_text(str(process.get("stderrTail") or "")[-650:], 650),
         "rssSamples": recent, "rssColumns": ["pid", "rssKiB", "cpuPercent", "process"], "rssLimit": "Last six samples; top three App/WebContent rows, at most 40 source rows. Snapshot only, not evidence of a memory kill.",
         "crashes": [compact_text(PurePosixPath(name).name, 100) for name in files if PurePosixPath(name).name.startswith("crash-") and name.endswith((".ips", ".crash"))][:4]})
-    log = read("system-webkit.ndjson", 8 * 1024 * 1024, False)
+    log, capture = read_system_logs(read, report)
     crashes, crash_count = crash_summaries(read, files)
     debugger = debugger_summary(read, report, files)
     dom_events = dom_event_summary(native)
-    summary = system_log_summary(log or b"", report, samples, max_lines=4 * (4 - len(crashes) - int(debugger is not None) - int(dom_events is not None)), native=native)
-    notice("system-log", {"available": log is not None, **pick(report.get("systemLog"), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine", "stderr"]), **pick(summary, ["parsedLines", "skippedLines", "matchingLines", "firstParsedTimestamp", "lastParsedTimestamp", "timeFilterAvailable", "ownedWebContentPids", "limitation"])})
+    summary = system_log_summary(log, report, samples, max_lines=4 * (4 - len(crashes) - int(debugger is not None) - int(dom_events is not None)), native=native)
+    notice("system-log", {"available": any(source["available"] for source in capture["sources"]), **capture, **pick(report.get("systemLog"), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine", "stderr"]), **pick(summary, ["parsedLines", "skippedLines", "matchingLines", "firstParsedTimestamp", "lastParsedTimestamp", "timeFilterAvailable", "ownedWebContentPids", "limitation"])})
     notice("crash-evidence", {**crash_metadata(report, files), "ipsCount": crash_count, "ipsSummarized": len(crashes)})
     for crash in crashes:
         notice("crash-report", crash)

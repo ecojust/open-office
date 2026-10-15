@@ -17,7 +17,9 @@ try:
     elif request.get('mode') == 'ips':
         value = module.ips_summary(request['ips'].encode())
     elif request.get('mode') in ('emit', 'rust-emit'):
-        evidence = {'report.json': request['report'], 'system-webkit.ndjson': request['log'].encode()}
+        evidence = {'report.json': request['report']}
+        if request.get('log') is not None:
+            evidence['system-webkit.ndjson'] = request['log'].encode()
         evidence.update({name: text.encode() for name, text in request.get('evidence', {}).items()})
         def read(name, limit, as_json=True):
             value = evidence.get(name)
@@ -261,6 +263,69 @@ test('system exit messages retain exact native WebContent PID references without
   const unowned = annotations(inspect({ mode: 'emit', time: '', pids: '', report, log }).value);
   assert.deepEqual(unowned.find(row => row.section === 'system-log').ownedWebContentPids, []);
   assert.ok(!unowned.filter(row => row.section === 'related-system-log').flatMap(row => row.lines).some(row => row.pid === 1));
+});
+
+test('late capture keeps exact-PID invalid IPC and failed assertions ahead of routine teardown within ten notices', () => {
+  const report = {
+    startedAt: '2026-10-15T17:16:10.000Z', finishedAt: '2026-10-15T17:16:30.000Z',
+    process: { pid: 15706 }, reportCrashLog: { mode: 'tail', truncated: false },
+    nativeDiagnostics: { events: [{ phase: 'editing-window-geometry', detail: JSON.stringify({
+      webContent: { supported: true, pid: 15734, source: 'WKWebView._webProcessIdentifier' },
+    }) }] },
+  };
+  const ipc = event(15706, 120, 'Received an invalid IPC message during editing');
+  const late = [ipc, event(15734, 130, 'Assertion failed: native selection invariant'),
+    event(1, 140, 'pid 157340 exited due to SIGSEGV'),
+    event(999, 150, 'Received an invalid IPC message unrelated process'),
+    event(15734, 20000, 'Assertion failed: outside run'),
+    ...Array.from({ length: 30 }, (_, i) => event(1, 300 + i, 'pid 15734 exited during routine teardown'))].join('\n');
+  const result = inspect({ mode: 'emit', time: '', pids: '', report, log: ipc,
+    evidence: { 'system-reportcrash.ndjson': late } });
+  assert.equal(result.ok, true, result.error);
+  const rows = annotations(result.value);
+  assert.equal(rows.length, 10);
+  const summary = rows.find(row => row.section === 'system-log');
+  assert.deepEqual(summary.sources.map(source => [source.file, source.available]),
+    [['system-webkit.ndjson', true], ['system-reportcrash.ndjson', true]]);
+  assert.equal(summary.sources[1].bytesRead, Buffer.byteLength(late));
+  assert.equal(summary.sources[1].mode, 'tail');
+  assert.equal(summary.duplicateLines, 1);
+  const messages = rows.filter(row => row.section === 'related-system-log').flatMap(row => row.lines);
+  assert.equal(messages.filter(row => row.message.includes('invalid IPC')).length, 1);
+  assert.equal(messages[0].correlation, 'launched-app-pid');
+  assert.equal(messages[1].message, 'Assertion failed: native selection invariant');
+  assert.equal(messages[1].correlation, 'WKWebView WebContent pid');
+  assert.ok(!messages.some(row => /157340|unrelated|outside run/.test(row.message)));
+  assert.ok(rows.filter(row => row.section === 'related-system-log').every(row => row.causalityEstablished === false));
+});
+
+test('context reads the late phase using the same exact PID and time window without duplicate overlap', () => {
+  const shared = event(15734, 230, 'ordinary selection detail');
+  const result = inspect({ mode: 'emit', log: shared, evidence: {
+    'system-reportcrash.ndjson': ['checkpoint fragment', shared,
+      event(15734, 240, 'late ordinary focus detail'), event(999, 240, 'wrong PID'),
+      event(15734, 2000, 'outside context')].join('\n'),
+  } });
+  assert.equal(result.ok, true, result.error);
+  const rows = annotations(result.value);
+  assert.ok(rows.length <= 10);
+  assert.equal(rows[0].duplicateLines, 1);
+  assert.equal(rows[0].sources[1].available, true);
+  assert.equal(rows[0].skippedLines, 1);
+  assert.deepEqual(rows.slice(1).flatMap(row => row.lines).map(row => row.message),
+    ['ordinary selection detail', 'late ordinary focus detail']);
+  const lateOnly = inspect({ mode: 'emit', log: null, evidence: { 'system-reportcrash.ndjson': shared } });
+  assert.equal(lateOnly.ok, true, lateOnly.error);
+  const lateRows = annotations(lateOnly.value);
+  assert.equal(lateRows[0].available, true);
+  assert.deepEqual(lateRows[0].sources.map(source => source.available), [false, true]);
+  assert.equal(lateRows[1].lines[0].message, 'ordinary selection detail');
+});
+
+test('late system capture has the same fixed 8 MiB read bound as the initial phase', () => {
+  const evidence = { 'system-reportcrash.ndjson': 'x'.repeat(8 * 1024 * 1024 + 1) };
+  assert.equal(inspect({ mode: 'emit', evidence }).ok, false);
+  assert.equal(inspect({ mode: 'emit', time: '', pids: '', evidence }).ok, false);
 });
 
 test('debugger evidence exposes denied attach or a bounded captured stack and stays within notice quota', () => {
