@@ -12,14 +12,14 @@ const sha = value => createHash('sha256').update(value).digest('hex');
 function installation() {
   const directory = mkdtempSync(join(tmpdir(), 'wordcraft-native-contract-'));
   const root = join(directory, 'checkout'), resourceRoot = join(directory, 'installed');
-  for (const path of ['scripts', 'vendor/wordcraft/src', 'crates/word-engine/fonts', 'src/icons/svg/word']) mkdirSync(join(root, path), { recursive: true });
+  for (const path of ['scripts', 'vendor/wordcraft/src', 'assets/fonts/open-office', 'src/icons/svg/word']) mkdirSync(join(root, path), { recursive: true });
   writeFileSync(join(root, 'scripts/build-wordcraft.mjs'), '// independently controlled fixture');
   writeFileSync(join(root, 'scripts/build-office-icons.mjs'), '// offline geometry compiler fixture');
   writeFileSync(join(root, 'src/icons/shared.json'), '{}');
   writeFileSync(join(root, 'src/icons/svg/word/names.json'), '["test"]');
   writeFileSync(join(root, 'src/icons/svg/word/test.svg'), '<svg/>');
   writeFileSync(join(root, 'vendor/wordcraft/src/lib.rs'), '// source fixture');
-  writeFileSync(join(root, 'crates/word-engine/fonts/license.txt'), 'font fixture');
+  writeFileSync(join(root, 'assets/fonts/open-office/license.txt'), 'font fixture');
   const assets = join(resourceRoot, 'frontend/wordcraft'); mkdirSync(assets, { recursive: true });
   const bytes = { 'wordcraft.js': Buffer.from('export const engine = "WordCraft";'), 'wordcraft.d.ts': Buffer.from('export const engine: string;'),
     'wordcraft_bg.wasm': Buffer.from('0061736d01000000', 'hex'), 'wordcraft_bg.wasm.d.ts': Buffer.from('export const memory: WebAssembly.Memory;') };

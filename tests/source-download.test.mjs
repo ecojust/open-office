@@ -5,7 +5,9 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import { fetchSourceArchives, validateManifest } from '../scripts/fetch-corresponding-sources.mjs';
+import { fetchSourceArchives, validateManifest, validatePdfRuntimeSources } from '../scripts/fetch-corresponding-sources.mjs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 const bytes=gzipSync(Buffer.from('owned fixture, no third-party code'));
 const asset={file:'fixture.tar.gz',url:'https://example.com/fixture.tar.gz',bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')};
 const manifest={schemaVersion:1,archives:[asset]};
@@ -19,3 +21,20 @@ test('digest mismatch never overwrites an existing file',async t=>{const d=await
 test('HTML response is rejected even if recorded size/digest were incorrectly copied',async t=>{const d=await directory(t);const html=Buffer.from('<html>antibot challenge</html>');const bad={schemaVersion:1,archives:[{...asset,bytes:html.length,sha256:createHash('sha256').update(html).digest('hex')}]};await assert.rejects(fetchSourceArchives({manifest:bad,directory:d,fetchImpl:async()=>new Response(html),log:quiet}),/verification failed/);assert.deepEqual(await readdir(d),[])});
 test('failed HTTP download cannot generate a success checksum set',async t=>{const d=await directory(t);await assert.rejects(fetchSourceArchives({manifest,directory:d,fetchImpl:async()=>new Response('no',{status:503}),log:quiet}),/HTTP 503/);assert.deepEqual(await readdir(d),[])});
 test('paths, duplicate filenames, insecure URLs, and floating commit refs are refused',()=>{for(const archives of [[{...asset,file:'../outside.tar.gz'}],[asset,asset],[{...asset,url:'http://example.com/file.tar.gz'}],[{...asset,commit:'a'.repeat(40),url:'https://example.com/main.tar.gz'}]])assert.throws(()=>validateManifest({schemaVersion:1,archives}));});
+
+test('active source listing works offline after retirement of the old office runtime', async () => {
+  const expected = JSON.parse(await readFile(new URL('../public/legal/corresponding-sources-manifest.json', import.meta.url), 'utf8'));
+  const actual = JSON.parse(execFileSync(process.execPath, [fileURLToPath(new URL('../scripts/fetch-corresponding-sources.mjs', import.meta.url)), '--list'], { encoding: 'utf8' }));
+  assert.deepEqual(actual, expected);
+  assert.deepEqual(actual.archives.map(entry => entry.id), ['pymupdf', 'mupdf', 'python']);
+  for (const retired of ['runtimeManifestSha256', 'runtimeAssetSha256', 'zetaJsShippedSha256', 'localRuntimeDerivations', 'localModificationMaterials']) assert.equal(retired in actual, false);
+  assert.ok(actual.archives.every(entry => entry.bytes > 0 && /^[a-f0-9]{64}$/.test(entry.sha256)));
+});
+
+test('PDF sources must match the shipped backend and include both PyMuPDF and MuPDF', () => {
+  const active = { archives: [{ id: 'pymupdf', version: '1.28.2' }, { id: 'mupdf', version: '1.28.2' }] };
+  assert.doesNotThrow(() => validatePdfRuntimeSources(active, 'PyMuPDF==1.28.2\n'));
+  assert.throws(() => validatePdfRuntimeSources(active, 'PyMuPDF==1.28.1\n'), /matching PyMuPDF and MuPDF/);
+  assert.throws(() => validatePdfRuntimeSources({ archives: active.archives.slice(0, 1) }, 'PyMuPDF==1.28.2\n'), /matching PyMuPDF and MuPDF/);
+  assert.throws(() => validatePdfRuntimeSources({ archives: [{ id: 'pymupdf', version: '1.28.2' }, { id: 'mupdf', version: '1.28.1' }] }, 'PyMuPDF==1.28.2\n'), /matching PyMuPDF and MuPDF/);
+});

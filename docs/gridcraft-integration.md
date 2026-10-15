@@ -26,9 +26,9 @@ Open Office Vue/Tauri 外壳 ↔ 本地 WASM 宿主 ↔ SheetApp
 | --- | --- |
 | XLSX | Rust 引擎解析、编辑并写出工作簿。上游对部分未知包内容采用透传，但切片器、时间线、数据模型、未建模扩展和复杂图表细节仍可能丢失。首次保存导入文件应另存副本；不能宣称任意 XLSX 无损往返。 |
 | CSV / TSV | 属于单工作表文本数据。上游导出活动表的显示值和公式结果，不携带公式、格式、多工作表及对象。CSV 可保留读取时检测到的分隔符；文本编码及引用规则以实现和测试为准。 |
-| ODS / XLSB | 上游只导入数据及公式的最后保存值，不保留可重算公式、格式和多数对象，也不写出这些格式。ODS 保持既有兼容入口；本应用尚未开放 XLSB。不能静默导入后覆盖原件。 |
-| XLS（BIFF8） | 上游只读部分值、公式、数字格式、合并和尺寸等内容；字体、填充、边框及多数对象未保留，不能写回 XLS。保持兼容入口。 |
-| XLSM / 模板 / 加密工作簿 | 上游的宏字节保留、模板内容类型和密码解密能力，不代表已接通本应用的完整安全保存流程。宏不执行；上游不能写出密码加密文件。未开放的格式应明确走兼容入口或返回错误。 |
+| ODS / XLSB | 上游只导入数据及公式的最后保存值，不保留可重算公式、格式和多数对象，也不写出这些格式。本应用不开放 ODS 或 XLSB；旧兼容入口已移除，需先转换为 XLSX。 |
+| XLS（BIFF8） | 上游只读部分值、公式、数字格式、合并和尺寸等内容；字体、填充、边框及多数对象未保留，不能写回 XLS。本应用不开放 XLS，需先转换为 XLSX。 |
+| XLSM / 模板 / 加密工作簿 | 上游的宏字节保留、模板内容类型和密码解密能力，不代表已接通本应用的完整安全保存流程。宏不执行；上游不能写出密码加密文件。本应用拒绝未开放的格式，不提供兼容内核回退。 |
 | PDF / 打印 | 上游原有标准 PDF 字体路径不能覆盖中文。本地 PDF 字体适配使用本项目已有字体并嵌入子集；实际字符、图片、分页和导出结果须以专项验收为准，不据字体文件存在就认定所有文字系统正确。 |
 
 不支持或损坏的文件应给出可理解的失败结果；保留原有标签、修改和历史，不能自动切换引擎掩盖错误。复杂原件应与另存的副本核对。没有性能对照测试时，不宣称此次替换比旧引擎更快。
@@ -48,7 +48,7 @@ Open Office Vue/Tauri 外壳 ↔ 本地 WASM 宿主 ↔ SheetApp
 
 ## 表格引擎替换轮次的验证
 
-以下记录对应 2026-10-15 表格引擎替换轮次的快照，早于随后全局工具栏与主题调整。后续改动的检查见[全局工具栏与主题](development.md#全局工具栏与主题)，不沿用此快照的通过结论。
+以下记录对应 2026-10-15 表格引擎替换轮次的快照，早于随后全局工具栏与主题调整。后续改动的检查见[全局工具栏与主题](development.md#交互约定)，不沿用此快照的通过结论。
 
 | 命令 | 结果与范围 |
 | --- | --- |
@@ -85,6 +85,6 @@ Chromium 自检使用实际默认表格画布，覆盖本地 WASM 绘制、合�
 
 ArtCraft 的标志图片依据上游品牌条款从派生源码移除；原始 NOTICE 和 ATTRIBUTION 保持原样，其中的图片引用描述上游资源集合。`craft-ui` 与文字工作区固定到相同的 `craft-libs` 提交，许可和代码来源记录复用已有法律目录。
 
-本地画布复用 `crates/word-engine/fonts/` 的 Noto Sans CJK SC Regular、Bold、DejaVu Sans Regular、Bold、Oblique、Bold Oblique 及 Noto Sans Symbols2 Regular，共七份字体；PDF 使用其中的常规／粗体和符号字体，不使用两份斜体。许可分别为 SIL OFL 1.1 和 DejaVu／Bitstream Vera，字体哈希和原始许可单独保留。字体替换可能改变尺寸和分页；这组字体不代表完整或彩色 emoji 支持。未使用可选 `storytold/craft-fonts` 仓库。
+本地画布复用 `assets/fonts/open-office/` 的 Noto Sans CJK SC Regular、Bold、DejaVu Sans Regular、Bold、Oblique、Bold Oblique 及 Noto Sans Symbols2 Regular，共七份字体；PDF 使用其中的常规／粗体和符号字体，不使用两份斜体。许可分别为 SIL OFL 1.1 和 DejaVu／Bitstream Vera，字体哈希和原始许可单独保留。字体替换可能改变尺寸和分页；这组字体不代表完整或彩色 emoji 支持。未使用可选 `storytold/craft-fonts` 仓库。
 
-GridCraft 的 MIT OR Apache-2.0 不替代其他工作区或兼容运行时的 AGPL／GPL／MPL／LGPL 等许可；整体分发仍遵守[第三方说明](../THIRD_PARTY_NOTICES.md)。
+GridCraft 的 MIT OR Apache-2.0 不替代 PDF 内核的 AGPL 或其他依赖各自的许可；整体分发仍遵守[第三方说明](../THIRD_PARTY_NOTICES.md)。

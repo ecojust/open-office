@@ -1,0 +1,2340 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "name": "DeckCraft",
+    "repository": "https://github.com/storytold/deckcraft",
+    "commit": "9859da39255c0262cd592bb57101d7f2fa961f72",
+    "version": "0.7.0",
+    "license": "MIT OR Apache-2.0",
+    "selectedLicense": "MIT",
+    "sourceDirectory": "vendor/deckcraft",
+    "localIntegrationDirectory": "vendor/deckcraft/apps/open-office-host",
+    "excludedBrandAssets": [
+      "docs/brand/artcraft-mark.svg",
+      "docs/brand/artcraft-mark-black.png",
+      "docs/brand/artcraft-mark.png",
+      "docs/brand/artcraft-mark-black.svg",
+      "docs/brand/artcraft-logo.png",
+      "docs/brand/artcraft-logo-white.png",
+      "docs/brand/artcraft-logo.svg",
+      "docs/brand/artcraft-logo-white.svg"
+    ]
+  },
+  "licenseFiles": [
+    {
+      "file": "LICENSE-MIT",
+      "source": "https://raw.githubusercontent.com/storytold/deckcraft/9859da39255c0262cd592bb57101d7f2fa961f72/LICENSE-MIT",
+      "sha256": "90e96fef569474cd526350e716e4b05dd32f179ca96d39d61e6b928485e35406",
+      "bytes": 1101
+    },
+    {
+      "file": "LICENSE-APACHE",
+      "source": "https://raw.githubusercontent.com/storytold/deckcraft/9859da39255c0262cd592bb57101d7f2fa961f72/LICENSE-APACHE",
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+      "bytes": 10174
+    },
+    {
+      "file": "NOTICE",
+      "source": "https://raw.githubusercontent.com/storytold/deckcraft/9859da39255c0262cd592bb57101d7f2fa961f72/NOTICE",
+      "sha256": "e1a258c4eaf704ef7bc0592784ca3b406144d35fd0f5a045c84ae55e0f1bb6e0",
+      "bytes": 4672
+    },
+    {
+      "file": "ATTRIBUTION.md",
+      "source": "https://raw.githubusercontent.com/storytold/deckcraft/9859da39255c0262cd592bb57101d7f2fa961f72/ATTRIBUTION.md",
+      "sha256": "2c132af8d257c4dcd8f1872864de5ba0086f0c2be07d074029515d3cb2c9b386",
+      "bytes": 9855
+    },
+    {
+      "file": "LICENSE-brand.txt",
+      "source": "https://raw.githubusercontent.com/storytold/deckcraft/9859da39255c0262cd592bb57101d7f2fa961f72/docs/brand/LICENSE-brand.txt",
+      "sha256": "c5ad8e77d0dd8939161b4c4eca7aaba2437d6340c29e7809fa4679f0f2a82f62",
+      "bytes": 2263
+    },
+    {
+      "file": "LICENSE-ICC.txt",
+      "source": "https://raw.githubusercontent.com/storytold/deckcraft/9859da39255c0262cd592bb57101d7f2fa961f72/licenses/pdf-writer/LICENSE-ICC.txt",
+      "sha256": "469d87b5fa48f8aaf69e25f4fcac3a309c97dbb7d561b917638abdb640e004d9",
+      "bytes": 6552
+    }
+  ],
+  "gitDependencies": [
+    {
+      "name": "craft-pdf / krilla",
+      "repository": "https://github.com/storytold/craft-libs",
+      "commit": "c3487320b2d1de657b860b3c8abb44e1f2b32bd8",
+      "license": "MIT OR Apache-2.0"
+    }
+  ],
+  "originalSourceFiles": [
+    {
+      "path": ".cargo/config.toml",
+      "sha256": "6c0e7d271520f7d771b1c0e4958f34be903cb2d64de5f7b95548baa25ef14554"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "779217139ac31d2003d9c632d1af0f203f7a3b85517d442ef18bf7c9f57ab168"
+    },
+    {
+      "path": ".github/workflows/freebsd.yml",
+      "sha256": "a95c8db4148578ed9ffa59ccd206b2cdb31e62878a9b8ea7f3f135ad8534f4c4"
+    },
+    {
+      "path": ".github/workflows/packaging-lint.yml",
+      "sha256": "906ed94773036da81a25e2940bd458dee10c85b9f54789011ea423c2352d94ba"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "8d70fa34d30b1cb4a22ea241821d4bcd0754c482423a5dc8a25d02809887199b"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "a85351bb046a71da61e73fca9dc492f9189933e2e890d63796075fc97f31ea54"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "ecfbeb2fbe75406c442e39872e4b03b2f527be1cd1983fbe156d59e19c6d9423"
+    },
+    {
+      "path": "ATTRIBUTION.md",
+      "sha256": "2c132af8d257c4dcd8f1872864de5ba0086f0c2be07d074029515d3cb2c9b386"
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "dd43b4141e3ae9f4128996f3628376705543704e9a67e3b460168a1ad7fcd5d5"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "d884ef42c6720d64124abf6306f8f4cf20708960ab8377963c5f70b05a07609c"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "0cb890dbbed5f1d6163fa3ebc8fc52ca21cbf92e4f701f97719bbab8704f0be3"
+    },
+    {
+      "path": "LICENSE-APACHE",
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    },
+    {
+      "path": "LICENSE-MIT",
+      "sha256": "90e96fef569474cd526350e716e4b05dd32f179ca96d39d61e6b928485e35406"
+    },
+    {
+      "path": "NOTICE",
+      "sha256": "e1a258c4eaf704ef7bc0592784ca3b406144d35fd0f5a045c84ae55e0f1bb6e0"
+    },
+    {
+      "path": "README.md",
+      "sha256": "d4b1570c432c77d254d456c22e5657420ace2cf8f1770d36f844f5ff61ab38c0"
+    },
+    {
+      "path": "ROADMAP.md",
+      "sha256": "6ef6e3135fe7e9e9bfd0651194c484ba1a75756b352497054b455b6bf9e5e83f"
+    },
+    {
+      "path": "apps/deckcraft-cli/Cargo.toml",
+      "sha256": "265b48dee57c015d6f4049e91c1a52b36a0bb0f7590d7cd99dac8c01985a7cea"
+    },
+    {
+      "path": "apps/deckcraft-cli/src/automation_args.rs",
+      "sha256": "48086381d4d9012589f384f47e9410f28291b0fe7c5b508fd6fe0788109364bb"
+    },
+    {
+      "path": "apps/deckcraft-cli/src/help.rs",
+      "sha256": "aeeafdd4e707bbd50b4c65d3826766b7bfa89786076780ba897f5ae2cd2b9910"
+    },
+    {
+      "path": "apps/deckcraft-cli/src/main.rs",
+      "sha256": "c17b8a545de134fa9698fabd849b1e9795629b5a2026aa25c63b198476f8a2e9"
+    },
+    {
+      "path": "apps/deckcraft-cli/tests/cli.rs",
+      "sha256": "511cc3c02a7c08c4f8aabd1c9dd0e0778068456d62e8ef72c2d0c0424f1b4e2a"
+    },
+    {
+      "path": "apps/deckcraft-cli/tests/convert.rs",
+      "sha256": "2bd6c16f4a9942f8ac6538051867f7ea6488859e696c797ec6c2089c2942224f"
+    },
+    {
+      "path": "apps/deckcraft-cli/tests/mcp_roots.rs",
+      "sha256": "3a6b435b345eaa8d99a3056f14302b4db53e1427b1b01a11b8a9cf85a665cbd2"
+    },
+    {
+      "path": "apps/deckcraft-web/Cargo.toml",
+      "sha256": "78b7d0a367b47ca10ff03c12632ede6974890157c1df8b631944232f62a9731d"
+    },
+    {
+      "path": "apps/deckcraft-web/Trunk.toml",
+      "sha256": "a996cb61144f4f961e8a44d8df04ef329620c12928aea4a4f328d1fcaf055ec8"
+    },
+    {
+      "path": "apps/deckcraft-web/index.html",
+      "sha256": "b48329a038b54773aa087437d55c3a39e583e645871e9f435a56d0eff3b818a0"
+    },
+    {
+      "path": "apps/deckcraft-web/src/main.rs",
+      "sha256": "191cf6b07d914fcbcd15bcca55bb5e9606779b24ace7d5622c2a1dc8422f3223"
+    },
+    {
+      "path": "apps/deckcraft-web/src/web.rs",
+      "sha256": "98addc5b66449faa9c55bdae2adf65da92aff15ea80575134eb8ea54550c9ea9"
+    },
+    {
+      "path": "apps/deckcraft/Cargo.toml",
+      "sha256": "5a0e99693033024cafce8ce1fe1921a55ff12cc0ec0c3d36b8244e13a24b095b"
+    },
+    {
+      "path": "apps/deckcraft/build.rs",
+      "sha256": "893022bd3711b8df0b56fdaab316c8841bda4bc0d24fe6c27beeb08da5cc9493"
+    },
+    {
+      "path": "apps/deckcraft/src/audio.rs",
+      "sha256": "d63636f5fd67db7849998a5ea7f30ff5ced8a2b24c43df201031b990e00e805f"
+    },
+    {
+      "path": "apps/deckcraft/src/control_server.rs",
+      "sha256": "ea4d72cdca3ba04607f70f843c008b4ddeecc4d20d3e15aae326bed567166fed"
+    },
+    {
+      "path": "apps/deckcraft/src/display.rs",
+      "sha256": "d36880abe9bc3de6c9e9f0ed5923bc8e8d9b212392d360228fac24805dda9b36"
+    },
+    {
+      "path": "apps/deckcraft/src/graphics.rs",
+      "sha256": "8c64572e53730d8f5c97611d9afbc951694111d58ffa4f78d1a402e3d874cdf8"
+    },
+    {
+      "path": "apps/deckcraft/src/logging.rs",
+      "sha256": "a877b620f88345c07d6922a825c7fa34eb2fa70b375086b5285e9b4453985b99"
+    },
+    {
+      "path": "apps/deckcraft/src/main.rs",
+      "sha256": "a91f490fe9381593e2c3935e3edf2cfc600aa99fa913a9baca55705330e24b8d"
+    },
+    {
+      "path": "apps/deckcraft/src/pasteboard.rs",
+      "sha256": "4b2e57f5bde3725e7b16fd69d669be5920a4d4594c3daf619e3b7a318139ab74"
+    },
+    {
+      "path": "assets/app-icon/deckcraft-1024.png",
+      "sha256": "457cb046a1a4f2e13f06cf7e2e071cb48f6011633ed629b99ff348be4ca91ce0"
+    },
+    {
+      "path": "assets/app-icon/deckcraft.icns",
+      "sha256": "c00e0efeae23fbb3651976f9c1b5a062b6327d7ab2f5602b339204208b0283a6"
+    },
+    {
+      "path": "assets/app-icon/deckcraft.ico",
+      "sha256": "ceb73e008aa2cdf4d05d6375da32c5536a2bc2637bee59cdf441e2f9f792a9cd"
+    },
+    {
+      "path": "assets/app-icon/hicolor/128x128/apps/ai.storyteller.deckcraft.png",
+      "sha256": "1bf98b43bb0b21cb038ce063e71b9922e7f48c10d5b99afd046aa6c30642ca69"
+    },
+    {
+      "path": "assets/app-icon/hicolor/16x16/apps/ai.storyteller.deckcraft.png",
+      "sha256": "a1f4766da1452f20a1c85292b799e6ee47bd2207e240d08de445c54882a6d379"
+    },
+    {
+      "path": "assets/app-icon/hicolor/24x24/apps/ai.storyteller.deckcraft.png",
+      "sha256": "c2b810c537c463a414251c737d16863137c5d5b4c5f5b8f88d41b0957821876e"
+    },
+    {
+      "path": "assets/app-icon/hicolor/256x256/apps/ai.storyteller.deckcraft.png",
+      "sha256": "66343901b993332bceadf13277e6a028b80b2fb3a1e215b841c855be731e5130"
+    },
+    {
+      "path": "assets/app-icon/hicolor/32x32/apps/ai.storyteller.deckcraft.png",
+      "sha256": "61ce7f8438d6738d42cb6a1697b561ba11b25f43d1ab7f9c7a2ef07bbcf72f4c"
+    },
+    {
+      "path": "assets/app-icon/hicolor/48x48/apps/ai.storyteller.deckcraft.png",
+      "sha256": "114652a038ffba2d571398d8338657fa34d94e8a0dc7d4696b608d325851e23e"
+    },
+    {
+      "path": "assets/app-icon/hicolor/512x512/apps/ai.storyteller.deckcraft.png",
+      "sha256": "1c40489926085fd2d998fa3a15c1c22f3eed521e0049e79f19772f1b4a59a2aa"
+    },
+    {
+      "path": "assets/app-icon/hicolor/64x64/apps/ai.storyteller.deckcraft.png",
+      "sha256": "e38cec9053092960b1d320edddc4e0bbaf3af1dc9cbe094c014ce633b8db796e"
+    },
+    {
+      "path": "assets/app-icon/hicolor/scalable/apps/ai.storyteller.deckcraft.svg",
+      "sha256": "23eedc47e14cea6f4cc6724b13aec3e668e4e0177f6cee1f072f428385e0e6dd"
+    },
+    {
+      "path": "assets/app-icon/icon-source.deckcraft",
+      "sha256": "9e02b7ec36072b6c974d84b2aea65911334576850be9f719bc22197fc1ae4345"
+    },
+    {
+      "path": "clippy.toml",
+      "sha256": "32aec157b63c9e16340558b52291d6f6b767c8e9e3daa0315f555c19dc040e6c"
+    },
+    {
+      "path": "contributors/contributors.json",
+      "sha256": "c6b5ec2aeca94d625852ced2b74b40727fa19ffb23e4ae48cafdd1317c130559"
+    },
+    {
+      "path": "contributors/people.toml",
+      "sha256": "01715905276d974bb249b24d1e7b2522d8f8d98405abb8f327adc201db4923aa"
+    },
+    {
+      "path": "crates/anim/Cargo.toml",
+      "sha256": "5a3a87da8998646343243b1b70347e4758fc535ab1b93907f4f8471ad7766899"
+    },
+    {
+      "path": "crates/anim/src/easing.rs",
+      "sha256": "81c4673626731babc8f1234b7f86fe818650665930cd0b9a40bf04d1a5338911"
+    },
+    {
+      "path": "crates/anim/src/effects.rs",
+      "sha256": "116fcd66d7b31f191821e9de13af0a10798647516a744a6ede3fe8fc637e125f"
+    },
+    {
+      "path": "crates/anim/src/interact.rs",
+      "sha256": "e17ae8513dff536d8cc00e21018bc016580f2d8ba8dee4d69ddccd4d4dafbc76"
+    },
+    {
+      "path": "crates/anim/src/lib.rs",
+      "sha256": "960fee50af9c7cd413c62db1a8222a1500247882f2b855e0f0a7e688132d733c"
+    },
+    {
+      "path": "crates/anim/src/mesh.rs",
+      "sha256": "0e75e8c7b29396f4427c16416d5b4e6c436145493feba6d18a7ae5272bab4a29"
+    },
+    {
+      "path": "crates/anim/src/morph.rs",
+      "sha256": "c89e90da006371bb77d4e2fb5a9f2f3682764f8332bb73787dd87e7dbbe6f30b"
+    },
+    {
+      "path": "crates/anim/src/path.rs",
+      "sha256": "04f62b99b04414f107e692c0796a98d4205f25bf2d4b339a933e32f1ca8ae9fe"
+    },
+    {
+      "path": "crates/anim/src/show.rs",
+      "sha256": "a44df4a9f9743677dbe83831ad368fc5bc513ddb58144e31bc10e9270baa99dd"
+    },
+    {
+      "path": "crates/anim/src/tests.rs",
+      "sha256": "8be5dcd5e9571deb14a884f9ba59f9df38cb7d2e679140e4f3ee0337d0ca7cbd"
+    },
+    {
+      "path": "crates/anim/src/tests_interact.rs",
+      "sha256": "55d1f9f29644f44fabf99e77e6aedaa95927d85609fee1f6b72bd64454b14069"
+    },
+    {
+      "path": "crates/anim/src/timeline.rs",
+      "sha256": "6c19a271da51281cf9a4eed6b44729ea17572fa2f3e080b170d0cb36dd8d0b84"
+    },
+    {
+      "path": "crates/anim/src/transition.rs",
+      "sha256": "22d2b6bbe3d919ece4da60511ad0b69c003c175a29f9c546127b16296e60849d"
+    },
+    {
+      "path": "crates/anim/src/transition_fx.rs",
+      "sha256": "92105a185cbe3016f22e730d472b345afa6557fca1d387b8347229108af667dd"
+    },
+    {
+      "path": "crates/anim/src/transition_geom.rs",
+      "sha256": "5b1f243f755182dfdf10a93ac36764b2f1b93bb6d964e7f22e31605e99ac77a2"
+    },
+    {
+      "path": "crates/anim/src/transition_tests.rs",
+      "sha256": "25b1f239d26905c592bda30f8538d0daa3d08be9b864054f3c78814a5a24eac8"
+    },
+    {
+      "path": "crates/av1/Cargo.toml",
+      "sha256": "0e6da096c9c1d840f62d72a9a6809c5187ca5b20edd22bb9ceb68d25185ed847"
+    },
+    {
+      "path": "crates/av1/src/bits.rs",
+      "sha256": "3ea408ebb3f08def374f538424ee0d08161a27bc7f5caa2a925907c47d2805a8"
+    },
+    {
+      "path": "crates/av1/src/cdef.rs",
+      "sha256": "5386a472b7ae1b8aa57f4d20b0b19982904c426046ae2c951c709eb6ef372442"
+    },
+    {
+      "path": "crates/av1/src/cdf.rs",
+      "sha256": "96c1c4630d4be7c6ef6a662e260ec384e760cefff94e0f28b470e278065cfa31"
+    },
+    {
+      "path": "crates/av1/src/decoder.rs",
+      "sha256": "1be9740f2125dca70ce0fa530ccaed5d222ff95b5b2c26e14d1b25e07d844e51"
+    },
+    {
+      "path": "crates/av1/src/frame.rs",
+      "sha256": "62977da7c4a00ad6017a399c99897ac12bd46ee013d4c6b2c7b91bb7733c60f5"
+    },
+    {
+      "path": "crates/av1/src/grain.rs",
+      "sha256": "c3f94d2aafc9a3d3b0a198d85046188f8071bf3ccf06b40474a75a3e90c30ccf"
+    },
+    {
+      "path": "crates/av1/src/header.rs",
+      "sha256": "0af7327eb3b6820b5fd54f1149a11fc56504393faf78140fa8beb4c0dc1a83cb"
+    },
+    {
+      "path": "crates/av1/src/inter.rs",
+      "sha256": "5a2ae2460b2074d1ec9c3ea42f4545e45777cee00d609399c7736767253aa7a5"
+    },
+    {
+      "path": "crates/av1/src/inter_info.rs",
+      "sha256": "a6c1095f90db7eefd6e157122745b6583ed60d1de2871e8b631a4037829ef4cb"
+    },
+    {
+      "path": "crates/av1/src/intra.rs",
+      "sha256": "a4749c3f83c8ab5a5d459718bcf56ed79a3759dd1da00aef78fcdc02438ef4ed"
+    },
+    {
+      "path": "crates/av1/src/lib.rs",
+      "sha256": "af522559b53b8ab398169d66152e940653013252ca8ce3e022a02021af3e5c81"
+    },
+    {
+      "path": "crates/av1/src/mvpred.rs",
+      "sha256": "072867f16112b9808ef1729fa4b6933cde398c7f025b0d902f96ac4b431e16c4"
+    },
+    {
+      "path": "crates/av1/src/par.rs",
+      "sha256": "eb7ab8db4ca89242c4e2822cd9f657259e77d33d4abe244d3d9b240c34d254ad"
+    },
+    {
+      "path": "crates/av1/src/postfilter.rs",
+      "sha256": "e983d0df8c13d77bdb7c2be2fa938c4e80840e036f47a6b04cec76abbd99ea69"
+    },
+    {
+      "path": "crates/av1/src/restoration.rs",
+      "sha256": "4ca5a33cd93312d4c2c33fbeafae08bfb2c2cc698dd52ad1a435f8e5a454dc1b"
+    },
+    {
+      "path": "crates/av1/src/spec_tables.rs",
+      "sha256": "8680902afae398330a6018ed03a9aed9deaa40011a3a4d60d8d8b0a056dcda01"
+    },
+    {
+      "path": "crates/av1/src/state.rs",
+      "sha256": "8d3a45a2e7c149e0409a7337312af2bbaea303c5b12650a909b3060a8eef4d0e"
+    },
+    {
+      "path": "crates/av1/src/stats.rs",
+      "sha256": "a518f00426534b1f2ffe6219df9cb72e752514fe1cf24819c5e24720eee43006"
+    },
+    {
+      "path": "crates/av1/src/symbol.rs",
+      "sha256": "e18c221bf11a1de6d7bcc39dc638d06181735120c91394dafe8d24adf656b3f3"
+    },
+    {
+      "path": "crates/av1/src/tile.rs",
+      "sha256": "ebf706f0411c4f8d511e82f4c315a1b5be558a035cbdc374fc9725a0cd9320ac"
+    },
+    {
+      "path": "crates/av1/src/transform.rs",
+      "sha256": "6d11671866dbe40dc1bcf742b0d835937de135902380a5f89a512f5d4018ed51"
+    },
+    {
+      "path": "crates/bitstream/Cargo.toml",
+      "sha256": "abdeeaf57f3bd95ca591c371085656948d788b0f1daa7f83fae1c87980af439b"
+    },
+    {
+      "path": "crates/bitstream/src/budget.rs",
+      "sha256": "23377be14a38a987f416f27daa57c4621cc38e1ed875bbac1c1937824b06e62c"
+    },
+    {
+      "path": "crates/bitstream/src/lib.rs",
+      "sha256": "13a39660eb94b8c59be51f4086e2dcfeffb9ec2d03875bce26482d126907e177"
+    },
+    {
+      "path": "crates/color/Cargo.toml",
+      "sha256": "a40ec478be86aa7afa1c445ae975a6fad88ccafcebdc7e09ddfd1e170f76c707"
+    },
+    {
+      "path": "crates/color/src/lib.rs",
+      "sha256": "22f2c6d3f1046bd3868882507b7a914a1c9ab0413b27a4be1b6b6b74c0026f33"
+    },
+    {
+      "path": "crates/engine/Cargo.toml",
+      "sha256": "e9a620988def26f087760b73e4ee17e5a1a3f89f04d48867c844137c28594eb9"
+    },
+    {
+      "path": "crates/engine/data/thesaurus.txt",
+      "sha256": "eee3d32fdd3646b191cf891d53f512971799b25541161fdfa51b140c5ce86e93"
+    },
+    {
+      "path": "crates/engine/src/cmd/animation.rs",
+      "sha256": "f58f6f626439fa422d9ef8671ee8947c2fe8d68795401785edf1652a7f3bab28"
+    },
+    {
+      "path": "crates/engine/src/cmd/arrange.rs",
+      "sha256": "0b330b04963b8dcd57f0e91f28f0b96d948e8a7f2e290b92ab97fcfe355ede5d"
+    },
+    {
+      "path": "crates/engine/src/cmd/artistic.rs",
+      "sha256": "4597683cd0e4da8617a9d54bc3d9f5a1dd0e78887d9e02e38b5862d05bf1d343"
+    },
+    {
+      "path": "crates/engine/src/cmd/background.rs",
+      "sha256": "112b4c4b856b4a6657ea1d6d58617264e983a780374593618be7e9a8da5eae09"
+    },
+    {
+      "path": "crates/engine/src/cmd/color_at_tests.rs",
+      "sha256": "fb4e4a1b87ee16e3aa2dbf6e4ab2a4bbbe8f1d8848a18d7e8ec6d93350f1b0d9"
+    },
+    {
+      "path": "crates/engine/src/cmd/compress.rs",
+      "sha256": "5757f0ceacfe7c805a42ecbcf45e86f8d315dac4bdbc0b9e6131d22a278a4c79"
+    },
+    {
+      "path": "crates/engine/src/cmd/design.rs",
+      "sha256": "09676187460d06a570a528e6b45732d390f99964a65964881889d6ba5f0d3412"
+    },
+    {
+      "path": "crates/engine/src/cmd/edit.rs",
+      "sha256": "651cf9de98086af9909c0452d6a884054b72e00ae70fed6cc28e156fb76bf884"
+    },
+    {
+      "path": "crates/engine/src/cmd/file.rs",
+      "sha256": "3a47615f7fcb14d8df5161f1ef733ac820399dce11afc307eb51a2e48db8b6be"
+    },
+    {
+      "path": "crates/engine/src/cmd/find.rs",
+      "sha256": "ead1b0750bf97a33310023ce9d3635d3af17e8137874a05ee2fb521d24a6bbb9"
+    },
+    {
+      "path": "crates/engine/src/cmd/format.rs",
+      "sha256": "4f4be54f82497eda6d7678cd695e71261161e481fd3f7c35534fc6c9674f6588"
+    },
+    {
+      "path": "crates/engine/src/cmd/guides_tests.rs",
+      "sha256": "22060f7dccc217dfac8aa8433d1626a53d8269b381cbcbd43a5828248d6d3843"
+    },
+    {
+      "path": "crates/engine/src/cmd/ideas.rs",
+      "sha256": "c0b1eebeddd22ea02d06052ebe334a2ba45597252565ba42a72a439996e16091"
+    },
+    {
+      "path": "crates/engine/src/cmd/insert.rs",
+      "sha256": "071595c1330b95d216142fd75e4ea82b472d69085a10dd44c0cc4116c8249d60"
+    },
+    {
+      "path": "crates/engine/src/cmd/inspect.rs",
+      "sha256": "b83cc0bd7860f21f367f945ffd0cf5366edd96c917dd6a63c97ab0aa4984cad7"
+    },
+    {
+      "path": "crates/engine/src/cmd/media.rs",
+      "sha256": "e012dba276c66d920175bc500fc968f533488a7c2b96e1606dd8b21e847ba8d0"
+    },
+    {
+      "path": "crates/engine/src/cmd/merge.rs",
+      "sha256": "3cb497c357b7e248129326b21a65d9d13a82d47eb448f404e067721e2d63214f"
+    },
+    {
+      "path": "crates/engine/src/cmd/mod.rs",
+      "sha256": "04edd148d48c9231468ba090ae188c80e03f9b7518b9e0b5f8de77e7f269360a"
+    },
+    {
+      "path": "crates/engine/src/cmd/picture_style.rs",
+      "sha256": "a9b608adbbf638771248f2d43ba1760020a091d0157c8f678da57d952fb6d341"
+    },
+    {
+      "path": "crates/engine/src/cmd/points.rs",
+      "sha256": "1c2910055dfb31bfd21f39cb7fa3a2df51e01c5380fe9b91cc1694eac2c164ef"
+    },
+    {
+      "path": "crates/engine/src/cmd/recolor.rs",
+      "sha256": "1fce8cddd87e94f2b80b4eb90aeb6449851d8e3461099bc5f18da19d0505c93f"
+    },
+    {
+      "path": "crates/engine/src/cmd/reuse.rs",
+      "sha256": "f86b2767de2887999ca416dc9ed9c3842feb0f623aa4ed9278dddddd8759d4e1"
+    },
+    {
+      "path": "crates/engine/src/cmd/review.rs",
+      "sha256": "595290706520197ff7cc30eafcdddf1c9f7b2967b81e8b7cc7a75fdf6a2ffcdf"
+    },
+    {
+      "path": "crates/engine/src/cmd/richclip.rs",
+      "sha256": "b0bd5170fb9c9d465e837fad9b170e908d6dfecca0b2b3e136088a870e43790c"
+    },
+    {
+      "path": "crates/engine/src/cmd/ruler_tests.rs",
+      "sha256": "2191e651f3d896a186afdf655b4bb5e047158363837d35ae1f71b27ed4bfa296"
+    },
+    {
+      "path": "crates/engine/src/cmd/selection.rs",
+      "sha256": "cf944fc2a817254b9398d0dc62a4cd62cda2a62e2955b4f6d9e31534ecefdc62"
+    },
+    {
+      "path": "crates/engine/src/cmd/selection_tests.rs",
+      "sha256": "035e8825876085ab541a483eebf5aa527d64e6c7112bedb28c4819a518fe3376"
+    },
+    {
+      "path": "crates/engine/src/cmd/shape.rs",
+      "sha256": "66f95f3f92b186cb16fa717c64f2c470caab44b925db62f43818c784b7459119"
+    },
+    {
+      "path": "crates/engine/src/cmd/slide.rs",
+      "sha256": "67f9da5be2b58acbbafe0f858fccee7c44e2eb8bdbddb9ee95a6fa686d92818e"
+    },
+    {
+      "path": "crates/engine/src/cmd/smartart.rs",
+      "sha256": "070281d53793f13647adbbac767279809646b8e5378a21ba031ef835abe718a5"
+    },
+    {
+      "path": "crates/engine/src/cmd/table.rs",
+      "sha256": "15743337a28a85994471f9f1f61482f18220c91e1d8c13834c470c9881e55e45"
+    },
+    {
+      "path": "crates/engine/src/cmd/text.rs",
+      "sha256": "6f328a321d601dfcec63257dc051a044baef20b4e0e6ecfa9b23940a306c6e87"
+    },
+    {
+      "path": "crates/engine/src/cmd/three_d.rs",
+      "sha256": "d704260b4ab5e12ee7a58dfec49b513a7e8233a3f2cc2bf12d4d76a783dcbcf5"
+    },
+    {
+      "path": "crates/engine/src/cmd/transition.rs",
+      "sha256": "9112cba19204ce368bcd7e76027c0bb9f7a1c8773f9648f784b24e726d6130a3"
+    },
+    {
+      "path": "crates/engine/src/cmd/zoom.rs",
+      "sha256": "a85e98f20e2f3e6ca79e91414505e11b9c33991d39823b20457e6d7c0054b29b"
+    },
+    {
+      "path": "crates/engine/src/compare.rs",
+      "sha256": "72792ae45c3da73783e5215fbf56b12f95b0c2b5f8c8fd90f92c4aaa1eed46df"
+    },
+    {
+      "path": "crates/engine/src/connect.rs",
+      "sha256": "22b4e7564e8ed426cf93f79de00433956858edc9f529717f2054506bdf373e4e"
+    },
+    {
+      "path": "crates/engine/src/drawtable.rs",
+      "sha256": "84411a0b9088e006889ab725ac3456de473a9c6df731fc5fd7b50eab55c2623a"
+    },
+    {
+      "path": "crates/engine/src/file_access.rs",
+      "sha256": "a03b2bf9caaa59b2ed64100b5a92bd8652a5a6cbd3d172ea1b0c84771aa925f3"
+    },
+    {
+      "path": "crates/engine/src/fonts.rs",
+      "sha256": "022e47aae724447d459822dff356369e0e8b8a4fa5d05cbfd9b8749c605592f6"
+    },
+    {
+      "path": "crates/engine/src/gif_export.rs",
+      "sha256": "cc1cfdd94acc5d9672d693068c8ea9db3202bafb9f56b399f65368f098e0b12a"
+    },
+    {
+      "path": "crates/engine/src/guard.rs",
+      "sha256": "e26a214978822455067e11aaa517f405137c66dc4c631fbd5c0cb318cecf0ef0"
+    },
+    {
+      "path": "crates/engine/src/icon_data.rs",
+      "sha256": "2d5e479a515626c6f6e0a74f83e2a9d28fbcf3763979a7e7ebe2fb7097713e2c"
+    },
+    {
+      "path": "crates/engine/src/icons.rs",
+      "sha256": "a8c48bea4dfcd31419c3dee13e5790ce716b8f0cf8da7be28453f8e035109d39"
+    },
+    {
+      "path": "crates/engine/src/inkshape.rs",
+      "sha256": "f445d669863cab5ae28ed38c2beeee7a0e3c71099a292fc4b3481b2dea265215"
+    },
+    {
+      "path": "crates/engine/src/io.rs",
+      "sha256": "2a5487f26d0ceff66ff9accb39eeef6ac2ea8366030e31f7e190eddb8e9d80ce"
+    },
+    {
+      "path": "crates/engine/src/keys.rs",
+      "sha256": "2aea1b44cdc373383ae0b71c8d4026445c5a261a21af751e5dee9bd2e59f6260"
+    },
+    {
+      "path": "crates/engine/src/lib.rs",
+      "sha256": "9e4c5198fb1d4853baa3760ff739b5d73fcb84e6e1a527d9f62b7ac49d9ec131"
+    },
+    {
+      "path": "crates/engine/src/links.rs",
+      "sha256": "a60b41637788503857504beeea799836bb5191ce20de8d2dc3ff621da3e56357"
+    },
+    {
+      "path": "crates/engine/src/media_refs.rs",
+      "sha256": "2f635edb0e1d8a0325c6245434ba1eb84d2c50649b73e2109ae8e806944ce354"
+    },
+    {
+      "path": "crates/engine/src/recovery.rs",
+      "sha256": "97bc0f98a101e78f1840f28018c4366f42d850b57dcb8f0e89d522fa836fa1b7"
+    },
+    {
+      "path": "crates/engine/src/sample.rs",
+      "sha256": "b2d8e6e9bc4078839c8a84825b582fea63a002f1efe92d43d86a1140b5e32908"
+    },
+    {
+      "path": "crates/engine/src/soak_tests.rs",
+      "sha256": "e62b887816430584eb121db404e914c0943b0a47418cd5fd83abc8ef0281cbc8"
+    },
+    {
+      "path": "crates/engine/src/sounds.rs",
+      "sha256": "6a059071a93c884e2bd50a7c5b38717fd7602f6397197089c0d1020a81ed3a53"
+    },
+    {
+      "path": "crates/engine/src/spell.rs",
+      "sha256": "a459535461fb76d3dc0c581ca6321165c0d780fc6daccf40d66f5a7aed39e60b"
+    },
+    {
+      "path": "crates/engine/src/templates.rs",
+      "sha256": "b612bf41bd789b41b3d13a19a969ed7c8ab25e300df2abf9a3d04779a860b42a"
+    },
+    {
+      "path": "crates/engine/src/tests.rs",
+      "sha256": "5560368fc05a235a6b94264a374800eef6418b79ec575b9be695ab31aeb38ab8"
+    },
+    {
+      "path": "crates/engine/src/tests_keys.rs",
+      "sha256": "2c0eb85ac4de7c2df84cc1c5e54e2736cf1814a892e0443379d90a7b89899143"
+    },
+    {
+      "path": "crates/engine/src/thesaurus.rs",
+      "sha256": "8fc422edfbadffbe0cc00c7c069e1d92a2a852ddfb40d73d2a04d76eb21656ef"
+    },
+    {
+      "path": "crates/engine/src/tools.rs",
+      "sha256": "a2aa331e9ed981256680fc7d2b32354a29c3a80b03c319c013eae548b8ebd3ac"
+    },
+    {
+      "path": "crates/engine/tests/show_clicks.rs",
+      "sha256": "13187e31d79fd288acd3981fa0396c073cc09fa40e808e1000db33a93efc5b3e"
+    },
+    {
+      "path": "crates/fonts/Cargo.toml",
+      "sha256": "3835758fd012825697b840964e82ecd167a170d37598628d2cdc9bcaee96d2fd"
+    },
+    {
+      "path": "crates/fonts/build.rs",
+      "sha256": "1370c1a5499afec1c5d078f81df4fc944db62d80c4aad148e9aa8748f9cca72b"
+    },
+    {
+      "path": "crates/fonts/src/fallback.rs",
+      "sha256": "c21cdaa0e7fc744abe781f402ad0e99ec288f7354db5b0680dfb8428c4d99882"
+    },
+    {
+      "path": "crates/fonts/src/fontdb.rs",
+      "sha256": "f39b40312e52d10531f7dbc3ccaf454f6a96306870af697a83177e667b0e8fb1"
+    },
+    {
+      "path": "crates/fonts/src/lib.rs",
+      "sha256": "b29a861b3b196fc202ae52fc5f96105b36e3e38811566eefbe1b540c4d9bffa6"
+    },
+    {
+      "path": "crates/fonts/src/script.rs",
+      "sha256": "48ea2b6a3fac4e61c8f4fb85ba30686a8ff21c7011ac6ec67b49a789bd20bc55"
+    },
+    {
+      "path": "crates/fonts/src/shape.rs",
+      "sha256": "d8a837b3348a79b0dad9052d5bb09f1e56cd8d3ca5777c3f38a9a9e71cf970b1"
+    },
+    {
+      "path": "crates/fonts/tests/fixtures/legacy-regular.ttf",
+      "sha256": "58f9dd88c98fa45efe7b9d9ab47fc7e77a617b4b4bfbe1fdf856ac57f74fa682"
+    },
+    {
+      "path": "crates/fonts/tests/fixtures/legacy-semibold.ttf",
+      "sha256": "07e1993f91bbdb7ece2ca97e55fe49de192c1c74922e2eb49f1928f9a0d100e6"
+    },
+    {
+      "path": "crates/fonts/tests/fixtures/make_legacy_font.py",
+      "sha256": "324a6fcac374e444c0fd90a08b19e7d7154a23d916315a654e23705d71c814bc"
+    },
+    {
+      "path": "crates/format/Cargo.toml",
+      "sha256": "a3bc629279e17b7c45e818c15eb7394a21735c66285841715d010d664c7cc72c"
+    },
+    {
+      "path": "crates/format/src/finite.rs",
+      "sha256": "8e996249a63b9aa559fecba24223afeea78a217ca079befc58fe8b5079685ce0"
+    },
+    {
+      "path": "crates/format/src/lib.rs",
+      "sha256": "ea9dfd4ce061d67df241e88ca9cac70f0665368d17c2bf4d1d3c166a09d9bed9"
+    },
+    {
+      "path": "crates/geom/Cargo.toml",
+      "sha256": "7424df077a7ef2d5eb9fbc35a723f66c59aaefcdbd9803fa001f455b1c31b3b8"
+    },
+    {
+      "path": "crates/geom/src/lib.rs",
+      "sha256": "28929d4b6a2f93a402ffb96d4193beaa2b7dc3040ab700e2e70dbb0909e55449"
+    },
+    {
+      "path": "crates/geom/src/morph.rs",
+      "sha256": "38435f8a08bc23ddd27f8914ce002b4810b3a3bf39d3be27a4ff2de557ec0435"
+    },
+    {
+      "path": "crates/geom/src/preset.rs",
+      "sha256": "2e0a3c4ffe03a844aa5b81fd34e33692fe3979e3b131229e58b8dc54d8067c21"
+    },
+    {
+      "path": "crates/geom/src/preset/extra.rs",
+      "sha256": "85250e9c6ca60e1388eea48d8c74dae1883beb9ec2cb00c5678e73742e28bb2f"
+    },
+    {
+      "path": "crates/geom/src/squircle.rs",
+      "sha256": "ec3a473d9a183b792832b516fe059b44b26a60693b594794996b7eefa909999b"
+    },
+    {
+      "path": "crates/geom/src/warp.rs",
+      "sha256": "f0571db9848e253d30a082cb4d1e6c0b91a6ab6c61d33769004d90ec04ffe71b"
+    },
+    {
+      "path": "crates/geom/src/warp/tests.rs",
+      "sha256": "a24d90113f6c8e32336f7f604b39d366c5f7f914f18a9edf4506c49d4aa9608a"
+    },
+    {
+      "path": "crates/h264/Cargo.toml",
+      "sha256": "92343063db7a1dfc3986a43198775be411e108cdac3577d01442b5b7223298e3"
+    },
+    {
+      "path": "crates/h264/src/cabac.rs",
+      "sha256": "395dc86ab4500d91405bf7e3a0318ed12f4bbb2b9ff065f549e33767cc1bd687"
+    },
+    {
+      "path": "crates/h264/src/cabac_mb.rs",
+      "sha256": "a3c02dd450d32d003979a9829f9a907c47851406a98de557a455daa39231a7b9"
+    },
+    {
+      "path": "crates/h264/src/cabac_tables.rs",
+      "sha256": "9eb9f6ca837238be5f4340e49b32e451aa5b589623c7abd5138410acdf0df174"
+    },
+    {
+      "path": "crates/h264/src/cavlc.rs",
+      "sha256": "aa62247f5c5eb33089e61c93b59358775e30cf33ab7e3a95264c8394c61749de"
+    },
+    {
+      "path": "crates/h264/src/cavlc_tables.rs",
+      "sha256": "d19043a937dd817664bb3e37445de6ec2feccf8ffecf8d481eb61a6716b529f3"
+    },
+    {
+      "path": "crates/h264/src/deblock.rs",
+      "sha256": "f3fad2225e2d1fba73f31eae14de98f42821c585d747fae6a9a7f4bf8d21346d"
+    },
+    {
+      "path": "crates/h264/src/decoder.rs",
+      "sha256": "6f8fb6ed524513918b5c3ed5b850cbb081f08259451378957513acec9fb6249e"
+    },
+    {
+      "path": "crates/h264/src/dpb.rs",
+      "sha256": "e121c36f9697f81fb41a1465d7691eeb0d50ac10b0eb1eac964fae6f492f4669"
+    },
+    {
+      "path": "crates/h264/src/error.rs",
+      "sha256": "c7875e1f8d6cf10b371af192d2eb6fb9ce4a3bded05f9527671cc9e383de8497"
+    },
+    {
+      "path": "crates/h264/src/inter.rs",
+      "sha256": "238c4f31eb6c9431d8113d260264eee9806bd0a99f4e7d025ce11d51fc05912e"
+    },
+    {
+      "path": "crates/h264/src/intra.rs",
+      "sha256": "181f99ca5d0f148d43ba61ff7e5d922132827500605b3da95d2b0c48c1c4b886"
+    },
+    {
+      "path": "crates/h264/src/lib.rs",
+      "sha256": "9910da0719480c7fcd1fa4fa7d5c9cfd7d2ec806d3b4e968fe1bfcea918ba0d1"
+    },
+    {
+      "path": "crates/h264/src/mbtypes.rs",
+      "sha256": "26c72524bf1600cf2c54a73ffdbad1bc8d372c2f3e3de72798922f8af47daceb"
+    },
+    {
+      "path": "crates/h264/src/params.rs",
+      "sha256": "9f686eb5e21bc8d9e129e1a1f2b388ec479b82b3ce2ed447a8f2bbb8088a2cfc"
+    },
+    {
+      "path": "crates/h264/src/picture.rs",
+      "sha256": "ad0d59d2e0ba20d3ecdefecccc3dbf13914575ea9a217a54a89ebae233ac9b12"
+    },
+    {
+      "path": "crates/h264/src/slice.rs",
+      "sha256": "9069b2cef100459bec60c3df910eea6cb5fa69ae84cc34ebf07ebaec790b6540"
+    },
+    {
+      "path": "crates/h264/src/slicedec.rs",
+      "sha256": "0fe51cfc789295bd109f3a3becb6d99ed993faf6ca8b56977383e7e2708e7a32"
+    },
+    {
+      "path": "crates/h264/src/synth_tests.rs",
+      "sha256": "36e7e8c2c62a4736ef6899efc1d199f60b5973d44b89abcbeda69da5ff4bf369"
+    },
+    {
+      "path": "crates/h264/src/tables.rs",
+      "sha256": "3d38e8e93dc7d86f83580347a1764c670fc5510ea6a34d295b92b8b4116dd768"
+    },
+    {
+      "path": "crates/h264/src/transform.rs",
+      "sha256": "ca0dfb3eaaf93780a24dbdd03b70156ec2cd48fdab93393486f31a3ee780bebb"
+    },
+    {
+      "path": "crates/hevc/Cargo.toml",
+      "sha256": "18214df5a537003a2bd86b4df4fbaecb49f2e797167c8dbdf50e0a057c9075e5"
+    },
+    {
+      "path": "crates/hevc/src/cabac.rs",
+      "sha256": "68ad08a03073822cdea27f681087965fe1d8f3ea589c37a9fa0cf065c2ec17e5"
+    },
+    {
+      "path": "crates/hevc/src/decoder.rs",
+      "sha256": "6e6f6473a703d0656b61286f4e4530787fc2984c93f22ab51fde9f6f8acb00fb"
+    },
+    {
+      "path": "crates/hevc/src/dpb.rs",
+      "sha256": "215bb67ac4365a3f1e7c06b3241dcb41200a37d44935c74f97e2b008b1d0a659"
+    },
+    {
+      "path": "crates/hevc/src/error.rs",
+      "sha256": "c7875e1f8d6cf10b371af192d2eb6fb9ce4a3bded05f9527671cc9e383de8497"
+    },
+    {
+      "path": "crates/hevc/src/filter.rs",
+      "sha256": "ba2402c0f076fb9b694c3052182fafde0373795ce669b576fbe5786c5ccc55fd"
+    },
+    {
+      "path": "crates/hevc/src/inter.rs",
+      "sha256": "0f9cd98ae34e6c686111ffae6a4c42f0597a4cfa528a5c1803f8fdaf7e702995"
+    },
+    {
+      "path": "crates/hevc/src/intra.rs",
+      "sha256": "872ab66cdec573fef0639fd0a07878fe3db6a09b6cba2e01e7337c91c203533f"
+    },
+    {
+      "path": "crates/hevc/src/lib.rs",
+      "sha256": "c00d7e9ad8bf8b45fc565eb747b1dce1f3fc6bfc987be65b283813f048b7ffb4"
+    },
+    {
+      "path": "crates/hevc/src/mvpred.rs",
+      "sha256": "cfeacbd81c5e2aa6db70f563a0c95c1702fd38a0e62eb17a4aebd7a0bf9755d8"
+    },
+    {
+      "path": "crates/hevc/src/params.rs",
+      "sha256": "93e023f51814414e116e8f609d2047328e17c1620fae3937382e2e4beb8c7982"
+    },
+    {
+      "path": "crates/hevc/src/picture.rs",
+      "sha256": "00277215b6ff89d4e98f79758a458310fcdc5fb4786e21db0594b1bde9e4e69f"
+    },
+    {
+      "path": "crates/hevc/src/slice.rs",
+      "sha256": "f5a81d91453719775c73409929cce98ae5be071ca1f9aad31a8c6eb4cba15480"
+    },
+    {
+      "path": "crates/hevc/src/slicedec.rs",
+      "sha256": "8c65384aef4459792b8610deeb4b260c396c5d6a642c8524db65311f6d741b5c"
+    },
+    {
+      "path": "crates/hevc/src/spec_tables.rs",
+      "sha256": "91430f16bb1193c56e05b5f2a77a539000f647665d9ec8a25cb4b7c6e2893154"
+    },
+    {
+      "path": "crates/hevc/src/synth_tests.rs",
+      "sha256": "e1b204ef4ff30c879ea34e4b05f447b9163749b75fd7eafbdff94351be18eb51"
+    },
+    {
+      "path": "crates/hevc/src/tables.rs",
+      "sha256": "2d7581925f9eed5b8e8ebeb22342f0e2516aba4888a700347ab17f7496156ee7"
+    },
+    {
+      "path": "crates/hevc/src/transform.rs",
+      "sha256": "843c7d7337e32bdc338d9d03a3185a02db3e484498cc6d6d44c5d331bf8b15d0"
+    },
+    {
+      "path": "crates/isobmff/Cargo.toml",
+      "sha256": "d9b3c3f2ad14e89c391cf91d13737019e2c8ced3cb836a1b77e213599ccd2647"
+    },
+    {
+      "path": "crates/isobmff/src/bytes.rs",
+      "sha256": "a28d8904c89735a0a30814268565ff148eb03c4795c608042b82a954e431016c"
+    },
+    {
+      "path": "crates/isobmff/src/codec.rs",
+      "sha256": "b1c15ad1dc5656b683779210402a256482ecc4810e50f420178a8b762d0321a7"
+    },
+    {
+      "path": "crates/isobmff/src/demux.rs",
+      "sha256": "ecb20b16849be2f42091ac21bb140dac9be3752e731391942daf849920be01f4"
+    },
+    {
+      "path": "crates/isobmff/src/error.rs",
+      "sha256": "52cefefb28a4a25ffd9fc3415b2fa33a10be9fd6c5d0f73381bccb307eb30be4"
+    },
+    {
+      "path": "crates/isobmff/src/lib.rs",
+      "sha256": "0c7bf6d5317323d6dd5a2b956fec780fc33d6ae965f399ee30d54ef5b1d9f255"
+    },
+    {
+      "path": "crates/isobmff/src/mux.rs",
+      "sha256": "896cd2f42870fcafed0c710aaf31cc5eed99ee7bf8422d93959f4c3629edab10"
+    },
+    {
+      "path": "crates/isobmff/src/source.rs",
+      "sha256": "8ab8dfcc22b31d92796ee73372f1bc5c2bc6b943be07e65b12ab055f3ad856b0"
+    },
+    {
+      "path": "crates/matroska/Cargo.toml",
+      "sha256": "b977a9ee766736e3191ea91472230f067471a9633593c37de13e3af4b9a0a1bd"
+    },
+    {
+      "path": "crates/matroska/src/codec.rs",
+      "sha256": "177eae56bb8d0b3857d188a8944fd4c80a3eff981ccee79cbe65a970dc1080eb"
+    },
+    {
+      "path": "crates/matroska/src/demux.rs",
+      "sha256": "8587940440c3c844281bd86f61d0c03d04c40c6cea7273bda64f8ebc344ec732"
+    },
+    {
+      "path": "crates/matroska/src/ebml.rs",
+      "sha256": "792cd8b7e94f29a7cd0ab0809202e050c819ffcf006b5dd77c0f1bd361a3535e"
+    },
+    {
+      "path": "crates/matroska/src/error.rs",
+      "sha256": "3b7a676da5362781424088d2dc41998bd5b8ec14904b7db47aac77a2ab8d370f"
+    },
+    {
+      "path": "crates/matroska/src/ids.rs",
+      "sha256": "62b3b55e6938cb92a8725e66923dd29f1c0cf199a6a8d0727b9306312a79b0f9"
+    },
+    {
+      "path": "crates/matroska/src/lib.rs",
+      "sha256": "77f1e15f89014bb6b8c4d04fdc34d9084d13e7c938fa07e53fd696355114e2fe"
+    },
+    {
+      "path": "crates/matroska/src/meta.rs",
+      "sha256": "c40a70849aed5318a605d821639f68e40657dcd8e3b9b6990eaada538733c549"
+    },
+    {
+      "path": "crates/matroska/src/mux.rs",
+      "sha256": "6fb8d9c6e776a4d81df81617ad95c35467e7ec23fc7c491dbff89dfe49cfd361"
+    },
+    {
+      "path": "crates/matroska/src/source.rs",
+      "sha256": "dc42432ed274d962cdfb8291eac1b17c6135203f539ae468c61e92ef27a0ab8a"
+    },
+    {
+      "path": "crates/matroska/src/synthetic_tests.rs",
+      "sha256": "2691fc03ad6d04a554a82066fd16e3efe71634679b93a13b34f39bed427fceb0"
+    },
+    {
+      "path": "crates/matroska/src/track.rs",
+      "sha256": "1bfc8f0fdea6d5db78ef0a0a2b3fe5481e91d53b2d23e3fb573158a5cf9697fc"
+    },
+    {
+      "path": "crates/mcp/Cargo.toml",
+      "sha256": "e0111d2023fec4e9dfb8938568a326154bd6e5901646acf9fb6c403aae95ddde"
+    },
+    {
+      "path": "crates/mcp/src/backend.rs",
+      "sha256": "b4dad7c7d84bd54a278b905ee2908fa64da678cef405cfe05b9505b569720b7d"
+    },
+    {
+      "path": "crates/mcp/src/headless.rs",
+      "sha256": "d8e9025705cd76ba6775c712f47ab06e2dcfea817466805abe08a38ca8d08207"
+    },
+    {
+      "path": "crates/mcp/src/lib.rs",
+      "sha256": "d6cc773fe9bca121038b6466ad51dbb2b9ce28a9332f0e61c2124d0bfb9ce47b"
+    },
+    {
+      "path": "crates/mcp/src/server.rs",
+      "sha256": "9ce8127ab43249d5db69f3b49687d12a1a89087e2bc8f462e0ba04e348e484cd"
+    },
+    {
+      "path": "crates/mcp/src/tests.rs",
+      "sha256": "d2b10269c13ed3eab4d133b389474c955f9105172493f7dbb5530923867c8795"
+    },
+    {
+      "path": "crates/mcp/src/tools.rs",
+      "sha256": "da363b71b81393bb1423a9491cf959e7a0dac843f56c0fb2b8c4e5ea3d72a904"
+    },
+    {
+      "path": "crates/mcp/tests/automation_roots.rs",
+      "sha256": "1bd34e9b23371985b82dd9f2dd08e8aeea454f21e9986de84ff8f80cbd8cbcbb"
+    },
+    {
+      "path": "crates/media/Cargo.toml",
+      "sha256": "cf7af03a2078547c244a56cdf83bb7326bf8d9d8d66dfe468988a8db43818804"
+    },
+    {
+      "path": "crates/media/src/audio.rs",
+      "sha256": "2e6f3dd3bf06750065f122e576e494579bea3908ca6cc5ba584cdd512dbbbedb"
+    },
+    {
+      "path": "crates/media/src/clip.rs",
+      "sha256": "c1356831f803206c4ca6836d33d032f01c13edeb49ad1777f5d53a78b0d2a992"
+    },
+    {
+      "path": "crates/media/src/feed.rs",
+      "sha256": "f6f47f04d63cbb297edab2ef86021704d1587de71f02a99c8023781e4f010cda"
+    },
+    {
+      "path": "crates/media/src/lib.rs",
+      "sha256": "c2acf887944230b64b0e41e5a3b0df97d47a4bde0003e4882c545c4184bc20e6"
+    },
+    {
+      "path": "crates/media/src/mp4guard.rs",
+      "sha256": "3a5dc1dcb60b8c820e2bba635c65aa8eeba723dd00f704af31c378c178674a9a"
+    },
+    {
+      "path": "crates/media/src/player.rs",
+      "sha256": "977d813f74c3fa0b5028eecb249bcce01e269cbba7d457bbbff0d28f008b99b3"
+    },
+    {
+      "path": "crates/media/src/probe.rs",
+      "sha256": "4008807aa75b245d5eb3ace6283abe440d8fbd1da116ce8047888aa498eaef2b"
+    },
+    {
+      "path": "crates/media/src/video.rs",
+      "sha256": "5274bfcc8a4e5f93b45c72b97af32effdf0a7f7b5b6cc48b7f0b41551c686276"
+    },
+    {
+      "path": "crates/media/src/yuv.rs",
+      "sha256": "5e8df7352d51471d0a8dea53d8bb5e54cdccc8575a114a52ad3561c1375dad21"
+    },
+    {
+      "path": "crates/media/tests/decode.rs",
+      "sha256": "18a68df2040693277c42035487bf249eb083183d4cc1efc9c54da44b066e5979"
+    },
+    {
+      "path": "crates/media/tests/fixtures/clip-av1.mkv",
+      "sha256": "634529531ac4a3999e11f96760fd1594fefd0d0d0a17e5b869b8e513dd0c771c"
+    },
+    {
+      "path": "crates/media/tests/fixtures/clip-h264.mov",
+      "sha256": "7aa9f53fdb1addc6d6a97ae07a4a0354a46d25f4a8969c4e7118007b1bc32d30"
+    },
+    {
+      "path": "crates/media/tests/fixtures/clip-h264.mp4",
+      "sha256": "69b5952809d2e8cf162c14027d451598b7923f6a1f4cf332c2c5243aab634770"
+    },
+    {
+      "path": "crates/media/tests/fixtures/clip-hevc.mp4",
+      "sha256": "7378b5d844303d350c4d05f75625588a7857413208d1d5b16bbe2283a6828ca5"
+    },
+    {
+      "path": "crates/media/tests/fixtures/clip-vp9.webm",
+      "sha256": "8076c8a445f52338fe360e467e6acc0fa6a2acb7f76237e61790307af500e765"
+    },
+    {
+      "path": "crates/media/tests/fixtures/damaged/demux-loop.m4a",
+      "sha256": "4e12acaf5cee43fdaae71ced68797497fbb58c5d8844b052a72faba854f4ad50"
+    },
+    {
+      "path": "crates/media/tests/fixtures/damaged/demux-loop.mp4",
+      "sha256": "a49d9e1015a8da4e8a827b7b55e990793f880078ab5b620d3b189739bbfec46c"
+    },
+    {
+      "path": "crates/media/tests/fixtures/damaged/ebml-header.mkv",
+      "sha256": "76a64581f08e7745b7a8e498204fffeadffab14e1d17c732962bc9d61dc0528b"
+    },
+    {
+      "path": "crates/media/tests/fixtures/damaged/ebml-position.webm",
+      "sha256": "dd6b35cf882218e81d6303b45ce5a75a131bc4251a5f69191dfc8d1284d95be9"
+    },
+    {
+      "path": "crates/media/tests/fixtures/damaged/stsc-count.m4a",
+      "sha256": "5ddf53448a943d047af15cfcdae1b6920b4e4ff07ad28bab2ec8dbea945b5419"
+    },
+    {
+      "path": "crates/media/tests/fixtures/damaged/stsz-size.m4a",
+      "sha256": "2eb2a427fded1d5c58926452ef41cad1db56dcb8c8470f32a3d3b6416d5a8b79"
+    },
+    {
+      "path": "crates/media/tests/fixtures/make.sh",
+      "sha256": "2d8f186e8db41668174a33f177de60fb3c331328fb99ea86e8fc998b02268302"
+    },
+    {
+      "path": "crates/media/tests/fixtures/tone-alac.m4a",
+      "sha256": "8e94094e31a73ead667af99d86f6e09dddd56810a758e64d63832236beb13ef0"
+    },
+    {
+      "path": "crates/media/tests/fixtures/tone.aac",
+      "sha256": "c21e2308f9bc77fb249a6cd6e3d6a851dd74b941e32cd45288a141fd955bf732"
+    },
+    {
+      "path": "crates/media/tests/fixtures/tone.flac",
+      "sha256": "89280f50bba03e0f7e2da425eb589713f75da6ee9bcdc81219a2d87c96c6b6ed"
+    },
+    {
+      "path": "crates/media/tests/fixtures/tone.m4a",
+      "sha256": "1ac82b51a6440c5714340cc05b97a955b1617d9a26d56d15b27b451c0ca6ee92"
+    },
+    {
+      "path": "crates/media/tests/fixtures/tone.mp3",
+      "sha256": "f38ce5cebb7c945a5087ef870941a3984d21de76d696d41a9266a5043b31be1b"
+    },
+    {
+      "path": "crates/media/tests/fixtures/tone.ogg",
+      "sha256": "9232ca1abc1a0594c583c7f217f737abfd9eaec10ec3449a37898f5aabbd5a86"
+    },
+    {
+      "path": "crates/media/tests/fixtures/tone.opus",
+      "sha256": "ca8c3c0dbcea84b5b5b527428bdbeac930fe1c47a4f41a3af0a8059123861318"
+    },
+    {
+      "path": "crates/media/tests/fixtures/tone.wma",
+      "sha256": "4b083245bf68f3070e7e11e8790ba1d803768241364859953e7d851be8f6fdd9"
+    },
+    {
+      "path": "crates/metafile/Cargo.toml",
+      "sha256": "671d63f1daa3371ca4de65b4e8c1cfb3ad000c294b7a45436721eb81c5d77f58"
+    },
+    {
+      "path": "crates/metafile/src/bytes.rs",
+      "sha256": "ef49693acf1b635386f7cb20cbaa4132059bebee8859713d632048a9ee606123"
+    },
+    {
+      "path": "crates/metafile/src/canvas.rs",
+      "sha256": "104da905a0f2c532dc1d2290c69b88d46c7f94bb424db5763716701b74434771"
+    },
+    {
+      "path": "crates/metafile/src/clip.rs",
+      "sha256": "db15261acc0bdadbefab80805696bf06527f84cbba854b2fa188301c842d428a"
+    },
+    {
+      "path": "crates/metafile/src/cliprect.rs",
+      "sha256": "f64afdfc702a838844475ec4303c5f2b4cd3f3be77485db1b4ec2c3f00de990a"
+    },
+    {
+      "path": "crates/metafile/src/dib.rs",
+      "sha256": "984b365afd888e4ef6b1fe52da8a9853330da101f3365124bbf8aa612555d3c1"
+    },
+    {
+      "path": "crates/metafile/src/emf.rs",
+      "sha256": "ecfde13c6cea9cb5603a8961d0cb85231a645e6541e458a243c2facbbe0bc91c"
+    },
+    {
+      "path": "crates/metafile/src/emfplus.rs",
+      "sha256": "3194cd07b5e3a12ad51e8b047f2643ff8a9702e3c0cdc34acd107fe0d1bd20a3"
+    },
+    {
+      "path": "crates/metafile/src/geom.rs",
+      "sha256": "d07a3ab7909fbdfc1153103e6d1c530959a71dfbbe0a2c9cf0833d382cda5215"
+    },
+    {
+      "path": "crates/metafile/src/lib.rs",
+      "sha256": "3adccd030b589e5f091cbc791f814929f62221850853b6932cca5d9a22014a1d"
+    },
+    {
+      "path": "crates/metafile/src/place.rs",
+      "sha256": "9864336b5fe0bbf0b5e6f0c6c863e14832bcc75e607207aa7ee2aa1fa853a975"
+    },
+    {
+      "path": "crates/metafile/src/tests.rs",
+      "sha256": "338c3292536ebc92317c190db3c8912ab3b7d96469109637f49d4c26261b0127"
+    },
+    {
+      "path": "crates/metafile/src/text.rs",
+      "sha256": "46765423734cb08cb0f4b1fe534a428e54ec713a1b78c09aeff06f8b558974ad"
+    },
+    {
+      "path": "crates/metafile/src/wmf.rs",
+      "sha256": "d2d13b7ecda9f62c3ee15e715d7cbda75417aabbc225efd9e75d9bd981ba78b5"
+    },
+    {
+      "path": "crates/model/Cargo.toml",
+      "sha256": "3579cd669b5afb8ddc458487e33e9906117f8907746a28306cf2889e7b7b87b8"
+    },
+    {
+      "path": "crates/model/src/anim.rs",
+      "sha256": "cd9f47b5094d62a8f57eb8d2d1662991c191243a951d48a87e08c500ae3af411"
+    },
+    {
+      "path": "crates/model/src/bidi.rs",
+      "sha256": "3c99f99c4c274cca974fff0e2c3f54a5710b36a4369b824d8ea353b33529428f"
+    },
+    {
+      "path": "crates/model/src/chart.rs",
+      "sha256": "22efdfa0a144fa77fc76fd1b87e05a4bc09c35f516951e5445dda42b6338ff15"
+    },
+    {
+      "path": "crates/model/src/defaults.rs",
+      "sha256": "8eab5aa7fc9cd9b993ff13529595c1907acf823aa09314ad0df1c5e6daa16a03"
+    },
+    {
+      "path": "crates/model/src/edit.rs",
+      "sha256": "7420be573d64886f5f8807fa659c6e0af10d22efe4998f2178d7bb093d8cebc6"
+    },
+    {
+      "path": "crates/model/src/lib.rs",
+      "sha256": "dd21381d57778e56f3192cff6ed7133ec505b079fd4492b53df3a4273a88087d"
+    },
+    {
+      "path": "crates/model/src/numfmt.rs",
+      "sha256": "211e7d80549a839c6a91f83826ee71f53f017b5b6f91d7561e2ecbb4cb07e32c"
+    },
+    {
+      "path": "crates/model/src/resolve.rs",
+      "sha256": "ae05c1d06ee795061df76a50203ccf61334c2b2ef5a48ff0a5ba78a855e038df"
+    },
+    {
+      "path": "crates/model/src/style.rs",
+      "sha256": "1876e386d694f55c62fc414ad336a448ae0144f2fd7e9835bec1fdb891355797"
+    },
+    {
+      "path": "crates/model/src/table.rs",
+      "sha256": "1c212558120b794f94c4cd40b68e276a31bfea19fef9fe0149658635d01cc5ab"
+    },
+    {
+      "path": "crates/model/src/tests.rs",
+      "sha256": "c6c793af668c6953f4d6673caff0cac302398a14ef29d01058a035ed05f3649f"
+    },
+    {
+      "path": "crates/model/src/text.rs",
+      "sha256": "f2548912c7d7be8a8485802751360eff11df43b8efa0f87bcd991c2cfc18ace8"
+    },
+    {
+      "path": "crates/model/src/theme.rs",
+      "sha256": "13955e89b9780a8f522f83c4e09c27d7210335284d85f58c53c0270879ef7472"
+    },
+    {
+      "path": "crates/model/src/trendline.rs",
+      "sha256": "eeccc7b6ffc2221b785d32b1fe7b499d248a5ad200f2b05aa8356b8d6e67d6c6"
+    },
+    {
+      "path": "crates/model/src/words.rs",
+      "sha256": "aa8b8b81b7fff4d030f3337bf00aac6e58640ad6842c34f4317c3f3cc694a099"
+    },
+    {
+      "path": "crates/ogg/Cargo.toml",
+      "sha256": "ec4812225a3f96c57e1bf334c7893260ea942035cf12f46bf05cfdf2af76f271"
+    },
+    {
+      "path": "crates/ogg/src/lib.rs",
+      "sha256": "da59f7a7bbc5916a1848f3805d1df37269db9be6b31511a55a9460221a8dee52"
+    },
+    {
+      "path": "crates/ogg/src/tests.rs",
+      "sha256": "389f19edbfb988bd74ae9aa81ec0e54f9dc1d81fada9511abf81a66373b02879"
+    },
+    {
+      "path": "crates/opus/Cargo.toml",
+      "sha256": "3d310eaa81662b3d3884bea08b2455b143f43b7d12f495aac62d27ac1b3952ba"
+    },
+    {
+      "path": "crates/opus/src/celt/bands.rs",
+      "sha256": "49651365cf53832606be1bf648a4b5b7de07a49877cffec078e14c4453570389"
+    },
+    {
+      "path": "crates/opus/src/celt/energy.rs",
+      "sha256": "311fd89460fd13ca033af85b2fc6d077386912484da10ebdf41d1286e8d8c2af"
+    },
+    {
+      "path": "crates/opus/src/celt/mdct.rs",
+      "sha256": "a4d3550e9ee11cbe812c5cbc7c75d979274f8872f9cce760f47b64c7d51a2991"
+    },
+    {
+      "path": "crates/opus/src/celt/mod.rs",
+      "sha256": "ea2c3334d7501670347f2491da5efecd77e4f5421a6d99fe843b52097eec8a0f"
+    },
+    {
+      "path": "crates/opus/src/celt/rate.rs",
+      "sha256": "c8aecb2d899c4c6e9155e078df6a496a85688fd319514aaa158a14d519e59b52"
+    },
+    {
+      "path": "crates/opus/src/celt/tables.rs",
+      "sha256": "2c1df67b064a9164701571fe54d1aceef331643a6fd2b1e9362634cdd859e5e3"
+    },
+    {
+      "path": "crates/opus/src/decoder.rs",
+      "sha256": "f0edab919e53159900a6da8e8494ca160abbb52670c54f7711ea13c16a4801d3"
+    },
+    {
+      "path": "crates/opus/src/header.rs",
+      "sha256": "92fc5751dec686c997e6dc7affa02207bbe386703e532fe09fd6888c6fc276d5"
+    },
+    {
+      "path": "crates/opus/src/lib.rs",
+      "sha256": "41bceb13297f69eb1bc2f1951423e86f8777bd303257b206aabd46ede68d8d4e"
+    },
+    {
+      "path": "crates/opus/src/multistream.rs",
+      "sha256": "82efa41a1d402cd066cf815607b2ac2b97f838ae662c2b880caef798f83d93df"
+    },
+    {
+      "path": "crates/opus/src/packet.rs",
+      "sha256": "adb04e31bb46a5b56097ea222cc584703f1b79ea9372d8bea6b8cbc9f874c6da"
+    },
+    {
+      "path": "crates/opus/src/range.rs",
+      "sha256": "2a63c00143b7be347e5ae0add323321fe5ece26284d07531c0d95cd9e91c25d2"
+    },
+    {
+      "path": "crates/opus/src/silk/lpc.rs",
+      "sha256": "a8866c37cf8d198684c5742e588c14108861f8dd56b5b297b965688b2e06c0f5"
+    },
+    {
+      "path": "crates/opus/src/silk/mod.rs",
+      "sha256": "4df1bdcbff22daabc863c67a5fbac010b6d9f0e299983ec5c53b4240a1c1339d"
+    },
+    {
+      "path": "crates/opus/src/silk/resampler.rs",
+      "sha256": "1b8f0987c829ba3709c25f959e3c1c524ea542f1542ce9b25c840a0b3d3c7424"
+    },
+    {
+      "path": "crates/opus/src/silk/tables.rs",
+      "sha256": "2062e7d6160baa5a17206675c6861ded9b329ba86e138987866402f085e78f0e"
+    },
+    {
+      "path": "crates/pdf/Cargo.toml",
+      "sha256": "6e936b32b18d409b2cda29d044d6e9c8524be0333379162d6bd81cb47f875b11"
+    },
+    {
+      "path": "crates/pdf/README.md",
+      "sha256": "57851ca85cdfa3cf1879cc1bf8f33f18d1d410c3c43eb455522a326365ab8fec"
+    },
+    {
+      "path": "crates/pdf/src/lib.rs",
+      "sha256": "4b8a6c469cb832451cdcc14916de2aee8e863be76611ff6d6ae59c1694b283c4"
+    },
+    {
+      "path": "crates/pdf/src/tests.rs",
+      "sha256": "89e71c169bc2b1e7ee9d644e5fb961f87995733393de2fa7ee787a1470b574dc"
+    },
+    {
+      "path": "crates/pptx/Cargo.toml",
+      "sha256": "30a783dcadbf5eb12d1e93df304c77586d1d82013cee8c8c2147ce42345fc86a"
+    },
+    {
+      "path": "crates/pptx/src/cfb.rs",
+      "sha256": "83c07c34dfe9647ffe5fd594f3b779527b4932f3ae0b63bcbbb9e135944cc4ad"
+    },
+    {
+      "path": "crates/pptx/src/custgeom.rs",
+      "sha256": "150da5178383f7e6db94cbe2d478564b16a01cc2af7b0d61862fff307616f9de"
+    },
+    {
+      "path": "crates/pptx/src/dgm.rs",
+      "sha256": "19ba2df552435ff4a3c9668267a1a325c2f66c0d1127fd57d7eb225c243f0e51"
+    },
+    {
+      "path": "crates/pptx/src/lib.rs",
+      "sha256": "483e8bd87917b3f99d5aa360d0a231f4d092e4dd69948f17c6378faeb817acaa"
+    },
+    {
+      "path": "crates/pptx/src/maps.rs",
+      "sha256": "be745de851c16d0480524de55d71a1fa938060ad1d89d105f2bee645ba558585"
+    },
+    {
+      "path": "crates/pptx/src/opc.rs",
+      "sha256": "39889ec4cc852c6f77e25db7eeb5d1bbd28ada93793696dfc8a43865eb5981f5"
+    },
+    {
+      "path": "crates/pptx/src/png.rs",
+      "sha256": "fe092c8e639319166b78e27e6b744a599874875ae81c9b75d52e2d2f727c87ac"
+    },
+    {
+      "path": "crates/pptx/src/read/chart.rs",
+      "sha256": "c0ef08ed8e564e96e20ad2f1d59ab136d96e63b14a4ed76ecbdcabe98a01926c"
+    },
+    {
+      "path": "crates/pptx/src/read/chartex.rs",
+      "sha256": "8d6c20fbc176558b6ea0729921883e6bf4ade4cad29aa5be281ba855611c385f"
+    },
+    {
+      "path": "crates/pptx/src/read/dml.rs",
+      "sha256": "1f201ee642cb75328f312cbafbeb98e4d502e2ca25c3b325c1ed8411edbfd4c4"
+    },
+    {
+      "path": "crates/pptx/src/read/mod.rs",
+      "sha256": "3380cc96fb05c0ec8ae1a396e06c5550d433be1be0e7fbb773ea873bc306d95b"
+    },
+    {
+      "path": "crates/pptx/src/read/shapes.rs",
+      "sha256": "8815aa90422fe8900c50439b3cc24997dc9dabb903d0e1504b5a770bfd6649ae"
+    },
+    {
+      "path": "crates/pptx/src/read/theme.rs",
+      "sha256": "bdf4ede3ce9506788bfef2b8a9c81e6ebf55d9fd4755ad1ecc65e0be721dd3ca"
+    },
+    {
+      "path": "crates/pptx/src/read/timing.rs",
+      "sha256": "09c27d0168b0e13bc841f7b69804022b4781113fd14476f57ef092816bb04bbb"
+    },
+    {
+      "path": "crates/pptx/src/tables.rs",
+      "sha256": "ac7d4cd70eab78dac370e3cdb9d6a7eab3cc911fb442f30f0b747f86feae30e1"
+    },
+    {
+      "path": "crates/pptx/src/write/chart.rs",
+      "sha256": "b7fc1bdd3ab977daaf33ae73a5003a674b707c381f60f256c3f1225155943226"
+    },
+    {
+      "path": "crates/pptx/src/write/dml.rs",
+      "sha256": "f91c3af04711bef2fce3d31d1c0670e3553d52ee0e99e32f88bcabc847071d07"
+    },
+    {
+      "path": "crates/pptx/src/write/mod.rs",
+      "sha256": "b7a81f9da279be738266f9aa54128fef2d0717ff42f62604a2a3114c00731566"
+    },
+    {
+      "path": "crates/pptx/src/write/shapes.rs",
+      "sha256": "3f74f9ef393df59ff0cdca4d704411f410475b699cf7258600772a08bd0356ad"
+    },
+    {
+      "path": "crates/pptx/src/write/theme.rs",
+      "sha256": "8dcd307c0a57a7033367d586f66381b932205d97651a8b00a67a3c3e52551047"
+    },
+    {
+      "path": "crates/pptx/src/write/timing.rs",
+      "sha256": "9be27871ff1b94c1b3dbf80014bb90f4304e0bfc54738474589ec1bc02163084"
+    },
+    {
+      "path": "crates/pptx/src/xml.rs",
+      "sha256": "c63a3a2cfd778260f13f444405ccac948122023f134f7b8866c78ec322794dd2"
+    },
+    {
+      "path": "crates/pptx/tests/anchor.rs",
+      "sha256": "42462436a0a90fbf608eca9a7b468a69c4c40ba743cef348374e463a0067fd62"
+    },
+    {
+      "path": "crates/pptx/tests/chart_embed.rs",
+      "sha256": "b2c4dca4c3f3481dbfa21fb93620a035d6978163d3c5421a53fc7c57d289d7ad"
+    },
+    {
+      "path": "crates/pptx/tests/comments.rs",
+      "sha256": "716948cabf6101f362c9ed10593d7fe2b4e9f98096f3764f0e9c1a5d77e4cc64"
+    },
+    {
+      "path": "crates/pptx/tests/corpus.rs",
+      "sha256": "4d071ca5a6664263a38b43707eac5aa48d9c86a0aec2cbf078e2a276ed3e37cb"
+    },
+    {
+      "path": "crates/pptx/tests/corpus_charts.rs",
+      "sha256": "cf44e888da49aab672f4fffdf1378d1146cd60a4c8e6904c9f444eb88602e4f7"
+    },
+    {
+      "path": "crates/pptx/tests/corpus_elements.rs",
+      "sha256": "191dd1ae191aef30f3c062ec63dd37919500378f468a1a030c9edcdc575c5c7d"
+    },
+    {
+      "path": "crates/pptx/tests/corpus_kinds.rs",
+      "sha256": "019d69980cb6e213194afc0f5b85b4255ad2481aeea21fad577f232279505516"
+    },
+    {
+      "path": "crates/pptx/tests/corpus_media.rs",
+      "sha256": "049c3c83377bb5e84716fbb77599551919cf83cf9b83203c71653d151728edb7"
+    },
+    {
+      "path": "crates/pptx/tests/corpus_style.rs",
+      "sha256": "50b429790cff73a1f48054a5eaca3fca9134049479d374b25f5b90dfed219511"
+    },
+    {
+      "path": "crates/pptx/tests/corpus_themes.rs",
+      "sha256": "0600dca78304571c6e68db2639e6d9f018975b954125e087dbcf693f5a5da270"
+    },
+    {
+      "path": "crates/pptx/tests/fills.rs",
+      "sha256": "ddb97072aedb4efe848b898d59398506bffa93f1dfd6a1c20e3c1d08db7deaab"
+    },
+    {
+      "path": "crates/pptx/tests/kept_parts.rs",
+      "sha256": "974334fdde427d4b2d3bdc18a59acd930a4957d7cc36f49cfe7dbc8a66037971"
+    },
+    {
+      "path": "crates/pptx/tests/locks.rs",
+      "sha256": "c48a562252bbe9efde7197794de82a7cfa8e3756fdefa8c2c22756a625ba441a"
+    },
+    {
+      "path": "crates/pptx/tests/malformed.rs",
+      "sha256": "4e2900f0db8d4949c6df81ea1b7d6b35fdd1ebf4443f093ca4d6f2a6566284d2"
+    },
+    {
+      "path": "crates/pptx/tests/math_ns.rs",
+      "sha256": "f048e52263f3bd16128b08ce04e08160d51c8fa7c7da2de4f0c463c62eec02d3"
+    },
+    {
+      "path": "crates/pptx/tests/notes.rs",
+      "sha256": "7572e030d9b472a4153f82267e8f00d6b1bdba231f3ca3af4a7f7085597eae62"
+    },
+    {
+      "path": "crates/pptx/tests/ole.rs",
+      "sha256": "631395fbeb8d15e0a00f6adc804268e08d9c8c1db9bc0167e7ec1bd08ca9eee4"
+    },
+    {
+      "path": "crates/pptx/tests/ole_vml.rs",
+      "sha256": "1dc1aa79b399644abba590a3d1d52c8b67774955229a0bac59ffdec1e055ae44"
+    },
+    {
+      "path": "crates/pptx/tests/placeholders.rs",
+      "sha256": "bb6dfe9201f72322270934f3f3681e3f55b2a489fa06f499eb36d8e2fc906621"
+    },
+    {
+      "path": "crates/pptx/tests/roundtrip.rs",
+      "sha256": "7012377aaa2a9f9408673d78ac06ce3ed0ac65f00bb856f5138ae983e81cb5a3"
+    },
+    {
+      "path": "crates/pptx/tests/sample.rs",
+      "sha256": "3c17be11b6b9c57ac15cfdc7d0b3f1a9bd3afb22ee570019f19ced4f23268e38"
+    },
+    {
+      "path": "crates/pptx/tests/smartart.rs",
+      "sha256": "eeabdd4e3aed8bd8867b8c12cf074b432f363d72627b0b671ba04123fb219de2"
+    },
+    {
+      "path": "crates/pptx/tests/sniff.rs",
+      "sha256": "8646b4599d6b73d8aac69ef9f412e416bb0a86f67e70c00301e949e09b668936"
+    },
+    {
+      "path": "crates/pptx/tests/table_styles.rs",
+      "sha256": "ca49197d0dca1ff272221f11aa050dcc537df3d0c8cf14a2ff9699340ec6f18f"
+    },
+    {
+      "path": "crates/pptx/tests/tags.rs",
+      "sha256": "a43b9b10077f47ae0429c526b93f624173d201761a977447b5abd0c4ad0f7db5"
+    },
+    {
+      "path": "crates/pptx/tests/transition_xml.rs",
+      "sha256": "130344ef47cdfc71cd7e09b7e3a38946bfa0da89a9283e20d5059ee4581b4139"
+    },
+    {
+      "path": "crates/render/Cargo.toml",
+      "sha256": "8aa25ab13f507069d45d9a06d68cefd43d412b84c7d3cd7fdfb25ce738886133"
+    },
+    {
+      "path": "crates/render/src/bevel.rs",
+      "sha256": "4bd6263179c96b4d9b29a9d0309dc1b4f214fe7dd31abf7379724ded3abc2736"
+    },
+    {
+      "path": "crates/render/src/camera.rs",
+      "sha256": "c7d5aa72ec9e427f7a8e6d1375471a9a1c098793d361347586435b14e5d1e256"
+    },
+    {
+      "path": "crates/render/src/chart.rs",
+      "sha256": "a2e17e1ae02c53a746a816314685916e8d005ceb9f43d67a5c22175c2da76a0c"
+    },
+    {
+      "path": "crates/render/src/chartex.rs",
+      "sha256": "5c30861e1177dfdb275a05c98a1a8b9ce4e89b7fc19eff839d8763dc1ac98d8d"
+    },
+    {
+      "path": "crates/render/src/colr.rs",
+      "sha256": "20a57537101b4d76c3d7b641b799d2374ade518afaf398747a787f7c20fa4237"
+    },
+    {
+      "path": "crates/render/src/compound.rs",
+      "sha256": "e08dff4c83bdf3b74c84036344234aa4c646e08497b3c2808ac2cb234af64cd6"
+    },
+    {
+      "path": "crates/render/src/extent.rs",
+      "sha256": "d86375960f33920f8d7320290a4aee234184d34fdfe798d569857f4683b62a09"
+    },
+    {
+      "path": "crates/render/src/extrude.rs",
+      "sha256": "7a4376fedaee9078a88338615fed6889b8d6edd0a17c100e4d7ce8c3153f489a"
+    },
+    {
+      "path": "crates/render/src/images.rs",
+      "sha256": "1c7bb06da6ccfffdd781b9fe7f4adfae8d385767724546a2661653f5fd4519a9"
+    },
+    {
+      "path": "crates/render/src/lib.rs",
+      "sha256": "9e2ab1cc27ed9f625e0d7331e7577584ab4124e0bfa4c6dad91c6d9944b1412e"
+    },
+    {
+      "path": "crates/render/src/light.rs",
+      "sha256": "e8b9f52981335dcd21e5bae556f1d237cf18802af6152a53a7361158b376c010"
+    },
+    {
+      "path": "crates/render/src/metafile.rs",
+      "sha256": "339940f343ff37e5df3cc0e6c6ef396d15051d59b34527785471b799b6a111e5"
+    },
+    {
+      "path": "crates/render/src/morph_path.rs",
+      "sha256": "8a995f3d133d39783a36a9b120c9c6d9720ed468cca1cca28f203451dfb11763"
+    },
+    {
+      "path": "crates/render/src/morph_text.rs",
+      "sha256": "a2727528b30c1ccc2a3da9999ace0e2430e8f7e451b9b43d9ddc6310db18f310"
+    },
+    {
+      "path": "crates/render/src/paint.rs",
+      "sha256": "3e51bbf4ce89a8249e9ce41cc97301574693619800026d9db9d54eee8ea22e81"
+    },
+    {
+      "path": "crates/render/src/pathgrad.rs",
+      "sha256": "1131b29be7d30c373948be2dde8e067aefbc072fb91e446dc04a04996a9cc101"
+    },
+    {
+      "path": "crates/render/src/pattern.rs",
+      "sha256": "acb93350bc6b990b432e8357199efe8642012cc9fb74bebd3dd51913893290e4"
+    },
+    {
+      "path": "crates/render/src/placed.rs",
+      "sha256": "252b73b503e2ec442b6e91e7e75ed6bc40f562a46a698d1a7eac5bed7a4e30e7"
+    },
+    {
+      "path": "crates/render/src/radar.rs",
+      "sha256": "41f31f74445f30a8f113d26da80ba3d5dd8c4b5e256263d0ceaa1cce0e6dc6ed"
+    },
+    {
+      "path": "crates/render/src/ramp.rs",
+      "sha256": "3f0eeeab1e3c0ce0c72e1f263b471af83a5effd35c9d4f8c6109c24bc7f7b334"
+    },
+    {
+      "path": "crates/render/src/table.rs",
+      "sha256": "1af3f8c6f678996b74c007cbe3b1e1a0ce5539204560b9d47bcbcfb6c21f2912"
+    },
+    {
+      "path": "crates/render/src/tests.rs",
+      "sha256": "7356f51d6f40e4b535b85736de2f7febc7236a0f0161593dfdad203886f93ac5"
+    },
+    {
+      "path": "crates/render/src/tests_wild.rs",
+      "sha256": "abcb8643b1203caef3f224e9999c83abbe0fc0c13de6272116c675ddcc83a311"
+    },
+    {
+      "path": "crates/render/src/transition.rs",
+      "sha256": "907edb3462f8b64dc096d869186e804ba1da0817053855b7da7c1898bdad201f"
+    },
+    {
+      "path": "crates/render/src/warp.rs",
+      "sha256": "7bcc16bfa2377a57f9d37a39fabb19fff12e1189df5c984be7aff8c468662014"
+    },
+    {
+      "path": "crates/render/tests/fixtures/colr-squares.ttf",
+      "sha256": "7dee7d437ce4a82e14e264f3aca347c2c1b512af5a8c580e0562e2360d8b2abf"
+    },
+    {
+      "path": "crates/render/tests/fixtures/make_colr_font.py",
+      "sha256": "3338dbbf7eb07c8c949b5550775aee6b6c6c5344638a7d8431d7910e63d6df93"
+    },
+    {
+      "path": "crates/text/Cargo.toml",
+      "sha256": "8b532e291c67f774843b17e683bf388ff6eccbcb9f071d81e1c235d9a0f29591"
+    },
+    {
+      "path": "crates/text/src/bidi.rs",
+      "sha256": "582da8ced066c5d80b8d4c10988ae66329c4b1da280bccaff5b24e49b9b7ff9b"
+    },
+    {
+      "path": "crates/text/src/datetime.rs",
+      "sha256": "881e594046311e4e6f059458832db3543b1a0ae0f9e74ee3b4ef25c5564a57f9"
+    },
+    {
+      "path": "crates/text/src/lib.rs",
+      "sha256": "33a615a043a264ddb5b39c6310eb286a725503216ab4030e4421d937e1072b40"
+    },
+    {
+      "path": "crates/text/src/tests.rs",
+      "sha256": "8ceceebca088e308685f8c4d3404958f8f65b3714c0c79ec25c3f5f684c96a38"
+    },
+    {
+      "path": "crates/ui-egui/Cargo.toml",
+      "sha256": "344bd3e2a852d6320f60d9e77d5d88b804e5049629a85358b7519669e5ab4815"
+    },
+    {
+      "path": "crates/ui-egui/build.rs",
+      "sha256": "86975899530148050a34ac8bd005fd1bf214982c19c0e274e4b412c3caccbe80"
+    },
+    {
+      "path": "crates/ui-egui/examples/icon_gallery.rs",
+      "sha256": "8c7a209c08b3dae8f91b24986d9f82cc017186e2b8f2e1c0afd3cfcc38f1641c"
+    },
+    {
+      "path": "crates/ui-egui/src/animpane_tests.rs",
+      "sha256": "923efb53ae45f228e382d9573f9f9d4c74607e9ea149a02ebdcab21bdfd83474"
+    },
+    {
+      "path": "crates/ui-egui/src/animtimeline.rs",
+      "sha256": "c8a8fa6c02ea0e24569e4a5aa69fd325c142a54b7d93152e120b6b787b2a0ca1"
+    },
+    {
+      "path": "crates/ui-egui/src/background_tests.rs",
+      "sha256": "cde87277faeb40a6ad0e3782becf24eb462f5240ab8e349edddf5cb4398d4c5f"
+    },
+    {
+      "path": "crates/ui-egui/src/backstage.rs",
+      "sha256": "afec2ce043c2bb5051dc6bc923746f094f586c612f83748d4f37a8113546749d"
+    },
+    {
+      "path": "crates/ui-egui/src/backstage_tests.rs",
+      "sha256": "38e52ed7d0b87d5ddfea40c93e9e8551589650ff645775b13ec6e48e88937714"
+    },
+    {
+      "path": "crates/ui-egui/src/browsetheme_tests.rs",
+      "sha256": "cf31f41501b1eee93f85edac1c054291a8d255dcb4738f7519c4d1c9cd565134"
+    },
+    {
+      "path": "crates/ui-egui/src/canvas.rs",
+      "sha256": "1f0bd0e216aba789e26fcf82bb8ae16a1571def1c172fe04c6843cb70d676380"
+    },
+    {
+      "path": "crates/ui-egui/src/compare_tests.rs",
+      "sha256": "6bd642986b9a67afd78f9b14bb48217c4ea06e689f5eade0f15cb65421b9475a"
+    },
+    {
+      "path": "crates/ui-egui/src/control.rs",
+      "sha256": "4507a41d6cc8460d4ff955a2076cf677ab3827acf87dbed32f82926ece882e9e"
+    },
+    {
+      "path": "crates/ui-egui/src/credits.rs",
+      "sha256": "4cf91b98516a122fc2085d66b798225cded3534199556ccdae63c87dfa70bff2"
+    },
+    {
+      "path": "crates/ui-egui/src/datetime_tests.rs",
+      "sha256": "da11c310a0a714515c2070701a4d90373f75b0e79c9bbfdf4d429c6181b8ce1e"
+    },
+    {
+      "path": "crates/ui-egui/src/dialogs.rs",
+      "sha256": "6558261cc24cf768cb5b3a5c82e585e51f633a1fd76f6cc883204697eb58fa7b"
+    },
+    {
+      "path": "crates/ui-egui/src/doc_window.rs",
+      "sha256": "a8f3543a562d8bbb30e7adf54b50676454d0d41e0e1f70fa811011f619232295"
+    },
+    {
+      "path": "crates/ui-egui/src/drawtable_tests.rs",
+      "sha256": "4668e1f2ef3689ff8a69d0653a53a98bcc6cfd2171c4713c63bf202f23ab9286"
+    },
+    {
+      "path": "crates/ui-egui/src/effects_tests.rs",
+      "sha256": "1d8d31ccad2ff5c20861905a715c5dfe278edbee39a554e7613b00a8133a3d2d"
+    },
+    {
+      "path": "crates/ui-egui/src/eyedropper.rs",
+      "sha256": "4aec62bd0c25b24e60b6b9b35fd9f8fa35e8a1f3d279a1e6a042cef367cec525"
+    },
+    {
+      "path": "crates/ui-egui/src/eyedropper_tests.rs",
+      "sha256": "aa3d7a7b6c53a8c861165c8896df3ff5a0378c90f91778fecd66e865144af7fa"
+    },
+    {
+      "path": "crates/ui-egui/src/fillui.rs",
+      "sha256": "3fdb89b99b61e558da1a7fc4716dbad2a768f49f04274a154abf33e10ec826af"
+    },
+    {
+      "path": "crates/ui-egui/src/font_dialog_tests.rs",
+      "sha256": "0d7511fc01e8aefd58816283160c2b46bc7831fb6a46b71a0a0359d8229b9029"
+    },
+    {
+      "path": "crates/ui-egui/src/guides_tests.rs",
+      "sha256": "ab9f2d472df73f2740b121e0a928fb679c916471a8952b65575152ea110b0843"
+    },
+    {
+      "path": "crates/ui-egui/src/huge_deck_tests.rs",
+      "sha256": "7867af43745fedb7d0db0157c531112e146b3080a23a3f5ae34e9321dfb5bd76"
+    },
+    {
+      "path": "crates/ui-egui/src/icons.rs",
+      "sha256": "d6abf35d3f22af90c547186fe6a862f982475ab0c5888cc090ed0260225183ef"
+    },
+    {
+      "path": "crates/ui-egui/src/ime_tests.rs",
+      "sha256": "7934327980a1221420297852a35a0567614a36d3cb84be2c1ade6041fc32b5c9"
+    },
+    {
+      "path": "crates/ui-egui/src/inbox_tests.rs",
+      "sha256": "5818c1a057cd0a401a7976836c5718c236ddb6192f8b82e0f45a49c52a9f3c4d"
+    },
+    {
+      "path": "crates/ui-egui/src/inktoshape_tests.rs",
+      "sha256": "bea47ac463dfcf0662b3a3b66d43d703c4d5dd2443305a5e34dc8e7826c697d0"
+    },
+    {
+      "path": "crates/ui-egui/src/lib.rs",
+      "sha256": "472193e5af53fd84b1f82438fe977488ae2ada3c2098172f910dd1f25884bb6f"
+    },
+    {
+      "path": "crates/ui-egui/src/master_layout_tests.rs",
+      "sha256": "0c9328807e5b846cbc5095128aa36e97ed2d67db843c67bf35a970d625b9f231"
+    },
+    {
+      "path": "crates/ui-egui/src/media.rs",
+      "sha256": "6dab365f5a53f4514630ac6e03c9c3d33d4c526ee4c3eafd00eacb8563549d47"
+    },
+    {
+      "path": "crates/ui-egui/src/menus.rs",
+      "sha256": "0e4cbb80ef4a1a6fc810cd935eb9a1be25eb4ce42ad7f47edbf35610f515cec0"
+    },
+    {
+      "path": "crates/ui-egui/src/notes.rs",
+      "sha256": "9b5dd2220661def20468d24744b41bb880289c5070a1d81f9f81e49df894158e"
+    },
+    {
+      "path": "crates/ui-egui/src/opening.rs",
+      "sha256": "9b65397f01cc9a4b8be5c011b5476e60067143f2f12cbcdc18d158b89f05523e"
+    },
+    {
+      "path": "crates/ui-egui/src/panes.rs",
+      "sha256": "613221cc298566886c44c96f9740badba2bb7f26277cde5261a79f85347a1a84"
+    },
+    {
+      "path": "crates/ui-egui/src/paragraph_dialog_tests.rs",
+      "sha256": "e8d485d9445a0c4145ff6991c5d79656535b78a756909e827db6ea34ff0b467a"
+    },
+    {
+      "path": "crates/ui-egui/src/photo_album_tests.rs",
+      "sha256": "2dd97cb7f59d8d605a163b71b0902b156b5b260d14c5a2617d2b5a4108b2c054"
+    },
+    {
+      "path": "crates/ui-egui/src/preview.rs",
+      "sha256": "26795413798b15b267b691595888809cde6e8df505ae88edbac165680fa3b412"
+    },
+    {
+      "path": "crates/ui-egui/src/qat.rs",
+      "sha256": "74af8cb9569b8301de567446f62834ec1f5534d611ca5eb19db68234f42b68a6"
+    },
+    {
+      "path": "crates/ui-egui/src/replacefonts_tests.rs",
+      "sha256": "4e1ad1cd27c262da2adec0a6ab555dcf6d311223763db3968a899dfd65865ff3"
+    },
+    {
+      "path": "crates/ui-egui/src/ribbon.rs",
+      "sha256": "6fc245945ef58869d1794b15a093225a31591e28265da0a37424e285c0fba1a5"
+    },
+    {
+      "path": "crates/ui-egui/src/ruler_tests.rs",
+      "sha256": "49ea207cb9c6ce98d24c2175f9feb64d4f066fbf8acf619fdc5fcf9efe3458e7"
+    },
+    {
+      "path": "crates/ui-egui/src/selpane.rs",
+      "sha256": "9cc79a533acc9f708ac55e86e1034885da57e761a960eb560d7285d5b8c99261"
+    },
+    {
+      "path": "crates/ui-egui/src/selpane_tests.rs",
+      "sha256": "afadbf391e1bdb52c295be830e6db6f9d3a99e22711fbc5a6274e8e62fbd7044"
+    },
+    {
+      "path": "crates/ui-egui/src/settings.rs",
+      "sha256": "9a7cdc95e981e5c65ee2cde2683111e8f7666031c3d78861fb455e9529766ea3"
+    },
+    {
+      "path": "crates/ui-egui/src/show.rs",
+      "sha256": "ee593b501aed4d60ad64f27f2bcc4d7566f81e3ff2ed34785628bc73d3562bd9"
+    },
+    {
+      "path": "crates/ui-egui/src/size_position_tests.rs",
+      "sha256": "c496bc3212249be9d0f69adc991830db4063a3e5d6bf8d919fe8f751ee1e4757"
+    },
+    {
+      "path": "crates/ui-egui/src/slide_size_tests.rs",
+      "sha256": "755ff3a294956be217d8b2909ba3482d9f09fdebc24c303e6ee8abecdfba5ace"
+    },
+    {
+      "path": "crates/ui-egui/src/smartart_tests.rs",
+      "sha256": "1056faa880fa3c3047a766d540728f3ca4037f627bb9488b048f2c632b6f2b25"
+    },
+    {
+      "path": "crates/ui-egui/src/sorter.rs",
+      "sha256": "3ca4026c4b86026cd4251998e286a8c31f0c12ac468a228097e36af08a63795c"
+    },
+    {
+      "path": "crates/ui-egui/src/sorter_tests.rs",
+      "sha256": "de11f3286b0bd16c0370dfc032156bc481e3b1e9afffc06e843520c290316613"
+    },
+    {
+      "path": "crates/ui-egui/src/spelling_tests.rs",
+      "sha256": "0d28879bdba61e246f8709ad44aa682994012bfac232a34b35ed3f7ef75f8081"
+    },
+    {
+      "path": "crates/ui-egui/src/squiggles.rs",
+      "sha256": "395c3b4f680cfc20126323c945e8e56b510768b2886b9fbe3880b465e07bdb1e"
+    },
+    {
+      "path": "crates/ui-egui/src/status.rs",
+      "sha256": "56d448f5d66c0755c1e37b811f8cb4149276ce88904c21ca0eafa3b43e2deece"
+    },
+    {
+      "path": "crates/ui-egui/src/texture_limit_tests.rs",
+      "sha256": "9b20bc30beecd12d044a060d5a1bc9557f40acc4bd20d5203b48678c2d2f8bff"
+    },
+    {
+      "path": "crates/ui-egui/src/textures.rs",
+      "sha256": "0b62ac7e0333cd353e7b5527ec06c7b78357b17f4f65d03cdddfd4a9b183a69b"
+    },
+    {
+      "path": "crates/ui-egui/src/theme.rs",
+      "sha256": "347ec737fd6597219113bde8411edefe520231bdca948c8b10ad9983eef904b1"
+    },
+    {
+      "path": "crates/ui-egui/src/theme_colors_tests.rs",
+      "sha256": "4c84ca01f8ebe37dc6afcb6b2e536b0c1a36a15314c142e7a3ea9b5a96bb053c"
+    },
+    {
+      "path": "crates/ui-egui/src/theme_fonts_tests.rs",
+      "sha256": "985ebf1ad7988325ae1252971105bc6491b9aa943f096ccdb10e6671952eef43"
+    },
+    {
+      "path": "crates/ui-egui/src/thesaurus_tests.rs",
+      "sha256": "e7c90f589d7e70090f5ba476d1251bce677b6b819b7ca288e5acc3bfa34c529b"
+    },
+    {
+      "path": "crates/ui-egui/src/thumbs.rs",
+      "sha256": "1e7239c6f0687d0b39612d03757baae1b0b7dec8107c7e129a57397d083ee8d1"
+    },
+    {
+      "path": "crates/ui-egui/src/toast.rs",
+      "sha256": "dfb12f352aaf65a60a524a6ee436edfaaa795501a9b373fb4ab0c6a095c83738"
+    },
+    {
+      "path": "crates/ui-egui/src/ui_soak_tests.rs",
+      "sha256": "57da34a1f30a7a5f05234c58917fe274491772cb5ba7979005bdea1d2eec2053"
+    },
+    {
+      "path": "crates/ui-egui/src/uifonts.rs",
+      "sha256": "79ff86ec17dc0b8b77719e3034aa3ec078b263a164bdba1369f7f694f47f060c"
+    },
+    {
+      "path": "crates/ui-egui/src/widgets.rs",
+      "sha256": "3aee610de14a18b6ad20edac2c91ddd5632193ca867f54e5b52ba0941860cb26"
+    },
+    {
+      "path": "crates/vp9/Cargo.toml",
+      "sha256": "be42dcafaf42ea35ef05e642306951db16a2f2a5060556a7a5656ebcee7d8e4e"
+    },
+    {
+      "path": "crates/vp9/src/boolcoder.rs",
+      "sha256": "2c5b8c183d10f7c63818b082a06fb83210a8491b270913940ee2729b64cc6c68"
+    },
+    {
+      "path": "crates/vp9/src/decoder.rs",
+      "sha256": "0ee405859291f340e6b80aaa2327b0cbd65a35b30ae1b8655459f2c633b50b61"
+    },
+    {
+      "path": "crates/vp9/src/error.rs",
+      "sha256": "08efc675b9734e3c5cbd7bbf837d6a0526b6668ffccdd1cde36f39671cf522c0"
+    },
+    {
+      "path": "crates/vp9/src/frame.rs",
+      "sha256": "0a5d311a7ded97ab0e601727355e0fa83b6553eced948e3b68b64d280dc331b5"
+    },
+    {
+      "path": "crates/vp9/src/header.rs",
+      "sha256": "fbb3bae9f0e7b4ce7a354c8a25904e1825ef2d5743a4c25451a64a956a21d3dd"
+    },
+    {
+      "path": "crates/vp9/src/inter.rs",
+      "sha256": "8547c8076c7d5ae27e99de55f9c5adb62ec4e711284e1ed6af00bbe36c808b28"
+    },
+    {
+      "path": "crates/vp9/src/intra.rs",
+      "sha256": "ff84efa437850493f984bcf90eb585fde8098407c926826e9be950f1da541362"
+    },
+    {
+      "path": "crates/vp9/src/lib.rs",
+      "sha256": "0596929f688f4fdc74aaafa2fc43af99d960016e44e585ab63a761ce6b2d26b3"
+    },
+    {
+      "path": "crates/vp9/src/loopfilter.rs",
+      "sha256": "eb6c829f652b3e8882ffaa99f097674340dc45b504ed30add80b157452eb5753"
+    },
+    {
+      "path": "crates/vp9/src/probs.rs",
+      "sha256": "65ee4e1fdcdc1fc6567523eb5326cf66536eac8b86897764feb75fb585decf27"
+    },
+    {
+      "path": "crates/vp9/src/spec_tables.rs",
+      "sha256": "2b21a1f4354d8ccfbae85dfe94ed255ac4d2b681a0e2fea9e0dac8c3c51fb60a"
+    },
+    {
+      "path": "crates/vp9/src/tables.rs",
+      "sha256": "89b5618a2573d99c8059d744d0ae458653e78745dfabb44d47ee3bc2c5482627"
+    },
+    {
+      "path": "crates/vp9/src/tile.rs",
+      "sha256": "b58c5d18ba9d14d7aecce2c105d91e0d20c18669c8510a7ee95f0791ea9e14fa"
+    },
+    {
+      "path": "crates/vp9/src/tile/recon.rs",
+      "sha256": "f2bcfc0baab39d9085ec12cc9607a8710e3bc63970030d409fa35f4e8c1ab69b"
+    },
+    {
+      "path": "crates/vp9/src/transform.rs",
+      "sha256": "2dc75c765cae8e0ca7979a7d802d195546229f155706d02549bb584a978151c8"
+    },
+    {
+      "path": "crates/vp9/src/transform_gen.rs",
+      "sha256": "1dab758ce299fc59f1cfeb4d15014dfcea655cd3f085659d30eb287d71b9643f"
+    },
+    {
+      "path": "docs/animation-parity.md",
+      "sha256": "4013eb6e3f3dc6770451975fd88c78635cf1225538652a671aad5eadcc58ff0d"
+    },
+    {
+      "path": "docs/architecture.md",
+      "sha256": "9b41b8010b612dcd4cd794c80f0bf6e1a63e2bddf45bb9390e1228eb2a7db372"
+    },
+    {
+      "path": "docs/brand/LICENSE-brand.txt",
+      "sha256": "c5ad8e77d0dd8939161b4c4eca7aaba2437d6340c29e7809fa4679f0f2a82f62"
+    },
+    {
+      "path": "docs/brand/artcraft-logo-white.png",
+      "sha256": "8b86aeb06a12a90ba77a60e0d90329272310e244ee5c1f9b161b391280ca79d8"
+    },
+    {
+      "path": "docs/brand/artcraft-logo-white.svg",
+      "sha256": "a3e03dc49f9ad4225b8517d5424309c8d1c864d3996d862190d9cc797d5af427"
+    },
+    {
+      "path": "docs/brand/artcraft-logo.png",
+      "sha256": "08fc6d9d3717e8f13417bac6f9025b50e11d1e0b32e9e000883d2fe0c4a0c67b"
+    },
+    {
+      "path": "docs/brand/artcraft-logo.svg",
+      "sha256": "3188971e1affdf4f6be4fa65f715376a7a305e6aa741ec78b0296c8f934eff08"
+    },
+    {
+      "path": "docs/brand/artcraft-mark-black.png",
+      "sha256": "5954cc0306e1b9d7beb47097e2e842157113a39d9aba078b57304902687936a9"
+    },
+    {
+      "path": "docs/brand/artcraft-mark-black.svg",
+      "sha256": "570adcb4f7ba8ca0647f97074476bab81d3272988f1cdee52efa21bf026036a4"
+    },
+    {
+      "path": "docs/brand/artcraft-mark.png",
+      "sha256": "9d372157a949c147318561e629b11561c28b7cbc14c84b516a3fe6e84d8fbbad"
+    },
+    {
+      "path": "docs/brand/artcraft-mark.svg",
+      "sha256": "f87af81b6fa411da8820eed2bfdcc54c0ee9cd453b4e868c64f56c69db142d0e"
+    },
+    {
+      "path": "docs/contributors.md",
+      "sha256": "9bfc371ce577e1f1d7b09c76d4973ecfa061e58938188a1196a84f14ce8a4af9"
+    },
+    {
+      "path": "docs/control-protocol.md",
+      "sha256": "dd46884320d887ffa3b3247172cecc3e6287b0cdde9d76889fffeaa3f48dce27"
+    },
+    {
+      "path": "docs/file-format-parity.md",
+      "sha256": "c2a37d2eb10f55568cb2c5caba94688a1fd36053ec073037f528ec029fb627b2"
+    },
+    {
+      "path": "docs/gaps.md",
+      "sha256": "f269d787b6a804f2e96a3dfa4c3ac6db68675b4948c45b9abfd003eaf56a8ecf"
+    },
+    {
+      "path": "docs/hardware-parity.md",
+      "sha256": "f4b23067f8ecaa4e3c91d96a8f3b54be54a6ebef2e0cefa3809919512430bfb0"
+    },
+    {
+      "path": "docs/images/dark-mode.png",
+      "sha256": "a5704d75ffcbf7f723e2eb2c5efe592637a8e1fd0655ae6bff36a773d4fdd693"
+    },
+    {
+      "path": "docs/images/editor.png",
+      "sha256": "45ef129dcc26f3ce829cc8f30879e5547afc6f29054f9abff13e4e1a2cb04350"
+    },
+    {
+      "path": "docs/images/format-pane.png",
+      "sha256": "32e99f6023e32d0faff01cb641feb8fd5737ff57ef4f9a18d38eb4acb4a71b6b"
+    },
+    {
+      "path": "docs/images/sample-deck.png",
+      "sha256": "e93e83a630b4aba745401b50bd52ce94b2b00cb7a31fe3c8afbd544007c1c311"
+    },
+    {
+      "path": "docs/images/shape-format.png",
+      "sha256": "98520d38a810b1d86c27b78e64465f6598cd259c588e26aead5c2b63a34e40be"
+    },
+    {
+      "path": "docs/images/slide-sorter.png",
+      "sha256": "e0f6d1e03d6b55d3c3e33670a4dab02ad19666feec76829c064c7e697db8dc45"
+    },
+    {
+      "path": "docs/localization-parity.md",
+      "sha256": "ccb55a35d862b41f20254a5d87e29ac1c0a0a3c42dc59e77ffe90b10fa8e71b4"
+    },
+    {
+      "path": "docs/mcp.md",
+      "sha256": "26fd57114b379fa37fce1ecb679b0ede885e8c746630e618aed301d6ad0c5d8f"
+    },
+    {
+      "path": "docs/parity-checklist.md",
+      "sha256": "579603cbbd9978c35e20776a57d0144ead495aff5736addb2820a93fc05a9f34"
+    },
+    {
+      "path": "docs/roadmap.md",
+      "sha256": "48c1981fbdb0f7846ceeb39961b6d03941484a7455d37a02194d5608eb343886"
+    },
+    {
+      "path": "docs/slideshow-parity.md",
+      "sha256": "7f392d166f25c9503c441e7ad88f668160a1d294b08b5fb34f9d82719f412f36"
+    },
+    {
+      "path": "docs/target-app-parity.md",
+      "sha256": "b39b018589126d7629a1203d2974c33297de40c154363237e6e58e4ab8620e54"
+    },
+    {
+      "path": "docs/ui-parity.md",
+      "sha256": "5d5a13a3081a7c4b0ac49ce072872dcf9552fa580ed69f2cd39ae77569c007d7"
+    },
+    {
+      "path": "licenses/pdf-writer/LICENSE-ICC.txt",
+      "sha256": "469d87b5fa48f8aaf69e25f4fcac3a309c97dbb7d561b917638abdb640e004d9"
+    },
+    {
+      "path": "omastore.toml",
+      "sha256": "a8d2ab25fc85c5c1845e1baa1f362696dca15ca238fe288ebfb27d6cd76d8494"
+    },
+    {
+      "path": "packaging/.shellcheckrc",
+      "sha256": "323ba610a82be091a8e811681fc6d6eaf28189b7a1b7cf7ec31a185a69811f43"
+    },
+    {
+      "path": "packaging/common.sh",
+      "sha256": "eaab388ac13bee59e98f1253714681baafa1fa90534e62c1b190e1664df94de4"
+    },
+    {
+      "path": "packaging/freebsd/package.sh",
+      "sha256": "0751fbc4e75625d138e081f01e976edd10ad266d61a62908646616ced63a5ab5"
+    },
+    {
+      "path": "packaging/icons.sh",
+      "sha256": "0bb08c2faa132772578f63a49317f146574a4166cc3aae9aa907eccf62a4bb02"
+    },
+    {
+      "path": "packaging/linux/ai.storyteller.deckcraft.desktop",
+      "sha256": "5b949eb272d575ca860c942a3882b435d77f653d77fa943d6565b345541da0b9"
+    },
+    {
+      "path": "packaging/linux/ai.storyteller.deckcraft.metainfo.xml.in",
+      "sha256": "32b11f22137bcca6e094f7e978852f78598fa0b4574841da0916fae5ff347e3f"
+    },
+    {
+      "path": "packaging/linux/ai.storyteller.deckcraft.mime.xml",
+      "sha256": "c3d96b105a96482ee89d8e79d4c5846af600009853cf82852bd4a8d774cea301"
+    },
+    {
+      "path": "packaging/linux/flatpak-bundle.sh",
+      "sha256": "e34e409c7386aad5b09c58e46f2a6957986cddaed10a515e24259595805dcd84"
+    },
+    {
+      "path": "packaging/linux/flatpak/ai.storyteller.deckcraft.bundle.yml",
+      "sha256": "52ef6e9414bc4356e886e19ddd01b2e59ad7b39d2f8d01ec761a51ec243bceb5"
+    },
+    {
+      "path": "packaging/linux/flatpak/ai.storyteller.deckcraft.yml",
+      "sha256": "4a721bbe8278bc54b9742838cc5a29fc43d9e784a95c10471e3c2f16ef80bf8a"
+    },
+    {
+      "path": "packaging/linux/nfpm.yaml",
+      "sha256": "ff9a5af57c0e7cab6df8f2c2b7bc9f2913fd59fdda8f2d94e0ea9192de97ea87"
+    },
+    {
+      "path": "packaging/linux/package.sh",
+      "sha256": "3093157b5639932629428cb14e56d50401c3b12e99f2d845ac2489b3877a979f"
+    },
+    {
+      "path": "packaging/linux/postinst.sh",
+      "sha256": "dd71f9ebaae3a82d0e7c917630b456fd1f6b4bc55c238d9973d7c86fefd57440"
+    },
+    {
+      "path": "packaging/macos/Info.plist.in",
+      "sha256": "608a153816bb9f15930dc53a6af57c8c1dd3984972f7780cfb0d0113219d19bb"
+    },
+    {
+      "path": "packaging/macos/dmg/README.md",
+      "sha256": "67c2043a1fcea754c652e2d7566f3b856f324b3624fbddf18843f07a36c734ef"
+    },
+    {
+      "path": "packaging/macos/dmg/background.svg",
+      "sha256": "28b1cde806ea648fc2cc5602c0f14cde0dcd9943f3eca4902e36a895d8d64605"
+    },
+    {
+      "path": "packaging/macos/dmg/background.tiff",
+      "sha256": "ada6f2af05218ff4af598225ebf956512f48ed063aa07d93accdb039844d9728"
+    },
+    {
+      "path": "packaging/macos/dmg/dmg-layout.DS_Store",
+      "sha256": "dacf9a397cdfa476c7e09e1f352f29d66fee99b2e69bfa97f278d9958e8fc873"
+    },
+    {
+      "path": "packaging/macos/dmg/generate.py",
+      "sha256": "7403640fa4bf0a14059f4da1bd24c79062f9238d2e20ef80a7c23060855ccfa7"
+    },
+    {
+      "path": "packaging/macos/entitlements.plist",
+      "sha256": "5a846a2cb8efde5d4386f2953c47bab4487e6cc7462fa5e9ce9e17e13ae289dc"
+    },
+    {
+      "path": "packaging/macos/import-cert.sh",
+      "sha256": "f1aab28052f6b88907d6b14ceac47736cf678b8ba527226203141ef7cc3cf5db"
+    },
+    {
+      "path": "packaging/macos/package.sh",
+      "sha256": "6b73a31b522b84b342bf9c50fe5259f62bb4592e5452517a0a5bf215046a48a6"
+    },
+    {
+      "path": "packaging/web/.htaccess",
+      "sha256": "c92d61b428bff284fce08dc57f0255261476397f2cba5836c833974eded5c725"
+    },
+    {
+      "path": "packaging/web/README.md",
+      "sha256": "82f7bcec29007abab2f9e9308924021f1f59b88927293fa44665643ecf83c161"
+    },
+    {
+      "path": "packaging/web/_headers",
+      "sha256": "e3e253de74fb99a761fc91d4dec4b81ad6a1022b29c98761b5ac1e8ba5aff05a"
+    },
+    {
+      "path": "packaging/web/package.sh",
+      "sha256": "ad27ccac4c851f6006ac557627553de0f0cffb9e17c647f127a907253a409602"
+    },
+    {
+      "path": "packaging/windows/deckcraft.wxs",
+      "sha256": "1204ef8bdba9334709fc07227733c5867a34bdd4f865aea8163f5ace587f09d9"
+    },
+    {
+      "path": "packaging/windows/package.ps1",
+      "sha256": "a006d0904c5a6c27d5e3dbf767fbe548d6ad0f711ef9d6f0068e91057d45d999"
+    },
+    {
+      "path": "packaging/windows/sign.ps1",
+      "sha256": "4abeac1de0133c7285d9a29492a5e37a59d220294e4023e3931a543b01ee389d"
+    },
+    {
+      "path": "rustfmt.toml",
+      "sha256": "1b51e53edb3571229e84540b9b08514fb23d8c8d3225e8b984773f5c36eaa906"
+    },
+    {
+      "path": "xtask/Cargo.toml",
+      "sha256": "1ba4d19eaa380fac4eb66f2195d9d2dbd3ef159edcf16d01e7a81e26f2efad3b"
+    },
+    {
+      "path": "xtask/src/assets.rs",
+      "sha256": "d0f7b438227824decbff6cae6d7288fd747eda71e4e17c113b124e013ff5adeb"
+    },
+    {
+      "path": "xtask/src/bench.rs",
+      "sha256": "5a86e98ab577fadc1ed5427b7ad3e2bab16d76d77a6dd8f08ec27adf2a9aff82"
+    },
+    {
+      "path": "xtask/src/ico.rs",
+      "sha256": "8897ea80552e065f7c6966d8a635aff0f88ffbd01b302fdf4944dd687c1b67ee"
+    },
+    {
+      "path": "xtask/src/layers.rs",
+      "sha256": "5a247b481b60cd011230e2bd7a08f8e7259a2e4d5690285d917a428ea23e3f39"
+    },
+    {
+      "path": "xtask/src/main.rs",
+      "sha256": "6151c35303c3d6475b046259cdff44ec66ba2e1d5145475caa1c67097915280f"
+    },
+    {
+      "path": "xtask/src/parity.rs",
+      "sha256": "a8c5c88b12c40e6ca463815eb98785f0ce649e9039d9ba38d49b270e95166810"
+    },
+    {
+      "path": "xtask/src/pdf_deps.rs",
+      "sha256": "821766b121e36046151e8be2c79a33de324e5307e56523a1afd0da20e188f316"
+    },
+    {
+      "path": "xtask/src/stats.rs",
+      "sha256": "eb8d3b627aff772a041d6fcf9a429487ca34b7b6157c6ad1bbae52e6999a70ec"
+    },
+    {
+      "path": "xtask/src/version.rs",
+      "sha256": "b2dafc89b4705a2f7d5e20084999fe2fc734ec5d2daa8981c3369c2c3d25dd86"
+    }
+  ],
+  "scope": "Original upstream file hashes before Open Office changes; modified source is recorded by Open Office commit and WASM manifest."
+}

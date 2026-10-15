@@ -1,0 +1,30 @@
+[package]
+name = "open-office-deckcraft-host"
+description = "Open Office local presentation canvas host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+deckcraft-engine = { workspace = true }
+deckcraft-ui-egui = { workspace = true }
+deckcraft-model = { workspace = true }
+deckcraft-pptx = { workspace = true }
+deckcraft-pdf = { workspace = true }
+egui = { workspace = true }
+serde_json = { workspace = true }
+zip = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+eframe = { workspace = true, features = ["default_fonts", "glow", "accesskit"] }
+wasm-bindgen = "=0.2.129"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["Window", "Document", "HtmlCanvasElement", "Clipboard", "ClipboardItem", "Navigator", "Blob", "BlobPropertyBag"] }

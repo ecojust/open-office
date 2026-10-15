@@ -158,6 +158,13 @@ async function checks() {
   const sheet = await newDocument('sheet');
   await selectCell('A1'); await page.keyboard.type('42'); await page.keyboard.press('Enter');
   await until(() => cell('A1'), state => state.value === 42, 'Actual spreadsheet numeric cell');
+  // The value is committed before Enter finishes closing the editor and moving
+  // the selection. Let that real input frame finish before measuring whether
+  // a later appearance change affects the revision or undo history.
+  await until(() => snapshot('sheet'), state => state.ui?.editor === null
+    && state.selection?.active?.col === 0 && state.selection?.active?.row === 1,
+  'Enter closes the cell editor and advances to A2');
+  await frames();
   await assertChrome('sheet');
   assert.equal((await snapshot('word', word.id)).dirty, true);
 

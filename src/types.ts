@@ -1,5 +1,7 @@
 export type DocumentKind = 'word' | 'sheet' | 'presentation' | 'pdf'
-export type DocumentExtension = 'docx' | 'odt' | 'doc' | 'rtf' | 'xlsx' | 'ods' | 'xls' | 'csv' | 'tsv' | 'pptx' | 'odp' | 'ppt' | 'pdf'
+export type DocumentExtension = 'docx' | 'xlsx' | 'csv' | 'tsv' | 'pptx' | 'potx' | 'ppsx' | 'pdf'
+/** Kept only to display previous recent-file records; opening still validates supported formats. */
+export type HistoricalDocumentExtension = 'odt' | 'doc' | 'rtf' | 'ods' | 'xls' | 'odp' | 'ppt'
 
 export interface DocumentReceipt {
   id: string
@@ -14,7 +16,7 @@ export interface NativeDocument extends DocumentReceipt { base64: string }
 export interface RecentDocument {
   id: string
   name: string
-  extension: DocumentExtension
+  extension: DocumentExtension | HistoricalDocumentExtension
   kind: DocumentKind
   lastOpenedAt: number
 }
@@ -36,10 +38,9 @@ export type SaveResult =
 export interface AppBootstrap {
   origin: string
   basePath: string
-  runtimeBaseUrl: string
   platform: string
   smokeMode: boolean
-  smokeScope?: 'full' | 'word-package-ipc' | 'rust-word-engine'
+  smokeScope?: 'full'
 }
 
 export interface NativeImage { name: string; base64: string; mimeType: 'image/png' | 'image/jpeg' }

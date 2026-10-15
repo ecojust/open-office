@@ -57,7 +57,7 @@ jobs:
           assert.ok(files.length > 0, 'No existing native verification reports were found');
           const escape = value => String(value).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
           for (const file of files) {
-            assert.ok(statSync(`diagnostics/${file}`).size <= 1024 * 1024, 'Diagnostic report exceeds 1 MiB');
+            assert.ok(statSync(`diagnostics/${file}`).size <= 12 * 1024 * 1024, 'Diagnostic report exceeds 12 MiB');
             const report = JSON.parse(readFileSync(`diagnostics/${file}`, 'utf8'));
             // GitHub truncates each annotation message at 4096 bytes. Preserve
             // valid JSON through numbered ASCII chunks instead of cutting JSON

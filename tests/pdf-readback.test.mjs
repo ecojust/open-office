@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { pdfReadbackText } from '../src/office/pdf-readback.ts'
+import { pdfReadbackText } from '../src/pdf/readback.ts'
 
 test('PDF font spans on the same line preserve exact mixed-language text and spacing', () => {
   assert.equal(pdfReadbackText([

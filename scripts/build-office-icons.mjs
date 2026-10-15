@@ -224,7 +224,7 @@ export function compileSvg(source, label = 'icon.svg') {
 export async function verifySharedIcons(root = ROOT) {
   const aliases = JSON.parse(await readFile(join(root, 'src/icons/shared.json'), 'utf8'))
   if (!aliases || Array.isArray(aliases) || typeof aliases !== 'object' || Object.keys(aliases).length > 1024) fail('shared.json must be a bounded object mapping icon names')
-  const safe = name => typeof name === 'string' && /^(word|sheet|shell)\/[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(name)
+  const safe = name => typeof name === 'string' && /^(word|sheet|deck|shell)\/[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(name)
   for (const [target, source] of Object.entries(aliases)) {
     if (!safe(target) || !safe(source) || target === source) fail(`invalid shared icon mapping ${target}`)
     const targetBytes = await readFile(join(root, 'src/icons/svg', `${target}.svg`))
@@ -260,11 +260,12 @@ function rustSource(family, icons) {
 }
 
 /** Pure --check: generate in memory, compare exact bytes, never write or launch Cargo. */
-export async function buildOfficeIcons({ root = ROOT, families = ['word', 'sheet'], check = false } = {}) {
+export async function buildOfficeIcons({ root = ROOT, families = ['word', 'sheet', 'deck'], check = false } = {}) {
   await verifySharedIcons(root)
   const products = []
   for (const family of families) {
-    if (!['word', 'sheet'].includes(family)) fail(`unknown family ${family}`)
+    const vendors = { word: 'wordcraft', sheet: 'gridcraft', deck: 'deckcraft' }
+    if (!Object.hasOwn(vendors, family)) fail(`unknown family ${family}`)
     const relative = `src/icons/svg/${family}`, directory = join(root, relative)
     const names = JSON.parse(await readFile(join(directory, 'names.json'), 'utf8'))
     if (!Array.isArray(names) || !names.length || names.length > 1024 || names.some(name => typeof name !== 'string' || !/^[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(name))
@@ -276,7 +277,7 @@ export async function buildOfficeIcons({ root = ROOT, families = ['word', 'sheet
     if (JSON.stringify(actual) !== JSON.stringify(expected)) fail(`${family} coverage differs: missing [${expected.filter(name => !actual.includes(name))}], unexpected [${actual.filter(name => !expected.includes(name))}]`)
     const icons = []
     for (const name of expected) icons.push({ name, paths: compileSvg(await readFile(join(directory, `${name}.svg`), 'utf8'), `${relative}/${name}.svg`) })
-    const output = join(root, `vendor/${family === 'word' ? 'wordcraft' : 'gridcraft'}/crates/ui-egui/src/office_icons.rs`)
+    const output = join(root, `vendor/${vendors[family]}/crates/ui-egui/src/office_icons.rs`)
     const content = rustSource(family, icons)
     let existing
     try { existing = await readFile(output, 'utf8') } catch (error) { if (error.code !== 'ENOENT') throw error }
@@ -293,7 +294,7 @@ export async function buildOfficeIcons({ root = ROOT, families = ['word', 'sheet
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2)
-  let check = false, families = ['word', 'sheet']
+  let check = false, families = ['word', 'sheet', 'deck']
   while (args.length) {
     const option = args.shift()
     if (option === '--check') check = true

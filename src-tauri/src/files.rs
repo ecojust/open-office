@@ -27,12 +27,13 @@ const IMAGE_LIMIT: u64 = 20 * 1024 * 1024;
 const ENCODED_LIMIT: usize = ((DOCUMENT_LIMIT as usize + 2) / 3) * 4;
 const HISTORY_LIMIT: u64 = 2 * 1024 * 1024;
 const MAX_RECENT: usize = 100;
-const EXTENSIONS: &[&str] = &[
-    "docx", "odt", "doc", "rtf", "xlsx", "csv", "tsv", "ods", "xls", "pptx", "odp", "ppt", "pdf",
-];
+const EXTENSIONS: &[&str] = &["docx", "xlsx", "csv", "tsv", "pptx", "potx", "ppsx", "pdf"];
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+// Keep retired variants readable so a previous recent-file database can be
+// migrated entry by entry. They are rejected by from_path and cannot be opened
+// or exported; no retired engine is registered or loaded.
 pub enum DocExt {
     Docx,
     Odt,
@@ -44,6 +45,8 @@ pub enum DocExt {
     Ods,
     Xls,
     Pptx,
+    Potx,
+    Ppsx,
     Odp,
     Ppt,
     Pdf,
@@ -62,6 +65,8 @@ impl DocExt {
             Self::Ods => "ods",
             Self::Xls => "xls",
             Self::Pptx => "pptx",
+            Self::Potx => "potx",
+            Self::Ppsx => "ppsx",
             Self::Odp => "odp",
             Self::Ppt => "ppt",
             Self::Pdf => "pdf",
@@ -75,19 +80,14 @@ impl DocExt {
             .ok_or("文件缺少受支持的扩展名。")?;
         match extension.to_ascii_lowercase().as_str() {
             "docx" => Ok(Self::Docx),
-            "odt" => Ok(Self::Odt),
-            "doc" => Ok(Self::Doc),
-            "rtf" => Ok(Self::Rtf),
             "xlsx" => Ok(Self::Xlsx),
             "csv" => Ok(Self::Csv),
             "tsv" => Ok(Self::Tsv),
-            "ods" => Ok(Self::Ods),
-            "xls" => Ok(Self::Xls),
             "pptx" => Ok(Self::Pptx),
-            "odp" => Ok(Self::Odp),
-            "ppt" => Ok(Self::Ppt),
+            "potx" => Ok(Self::Potx),
+            "ppsx" => Ok(Self::Ppsx),
             "pdf" => Ok(Self::Pdf),
-            _ => Err("请选择 DOCX、ODT、DOC、RTF、XLSX、CSV、TSV、ODS、XLS、PPTX、ODP、PPT 或 PDF 文件；宏、加密文件及其他格式暂不支持。".into()),
+            _ => Err("请选择 DOCX、XLSX、CSV、TSV、PPTX、POTX、PPSX 或 PDF 文件；其他格式请先转换为受支持的格式。".into()),
         }
     }
 
@@ -95,14 +95,21 @@ impl DocExt {
         match self {
             Self::Docx | Self::Odt | Self::Doc | Self::Rtf => DocumentKind::Word,
             Self::Xlsx | Self::Csv | Self::Tsv | Self::Ods | Self::Xls => DocumentKind::Sheet,
-            Self::Pptx | Self::Odp | Self::Ppt => DocumentKind::Presentation,
+            Self::Pptx | Self::Potx | Self::Ppsx | Self::Odp | Self::Ppt => {
+                DocumentKind::Presentation
+            }
             Self::Pdf => DocumentKind::Pdf,
         }
     }
 
     fn ensure_exportable(self) -> Result<(), String> {
-        if matches!(self, Self::Doc | Self::Rtf | Self::Xls | Self::Ppt) {
-            return Err("旧格式仅供导入。请另存为 DOCX、XLSX 或 PPTX 副本，原文件将保留。".into());
+        if !matches!(
+            self,
+            Self::Docx | Self::Xlsx | Self::Csv | Self::Tsv | Self::Pptx | Self::Pdf
+        ) {
+            return Err(
+                "此格式不能直接保存。演示模板和放映文件请另存为 PPTX 副本，原文件将保留。".into(),
+            );
         }
         Ok(())
     }
@@ -236,7 +243,13 @@ impl DocumentStore {
                     if !valid_id(&document.id)
                         || !valid_hash(&document.sha256)
                         || !document.path.is_absolute()
-                        || DocExt::from_path(&document.path)? != document.extension
+                        || !document
+                            .path
+                            .extension()
+                            .and_then(|value| value.to_str())
+                            .is_some_and(|value| {
+                                value.eq_ignore_ascii_case(document.extension.as_str())
+                            })
                         || document.path.file_name().is_none()
                         || !ids.insert(document.id.clone())
                         || !paths.insert(document.path.clone())
@@ -485,9 +498,9 @@ fn validate_file_name(name: &str, extension: DocExt) -> Result<(), String> {
     Ok(())
 }
 
-/// Screen the container header before passing local bytes to the Office engine.
-/// This is not a full ZIP/CFB parser: the engine must still parse and check its
-/// Word/Calc/Impress service, and refuse encrypted or damaged payloads.
+/// Screen the container header before passing local bytes to the active engine.
+/// This is not a full ZIP parser: each Rust editor must still parse and validate
+/// its document package and refuse encrypted or damaged payloads.
 fn validate_document_signature(bytes: &[u8], extension: DocExt) -> Result<(), String> {
     if bytes.is_empty() {
         return Err("文档为空，无法打开。".into());
@@ -504,30 +517,13 @@ fn validate_document_signature(bytes: &[u8], extension: DocExt) -> Result<(), St
         DocExt::Pdf => bytes[..bytes.len().min(1024)]
             .windows(5)
             .any(|window| window == b"%PDF-"),
-        DocExt::Rtf => {
-            let digits = bytes.get(5..).unwrap_or_default();
-            let end = digits
-                .iter()
-                .position(|byte| !byte.is_ascii_digit())
-                .unwrap_or(digits.len());
-            bytes.starts_with(b"{\\rtf")
-                && digits
-                    .first()
-                    .is_some_and(|byte| matches!(byte, b'1'..=b'9'))
-                && digits
-                    .get(end)
-                    .is_some_and(|byte| *byte == b'\\' || byte.is_ascii_whitespace())
-        }
-        DocExt::Doc | DocExt::Xls | DocExt::Ppt => {
-            if bytes.len() < 512 || !bytes.starts_with(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1") {
-                false
-            } else {
-                let value = |index| u16::from_le_bytes([bytes[index], bytes[index + 1]]);
-                value(28) == 0xfffe
-                    && value(32) == 6
-                    && matches!((value(26), value(30)), (3, 9) | (4, 12))
-            }
-        }
+        DocExt::Odt
+        | DocExt::Doc
+        | DocExt::Rtf
+        | DocExt::Ods
+        | DocExt::Xls
+        | DocExt::Odp
+        | DocExt::Ppt => false,
         _ => bytes.len() >= 30 && bytes.starts_with(b"PK\x03\x04"),
     };
     if !valid {
@@ -921,10 +917,8 @@ mod tests {
     #[test]
     fn import_only_formats_retain_kind_and_cannot_be_written_back() {
         for (extension, name, kind) in [
-            (DocExt::Doc, "doc", DocumentKind::Word),
-            (DocExt::Rtf, "rtf", DocumentKind::Word),
-            (DocExt::Xls, "xls", DocumentKind::Sheet),
-            (DocExt::Ppt, "ppt", DocumentKind::Presentation),
+            (DocExt::Potx, "potx", DocumentKind::Presentation),
+            (DocExt::Ppsx, "ppsx", DocumentKind::Presentation),
         ] {
             assert!(EXTENSIONS.contains(&name));
             assert_eq!(
@@ -936,11 +930,7 @@ mod tests {
             assert!(extension.ensure_exportable().is_err());
             let directory = tempfile::tempdir().unwrap();
             let path = directory.path().join(format!("source.{name}"));
-            let original = if extension == DocExt::Rtf {
-                b"{\\rtf1\\ansi example}".to_vec()
-            } else {
-                ole_header_fixture()
-            };
+            let original = zip_header_fixture(b"original presentation");
             fs::write(&path, &original).unwrap();
             let store = DocumentStore::new(directory.path().join("data")).unwrap();
             let opened = store.register_open(path.clone()).unwrap();
@@ -972,6 +962,57 @@ mod tests {
                 "A converted copy must preserve the original bytes"
             );
         }
+    }
+
+    #[test]
+    fn retired_formats_are_rejected_without_discarding_supported_history() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let store = DocumentStore::new(data.clone()).unwrap();
+        let active = directory.path().join("active.docx");
+        fs::write(&active, zip_header_fixture(b"active document")).unwrap();
+        let opened = store.register_open(active).unwrap();
+        let mut records = store.records().unwrap();
+        for (name, extension) in [
+            ("odt", DocExt::Odt),
+            ("doc", DocExt::Doc),
+            ("rtf", DocExt::Rtf),
+            ("ods", DocExt::Ods),
+            ("xls", DocExt::Xls),
+            ("odp", DocExt::Odp),
+            ("ppt", DocExt::Ppt),
+        ] {
+            assert!(!EXTENSIONS.contains(&name));
+            assert_eq!(
+                serde_json::from_str::<DocExt>(&format!("\"{name}\"")).unwrap(),
+                extension
+            );
+            assert!(DocExt::from_path(Path::new(&format!("old.{name}"))).is_err());
+            assert!(extension.ensure_exportable().is_err());
+            let old = directory.path().join(format!("old.{name}"));
+            fs::write(&old, zip_header_fixture(b"retired format")).unwrap();
+            assert!(store.register_open(old.clone()).is_err());
+            upsert_record(
+                &mut records,
+                old,
+                extension,
+                hash_bytes(&zip_header_fixture(b"retired format")),
+            )
+            .unwrap();
+        }
+        assert_eq!(store.records().unwrap().len(), 1);
+        store
+            .stage_history(&records)
+            .unwrap()
+            .persist(&store.inner.history_path)
+            .unwrap();
+        let restored = DocumentStore::new(data).unwrap();
+        assert_eq!(
+            restored.records().unwrap().len(),
+            8,
+            "Historical entries stay readable without loading a retired engine"
+        );
+        assert_eq!(restored.record(&opened.id).unwrap().extension, DocExt::Docx);
     }
 
     #[test]
@@ -1024,24 +1065,12 @@ mod tests {
     #[test]
     fn document_headers_reject_empty_mislabeled_and_broken_containers() {
         let ole = ole_header_fixture();
-        for extension in [DocExt::Doc, DocExt::Xls, DocExt::Ppt] {
-            assert!(validate_document_signature(&ole, extension).is_ok());
-            assert!(validate_document_signature(&ole[..100], extension).is_err());
-            let mut broken = ole.clone();
-            broken[28] = 0;
-            assert!(validate_document_signature(&broken, extension).is_err());
-            assert!(
-                validate_document_signature(&zip_header_fixture(b"renamed zip"), extension)
-                    .is_err()
-            );
-        }
         for extension in [
             DocExt::Docx,
-            DocExt::Odt,
             DocExt::Xlsx,
-            DocExt::Ods,
             DocExt::Pptx,
-            DocExt::Odp,
+            DocExt::Potx,
+            DocExt::Ppsx,
         ] {
             assert!(
                 validate_document_signature(&zip_header_fixture(b"package"), extension).is_ok()
@@ -1055,7 +1084,7 @@ mod tests {
                 validate_document_signature(b"<html>renamed document</html>", extension).is_err()
             );
         }
-        assert!(validate_document_signature(b"{\\rtf1\\ansi text}", DocExt::Rtf).is_ok());
+        assert!(validate_document_signature(b"{\\rtf1\\ansi text}", DocExt::Rtf).is_err());
         assert!(validate_document_signature(b"{\\rtf0 text}", DocExt::Rtf).is_err());
         assert!(validate_document_signature(b"{\\rtf1invalid}", DocExt::Rtf).is_err());
         assert!(validate_document_signature(b"\n%PDF-1.7", DocExt::Pdf).is_ok());
@@ -1077,7 +1106,11 @@ mod tests {
 
     #[test]
     fn presentation_formats_serialize_without_enabling_mismatched_files() {
-        for (extension, name) in [(DocExt::Pptx, "pptx"), (DocExt::Odp, "odp")] {
+        for (extension, name) in [
+            (DocExt::Pptx, "pptx"),
+            (DocExt::Potx, "potx"),
+            (DocExt::Ppsx, "ppsx"),
+        ] {
             assert!(
                 EXTENSIONS.contains(&name),
                 "Native open dialog must expose {name}"
@@ -1124,12 +1157,12 @@ mod tests {
             serde_json::from_value::<DocExt>(serde_json::json!("ppt")).unwrap(),
             DocExt::Ppt
         );
-        assert!(EXTENSIONS.contains(&"ppt"));
+        assert!(!EXTENSIONS.contains(&"ppt"));
     }
 
     #[test]
     fn presentation_save_and_history_reopen_preserve_bytes_identity_and_kind() {
-        // This tests the native opaque-byte file bridge; Impress parsing and
+        // This tests the native opaque-byte file bridge; Rust slide parsing and
         // actual slide edits are exercised by the separate engine round trips.
         let directory = tempfile::tempdir().unwrap();
         let data = directory.path().join("app-data");
@@ -1137,7 +1170,7 @@ mod tests {
         let existing = directory.path().join("已有文档.docx");
         fs::write(&existing, zip_header_fixture(b"existing word document")).unwrap();
         let word = store.register_open(existing).unwrap();
-        for extension in [DocExt::Pptx, DocExt::Odp] {
+        for extension in [DocExt::Pptx] {
             let path = directory
                 .path()
                 .join(format!("汇报.{}", extension.as_str()));
@@ -1190,7 +1223,7 @@ mod tests {
 
     #[test]
     fn presentation_conflict_preserves_external_edits_and_original_history() {
-        for extension in [DocExt::Pptx, DocExt::Odp] {
+        for extension in [DocExt::Pptx] {
             let directory = tempfile::tempdir().unwrap();
             let path = directory
                 .path()
@@ -1213,7 +1246,7 @@ mod tests {
 
     #[test]
     fn names_cannot_select_paths_devices_or_different_types() {
-        for valid in ["报告.docx", "财务 2026.xlsx", "笔记.ODT", "文档.pdf"] {
+        for valid in ["报告.docx", "财务 2026.xlsx", "笔记.DOCX", "文档.pdf"] {
             assert!(
                 validate_file_name(valid, DocExt::from_path(Path::new(valid)).unwrap()).is_ok()
             );
@@ -1256,7 +1289,7 @@ mod tests {
     #[test]
     fn target_created_after_save_dialog_is_not_overwritten() {
         let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("new.ods");
+        let path = directory.path().join("new.xlsx");
         let snapshot = TargetSnapshot::capture(path.clone()).unwrap();
         let staged = stage_bytes(&path, b"my edits", None).unwrap();
         fs::write(&path, b"someone else's new file").unwrap();

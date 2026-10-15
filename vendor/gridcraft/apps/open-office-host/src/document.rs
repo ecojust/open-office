@@ -30,13 +30,13 @@ pub(crate) fn clean_error(error: impl std::fmt::Display) -> String {
 
 impl Entry {
     pub fn new(name: &str, bytes: &[u8], document_id: u32, services: Services) -> Result<Self, String> {
-        // Lossy legacy imports stay in the compatibility workspace. Check content as well as
-        // the suffix, so an ODS renamed .xlsx cannot silently lose formulas or formatting.
+        // Reject unsupported imports by content as well as suffix, so an ODS renamed
+        // .xlsx cannot silently lose formulas or formatting.
         if !matches!(
             gridcraft_engine::io::FileKind::from_path(name),
             Some(gridcraft_engine::io::FileKind::Xlsx | gridcraft_engine::io::FileKind::Csv | gridcraft_engine::io::FileKind::Tsv)
         ) {
-            return Err("此工作区支持 XLSX、CSV 和 TSV；其他格式请使用兼容模式。".into());
+            return Err("此工作区仅支持 XLSX、CSV 和 TSV；请先将其他格式转换后再打开。".into());
         }
         if matches!(
             gridcraft_xlsx::sniff(bytes),
@@ -46,12 +46,12 @@ impl Entry {
                 | gridcraft_xlsx::Format::LegacyBinary
                 | gridcraft_xlsx::Format::Encrypted
         ) {
-            return Err("此文件需要兼容模式打开；原文件保持不变。".into());
+            return Err("当前版本不支持此文件格式或加密工作簿；原文件保持不变。".into());
         }
         let (workbook, warnings) =
             if bytes.is_empty() { (Workbook::new(), Vec::new()) } else { gridcraft_engine::io::open_bytes(name, bytes).map_err(clean_error)? };
         if workbook.vba_project.is_some() {
-            return Err("含 VBA 宏的工作簿需要兼容模式，以保留宏内容。".into());
+            return Err("当前版本不支持含 VBA 宏的工作簿；原文件保持不变。".into());
         }
         let mut session = Session::new();
         session.prefs.user_name = "Open Office User".into();

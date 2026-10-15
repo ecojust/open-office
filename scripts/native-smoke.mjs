@@ -8,15 +8,15 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { validateWordPackageReport } from './word-package-native-smoke.mjs';
 import { inspectInstalledWordcraft, validateNativeWordcraftEvidence, validateWordcraftNativeReport } from './wordcraft-native-smoke.mjs';
 import { inspectInstalledGridcraft, validateNativeGridcraftEvidence, validateGridcraftNativeReport } from './gridcraft-native-smoke.mjs';
+import { inspectInstalledDeckcraft, validateNativeDeckcraftEvidence, validateDeckcraftNativeReport } from './deckcraft-native-smoke.mjs';
 
 // This launches the final packaged GUI, not a source executable or an isolated
 // engine substitute. A native desktop session is required on the CI runner.
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TIMEOUT_MS = 300_000;
-const MAX_REPORT_BYTES = 1024 * 1024;
+const MAX_REPORT_BYTES = 12 * 1024 * 1024;
 const STREAM_TAIL_BYTES = 32 * 1024;
 const PLATFORMS = Object.freeze({
   'windows-x64': { os: 'win32', arch: 'x64', target: 'x86_64-pc-windows-msvc' },
@@ -24,95 +24,8 @@ const PLATFORMS = Object.freeze({
   'macos-arm64': { os: 'darwin', arch: 'arm64', nativeArch: 'arm64', target: 'aarch64-apple-darwin' },
 });
 
-export const REQUIRED_RUST_WORD_CHECKS = Object.freeze([
-  'Real IPC creates a clean Rust-owned document',
-  'Chinese and emoji insertion, paragraph breaks and history stay in Rust',
-  'Real IPC selection, bold/italic/size/color, alignment and undo/redo match snapshots',
-  'Real IPC DOCX export/reopen preserves text and formatting with Rust glyph paths',
-  'Saved-state tracking and stale-revision failure preserve the current Rust session',
-]);
-
 function requireCheck(value, message) {
   assert.ok(value, message);
-}
-
-/** Native IPC evidence and independent exported-byte validation, not UI acceptance. */
-export function validateRustWordEngineReport(report) {
-  requireCheck(report && typeof report === 'object' && !Array.isArray(report), 'Rust Word engine native IPC report is missing');
-  requireCheck(report.schemaVersion === 1 && report.ok === true, 'Rust Word engine native IPC checks failed');
-  requireCheck(report.transport === 'tauri-word-engine-request', 'Rust Word engine requires real Tauri IPC transport');
-  assert.deepEqual(report.checks, [...REQUIRED_RUST_WORD_CHECKS], 'Rust Word engine requires all five ordered IPC checks');
-  requireCheck(report.paragraphs === 2, 'Rust Word engine paragraph count changed');
-  for (const key of ['pages', 'glyphPaths']) {
-    requireCheck(Number.isSafeInteger(report[key]) && report[key] > 0, `Rust Word engine returned invalid ${key}`);
-  }
-  assert.deepEqual(report.cleanup, { attempted: 2, closed: 2, ok: true }, 'Rust Word engine did not close both native sessions');
-  requireCheck(report.error === undefined && report.closeError === undefined, 'Rust Word engine reported an operation or cleanup error');
-  const base64 = report.docxBase64;
-  requireCheck(typeof base64 === 'string' && base64.length > 0 && base64.length < MAX_REPORT_BYTES
-    && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64), 'Rust Word engine DOCX Base64 is missing or invalid');
-  const bytes = Buffer.from(base64, 'base64');
-  requireCheck(bytes.length > 100 && bytes.subarray(0, 4).equals(Buffer.from('504b0304', 'hex'))
-    && bytes.toString('base64') === base64, 'Rust Word engine produced no valid DOCX ZIP bytes');
-  // CI provides Python in all native and publication jobs. No npm package or
-  // application codec participates in this independent ZIP/XML readback.
-  const python = process.env.OPEN_OFFICE_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
-  const directory = mkdtempSync(join(tmpdir(), 'open-office-rust-docx-readback-'));
-  let result;
-  try {
-    const path = join(directory, 'export.docx');
-    writeFileSync(path, bytes, { flag: 'wx' });
-    result = spawnSync(python, [join(PROJECT_ROOT, 'scripts', 'rust-word-smoke-docx.py'), path], {
-      stdio: ['ignore', 'pipe', 'pipe'], shell: false, encoding: 'utf8', timeout: 15_000, maxBuffer: 64 * 1024, windowsHide: true,
-    });
-  } finally { rmSync(directory, { recursive: true, force: true }); }
-  requireCheck(!result.error && result.status === 0 && !result.signal,
-    `Rust Word engine independent DOCX verification failed: ${String(result.stderr || result.error?.message || 'invalid ZIP/XML').trim().slice(0, 500)}`);
-  let evidence;
-  try { evidence = JSON.parse(result.stdout); } catch { throw Error('Rust Word engine independent DOCX verification returned invalid evidence'); }
-  requireCheck(evidence?.ok === true && evidence.docxBytes === bytes.length, 'Rust Word engine independent DOCX byte evidence is invalid');
-  assert.deepEqual(evidence.paragraphs, ['Rust 正文 中文😀', 'Second paragraph'], 'Rust Word engine independent DOCX text differs');
-  assert.deepEqual(evidence.firstParagraphFormat, { bold: true, italic: true, fontSize: 14, color: '#C00000', align: 'center' }, 'Rust Word engine independent DOCX formatting differs');
-  return evidence;
-}
-
-export function validateOfficeWorkbenches(report) {
-  const word = report.wordWorkbench;
-  requireCheck(word?.schemaVersion === 1 && word.ok === true && word.reopenCount === 2, 'Word workbench did not complete both real DOCX reopenings');
-  requireCheck(word.heading === 'Native Word heading 中文' && word.body === 'Native body SECOND_SAVE_TOKEN 正文', 'Word workbench original text or second edit did not persist');
-  requireCheck(word.textStyle?.bold === true && word.textStyle.fontSize === 18 && word.textStyle.color === '#203A5D' && word.textStyle.outlineLevel === 1, 'Word workbench lost its semantic heading or text formatting');
-  requireCheck(word.table?.rows === 2 && word.table.columns === 2
-    && JSON.stringify(word.table.cells) === JSON.stringify([['项目', '值'], ['Native edited table', '84']]), 'Word workbench table is missing or its second edit was lost');
-  for (const [name, value] of Object.entries({ left: 20, right: 20, top: 18, bottom: 18 })) {
-    requireCheck(typeof word.margins?.[name] === 'number' && Number.isFinite(word.margins[name]) && Math.abs(word.margins[name] - value) < .05, 'Word workbench page margins did not survive saving');
-  }
-  requireCheck(typeof word.headerText === 'string' && word.headerText.includes('Native header 页眉')
-    && typeof word.footerText === 'string' && word.footerText.includes('Native footer 页脚'), 'Word workbench headers/footers did not reopen');
-  for (const key of ['docxBytes', 'pdfBytes']) requireCheck(Number.isSafeInteger(word[key]) && word[key] > 100, 'Word workbench exported no real document');
-  requireCheck(word.pdfTextVerified === true && Number.isSafeInteger(word.pdfPageCount) && word.pdfPageCount >= 1, 'Word workbench independent PDF readback failed');
-
-  const sheet = report.sheetWorkbench;
-  requireCheck(sheet?.schemaVersion === 1 && sheet.ok === true && sheet.reopenCount === 2, 'Calc workbench did not complete both real XLSX reopenings');
-  requireCheck(JSON.stringify(sheet.sheetNames) === JSON.stringify(['Native data 中文', 'Native summary']), 'Calc workbench sheet names or order did not persist');
-  requireCheck(JSON.stringify(sheet.sortedMatrix) === JSON.stringify([['地区', '销量', '成本'], ['南', 24, 8], ['北', 18, 6], ['北', 12, 5]]), 'Calc workbench sorted data differs from the original worksheet');
-  requireCheck(sheet.formula === '=SUM(G1:G2)' && JSON.stringify(sheet.values) === '[41,2,43]', 'Calc workbench second edit did not recalculate and persist');
-  requireCheck(JSON.stringify(sheet.typedCells?.values) === JSON.stringify(['00123', '=SUM(9,9)']) && JSON.stringify(sheet.typedCells?.types) === '["text","text"]', 'Calc workbench typed text became a number or formula');
-  requireCheck(sheet.savedFilter?.enabled === true && sheet.savedFilter.header === true && Array.isArray(sheet.savedFilter.fields) && sheet.savedFilter.fields.length === 1
-    && sheet.savedFilter.fields[0]?.column === 0 && sheet.savedFilter.fields[0]?.operator === 'equal' && sheet.savedFilter.fields[0]?.value === '北', 'Calc workbench saved filter criteria did not reopen');
-  requireCheck(sheet.clearedFilter === null || (sheet.clearedFilter?.enabled === false && Array.isArray(sheet.clearedFilter.fields) && sheet.clearedFilter.fields.length === 0), 'Calc workbench cleared filter returned after saving');
-  requireCheck(sheet.headerFormat?.bold === true && sheet.headerFormat.textColor === '#203A5D', 'Calc workbench header formatting did not reopen');
-  requireCheck(sheet.frozen?.rows === 1 && sheet.frozen.columns === 1, 'Calc workbench frozen panes did not reopen');
-  const rangeMatches = (range, endColumn) => range && range.sheetIndex === 0 && range.startColumn === 0 && range.startRow === 0 && range.endColumn === endColumn && range.endRow === 3;
-  requireCheck(sheet.chartCount === 1 && typeof sheet.chart?.name === 'string' && sheet.chart.name.trim() && sheet.chart.chartType === 'column' && sheet.chart.headerRow === true && sheet.chart.headerColumn === true
-    && Array.isArray(sheet.chart.ranges) && sheet.chart.ranges.some(range => rangeMatches(range, 1)), 'Calc workbench editable chart/source did not reopen');
-  requireCheck(sheet.pivot?.name === 'NativeSalesPivot' && rangeMatches(sheet.pivot.source, 2) && sheet.pivot.output?.sheetIndex === 1
-    && Array.isArray(sheet.pivot.fields) && sheet.pivot.fields.some(field => field.index === 0 && typeof field.name === 'string' && field.name.trim() && field.orientation === 'row')
-    && sheet.pivot.fields.some(field => field.index === 1 && typeof field.name === 'string' && field.name.trim() && field.orientation === 'data' && field.operation === 'sum'), 'Calc workbench pivot source or field semantics did not reopen');
-  for (const key of ['xlsxBytes', 'pdfBytes']) requireCheck(Number.isSafeInteger(sheet[key]) && sheet[key] > 100, 'Calc workbench exported no real workbook');
-  requireCheck(sheet.pdfTextVerified === true && Number.isSafeInteger(sheet.pdfPageCount) && sheet.pdfPageCount >= 1, 'Calc workbench independent PDF readback failed');
-  return { wordWorkbenchSecondSave: true, wordEditableTable: true, wordTextAndPageFormatting: true,
-    wordIndependentPdfReadback: true, calcWorkbenchSecondSave: true, calcEditableChart: true, calcPivotSemantics: true,
-    calcSortAndFreeze: true, calcTypedTextPreserved: true, calcFilterPersistence: true, calcIndependentPdfReadback: true };
 }
 
 export function selectExecution(platformId, target, hostPlatform, hostArch, allowRosetta) {
@@ -196,44 +109,16 @@ export function emitFailureDiagnostics(report, env, reportPath) {
   }
 }
 
-/** Keep this aligned with App.vue and public/office/host.js, not just report.ok. */
+/** Require the actual three mounted Rust editors and the retained PDF engine. */
 export function validateFrontendReport(report) {
   requireCheck(report && typeof report === 'object' && !Array.isArray(report), 'Missing native frontend report');
   requireCheck(report.ok === true, 'The native GUI reported a failed smoke test');
   requireCheck(report.crossOriginIsolated === true, 'Native WebView is not cross-origin isolated');
   requireCheck(report.sharedArrayBuffer === true, 'SharedArrayBuffer is unavailable in the native WebView');
   requireCheck(typeof report.userAgent === 'string' && report.userAgent.length > 10, 'Missing native WebView user agent');
-
-  requireCheck(report.independentWordPackage && typeof report.independentWordPackage === 'object', 'Independent Word native IPC report is missing');
-  validateWordPackageReport(report.independentWordPackage);
-
-  const office = report.office;
-  requireCheck(office?.ok === true, 'Office engine did not pass its document round trips');
-  requireCheck(typeof office.engine === 'string' && office.engine.includes('LibreOffice'), 'Missing actual Office engine identity');
-  const writer = office.writer;
-  requireCheck(writer?.originalTextEdited === true, 'Writer did not reopen and edit original DOCX text');
-  requireCheck(writer.text === 'Open Office edited original text · 中文测试', 'Writer DOCX round-trip text differs from the fixture');
-  requireCheck(writer.macrosDisabled === true && writer.linkUpdatesDisabled === true, 'Writer safe import settings were not exercised');
-  requireCheck(Number.isSafeInteger(writer.docxBytes) && writer.docxBytes > 100, 'Writer produced no real DOCX file');
-  requireCheck(Number.isSafeInteger(writer.pdfBytes) && writer.pdfBytes > 100 && writer.pdfHeader === '%PDF-', 'Writer PDF export failed');
-  const calc = office.calc;
-  requireCheck(calc?.a1 === 40 && calc.a2 === 2, 'Calc original cell values did not survive XLSX reopening');
-  requireCheck(calc.formula === '=SUM(A1:A2)' && calc.value === 42, 'Calc formula or computed result did not survive XLSX reopening');
-  requireCheck(Number.isSafeInteger(calc.xlsxBytes) && calc.xlsxBytes > 100, 'Calc produced no real XLSX file');
-  requireCheck(Number.isSafeInteger(calc.pdfBytes) && calc.pdfBytes > 100 && calc.pdfHeader === '%PDF-', 'Calc PDF export failed');
-
-  const impress = office.impress;
-  requireCheck(impress?.pptxReopened === true && impress.odpReopened === true, 'Impress did not reopen both its edited PPTX and ODP files');
-  requireCheck(impress.originalTextEdited === true, 'Impress did not edit original text from a reopened PPTX');
-  requireCheck(impress.slideCount === 2, 'Impress did not preserve both slides after document reopening');
-  requireCheck(Array.isArray(impress.texts) && impress.texts.length === 2
-    && impress.texts[0] === 'Open Office edited slide · 中文演示测试'
-    && impress.texts[1] === 'Second slide · 第二页内容', 'Impress slide texts or slide order differ from the two-slide fixture');
-  requireCheck(impress.macrosDisabled === true && impress.linkUpdatesDisabled === true, 'Impress safe import settings were not exercised');
-  requireCheck(Number.isSafeInteger(impress.pptxBytes) && impress.pptxBytes > 100, 'Impress produced no real PPTX file');
-  requireCheck(Number.isSafeInteger(impress.odpBytes) && impress.odpBytes > 100, 'Impress produced no real ODP file');
-  requireCheck(Number.isSafeInteger(impress.pdfBytes) && impress.pdfBytes > 100 && impress.pdfHeader === '%PDF-', 'Impress PDF export failed');
-  requireCheck(impress.pdfPageCount === 2, 'The independently reopened Impress PDF did not contain both pages');
+  validateWordcraftNativeReport(report.wordcraft);
+  validateGridcraftNativeReport(report.gridcraft);
+  validateDeckcraftNativeReport(report.deckcraft);
 
   const pdf = report.pdf;
   requireCheck(pdf?.ok === true && pdf.reopened === true, 'The bundled PDF engine did not reopen its edited output');
@@ -243,31 +128,14 @@ export function validateFrontendReport(report) {
     && pdf.text.includes('NEW_NATIVE_TEXT') && pdf.text.includes('新的合同')
     && !pdf.text.includes('OLD_NATIVE_TEXT') && !pdf.text.includes('旧合同'), 'PDF reopened text does not match the replacement fixture');
 
-  const workbench = report.presentationWorkbench;
-  requireCheck(workbench?.ok === true, 'Presentation workbench native verification missing or failed');
-  requireCheck(workbench.pageCount === 3 && workbench.hiddenPageIndex === 2, 'Presentation workbench hidden-page round trip failed');
-  requireCheck(workbench.slideName === 'Native saved page 中文' && typeof workbench.notes === 'string' && workbench.notes.includes('Native notes persisted'), 'Presentation workbench name or notes did not reopen');
-  requireCheck(workbench.editableTable === true && workbench.editableChart === true, 'Presentation workbench lost editable embedded objects');
-  requireCheck(workbench.transition === 'fade' && workbench.mediaBytes === 3244 && typeof workbench.mediaDuration === 'number' && Math.abs(workbench.mediaDuration - .2) < .05, 'Presentation workbench transition or native media metadata failed');
-  requireCheck(JSON.stringify(workbench.pdfCanvasPages) === '[0,1]', 'Presentation workbench actual canvas navigation failed');
-  const officeWorkbenchChecks = validateOfficeWorkbenches(report);
-  validateRustWordEngineReport(report.rustWordEngine);
-  validateWordcraftNativeReport(report.wordcraft);
-  validateGridcraftNativeReport(report.gridcraft);
-
   return {
-    ...officeWorkbenchChecks,
     wordcraftDefaultCanvas: true, wordcraftDomInput: true, wordcraftDocxReadback: true,
     wordcraftFailureAtomicity: true, wordcraftSessionCleanup: true,
     gridcraftDefaultCanvas: true, gridcraftDomInput: true, gridcraftXlsxReadback: true,
     gridcraftFormulaRoundTrip: true, gridcraftFailureAtomicity: true, gridcraftSessionCleanup: true,
-    rustWordEngineIpc: true, rustWordEngineDocxReadback: true, rustWordEngineSessionCleanup: true,
-    independentWordPackageIpc: true,
-    presentationWorkbenchRoundTrip: true, presentationMediaMetadata: true, presentationCanvasNavigation: true,
-    crossOriginIsolated: true, sharedArrayBuffer: true, writerOriginalTextRoundTrip: true,
-    writerPdfExport: true, calcFormulaRoundTrip: true, calcPdfExport: true,
-    impressOriginalTextRoundTrip: true, impressOdpRoundTrip: true,
-    impressPdfExport: true, impressPdfPageCount: true,
+    deckcraftDefaultCanvas: true, deckcraftDomInput: true, deckcraftPptxReadback: true,
+    deckcraftPdfReadback: true, deckcraftFailureAtomicity: true, deckcraftSessionCleanup: true,
+    crossOriginIsolated: true, sharedArrayBuffer: true,
     pdfOriginalTextReplacementRoundTrip: true,
   };
 }
@@ -493,9 +361,9 @@ async function runGui(executable, output, workingDirectory, env, diagnostic, exe
 
 function readJsonEvidence(path) {
   const stat = lstatSync(path);
-  requireCheck(stat.isFile() && !stat.isSymbolicLink() && stat.size > 0 && stat.size <= MAX_REPORT_BYTES, 'Native evidence must be a regular JSON file no larger than 1 MiB');
+  requireCheck(stat.isFile() && !stat.isSymbolicLink() && stat.size > 0 && stat.size <= MAX_REPORT_BYTES, 'Native evidence must be a regular JSON file no larger than 12 MiB');
   const bytes = readFileSync(path);
-  requireCheck(bytes.length > 0 && bytes.length <= MAX_REPORT_BYTES, 'Native evidence exceeded 1 MiB while being read');
+  requireCheck(bytes.length > 0 && bytes.length <= MAX_REPORT_BYTES, 'Native evidence exceeded 12 MiB while being read');
   return { bytes, value: JSON.parse(bytes.toString('utf8')) };
 }
 
@@ -563,6 +431,7 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     report.preflight.pdfExecutableSha256 = hashFile(location.pdfExecutable);
     report.preflight.wordcraft = inspectInstalledWordcraft(location.resourceRoot, { root });
     report.preflight.gridcraft = inspectInstalledGridcraft(location.resourceRoot, { root });
+    report.preflight.deckcraft = inspectInstalledDeckcraft(location.resourceRoot, { root });
     if (configuration.os === 'darwin') {
       report.preflight.macos = macPreflight(location.app, location.executable, location.pdfExecutable, configuration.nativeArch);
       if (execution.executionMode === 'rosetta2') {
@@ -584,6 +453,7 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     report.checks = validateFrontendReport(report.frontend);
     Object.assign(report.checks, validateNativeWordcraftEvidence(report, { root }));
     Object.assign(report.checks, validateNativeGridcraftEvidence(report, { root }));
+    Object.assign(report.checks, validateNativeDeckcraftEvidence(report, { root }));
     requireCheck(report.process.cleanExit === true && report.process.exitCode === 0 && !report.process.signal && !report.process.timedOut, 'Native GUI did not exit cleanly after its checks');
     report.ok = true;
   } catch (error) {

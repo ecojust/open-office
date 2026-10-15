@@ -68,25 +68,25 @@
     },
     {
       "file": "fonts/LICENSE-DejaVu.txt",
-      "source": "crates/word-engine/fonts/LICENSE-DejaVu.txt",
+      "source": "assets/fonts/open-office/LICENSE-DejaVu.txt",
       "bytes": 3859,
       "sha256": "63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9"
     },
     {
       "file": "fonts/LICENSE-Noto-CJK.txt",
-      "source": "crates/word-engine/fonts/LICENSE-Noto-CJK.txt",
+      "source": "assets/fonts/open-office/LICENSE-Noto-CJK.txt",
       "bytes": 14712,
       "sha256": "849f4ea9c214fa4ac3593b770c699f387534b11ce671264c1b10d85bdcb5997b"
     },
     {
       "file": "fonts/LICENSE-Noto-Core.txt",
-      "source": "crates/word-engine/fonts/LICENSE-Noto-Core.txt",
+      "source": "assets/fonts/open-office/LICENSE-Noto-Core.txt",
       "bytes": 5208,
       "sha256": "075f91382875da1c4b491f1facf2586f55448705133264d98ce15cab6211b125"
     },
     {
       "file": "fonts/manifest.json",
-      "source": "crates/word-engine/fonts/manifest.json",
+      "source": "assets/fonts/open-office/manifest.json",
       "bytes": 1783,
       "sha256": "65e6b6add6865cb92705edcf859d02dbcb37408663a931cc49ff8a0feec5e909"
     }
@@ -100,43 +100,43 @@
     "note": "The local canvas embeds all seven listed faces. PDF uses the regular/bold Noto CJK and DejaVu faces plus Noto Sans Symbols2; it does not use the two oblique faces. This does not promise full or color emoji coverage.",
     "embeddedFiles": [
       {
-        "file": "crates/word-engine/fonts/NotoSansCJKsc-Regular.otf",
+        "file": "assets/fonts/open-office/NotoSansCJKsc-Regular.otf",
         "bytes": 16437340,
         "sha256": "fb3b8d574150df2fb21d13554d20aae3dc316062e24d34fe3d1ae136d7b4f71f",
         "licenseFile": "fonts/LICENSE-Noto-CJK.txt"
       },
       {
-        "file": "crates/word-engine/fonts/NotoSansCJKsc-Bold.otf",
+        "file": "assets/fonts/open-office/NotoSansCJKsc-Bold.otf",
         "bytes": 17002224,
         "sha256": "9023d55873ce84a6fcbc8d5ade547ab571563091654a5e854c64e04e0a44f8c5",
         "licenseFile": "fonts/LICENSE-Noto-CJK.txt"
       },
       {
-        "file": "crates/word-engine/fonts/DejaVuSans.ttf",
+        "file": "assets/fonts/open-office/DejaVuSans.ttf",
         "bytes": 759720,
         "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
         "licenseFile": "fonts/LICENSE-DejaVu.txt"
       },
       {
-        "file": "crates/word-engine/fonts/DejaVuSans-Bold.ttf",
+        "file": "assets/fonts/open-office/DejaVuSans-Bold.ttf",
         "bytes": 708920,
         "sha256": "a4c5bc453ca281d90ea079e596da7ae0dfeb5777497c29ec254e76d97ff6f890",
         "licenseFile": "fonts/LICENSE-DejaVu.txt"
       },
       {
-        "file": "crates/word-engine/fonts/NotoSansSymbols2-Regular.ttf",
+        "file": "assets/fonts/open-office/NotoSansSymbols2-Regular.ttf",
         "bytes": 656852,
         "sha256": "876598db5f1e3bef2bc77c4d94c5b0d5d2c1620be4878a06f18fb5434e331688",
         "licenseFile": "fonts/LICENSE-Noto-Core.txt"
       },
       {
-        "file": "crates/word-engine/fonts/DejaVuSans-Oblique.ttf",
+        "file": "assets/fonts/open-office/DejaVuSans-Oblique.ttf",
         "bytes": 637648,
         "sha256": "e2f09289f4276309a36b9a93e5a0ac64957ef3eb7158151b243d41f667151ee4",
         "licenseFile": "fonts/LICENSE-DejaVu.txt"
       },
       {
-        "file": "crates/word-engine/fonts/DejaVuSans-BoldOblique.ttf",
+        "file": "assets/fonts/open-office/DejaVuSans-BoldOblique.ttf",
         "bytes": 645600,
         "sha256": "c35383d5e56add5cc9cdc9f4e4a899f9e540f7c7e49f1901074c2d03af194eff",
         "licenseFile": "fonts/LICENSE-DejaVu.txt"

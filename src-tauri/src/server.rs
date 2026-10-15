@@ -25,7 +25,6 @@ const CSP: &str = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe
 pub struct Bootstrap {
     pub origin: String,
     pub base_path: String,
-    pub runtime_base_url: String,
     pub platform: String,
     pub smoke_mode: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -71,7 +70,6 @@ impl AssetServer {
         let origin = format!("http://{address}");
         let base_path = format!("/{token}/");
         let info = Bootstrap {
-            runtime_base_url: format!("{origin}{base_path}office-runtime/"),
             origin,
             base_path,
             platform: std::env::consts::OS.into(),
@@ -867,14 +865,13 @@ mod tests {
         let info = Bootstrap {
             origin: "http://127.0.0.1:12345".into(),
             base_path: "/secret/".into(),
-            runtime_base_url: String::new(),
             platform: "test".into(),
             smoke_mode: false,
             smoke_scope: None,
         };
         assert!(AssetServer::allows_navigation(
             &info,
-            &"http://127.0.0.1:12345/secret/office/host.html"
+            &"http://127.0.0.1:12345/secret/wordcraft/wordcraft.js"
                 .parse()
                 .unwrap()
         ));

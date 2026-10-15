@@ -1,5 +1,5 @@
 //! Open Office embeds its existing full Noto Sans CJK SC and symbol faces for document and UI text.
-//! Their single source lives in `crates/word-engine/fonts`; no duplicate font assets are copied.
+//! Their single source lives in `assets/fonts/open-office`; no duplicate font assets are copied.
 //! Optional craft-fonts build input (https://github.com/storytold/craft-fonts, recipe from its
 //! `docs/integration.md`). With `CRAFT_FONTS_DIR=<checkout>` the fonts in its
 //! `fonts/manifest.txt` are embedded as `CRAFT_FONTS`; unset, `CRAFT_FONTS` is empty. Web
@@ -52,7 +52,7 @@ const REQUIRED_SCRIPTS: &[&str] = &["Jpan", "Hans"];
 /// Keep both real weights; the document shaper must not synthesize Chinese bold unnecessarily.
 fn open_office_fonts() -> Result<String, String> {
     let dir = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap_or_default())
-        .join("../../../../crates/word-engine/fonts");
+        .join("../../../../assets/fonts/open-office");
     let mut out = String::new();
     for (family, style, file, script) in [
         ("Noto Sans CJK SC", "Regular", "NotoSansCJKsc-Regular.otf", "Hans"),

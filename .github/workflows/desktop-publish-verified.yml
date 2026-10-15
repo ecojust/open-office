@@ -164,6 +164,8 @@ jobs:
               print(f'::error title=Verified desktop artifact extraction::{message}', file=sys.stderr)
               raise
           PYTHON
+      - name: Install independent presentation PDF inspector
+        run: python -m pip install -r verified-source/pdf-backend/requirements.txt
       - name: Validate all native reports and create exact source archive
         shell: bash
         run: |
@@ -174,6 +176,9 @@ jobs:
           import { execFileSync } from 'node:child_process';
           import { readFileSync, statSync, writeFileSync } from 'node:fs';
           import { validateFrontendReport } from './verified-source/scripts/native-smoke.mjs';
+          import { validateNativeWordcraftEvidence } from './verified-source/scripts/wordcraft-native-smoke.mjs';
+          import { validateNativeGridcraftEvidence } from './verified-source/scripts/gridcraft-native-smoke.mjs';
+          import { validateNativeDeckcraftEvidence } from './verified-source/scripts/deckcraft-native-smoke.mjs';
           import { sha256File, verifyTransferProof } from './verified-source/scripts/macos-intel-transfer.mjs';
           assert.equal(execFileSync('git', ['-C', 'verified-source', 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), process.env.VERIFIED_SOURCE_SHA);
           const version = JSON.parse(readFileSync('verified-source/package.json', 'utf8')).version;
@@ -190,6 +195,9 @@ jobs:
             assert.equal(report.process.timedOut, false);
             assert.equal(report.frontend.ok, true);
             validateFrontendReport(report.frontend);
+            validateNativeWordcraftEvidence(report);
+            validateNativeGridcraftEvidence(report);
+            validateNativeDeckcraftEvidence(report);
             assert.equal(report.targetArch, id === 'macos-arm64' ? 'arm64' : 'x64');
             assert.equal(report.hostArch, id === 'windows-x64' ? 'x64' : 'arm64');
             assert.equal(report.executionMode, id === 'macos-x64' ? 'rosetta2' : 'native');
@@ -244,8 +252,8 @@ jobs:
           cp "$notes_file" release-notes.md
           cat >> release-notes.md <<EOF
 
-          功能及验证记录：https://github.com/${GITHUB_REPOSITORY}/blob/${VERIFIED_SOURCE_SHA}/docs/rea-compatibility-progress.md
-          窗口与已知输入异常：https://github.com/${GITHUB_REPOSITORY}/blob/${VERIFIED_SOURCE_SHA}/docs/office-viewport-validation.md
+          演示引擎及验证记录：https://github.com/${GITHUB_REPOSITORY}/blob/${VERIFIED_SOURCE_SHA}/docs/deckcraft-integration.md
+          表格引擎及已知限制：https://github.com/${GITHUB_REPOSITORY}/blob/${VERIFIED_SOURCE_SHA}/docs/gridcraft-integration.md
           第三方许可与源码：https://github.com/${GITHUB_REPOSITORY}/blob/${VERIFIED_SOURCE_SHA}/THIRD_PARTY_NOTICES.md
           源码提交：${VERIFIED_SOURCE_SHA}
           构建记录：https://github.com/${GITHUB_REPOSITORY}/actions/runs/${VERIFIED_BUILD_RUN_ID}

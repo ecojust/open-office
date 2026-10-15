@@ -12,11 +12,6 @@ export const pickImage = (): Promise<NativeImage | null> => invoke('pick_image')
 export const confirmClose = (): Promise<void> => invoke('confirm_close')
 export const onCloseRequested = (callback: () => void): Promise<UnlistenFn> => listen('app-close-requested', callback)
 
-export interface WordPackagePart { name: string; dataBase64: string }
-/** ZIP/CRC work runs in the Rust backend; OOXML semantics remain in the shared codec. */
-export const readWordPackage = (base64: string): Promise<WordPackagePart[]> => invoke('word_read_package', { base64 })
-export const writeWordPackage = (parts: WordPackagePart[]): Promise<string> => invoke('word_write_package', { parts })
-
 export function bytesToBase64(bytes: Uint8Array): string {
   const chunks: string[] = []
   for (let offset = 0; offset < bytes.length; offset += 32_768) {

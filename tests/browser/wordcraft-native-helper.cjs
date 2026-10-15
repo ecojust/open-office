@@ -49,7 +49,7 @@ const persist = () => fs.writeFileSync(path.join(output, 'report.json'), JSON.st
         async open(base64, name) {
           await app.editorTransaction('Browser smoke document', () => app.addDocument({ id: '', kind: 'word', extension: 'docx', name, base64, sha256: '', sizeBytes: Math.floor(base64.length * .75) }));
           await nextTick(); const tab = app.active;
-          if (!tab || tab.wordEngine !== 'rust') throw Error('Default WordCraft tab missing');
+          if (!tab || tab.document.kind !== 'word') throw Error('Default WordCraft tab missing');
           await app.awaitReady(tab);
           const handle = app.rustWordHandles.get(tab.key), state = await handle.inspect();
           const element = [...document.querySelectorAll('[data-testid="rust-word-editor"]')].find(node => node.dataset.sessionId === state.sessionId);

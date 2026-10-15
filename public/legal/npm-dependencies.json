@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lockfileSha256": "bf0fcf353d20747c5652d015416c9a7e58e6ec706013bce1116fe6f7df913a2b",
+  "lockfileSha256": "11660475b38e4d788766ca6c267d68c2ade55c123aeb54fdf173bfcca7d41dfb",
   "packages": [
     {
       "name": "@babel/helper-string-parser",
@@ -464,23 +464,10 @@
       "integrity": "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ=="
     },
     {
-      "name": "@pdf-lib/fontkit",
-      "version": "1.1.1",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": false,
-      "installedForThisAudit": true,
-      "licenseFiles": [
-        "npm/@pdf-lib__fontkit@1.1.1/README.md",
-        "npm/@pdf-lib__fontkit@1.1.1/package.json"
-      ],
-      "integrity": "sha512-KjMd7grNapIWS/Dm0gvfHEilSyAmeLvrEGVcqLGi0VYebuqqzTbgF29efCx7tvx+IEbG3zQciRSWl3GkUSvjZg=="
-    },
-    {
       "name": "@pdf-lib/standard-fonts",
       "version": "1.0.0",
       "license": "MIT",
-      "developmentOnly": false,
+      "developmentOnly": true,
       "optional": false,
       "installedForThisAudit": true,
       "licenseFiles": [
@@ -492,7 +479,7 @@
       "name": "@pdf-lib/upng",
       "version": "1.0.1",
       "license": "MIT",
-      "developmentOnly": false,
+      "developmentOnly": true,
       "optional": false,
       "installedForThisAudit": true,
       "licenseFiles": [
@@ -1181,7 +1168,7 @@
       "name": "fflate",
       "version": "0.8.2",
       "license": "MIT",
-      "developmentOnly": false,
+      "developmentOnly": true,
       "optional": false,
       "installedForThisAudit": true,
       "licenseFiles": [
@@ -1249,7 +1236,7 @@
       "name": "pako",
       "version": "1.0.11",
       "license": "(MIT AND Zlib)",
-      "developmentOnly": false,
+      "developmentOnly": true,
       "optional": false,
       "installedForThisAudit": true,
       "licenseFiles": [
@@ -1273,7 +1260,7 @@
       "name": "pdf-lib",
       "version": "1.17.1",
       "license": "MIT",
-      "developmentOnly": false,
+      "developmentOnly": true,
       "optional": false,
       "installedForThisAudit": true,
       "licenseFiles": [
@@ -1395,7 +1382,7 @@
       "name": "tslib",
       "version": "1.14.1",
       "license": "0BSD",
-      "developmentOnly": false,
+      "developmentOnly": true,
       "optional": false,
       "installedForThisAudit": true,
       "licenseFiles": [

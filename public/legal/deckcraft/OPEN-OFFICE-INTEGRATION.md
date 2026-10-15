@@ -1,0 +1,19 @@
+# Presentation engine in Open Office
+
+Open Office integrates DeckCraft's Rust presentation model, PPTX parser/writer, vector PDF exporter and egui editing canvas at [9859da39255c0262cd592bb57101d7f2fa961f72](https://github.com/storytold/deckcraft/tree/9859da39255c0262cd592bb57101d7f2fa961f72), upstream version 0.7.0. Upstream is MIT OR Apache-2.0; Open Office uses the MIT option. Both original license texts, NOTICE and ATTRIBUTION are retained unchanged. Dependencies and assets have their own licenses. This independent integration is not an official ArtCraft product.
+
+The local `apps/open-office-host` adds isolated document sessions, validated PPTX preparation, document revisions, save receipts, IME/draft flushing, media pick receipts, global appearance and file-action forwarding. Open Office owns new/open/save/export/print/close; the editor owns slide editing, drawing, formatting, transitions and presentation playback. Export never marks a document saved. Only an acknowledgement for the current document generation and revision can do that.
+
+The vendored recovery-instance initializer is adapted for WebAssembly: it uses browser time and randomness instead of the unsupported operating-system process ID, which otherwise traps when the first document opens.
+
+PPTX, POTX and PPSX imports are supported; edits save to PPTX, and PDF export renders the Rust presentation model. Binary PPT, ODP, encrypted and macro-enabled presentations are rejected rather than routed to an older office runtime. Imported advanced features can have upstream fidelity limits; this notice is not a claim of complete Microsoft PowerPoint parity.
+
+The upstream WebAssembly player has no browser audio-output adapter: inserted media is retained in PPTX, and video/playback clocks can run, but presentation playback is silent in this embedded web canvas. PDF export contains slide visuals, not interactive transitions or media playback.
+
+External theme import, external-deck comparison/reuse, SmartArt picture-file replacement, transition-sound file picking, Photo Album Add Pictures and image-file sources for shape/background fills are not connected to the shell's asynchronous file bridge in this version. Those browse controls are disabled in the embedded UI; built-in themes, palettes, layouts, editing existing pictures/albums and ordinary picture/audio/video insertion remain available.
+
+The standalone file title bar, File backstage and global appearance controls are suppressed in the embedded editor. UI icons are original Open Office SVG drawings, with build-time generated Rust geometry. The document Insert Icons library remains separate and retains upstream Lucide/Feather notices. Restricted ArtCraft logo and mark assets are removed from this modified source tree; original asset notices describe the upstream distribution, not this application's branding.
+
+The optional craft-fonts checkout is not used. The font build consumes pinned, locally bundled Inter Regular/SemiBold (Rasmus Andersson, OFL-1.1), LXGW WenKai Regular v1.522 (LXGW/Klee Project Authors, OFL-1.1), DejaVu Sans regular/bold/oblique/bold oblique (DejaVu/Bitstream Vera) and Noto Sans Symbols 2 (Google, OFL-1.1). Chinese text and PDF glyphs use LXGW WenKai; no Source Han/Noto CJK font is embedded in this presentation engine. Exact new font bytes and source URLs are in `fonts/manifest.json`; shared font licenses/inventory are retained under the Open Office font assets. Egui's default fonts retain their existing notices in the Rust dependency inventory.
+
+`craft-pdf` and its Krilla patch are pinned to craft-libs `c3487320b2d1de657b860b3c8abb44e1f2b32bd8`; PDF profiles retain `LICENSE-ICC.txt`. The normal/build Rust dependency closure must be included in the distribution's generated license inventory. The source manifest records original upstream file hashes; the build manifest records the actual modified source and generated WebAssembly hashes.

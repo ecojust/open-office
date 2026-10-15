@@ -116,25 +116,25 @@
     },
     {
       "file": "fonts/open-office/LICENSE-DejaVu.txt",
-      "source": "crates/word-engine/fonts/LICENSE-DejaVu.txt",
+      "source": "assets/fonts/open-office/LICENSE-DejaVu.txt",
       "bytes": 3859,
       "sha256": "63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9"
     },
     {
       "file": "fonts/open-office/LICENSE-Noto-CJK.txt",
-      "source": "crates/word-engine/fonts/LICENSE-Noto-CJK.txt",
+      "source": "assets/fonts/open-office/LICENSE-Noto-CJK.txt",
       "bytes": 14712,
       "sha256": "849f4ea9c214fa4ac3593b770c699f387534b11ce671264c1b10d85bdcb5997b"
     },
     {
       "file": "fonts/open-office/LICENSE-Noto-Core.txt",
-      "source": "crates/word-engine/fonts/LICENSE-Noto-Core.txt",
+      "source": "assets/fonts/open-office/LICENSE-Noto-Core.txt",
       "bytes": 5208,
       "sha256": "075f91382875da1c4b491f1facf2586f55448705133264d98ce15cab6211b125"
     },
     {
       "file": "fonts/open-office/manifest.json",
-      "source": "crates/word-engine/fonts/manifest.json",
+      "source": "assets/fonts/open-office/manifest.json",
       "bytes": 1783,
       "sha256": "65e6b6add6865cb92705edcf859d02dbcb37408663a931cc49ff8a0feec5e909"
     }

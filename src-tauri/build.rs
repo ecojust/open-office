@@ -11,9 +11,6 @@ fn main() {
             "pick_image",
             "pdf_request",
             "cancel_pdf",
-            "word_read_package",
-            "word_write_package",
-            "word_engine_request",
         ]),
     ))
     .expect("Unable to generate native command permissions");

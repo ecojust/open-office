@@ -1,51 +1,21 @@
 # 对应源码归档说明
 
-本目录记录 Open Office 使用的开源组件及其源码来源。许可证全文保存在同一 `legal/` 目录；应用完整说明见 `THIRD_PARTY_NOTICES.md`。这些说明不缩减任何上游许可赋予的权利。
+当前 Open Office 的文字、表格和演示编辑器分别由仓库内固定版本的 Rust 源码构建。`vendor/wordcraft/`、`vendor/gridcraft/` 和 `vendor/deckcraft/` 包含上游源码及本地宿主改动；各自的来源清单保留上游提交与许可，生成的构建清单记录实际输入、JS 和 WASM 摘要。旧办公兼容运行时不再包含在当前发行物中。
 
-## 已固定的源码
+## PDF 运行时源码
 
-`corresponding-sources-manifest.json` 固定源码 URL、版本 / Git 提交、归档大小和 SHA-256。执行项目中的 `node scripts/fetch-corresponding-sources.mjs`，会获取以下已实际下载核验的源码：
+`corresponding-sources-manifest.json` 固定以下三份官方归档的 URL、大小和 SHA-256：
 
-1. LibreOffice / ZetaOffice 核心 `efaf0670b4d055f838a2849becb10f08aa06a257`。
-2. Qt supermodule `3d440b7787f9b5ba15e5f8bcd7aef39b388f94fa`。
-3. QtBase `a320678c85ec8029d5394bcd673d4c208af1de3a`。
-4. Emscripten `949ee1d40467b80e90a9fdc67155d443426fef2d`。
-5. zeta.js v1.2.0，提交 `57360bcb0e7726ffa0e66567c8041261b959f8dd`。
-6. PyMuPDF 1.28.2 官方 PyPI sdist。
-7. MuPDF 1.28.2 官方完整 source tarball，包含 `thirdparty/` 源码。
-8. CPython 3.12.14 官方源码；这是此次本地运行时的实际版本。
+1. PyMuPDF 1.28.2 的 PyPI 源码分发包。
+2. MuPDF 1.28.2 完整源码包，包含 `thirdparty/` 源码。
+3. CPython 3.12.14 源码；该版本不能代表使用其他 Python 版本的安装包。
 
-下载器输出目录中的 `source-manifest.json` 是此清单的副本，`SHA256SUMS` 校验归档。归档总大小约 585 MiB。`--verify` / `--offline` 只使用已有归档；缺失或损坏时失败，不会通过网络补齐。`--out-dir` 可选择发行物的源码目录。
+在应用源码目录运行 `node scripts/fetch-corresponding-sources.mjs` 下载至 `artifacts/corresponding-sources/`，并生成清单副本和 `SHA256SUMS`。`--verify` 或 `--offline` 仅核验已有文件，缺失或损坏时失败；`--out-dir` 可指定源码发行目录。下载器不解压或执行归档。
 
-## WASM 来源与构建
+PyMuPDF 源码包不能代替完整 MuPDF C/C++ 源码，因此二者分别固定。`pdf-backend/engine.py`、requirements 和 `scripts/build-pdf-backend.mjs` 也属于必须随本应用提供的构建材料。不同平台的 Python、PyInstaller 或底层库若有变化，须核对实际版本、许可和对应源码，不能沿用不匹配的记录。
 
-ZetaOffice 上游 README 明确公开以下源分支：
+## 发行材料
 
-- <https://git.libreoffice.org/core/+/refs/heads/distro/allotropia/zeta-24-2>
-- <https://github.com/allotropia/qt5/tree/5.15.2%2Bwasm>
-- <https://github.com/allotropia/qtbase/tree/5.15.2%2Bwasm>
-- <https://github.com/allotropia/emscripten/commits/fixed-3.1.65>
+发行页应提供安装包、精确提交的应用源码（包含编辑器本地修改）、适用的依赖源码、许可证、构建脚本和配置、锁文件、来源清单及校验文件。源码可以独立于二进制分发，不必嵌入安装包。依赖索引包含开发或可选项，不能作为逐平台实际链接报告；按安装包实际内容核对对应源码完整性。
 
-分支会移动，因此发行材料采用清单中的完整提交号。LibreOffice 的固定提交直接取自所分发 `soffice.data` 内的 `versionrc`；QtBase 固定提交与 Qt supermodule 的 gitlink 相同。
-
-`LIBREOFFICE-WASM-BUILD.md` 是固定核心提交中的 `static/README.wasm.md` 原文，说明了 Qt、WASM、Emscripten、配置和构建方法。其历史示例写有 Emscripten 3.1.46，而 ZetaOffice 当前公开分发说明指向 `fixed-3.1.65`；两份上游信息有时间差，不能将旧示例冒称为当前 CDN 的完整构建日志。
-
-Qt GitHub supermodule 归档不会自动包含 submodule 内容。组装时把独立 QtBase 归档的内容放入 Qt supermodule 源码根目录的 `qtbase/`，并按上游说明仅构建所需模块。zeta.js 的本地变化在 `zetajs-local-change.patch`，应用源码中已包含修复后的 `public/office/zeta.js`。
-
-本地鼠标时间戳修复另外记录在 `localRuntimeDerivations`：上游 WASM 的 SHA-256 与实际分发的派生 SHA-256 分别固定。`scripts/office-mouse-time-patch.mjs` 只对已验证鼠标回调的一处整数转换做可重复的修改，修复 epoch 毫秒转 32 位时被清零的问题；不改变系统时钟或其他回调。应用源码包含该转换脚本、测试，以及 `vendor/patches/` 中的说明和 Qt 源码等价补丁。源码获取脚本也会校验并复制这些修改材料到归档目录。
-
-该派生 WASM 由原二进制加精确补丁生成，不能描述为 Qt 源码重新编译的结果。Qt 源码等价补丁针对已固定的公开快照提供；其与 CDN 编译输入的关系仍受下面的来源限制约束。
-
-LibreOffice Git 归档也不包含所有外部依赖 tarball。固定提交的 `download.lst` 另存为 `LIBREOFFICE-EXTERNAL-SOURCES.lst`。构建者应按实际配置执行上游获取外部依赖的步骤、核对列出的摘要，并把适用许可要求的对应源码及构建修改纳入最终源码发行。该文件同时列出可选组件，不能据此推断全部组件都在当前 WASM 中。
-
-## PDF 运行时
-
-`pdf-backend/engine.py`、Python requirements 和 `scripts/build-pdf-backend.mjs` 属于本应用源码的一部分，必须与相应发行版一起提供。PyMuPDF 的 `setup.py` 指向独立的 MuPDF source archive；因此这里只提供 PyMuPDF sdist 不够。MuPDF 的完整归档已另行固定。
-
-原生构建若选择不同的 Python、PyInstaller 或底层库版本，必须更新对应源码 / 许可记录，不能拿 3.12.14 的源码来代表另一个 Python 版本。系统框架及可选构建依赖与实际链接库应以每个平台的构建产物为准。
-
-## 发行材料的范围
-
-建议将安装包、精确提交的应用源码、上游源码归档、许可证、修改补丁、构建脚本 / 配置、来源清单和校验文件放在同一发行页面，并允许接收者取得适用许可证要求的完整对应源码。无需把几百 MiB 的源码重复嵌入应用二进制。
-
-本次已经核实核心 buildid、上游分支快照、归档字节与摘要，并保留了官方构建文档。上游未提供逐组件 CDN 构建 SBOM，本项目也尚未从这些源码逐字节重建该 CDN WASM。此源码快照集合不应被描述为已证明整个二进制发行物可重现，或替代对实际构建外部依赖的补齐。
+这些固定来源和摘要支持追溯与核验，不声称已经证明所有平台的二进制逐字节可重现。完整许可见 `THIRD_PARTY_NOTICES.md`、`DISTRIBUTION_LICENSE.md` 及同目录许可原文。

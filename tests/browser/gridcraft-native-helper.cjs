@@ -48,7 +48,7 @@ const persist = () => fs.writeFileSync(path.join(output, 'report.json'), JSON.st
         async open(base64, name) {
           await app.editorTransaction('Browser spreadsheet smoke', () => app.addDocument({ id: '', kind: 'sheet', extension: 'xlsx', name, base64, sha256: '', sizeBytes: Math.floor(base64.length * .75) }));
           await nextTick(); const tab = app.active;
-          if (!tab || tab.sheetEngine !== 'rust') throw Error('Default Rust spreadsheet tab missing');
+          if (!tab || tab.document.kind !== 'sheet') throw Error('Default Rust spreadsheet tab missing');
           await app.awaitReady(tab);
           const handle = app.rustSheetHandles.get(tab.key), snapshot = await handle.inspect();
           const element = [...document.querySelectorAll('[data-testid="rust-sheet-editor"]')].find(node => node.dataset.sessionId === snapshot.sessionId);

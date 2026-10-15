@@ -128,3 +128,15 @@ test('Shared icon contracts reject cross-workspace drift and unsafe references w
     await assert.rejects(verifySharedIcons(root), /invalid shared icon mapping/)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test('Presentation controls have complete original SVG coverage alongside existing editor families', async () => {
+  const root = new URL('../', import.meta.url)
+  const names = JSON.parse(await readFile(new URL('src/icons/svg/deck/names.json', root), 'utf8'))
+  const adapter = await readFile(new URL('vendor/deckcraft/crates/ui-egui/src/icons.rs', root), 'utf8')
+  const declared = [...adapter.matchAll(/^\s+\w+ => "([^"]+)",/gm)].map(match => match[1])
+  assert.deepEqual([...names].sort(), declared.sort(), 'every typed toolbar icon must use an authored SVG')
+  const products = await buildOfficeIcons({ check: true })
+  assert.deepEqual(products.map(product => product.family), ['word', 'sheet', 'deck'])
+  assert.equal(products.find(product => product.family === 'deck').count, names.length)
+  assert.ok(products.every(product => !product.changed), 'checking presentation icons must preserve all generated editor geometry')
+})

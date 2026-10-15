@@ -1,7 +1,4 @@
-const PHASES = new Set(['office-start','office-roundtrip','pdf-roundtrip','word-workbench','sheet-workbench','presentation-workbench','ipc-smoke-report','office-host:request','office-host:reply','office-host:dirty']);
-const ACTIONS = new Set(['open','export','discard','mark-saved','smoke-test','word-state','word-action','word-command','word-data','sheet-state','sheet-action','sheet-data','presentation-state','presentation-action','presentation-object-data','preview-presentation','dirty']);
-const KINDS = new Set(['word','sheet','presentation']);
-const TYPES = new Set(['insert-text','insert-break','insert-table','set-page','set-header-footer','find-replace','apply-style','format-text','update-table','rename-sheet','add-sheet','select-sheet','select-range','set-matrix','set-cell','patch-cells','format','sort','freeze','insert-chart','insert-pivot','filter','clear-filter']);
+const PHASES = new Set(['wordcraft-native','gridcraft-native','deckcraft-native','wordcraft','gridcraft','deckcraft','wordcraft-roundtrip','gridcraft-roundtrip','deckcraft-roundtrip','pdf-roundtrip','ipc-smoke-report']);
 const PLATFORM = new Set(['windows-x64','macos-arm64','macos-x64']);
 const CONFLICT = '文档在导出后又有修改，已保留内容。请重新保存或明确放弃修改。';
 const FAILURES = new Map([
@@ -26,22 +23,11 @@ export function nativeReportSummary(report) {
   for (const event of (Array.isArray(report.nativeDiagnostics?.events) ? report.nativeDiagnostics.events : []).slice(-256)) {
     if (!PHASES.has(event?.phase)) continue;
     const item = { phase: event.phase, elapsedMs: finite(event.elapsedMs) };
-    if (event.phase.startsWith('office-host:')) {
-      let detail;
-      try { detail = JSON.parse(typeof event.detail === 'string' && event.detail.length <= 400 ? event.detail : '{}'); } catch { detail = {}; }
-      if (!detail || !ACTIONS.has(detail.action)) continue;
-      item.action = detail.action;
-      if (typeof detail.ok === 'boolean') item.ok = detail.ok;
-      if (typeof detail.dirty === 'boolean') item.dirty = detail.dirty;
-      if (KINDS.has(detail.kind)) item.kind = detail.kind;
-      if (TYPES.has(detail.type)) item.type = detail.type;
-      for (const name of ['revision','expectedRevision']) if (Number.isSafeInteger(detail[name]) && detail[name] >= 0 && detail[name] <= 1000000000) item[name] = detail[name];
-      if (FAILURES.has(detail.error)) item.failure = FAILURES.get(detail.error);
-    } else item.complete = event.detail === 'complete';
+    item.complete = event.detail === 'complete';
     events.push(item);
   }
   const groups = {};
-  for (const name of ['office','pdf','wordWorkbench','sheetWorkbench','presentationWorkbench']) {
+  for (const name of ['wordcraft','gridcraft','deckcraft','pdf']) {
     groups[name] = { present: !!frontend[name] && typeof frontend[name] === 'object', ok: frontend[name]?.ok === true };
   }
   return { schemaVersion: 1, platformId: PLATFORM.has(report.platformId) ? report.platformId : 'unknown',

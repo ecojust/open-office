@@ -22,7 +22,7 @@ async function collect(relative) {
 await collect('vendor/gridcraft')
 await collect('src/icons')
 // The host embeds these locally bundled, licensed fonts for Chinese UI and documents.
-await collect('crates/word-engine/fonts')
+await collect('assets/fonts/open-office')
 const hash = createHash('sha256')
 for (const path of sources.sort()) hash.update(path).update('\0').update(await readFile(join(root, path))).update('\0')
 const sourceHash = hash.digest('hex')
@@ -40,7 +40,7 @@ if (version.status !== 0 || version.stdout.trim() !== 'wasm-bindgen 0.2.129') {
   throw Error('Install the pinned WASM bridge: cargo install --locked wasm-bindgen-cli --version 0.2.129 (or set WASM_BINDGEN to that executable).')
 }
 const targetDir = process.env.GRIDCRAFT_TARGET_DIR || join(source, 'target')
-const built = spawnSync(process.env.CARGO || 'cargo', ['build', '--locked', '--release', '--target', 'wasm32-unknown-unknown', '--manifest-path', join(source, 'Cargo.toml'), '-p', 'open-office-gridcraft-host', '--target-dir', targetDir], { cwd: root, stdio: 'inherit', env: { ...process.env, CARGO_PROFILE_RELEASE_LTO: 'false', OPEN_OFFICE_FONTS_DIR: join(root, 'crates/word-engine/fonts') } })
+const built = spawnSync(process.env.CARGO || 'cargo', ['build', '--locked', '--release', '--target', 'wasm32-unknown-unknown', '--manifest-path', join(source, 'Cargo.toml'), '-p', 'open-office-gridcraft-host', '--target-dir', targetDir], { cwd: root, stdio: 'inherit', env: { ...process.env, CARGO_PROFILE_RELEASE_LTO: 'false', OPEN_OFFICE_FONTS_DIR: join(root, 'assets/fonts/open-office') } })
 if (built.error) throw built.error
 if (built.status !== 0) process.exit(built.status || 1)
 await rm(output, { recursive: true, force: true })

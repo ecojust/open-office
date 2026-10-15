@@ -1,9 +1,6 @@
 node_modules/
 node_modules
 dist/
-public/office-runtime/
-public/office-runtime
-public/word-engine/
 public/wordcraft/
 vendor/wordcraft/target/
 src-tauri/target/
@@ -25,3 +22,5 @@ playwright-report/
 public/pdfjs/
 public/gridcraft/
 vendor/gridcraft/target/
+public/deckcraft/
+vendor/deckcraft/target/

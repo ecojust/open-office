@@ -44,9 +44,9 @@ export function wordcraftSourceHash(root = ROOT) {
       else if (entry.isFile()) files.push(path);
     }
   }
-  collect('vendor/wordcraft'); collect('crates/word-engine/fonts'); collect('src/icons');
+  collect('vendor/wordcraft'); collect('assets/fonts/open-office'); collect('src/icons');
   check(files.some(name => name.startsWith('vendor/wordcraft/'))
-    && files.some(name => name.startsWith('crates/word-engine/fonts/')), 'source and licensed fonts are required');
+    && files.some(name => name.startsWith('assets/fonts/open-office/')), 'source and licensed fonts are required');
   const hash = createHash('sha256');
   for (const path of files.sort()) hash.update(path).update('\0').update(readFileSync(join(root, path))).update('\0');
   return hash.digest('hex');

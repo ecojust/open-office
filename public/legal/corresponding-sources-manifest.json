@@ -1,83 +1,7 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-13",
-  "runtimeBuildId": "efaf0670b4d055f838a2849becb10f08aa06a257",
-  "runtimeManifestSha256": "c8f0e17ecb82a16b94dc28a04f67003eecf42ec237953a9f3fa35c86c86cbbf6",
-  "runtimeAssetSha256": {
-    "soffice.js": "5143e5354f470b87f86ba272bcfef857bd13e6f07b59666e48a7ccb89643cd77",
-    "soffice.wasm": "56a2f4f43d0c5dbe45937054833d1946383bd07f1017d359d0efe7f4c9d85dd0",
-    "soffice.data": "3dab0a5448e599dccc1b1e69f4f86ea9eb30777c3f1ed7b9c386a5f4163e361c",
-    "soffice.data.js.metadata": "5d9d909d0b9b38443c0f19704032d0fc12d654f6c9c24c2c3b237739c4848ae3",
-    "NotoSansCJKsc-Regular.otf": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b"
-  },
-  "zetaJsShippedSha256": "7bdfa389a1d220c279f60602b2e0724b2280fa91d68d5237d1bce3bf0dedbf32",
-  "zetaJsUpstreamSha256": "b70ee7022908822c512535bbf43c4e44c297acc364e7542abba0d3071f5f9bfd",
+  "recordedAt": "2026-10-15",
   "archives": [
-    {
-      "id": "libreoffice-core",
-      "version": "24.2.8.0",
-      "license": "MPL-2.0 AND LGPL-3.0-or-later AND other per-file licenses",
-      "repository": "https://github.com/LibreOffice/core",
-      "sourceRef": "distro/allotropia/zeta-24-2",
-      "commit": "efaf0670b4d055f838a2849becb10f08aa06a257",
-      "provenance": "Build ID extracted from the shipped soffice.data /instdir/program/versionrc.",
-      "file": "libreoffice-core-efaf0670b4d055f838a2849becb10f08aa06a257.tar.gz",
-      "url": "https://codeload.github.com/LibreOffice/core/tar.gz/efaf0670b4d055f838a2849becb10f08aa06a257",
-      "bytes": 334795672,
-      "sha256": "e6fc088020f268e78fb06fc72bfb1cefd81a5de8a3fb815fdd4bd538816c96c2"
-    },
-    {
-      "id": "qt5",
-      "version": "5.15.2+wasm",
-      "license": "GPL-3.0-only OR LGPL-3.0-only; see per-file licenses",
-      "repository": "https://github.com/allotropia/qt5",
-      "sourceRef": "5.15.2+wasm",
-      "commit": "3d440b7787f9b5ba15e5f8bcd7aef39b388f94fa",
-      "provenance": "Pinned snapshot of the upstream-published source branch; qtbase gitlink exactly matches the pinned qtbase archive. Not independently proven as CDN compiler input.",
-      "file": "qt5-3d440b7787f9b5ba15e5f8bcd7aef39b388f94fa.tar.gz",
-      "url": "https://codeload.github.com/allotropia/qt5/tar.gz/3d440b7787f9b5ba15e5f8bcd7aef39b388f94fa",
-      "bytes": 2086827,
-      "sha256": "d976efcdceb7fa3f31cef50fefaca9be4c5dfaa792db1e3016570f2176894772"
-    },
-    {
-      "id": "qtbase",
-      "version": "5.15.2+wasm",
-      "license": "GPL-3.0-only for the WASM platform plugin; LGPL-3.0-only and other licenses elsewhere",
-      "repository": "https://github.com/allotropia/qtbase",
-      "sourceRef": "5.15.2+wasm",
-      "commit": "a320678c85ec8029d5394bcd673d4c208af1de3a",
-      "provenance": "Pinned snapshot of the upstream-published source branch. Qt WASM plugin license verified in src/plugins/platforms/wasm/qwasmintegration.cpp.",
-      "file": "qtbase-a320678c85ec8029d5394bcd673d4c208af1de3a.tar.gz",
-      "url": "https://codeload.github.com/allotropia/qtbase/tar.gz/a320678c85ec8029d5394bcd673d4c208af1de3a",
-      "bytes": 67938669,
-      "sha256": "59f13761f9892aac0c7bf7b513fb3c279941d74bb38cbe16562441dd0a7d9c66"
-    },
-    {
-      "id": "emscripten",
-      "version": "fixed-3.1.65",
-      "license": "MIT OR NCSA; additional bundled-library licenses",
-      "repository": "https://github.com/allotropia/emscripten",
-      "sourceRef": "fixed-3.1.65",
-      "commit": "949ee1d40467b80e90a9fdc67155d443426fef2d",
-      "provenance": "Pinned snapshot of the upstream-published toolchain branch.",
-      "file": "emscripten-949ee1d40467b80e90a9fdc67155d443426fef2d.tar.gz",
-      "url": "https://codeload.github.com/allotropia/emscripten/tar.gz/949ee1d40467b80e90a9fdc67155d443426fef2d",
-      "bytes": 29625655,
-      "sha256": "f0d0fc3f71fe0d1852c9d04cabcafefd5863f6d0a353ae8d98fbf50da486af6e"
-    },
-    {
-      "id": "zetajs",
-      "version": "1.2.0",
-      "license": "MIT",
-      "repository": "https://github.com/allotropia/zetajs",
-      "sourceRef": "v1.2.0",
-      "commit": "57360bcb0e7726ffa0e66567c8041261b959f8dd",
-      "provenance": "Annotated v1.2.0 tag resolved to its commit. The locally shipped zeta.js includes the recorded local patch.",
-      "file": "zetajs-57360bcb0e7726ffa0e66567c8041261b959f8dd.tar.gz",
-      "url": "https://codeload.github.com/allotropia/zetajs/tar.gz/57360bcb0e7726ffa0e66567c8041261b959f8dd",
-      "bytes": 820266,
-      "sha256": "fc8d68cab83c0de567fea5ae68c9a5c635c156d0f6dd0af238b045d536587225"
-    },
     {
       "id": "pymupdf",
       "version": "1.28.2",
@@ -119,44 +43,8 @@
     }
   ],
   "scopeNotes": [
-    "This is a checksum-verified upstream source snapshot set, not a claim that the CDN binaries have been independently rebuilt byte-for-byte.",
-    "LibreOffice core build ID is embedded in the binary filesystem. Qt/Emscripten branches are publicly identified by the distributor, but an exact per-component CDN build SBOM is not provided.",
-    "LibreOffice external source tarballs are not inside the core Git archive. LIBREOFFICE-EXTERNAL-SOURCES.lst records the upstream filenames/checksums; source releases must additionally include the dependencies selected by the actual build configuration.",
-    "A complete distribution must also include this application source, its build scripts/lockfiles, the local zeta.js patch, applicable notices, and any source/object material required by the selected licenses.",
+    "Pinned source archives for the active PDF runtime; document, spreadsheet and presentation Rust editor source is vendored with this application.",
+    "A complete distribution must also include this application source, its build scripts/lockfiles, all local editor integrations, applicable notices, and source/object material required by the selected licenses.",
     "Python runtime versions are platform-specific build facts; 3.12.14 must not be relabeled as corresponding source for another installed Python version."
-  ],
-  "localRuntimeDerivations": [
-    {
-      "file": "soffice.wasm",
-      "id": "qt-wasm-mouse-time-u64-wrap-v1",
-      "upstream": {
-        "bytes": 161667499,
-        "sha256": "9ebd9a487e849a24b9c69f843ebdb451709c27b7722c010e36846433474a5bd4"
-      },
-      "shipped": {
-        "bytes": 161667500,
-        "sha256": "56a2f4f43d0c5dbe45937054833d1946383bd07f1017d359d0efe7f4c9d85dd0"
-      },
-      "script": "scripts/office-mouse-time-patch.mjs",
-      "sourcePatch": "vendor/patches/qt-wasm-mouse-time-source-equivalent.patch",
-      "provenance": "One confirmed mouse callback cast changed in a checksum-pinned WASM binary. Source-equivalent Qt patch is supplied against the published source snapshot; this is not a full source rebuild or proof that the snapshot was the original CDN compiler input."
-    }
-  ],
-  "localModificationMaterials": [
-    {
-      "path": "scripts/office-mouse-time-patch.mjs",
-      "bytes": 11407,
-      "sha256": "50e0346617d7475b284a573a6f83039dca0428f1a944e29376a16972a186726a"
-    },
-    {
-      "path": "vendor/patches/qt-wasm-mouse-time-source-equivalent.patch",
-      "bytes": 1606,
-      "sha256": "25ce16e1b92ed52426348bfa727d251f4f30eef098b0e4f28c021d4a22697b65"
-    },
-    {
-      "path": "vendor/patches/office-mouse-time.md",
-      "bytes": 7880,
-      "sha256": "78964a7fa6450d817382c0e04b9f25819ea798da92baf246e49555e1ab01c21d"
-    }
   ]
 }

@@ -44,7 +44,7 @@ function products() {
     'src/App.vue', 'src/components/RustWordEditor.vue', 'src/style.css', 'package.json',
     ...filesUnder(path.join(root, 'src/word/rust')),
     ...filesUnder(path.join(root, 'vendor/wordcraft')),
-    ...filesUnder(path.join(root, 'crates/word-engine/fonts')),
+    ...filesUnder(path.join(root, 'assets/fonts/open-office')),
     ...filesUnder(path.join(root, 'public/wordcraft')),
     'scripts/build-wordcraft.mjs',
   ].map(file => path.resolve(root, file)).filter(fs.existsSync);

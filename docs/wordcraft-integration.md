@@ -18,11 +18,11 @@ Vue/Tauri 外壳 ↔ open-office-host WASM 桥 ↔ WordApp
 
 `vendor/wordcraft/` 保留固定上游代码；`apps/open-office-host` 是 Open Office 的适配层。`wordcraft-doc`、`wordcraft-docx`、`wordcraft-layout`、`wordcraft-render`、`wordcraft-engine` 与 `wordcraft-ui-egui` 分别承担文档、格式、排版、绘制、命令和界面。功能区和正文画布一起复用，Vue 不另外维护一份正文模型。
 
-桌面 WebView 与浏览器都运行随应用分发的本地 WASM 和 JS。Tauri 继续负责原生文件与窗口生命周期；此次默认编辑器并不是通过原生 `word_engine_request` 执行。它不加载远程 Office 网页服务。显式文字兼容入口仍使用原办公引擎；默认电子表格的独立替换见 [GridCraft 集成](gridcraft-integration.md)，兼容表格、演示与 PDF 保留各自实现。
+桌面 WebView 与浏览器都运行随应用分发的本地 WASM 和 JS，Tauri 负责原生文件与窗口生命周期。旧原生 Word IPC 和兼容办公入口已移除。当前表格使用 [GridCraft](gridcraft-integration.md)，演示使用 [DeckCraft](deckcraft-integration.md)，PDF 保留 PDF.js 与本地 PyMuPDF 后端；三套 Office 编辑器均不加载远程 Office 网页服务。
 
 ## 功能与边界
 
-外壳当前开放 DOCX 新建、打开、编辑与保存，以及 PDF 副本导出。其他文字格式从“兼容编辑器”入口打开；上游支持某种格式不等于本项目已开放对应文件流程。打印先生成 PDF 并尝试浏览器打印预览；不可用时可导出 PDF 后用系统阅读器打印，不代表已接入上游原生打印栈。
+外壳当前开放 DOCX 新建、打开、编辑与保存，以及 PDF 副本导出。当前只开放 DOCX 文字格式；上游支持某种格式不等于本项目已开放对应文件流程。打印先生成 PDF 并尝试浏览器打印预览；不可用时可导出 PDF 后用系统阅读器打印，不代表已接入上游原生打印栈。
 
 复用的功能区提供文字与段落格式、样式、列表、表格、图片、页面设置、页眉页脚、查找替换、批注修订等命令入口。它们的具体保真度、边缘操作和本应用生命周期交互，需要以实际验收记录为准；本页不把完整功能区或上游命令数量当作全部功能通过的证明。
 
@@ -53,7 +53,7 @@ WordCraft 上游仍标记为 **Alpha**。复杂 DOCX、图表／SmartArt、域�
 
 需要 Rust 1.95 或更新版本（固定的 craft-ui 依赖要求）、`wasm32-unknown-unknown` 和固定 `wasm-bindgen-cli 0.2.129`。运行 `npm run word:build` 后，`public/wordcraft/manifest.json` 记录上游提交、实际源文件和字体输入摘要，以及生成 JS／WASM 的摘要；`npm run word:check` 检查产物是否匹配。完整步骤见[开发与构建](development.md)。
 
-2026-10-15 的集成冻结快照已通过生产构建和完整 WordCraft 浏览器验收。下表的通过数字与哈希对应这份历史快照；后续全局工具栏与主题调整的结果单独记录在[开发文档](development.md#全局工具栏与主题)。0.8.0 新增的安装包检查已接入，实际结果仍待对应 Actions。这里不使用旧基础 Rust 内核、CLI、兼容编辑器或历史安装包报告提供新引擎结论。
+2026-10-15 的集成冻结快照已通过生产构建和完整 WordCraft 浏览器验收。下表的通过数字与哈希对应这份历史快照；后续全局工具栏与主题调整的结果单独记录在[开发文档](development.md#交互约定)。0.8.0 新增的安装包检查已接入，实际结果仍待对应 Actions。这里不使用旧基础 Rust 内核、CLI、兼容编辑器或历史安装包报告提供新引擎结论。
 
 | 范围 | 当前证据与状态 |
 | --- | --- |

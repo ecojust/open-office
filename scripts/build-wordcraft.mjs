@@ -22,7 +22,7 @@ async function collect(relative) {
 await collect('vendor/wordcraft')
 await collect('src/icons')
 // The host embeds these locally bundled, licensed fonts for Chinese UI and documents.
-await collect('crates/word-engine/fonts')
+await collect('assets/fonts/open-office')
 const hash = createHash('sha256')
 for (const path of sources.sort()) hash.update(path).update('\0').update(await readFile(join(root, path))).update('\0')
 const sourceHash = hash.digest('hex')

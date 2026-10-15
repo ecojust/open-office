@@ -1,13 +1,13 @@
 export type Kind = 'word'|'sheet'|'presentation'|'pdf'
-export type Extension = 'docx'|'odt'|'doc'|'rtf'|'xlsx'|'ods'|'xls'|'csv'|'tsv'|'pptx'|'odp'|'ppt'|'pdf'
-export type SaveExtension = Exclude<Extension,'doc'|'rtf'|'xls'|'ppt'>
+export type Extension = 'docx'|'xlsx'|'csv'|'tsv'|'pptx'|'potx'|'ppsx'|'pdf'
+export type SaveExtension = Exclude<Extension,'potx'|'ppsx'>
 export type SaveFormatOption = { extension: SaveExtension; title: string; description: string }
 /** Formats actually implemented by each active editor, not all import formats. */
 export function saveFormats(kind: Kind): SaveFormatOption[] {
  const pdf: SaveFormatOption = { extension: 'pdf', title: 'PDF 文档', description: '用于阅读、打印与分享' }
  const formats: Record<Kind, SaveFormatOption[]> = {
-  word: [{ extension: 'docx', title: 'DOCX 文档', description: '保留可编辑的文字、表格和排版' }, { extension: 'odt', title: 'ODT 文档', description: '开放文档格式，可继续编辑' }, pdf],
-  sheet: [{ extension: 'xlsx', title: 'XLSX 工作簿', description: '保留工作表、公式和单元格格式' }, { extension: 'ods', title: 'ODS 工作簿', description: '开放工作簿格式，可继续编辑' }, pdf],
+  word: [{ extension: 'docx', title: 'DOCX 文档', description: '保留可编辑的文字、表格和排版' }, pdf],
+  sheet: [{ extension: 'xlsx', title: 'XLSX 工作簿', description: '保留工作表、公式和单元格格式' }, { extension: 'csv', title: 'CSV 数据副本', description: '仅导出当前工作表的显示值，不包含公式、格式和其他工作表' }, { extension: 'tsv', title: 'TSV 数据副本', description: '以制表符分隔当前工作表的显示值，不包含公式、格式和其他工作表' }, pdf],
   presentation: [{ extension: 'pptx', title: 'PPTX 演示文稿', description: '保留可编辑的幻灯片与对象' }, { ...pdf, description: '静态页面，不包含放映动画与音视频' }],
   pdf: [pdf],
  }
@@ -31,23 +31,24 @@ export type EditorHandle = {
  search?(value:string):void|Promise<void>;
  print?():void|Promise<void>;
 }
+const supportedExtensions = ['docx','xlsx','csv','tsv','pptx','potx','ppsx','pdf'] as const
 export function extensionOf(name:string):Extension {
  const extension=name.split('.').at(-1)?.toLowerCase()
- if(!['docx','odt','doc','rtf','xlsx','ods','xls','csv','tsv','pptx','odp','ppt','pdf'].includes(extension || ''))throw new Error('请选择 DOCX、ODT、DOC、RTF、XLSX、ODS、XLS、CSV、TSV、PPTX、ODP、PPT 或 PDF 文件。宏、加密文件及其他格式暂不支持。')
+ if(!(supportedExtensions as readonly string[]).includes(extension || ''))throw new Error('请选择 DOCX、XLSX、CSV、TSV、PPTX、POTX、PPSX 或 PDF 文件。其他格式请先转换；宏与加密文件暂不支持。')
  return extension as Extension
 }
-export function kindOf(extension:Extension):Kind{return extension==='pdf'?'pdf':['pptx','odp','ppt'].includes(extension)?'presentation':['xlsx','ods','xls','csv','tsv'].includes(extension)?'sheet':'word'}
-export function isImportOnly(extension:Extension):boolean{return ['doc','rtf','xls','ppt'].includes(extension)}
+export function kindOf(extension:Extension):Kind{return extension==='pdf'?'pdf':['pptx','potx','ppsx'].includes(extension)?'presentation':['xlsx','csv','tsv'].includes(extension)?'sheet':'word'}
+export function isImportOnly(extension:Extension):boolean{return extension==='potx'||extension==='ppsx'}
 export function defaultSaveExtension(extension:Extension):SaveExtension {
- if(extension==='doc'||extension==='rtf')return 'docx'
- if(extension==='xls'||extension==='csv'||extension==='tsv')return 'xlsx'
- if(extension==='ppt')return 'pptx'
+ if(extension==='csv'||extension==='tsv')return 'xlsx'
+ if(extension==='potx'||extension==='ppsx')return 'pptx'
  return extension
 }
-/** Header screening only: the local Office engine also verifies the actual document
- * service after parsing. This does not claim an OLE or ZIP payload is well formed. */
+/** Header screening only: the active Rust parser validates the full package
+ * before an existing editing session is changed. */
 export function validateDocumentSignature(bytes:Uint8Array,extension:Extension):void {
  if(!bytes.length)throw Error('文档为空，无法打开。')
+ if(!(supportedExtensions as readonly string[]).includes(extension))throw Error('此文件格式不受支持，请先转换为 DOCX、XLSX、PPTX 或 PDF。')
  const starts=(signature:number[])=>signature.every((value,index)=>bytes[index]===value)
  let valid=false
  if(extension==='pdf') {
@@ -55,14 +56,6 @@ export function validateDocumentSignature(bytes:Uint8Array,extension:Extension):
   valid=Array.from(bytes.subarray(0,1024),value=>String.fromCharCode(value)).join('').includes('%PDF-')
  } else if(extension==='csv'||extension==='tsv') {
   try { const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);valid=!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(text) } catch { valid=false }
- } else if(extension==='rtf') {
-  const prefix=Array.from(bytes.subarray(0,32),value=>String.fromCharCode(value)).join('')
-  valid=/^\{\\rtf[1-9]\d*(?=[\\\s])/.test(prefix)
- } else if(['doc','xls','ppt'].includes(extension)) {
-  if(bytes.length>=512&&starts([0xd0,0xcf,0x11,0xe0,0xa1,0xb1,0x1a,0xe1])) {
-   const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),major=view.getUint16(26,true),sector=view.getUint16(30,true)
-   valid=view.getUint16(28,true)===0xfffe&&view.getUint16(32,true)===6&&((major===3&&sector===9)||(major===4&&sector===12))
-  }
  } else valid=bytes.length>=30&&starts([0x50,0x4b,0x03,0x04])
  if(!valid)throw Error(`文件内容与 .${extension} 格式不符，或文件已损坏。请使用原始文档；加密文件请先在原应用解密。`)
 }

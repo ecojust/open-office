@@ -104,7 +104,7 @@ test('Node allowlist reads only bounded static test declarations without executi
 });
 
 test('Node TAP and spec failures and TypeScript codes expose only exact public identifiers', () => {
-  const title = 'the redistributed bridge remains pinned with its upstream copyright and modification notice';
+  const title = 'Deck canvas evidence independently verifies both PPTX exports and its PDF page text';
   const other = 'Node TAP and spec failures and TypeScript codes expose only exact public identifiers';
   const allowlist = knownRepositoryTests();
   assert.ok(knownNodeTests().has(title));
@@ -129,7 +129,7 @@ test('Node TAP and spec failures and TypeScript codes expose only exact public i
 });
 
 test('Forged failure lines cannot disclose suffixes paths assertion values or encoded payloads', () => {
-  const title = 'the redistributed bridge remains pinned with its upstream copyright and modification notice';
+  const title = 'Deck canvas evidence independently verifies both PPTX exports and its PDF page text';
   const encoded = Buffer.from(secret).toString('base64');
   const allowlist = knownNodeTests();
   const raw = [

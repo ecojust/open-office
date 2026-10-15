@@ -1,92 +1,53 @@
 # Open Office — 第三方版权、许可与源码
 
-本应用包含具有独立版权和许可的第三方软件。根目录 `LICENSE` 适用于其注明的项目代码，不替代以下组件的许可。本发行物包含 AGPL、GPL、MPL 和 LGPL 组件，不能将整个安装包标为“全部 MIT”。本项目未购买或假定持有 Artifex、Qt 或 ZetaOffice 的商业授权。
+Open Office 包含具有独立版权和许可的第三方软件。根目录 MIT `LICENSE` 适用于其注明的项目代码；集成发行包仍须遵守 PDF 内核的 AGPL 及其他组件许可，不能将整个安装包标为“全部 MIT”。原始许可随应用保存在 [`public/legal/`](index.html)，本项目不声称获得上游项目或商标所有者的背书。
 
-完整许可随网页和桌面资源放在 [`public/legal/`](public/legal/index.html)。这些组件按各自许可原样提供，不作保证；商标仍归原权利人所有。Open Office 不是 Apache OpenOffice、LibreOffice、Artifex 或 Qt 的官方产品，也未声称获得其背书。
+## 当前编辑引擎
 
-## 主要运行时
-
-| 组件 | 实际版本或构建 | 使用的许可与说明 |
+| 组件 | 固定来源 | 许可与本地集成 |
 | --- | --- | --- |
-| WordCraft 文档引擎及 egui 界面 | 固定提交 `3292ba05d3c15c003823be6849e87a1c6e205242`，本地集成见下文 | MIT OR Apache-2.0；Copyright (c) 2026 ArtCraft Team and the WordCraft contributors。保留 `wordcraft/` 中的双许可、NOTICE 和 ATTRIBUTION；这是上游 Rust 内核与界面的集成，不是本项目原创内核。 |
-| GridCraft 电子表格引擎及 egui 界面 | 固定提交 `e6b6b349708ab4978cb3f061f6bd6ecbc25667cb`，上游工作区版本 `0.7.0` | MIT OR Apache-2.0；Copyright (c) 2026 ArtCraft Team and the GridCraft contributors。双许可、NOTICE、资产归属及本地改动说明保留在 `gridcraft/`；这是对上游 Rust 引擎与界面的集成。 |
-| ZetaOffice / LibreOffice WASM | 24.2.8.0；核心构建 `efaf0670b4d055f838a2849becb10f08aa06a257` | LibreOffice 的 MPL-2.0、LGPL-3.0 及各文件许可；完整上游法律文档保留在 `LIBREOFFICE-THIRD-PARTY-LICENSES.html`。WASM 与 Qt 静态组合还包含下述 GPL 代码。 |
-| Qt 5 / QtBase WASM 分支 | `5.15.2+wasm` | **WASM 平台插件采用 GPL 第 3 版**，并保留 Qt 原文规定的后续版本选项；不能仅以 Qt 其他部分的 LGPL 掩盖该要求。插件原文见 `QT-WASM-LICENSE-HEADER.txt`，全文见 `GPL-3.0.txt`。其余组件仍按各文件许可。 |
-| zeta.js | v1.2.0，提交 `57360bcb0e7726ffa0e66567c8041261b959f8dd` | MIT，Copyright © 2024 allotropia software GmbH and contributors。本地修复 `getSingleton` 返回值转换，并补充 UNO `TYPEDEF` 别名递归解析（含异常路径的类型描述句柄释放）；完整差异保存在 `zetajs-local-change.patch`，上游版权与许可保持不变。 |
-| Emscripten | allotropia `fixed-3.1.65`，提交 `949ee1d40467b80e90a9fdc67155d443426fef2d` | MIT / University of Illinois NCSA 双许可及内含库各自许可；见 `EMSCRIPTEN-LICENSE.txt`。 |
-| PyMuPDF | 1.28.2 | 采用免费开源的 GNU AGPL 第 3 版授权。Artifex 的商业授权是另一条独立授权途径，本项目不使用该途径。完整原文来自此版本官方 sdist 的 `COPYING`，见 `AGPL-3.0.txt`。 |
-| MuPDF | 1.28.2，与 PyMuPDF 实测版本一致 | GNU AGPL 第 3 版；其第三方源代码、字体和编解码库另保留各自许可，见 `mupdf/`。PyMuPDF 的源码压缩包**不包含** MuPDF 全部 C/C++ 源码，因此源码下载脚本单独包含 MuPDF 完整源码包。 |
-| CPython | 本次本地运行时为 3.12.14 | Python Software Foundation 与历史 Python 许可，见 `PYTHON-LICENSE.txt`。原生平台构建若使用其他 Python 版本，须保留该实际版本的许可与源码。 |
-| PyInstaller | 6.16.0 | GPL 第 2 版及上游明确的 bootloader 例外；例外使打包产物可按其自身许可分发，但不取消 PyMuPDF 等组件的 AGPL 要求。见 `PYINSTALLER-COPYING.txt`。 |
+| WordCraft | `3292ba05d3c15c003823be6849e87a1c6e205242` | MIT OR Apache-2.0；[来源、NOTICE、字体与改动](wordcraft/OPEN-OFFICE-INTEGRATION.md) |
+| GridCraft | `e6b6b349708ab4978cb3f061f6bd6ecbc25667cb` | MIT OR Apache-2.0；[来源、NOTICE、字体与改动](gridcraft/OPEN-OFFICE-INTEGRATION.md) |
+| DeckCraft | `9859da39255c0262cd592bb57101d7f2fa961f72` | MIT OR Apache-2.0；[许可及本地集成](deckcraft/OPEN-OFFICE-INTEGRATION.md) |
 
-对于采用 AGPL/GPL 的组合作品，应在相应许可条件下提供其完整对应源码、修改内容与构建安装所需材料，不能仅提供 Python 调用脚本或一个动态变化的上游主页地址。使用原版第三方文件并不自动免除其分发义务。若将适用 AGPL 条款的修改版本提供为网络服务，还须遵守该许可中面向远程用户提供源码的条款。
+DeckCraft 的音频依赖 Symphonia 采用 MPL-2.0，原始许可及精确 crate 源码来源由其依赖索引记录。
 
-## 前端、字体与本地桥接
+三套编辑器源码随应用保存在 `vendor/`，各自的 `apps/open-office-host` 将 Rust 文档模型、格式读写和 egui 界面接入本地 WebAssembly 工作区。Vue/Tauri 负责文件、多标签、主题及保存保护。本项目保留上游版权、双许可、NOTICE 和资产归属，不将上游引擎声明为原创。受限 ArtCraft 品牌图片不分发；上游 NOTICE 中对它们的原始引用仅描述上游来源。
 
-| 组件 | 版本 | 许可 / 版权记录 |
+WordCraft 与 GridCraft 使用的 `craft-ui` 固定于 `storytold/craft-libs` 提交 `d27646a5f7c8b4fc85d9dd3213b8c88b58e0088d`，原始双许可和来源声明在 [wordcraft/craft-libs](wordcraft/craft-libs/NOTICE)。可选 `storytold/craft-fonts` 仓库不包含在本集成中。
+
+旧 LibreOffice/ZetaOffice/Qt WASM 兼容内核、早期 TypeScript 文档引擎及自研 Rust Word IPC 内核已从当前应用移除。历史发布物仍以其对应版本的声明和源码为准。
+
+## PDF、前端与原生运行时
+
+| 组件 | 版本 | 许可与说明 |
 | --- | --- | --- |
-| Vue | 3.5.22 | MIT；包含 Evan You 及 Vue 贡献者的原始许可。 |
-| PDF.js | 6.4.299 | Apache-2.0；保留 Mozilla Foundation 的许可。离线 CMaps、标准字体及 WASM 编解码器另见 `pdfjs/` 下的原始许可。 |
-| pdf-lib | 1.17.1 | MIT；用于独立演示文稿的本地向量 PDF 导出，原始许可见 `npm/pdf-lib@1.17.1/LICENSE.md`。 |
-| @pdf-lib/fontkit | 1.1.1 | 包声明 MIT；用于中文字体嵌入与子集化，保留包内 README 许可声明及作者/贡献者元数据于 `npm/@pdf-lib__fontkit@1.1.1/`。 |
-| fflate | 0.8.2 | MIT；Copyright © 2023 Arjun Barrett。用于 PPTX ZIP 解压、原位包编辑与浏览器独立 DOCX 包读写，原始许可见 `npm/fflate@0.8.2/LICENSE`。 |
-| Noto Sans CJK SC Regular | 文件 SHA-256 `2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b` | SIL Open Font License 1.1；字体内版权为 © 2014–2021 Adobe。见 `NOTO-CJK-NOTICE.txt` 与 `OFL-1.1.txt`。 |
-| Tauri JavaScript API | 2.12.3 | Apache-2.0 OR MIT；两份原始文本均保留。 |
-| Rust / Tauri 与文字内核依赖 | `src-tauri/Cargo.lock`、`crates/word-engine/Cargo.lock`、`crates/word-package/Cargo.lock` | 多数为 MIT / Apache-2.0；另有 MPL、BSD、ISC 等。逐项表达式、锁文件摘要和原始许可见 `rust-dependencies.json`、`rust/`。 |
+| PyMuPDF / MuPDF | 1.28.2 | GNU AGPL 第 3 版；[许可全文](AGPL-3.0.txt)，MuPDF 附带库、字体和编解码器另保留 `public/legal/mupdf/` 中各自许可。未购买商业授权。 |
+| CPython | 固定源码记录为 3.12.14 | PSF 与历史 Python 许可；平台构建使用其他版本时必须提供匹配的许可和源码。 |
+| PyInstaller | 6.16.0 | GPL 第 2 版及上游 bootloader 例外；例外不取消被打包组件的 AGPL 等要求。 |
+| Vue | 3.5.22 | MIT，Evan You 与贡献者原始许可。 |
+| PDF.js | 6.4.299 | Apache-2.0；CMaps、标准字体及 WASM 编解码器另保留 `public/legal/pdfjs/` 的版权许可。 |
+| Tauri JavaScript API | 2.12.3 | Apache-2.0 OR MIT；原生依赖精确版本见 `src-tauri/Cargo.lock`。 |
+| pdf-lib / fflate | 1.17.1 / 0.8.2 | MIT；仅用于开发、测试样例及独立导出校验，已不承担产品文档解析或 PDF 导出。 |
 
-完整 npm 清单见 `npm-dependencies.json`，包括锁文件中的开发依赖、可选平台包和完整性摘要；`npm/` 保存已安装软件包的原始版权与许可。Rust 清单取上述三份锁文件的外部依赖并集，涵盖原生、独立文字内核／WASM、平台和构建依赖，不包含本项目的本地 crate，**并不表示每一个包都链接进每个平台的应用**。新文字内核新增包的许可原文已与锁文件校验和对应的已发布 crate 归档逐字节核对，归档来源及许可文件摘要保存在索引的 `publishedArchiveEvidence`。未安装的 npm 平台二进制包使用其发行包元数据记录，不冒称已经检查其本地内容。最终原生发布仍应以各平台实际运行时清单核对附加库。
+完整 npm 锁文件清单见 [`npm-dependencies.json`](npm-dependencies.json)，包括开发依赖及可选平台包，不表示每项都会进入安装包。原生 Rust 外部依赖见 [`rust-dependencies.json`](rust-dependencies.json)；WordCraft、GridCraft、DeckCraft 的 WASM normal/build 依赖分别记录于各自的依赖清单。原始许可保存在 `public/legal/npm/`、`public/legal/rust/`；已发布 crate 或上游许可来源的 URL、字节数及摘要在对应条目中记录。
 
-PDF.js 资产的许可证并不全是 Apache-2.0：例如 Liberation 标准字体采用 OFL，Foxit 标准字体、Adobe CMaps、OpenJPEG、JBIG2 和 QCMS 各有对应的版权文本。这些文件已原样保留，不能仅保留 PDF.js 顶层 LICENSE。
+## 字体与其他素材
 
-## 对应源码与复现依据
+共享字体资源已迁到 [`assets/fonts/open-office/`](wordcraft/fonts/open-office/manifest.json)，保留逐文件 SHA-256、来源、Noto 的 SIL OFL 1.1 及 DejaVu/Bitstream Vera 许可。WordCraft 与 GridCraft 的实际嵌入字体清单由各自来源和构建清单记录；保留字体文件不代表每个工作区都使用所有字重。
 
-固定源码、下载地址、字节数、SHA-256 和关联证据保存在 [`public/legal/corresponding-sources-manifest.json`](public/legal/corresponding-sources-manifest.json)。执行：
+WordCraft 自带 Inter、JetBrains Mono、Source Sans 3、Source Serif 4 共 13 份字体，原始四份 OFL 在 `public/legal/wordcraft/fonts/`。其断词数据保留公有领域、CC0、MIT 或 BSD 的原始来源和作者声明。DeckCraft 的中文回退字体及许可证单独保存在 `assets/fonts/deck/` 和相应集成说明中。
+
+egui 的 `epaint_default_fonts` 内嵌 Noto Emoji、Ubuntu Light、Hack 和 emoji-icon-font，分别适用 OFL、Ubuntu Font Licence、MIT/Bitstream Vera/DejaVu 等许可；原文在 `public/legal/rust/epaint_default_fonts@0.36.2/fonts/`。这组字体不保证完整或彩色 emoji 覆盖。PDF.js 内的 Liberation/Foxit 字体、Adobe CMaps、OpenJPEG、JBIG2、QCMS 也各有许可，不能只保留 PDF.js 顶层 LICENSE。
+
+## 对应源码与构建材料
+
+[`corresponding-sources-manifest.json`](corresponding-sources-manifest.json) 固定当前 PDF 内核的 PyMuPDF、MuPDF 和 CPython 三份源码归档、URL、大小及 SHA-256。下载器不会执行归档内容或自动接受变化的摘要：
 
 ```sh
 node scripts/fetch-corresponding-sources.mjs
 node scripts/fetch-corresponding-sources.mjs --verify
-# 已有归档时也可以指定目录，完全离线核验：
 node scripts/fetch-corresponding-sources.mjs --offline --out-dir /path/to/sources
 ```
 
-脚本下载 8 份已实际核验的上游源码归档，默认放入 `artifacts/corresponding-sources/`，并生成 `SHA256SUMS`。归档位于应用资源目录之外，适合与发行版一起提供；脚本不会解压或执行下载内容，也不会自动更新校验值。源码脚本还会拒绝办公运行时清单、PyMuPDF 版本或本地 zeta.js 与本次审查记录不一致的构建。
-
-必须区分已经确认的证据和仍需补齐的发行材料：
-
-- **LibreOffice 核心提交已与实际二进制数据中的 buildid 对上。** 原始证据来自 `soffice.data` 的 `/instdir/program/versionrc`。
-- Qt、QtBase、Emscripten 的快照来自 ZetaOffice 官方列出的分支，Qt supermodule 指向的 QtBase gitlink 也已核对；上游未随 CDN 公布逐组件构建 SBOM，因此未宣称这些快照已逐字节重建 CDN 二进制。
-- LibreOffice 核心 Git 归档不含 `make fetch` 获取的外部依赖源码。`LIBREOFFICE-EXTERNAL-SOURCES.lst` 保留该核心提交规定的名称与校验值；完整源码发行还须包括实际配置选择的外部依赖、必要修改与构建材料。
-- 本应用源码、锁文件、构建脚本和本地 zeta.js 补丁必须随对应源码交付。仅下载这 8 个归档，不等于已经证明整个发行物的对应源码完整性。
-- 本地鼠标时间戳修改分别记录原始与派生 WASM 摘要。获取源码时会校验并复制精确转换脚本、Qt 源码等价补丁和修改说明；专项测试随完整应用源码提供。该二进制补丁不代表整个 WASM 已从源码重编译。
-
-更详细的源码组装说明见 [`public/legal/CORRESPONDING-SOURCE.md`](public/legal/CORRESPONDING-SOURCE.md)。
-
-## WordCraft 来源、字体及本地改动
-
-WordCraft 源码固定在 `vendor/wordcraft/`，新增 `apps/open-office-host` 桥接 Open Office 的 Vue/Tauri 外壳、文件保存和多标签生命周期。完整来源、13 份上游字体的摘要及许可文件摘要见 [`public/legal/wordcraft/source-manifest.json`](public/legal/wordcraft/source-manifest.json)，本地改动范围见 [`OPEN-OFFICE-INTEGRATION.md`](public/legal/wordcraft/OPEN-OFFICE-INTEGRATION.md)。生成的 `public/wordcraft/manifest.json` 另外记录实际构建输入和产物指纹；本地 Git 提交记录适配代码。上游 `docs/brand/` 的受限 ArtCraft 品牌素材未复制或分发，原始 NOTICE 对其引用仅用于保留上游说明。
-
-`craft-ui` 固定来自 `storytold/craft-libs` 提交 `d27646a5f7c8b4fc85d9dd3213b8c88b58e0088d`，同样为 MIT OR Apache-2.0。其原始 NOTICE 保留 PhotoCraft、VectorCraft 等项目的代码来源，四份许可与归属文档原样放在 `public/legal/wordcraft/craft-libs/`。
-
-WordCraft 自带 Inter、JetBrains Mono、Source Sans 3、Source Serif 4 共 13 份字形文件，采用 SIL OFL 1.1；原始四份 OFL 位于 `public/legal/wordcraft/fonts/`。本集成另外使用已有 Noto Sans CJK SC Regular、Bold，供中文界面和文档绘制，并复用 DejaVu Sans Regular 与 Noto Sans Symbols2 Regular 补充部分单色 emoji／符号；保留 `fonts/open-office/` 中的来源清单、DejaVu／Bitstream Vera 和 OFL 原文。此字体组合不代表完整或彩色 emoji 支持。未使用可选的 `storytold/craft-fonts` 仓库，不将其日本字体声明为本发行物内容。英语 Moby 词表为公有领域，衍生断词模式为 CC0；波兰语、葡萄牙语和意大利语断词模式分别保留 MIT／BSD 许可原文与作者声明。
-
-egui 依赖 `epaint_default_fonts` 的内嵌字体另外保留 Noto Emoji 的 OFL、Ubuntu Light 的 Ubuntu Font Licence 1.0、Hack 的 MIT／Bitstream Vera／DejaVu 声明，以及 emoji-icon-font 的 MIT 原文，位于 `public/legal/rust/epaint_default_fonts@0.36.2/fonts/`。字体许可独立于 Rust 代码的双许可；WASM 依赖清单记录字体文件摘要。
-
-WordCraft WASM 宿主的 normal／build 依赖闭包单独记录在 [`public/legal/wordcraft-dependencies.json`](public/legal/wordcraft-dependencies.json)，按 `wasm32-unknown-unknown` 目标与锁文件生成，未将整个上游桌面／测试依赖都计为实际链接库。旧 `rust-dependencies.json` 继续描述此前三个锁文件的范围。部分发布 crate 未随包携带代码 LICENSE，已根据各自 `.cargo_vcs_info.json` 的提交从 AccessKit/accesskit、emilk/egui、aclysma/profiling、nicoburns/wuff 获取原始许可；精确 URL、字节数和 SHA-256 位于各包的 `upstreamLicenseEvidence`。
-
-WordCraft 及其通用库并不免除本发行包中其他 AGPL/GPL 等组件的义务。它也不代表所有上游功能都已在 Open Office 中通过验收。
-
-## GridCraft 来源与本地改动
-
-电子表格源码固定在 `vendor/gridcraft/`。`apps/open-office-host` 将上游 Rust 工作簿模型、公式计算、编辑命令和 egui 界面接入 Open Office 的本地 WebAssembly 工作区，文件选择、写入和标签生命周期由外壳协调。原始上游归档的 URL、字节数、SHA-256，以及原样保留的许可文件摘要见 [`public/legal/gridcraft/source-manifest.json`](public/legal/gridcraft/source-manifest.json)。本地适配源码随 Open Office 的确切发行提交提供；上游提交本身不代表修改后的完整构建输入。
-
-GridCraft 使用的 `craft-ui` 与文字工作区固定到相同的 `craft-libs` 提交，复用 `public/legal/wordcraft/craft-libs/` 中的原始许可、NOTICE 和资产归属。上游 `docs/brand/` 的 ArtCraft 标志图片依其品牌条款从派生源码中移除，条款原文保留；NOTICE 和 ATTRIBUTION 对这些图片的原始引用不代表本应用仍分发它们，也不代表本应用获得 ArtCraft 背书。
-
-WASM 宿主的 normal／build 依赖闭包单独记录在 [`public/legal/gridcraft-dependencies.json`](public/legal/gridcraft-dependencies.json)，许可说明见 [`gridcraft/OPEN-OFFICE-INTEGRATION.md`](public/legal/gridcraft/OPEN-OFFICE-INTEGRATION.md)。可选 `storytold/craft-fonts` 未包含在本集成中。GridCraft 的双许可不改变已有 LibreOffice／Qt、PDF 及其他组件的许可和对应源码义务，也不代表上游全部功能均已在 Open Office 验收。
-
-## 0.7.0 第一阶段 Rust 文字内核的字体与基础库
-
-`crates/word-engine` 使用固定的 DejaVu Sans 四种字重／样式、Noto Sans CJK SC Regular、Bold，以及 Noto Sans Symbols2 Regular。原始许可、来源与 SHA-256 位于 [`crates/word-engine/fonts`](crates/word-engine/fonts)。字体字节嵌入内核；构建时将许可与清单复制到 `word-engine/fonts/`，随前端资源分发。DejaVu 保留 Bitstream Vera 与 DejaVu 原始许可，Noto CJK 和 Noto Sans Symbols2 遵循 SIL OFL 1.1。
-
-Noto Sans Symbols2 Regular 的文件 SHA-256 为 `876598db5f1e3bef2bc77c4d94c5b0d5d2c1620be4878a06f18fb5434e331688`，来源为 Noto 字体包，保留 Google 的版权声明；原始许可见 `LICENSE-Noto-Core.txt`。该文件同时保留 Debian 包装文件的版权段落，字体本身适用其中的 OFL-1.1 条款。
-
-新内核的通用 XML、字体塑形、轮廓读取和 Unicode 基础库分别包括 roxmltree、rustybuzz、ttf-parser 与 Unicode 系列 crate；精确依赖见 `crates/word-engine/Cargo.lock` 与 `src-tauri/Cargo.lock`。它们不提供完整 Office 编辑器；其他工作区和兼容入口的既有许可要求继续适用。
+每个发行版须同时提供精确应用提交的源码、三套编辑器的本地修改、锁文件、构建与安装材料，以及适用许可要求的依赖源码。仅提供下载脚本或上游主页不等于已交付完整对应源码。原生 Python 版本和底层库须与实际发布包匹配；具体组装范围见 [对应源码说明](CORRESPONDING-SOURCE.md)。组件原始许可优先于本概述，软件按适用许可原样提供，不作保证。

@@ -2,7 +2,6 @@ mod files;
 mod pdf;
 mod server;
 mod smoke;
-mod word;
 
 use std::{
     path::PathBuf,
@@ -72,7 +71,6 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(Closing::default())
         .manage(pdf::PdfRuntime::default())
-        .manage(word::WordRuntime::default())
         .invoke_handler(tauri::generate_handler![
             bootstrap,
             confirm_close,
@@ -84,9 +82,6 @@ pub fn run() {
             files::pick_image,
             pdf::pdf_request,
             pdf::cancel_pdf,
-            word::word_read_package,
-            word::word_write_package,
-            word::word_engine_request,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -128,10 +123,7 @@ pub fn run() {
                     .permission("allow-save-document")
                     .permission("allow-pick-image")
                     .permission("allow-pdf-request")
-                    .permission("allow-cancel-pdf")
-                    .permission("allow-word-read-package")
-                    .permission("allow-word-write-package")
-                    .permission("allow-word-engine-request"),
+                    .permission("allow-cancel-pdf"),
             )?;
             app.manage(server);
             if let Some(smoke) = &diagnostic {

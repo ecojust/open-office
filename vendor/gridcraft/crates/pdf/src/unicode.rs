@@ -6,11 +6,11 @@ use subsetter::GlyphRemapper;
 use ttf_parser::{Face, Tag};
 
 const DATA: [&[u8]; 5] = [
-    include_bytes!("../../../../../crates/word-engine/fonts/DejaVuSans.ttf"),
-    include_bytes!("../../../../../crates/word-engine/fonts/DejaVuSans-Bold.ttf"),
-    include_bytes!("../../../../../crates/word-engine/fonts/NotoSansCJKsc-Regular.otf"),
-    include_bytes!("../../../../../crates/word-engine/fonts/NotoSansCJKsc-Bold.otf"),
-    include_bytes!("../../../../../crates/word-engine/fonts/NotoSansSymbols2-Regular.ttf"),
+    include_bytes!("../../../../../assets/fonts/open-office/DejaVuSans.ttf"),
+    include_bytes!("../../../../../assets/fonts/open-office/DejaVuSans-Bold.ttf"),
+    include_bytes!("../../../../../assets/fonts/open-office/NotoSansCJKsc-Regular.otf"),
+    include_bytes!("../../../../../assets/fonts/open-office/NotoSansCJKsc-Bold.otf"),
+    include_bytes!("../../../../../assets/fonts/open-office/NotoSansSymbols2-Regular.ttf"),
 ];
 static FACES: OnceLock<[Option<Face<'static>>; 5]> = OnceLock::new();
 fn face(key: usize) -> Option<&'static Face<'static>> {

@@ -18,28 +18,18 @@ test('chosen save names preserve meaningful dots and follow cross-platform nativ
   assert.throws(()=>saveFileName('字'.repeat(79),'docx'),/过长/)
 })
 
-test('old Office imports keep their family while the default save is a modern copy',()=>{
-  for(const [source,kind,target] of [['doc','word','docx'],['rtf','word','docx'],['xls','sheet','xlsx'],['ppt','presentation','pptx']]){
+test('only active Rust formats are accepted and templates normalize to editable PPTX copies',()=>{
+  for(const [source,kind,target] of [['docx','word','docx'],['xlsx','sheet','xlsx'],['pptx','presentation','pptx'],['potx','presentation','pptx'],['ppsx','presentation','pptx'],['pdf','pdf','pdf']]){
     const extension=extensionOf('中文 report.'+source.toUpperCase())
     assert.equal(extension,source);assert.equal(kindOf(extension),kind)
-    assert.equal(defaultSaveExtension(extension),target);assert.equal(isImportOnly(extension),true)
+    assert.equal(defaultSaveExtension(extension),target)
+    assert.equal(isImportOnly(extension),['potx','ppsx'].includes(source))
   }
-  for(const extension of ['docx','odt','xlsx','ods','pptx','odp','pdf']){
-    assert.equal(defaultSaveExtension(extension),extension);assert.equal(isImportOnly(extension),false)
+  for(const extension of ['doc','rtf','odt','xls','ods','ppt','odp','docm','xlsm','pptm','xlsb','html']) {
+    assert.throws(()=>extensionOf(`Original.${extension}`),/请选择/)
+    assert.throws(()=>validateDocumentSignature(zip(),extension),/不受支持/)
   }
-  for(const name of ['macro.docm','macro.xlsm','macro.pptm','data.xlsb','web.html','no-extension','report.docx.exe'])assert.throws(()=>extensionOf(name))
-})
-
-test('OLE screening rejects truncated, byte-swapped and mislabeled legacy containers',()=>{
-  for(const extension of ['doc','xls','ppt']){
-    assert.doesNotThrow(()=>validateDocumentSignature(ole(),extension))
-    assert.doesNotThrow(()=>validateDocumentSignature(ole(4),extension))
-    assert.throws(()=>validateDocumentSignature(ole().subarray(0,100),extension))
-    const swapped=ole();swapped[28]=0
-    assert.throws(()=>validateDocumentSignature(swapped,extension))
-    assert.throws(()=>validateDocumentSignature(zip(),extension))
-    assert.throws(()=>validateDocumentSignature(encode('<html>Renamed document</html>'),extension))
-  }
+  for(const name of ['no-extension','report.docx.exe'])assert.throws(()=>extensionOf(name))
 })
 
 test('text spreadsheets default to a workbook copy and reject invalid UTF-8 or binary controls',()=>{
@@ -56,19 +46,17 @@ test('text spreadsheets default to a workbook copy and reject invalid UTF-8 or b
   }
 })
 
-test('modern ZIP and RTF signatures fail closed before the engine parses content',()=>{
-  for(const extension of ['docx','odt','xlsx','ods','pptx','odp']){
+test('supported OOXML signatures fail closed before a Rust parser reads the package',()=>{
+  for(const extension of ['docx','xlsx','pptx','potx','ppsx']){
     assert.doesNotThrow(()=>validateDocumentSignature(zip(),extension))
     assert.throws(()=>validateDocumentSignature(ole(),extension),/加密文件/, 'Encrypted OOXML is OLE, not a readable ZIP package')
     assert.throws(()=>validateDocumentSignature(zip().subarray(0,4),extension))
+    assert.throws(()=>validateDocumentSignature(encode('<html>Renamed file</html>'),extension))
   }
-  assert.doesNotThrow(()=>validateDocumentSignature(encode('{\\rtf1\\ansi text}'),'rtf'))
-  assert.doesNotThrow(()=>validateDocumentSignature(encode('{\\rtf1 text}'),'rtf'))
-  for(const value of ['{\\rtf0 text}','{\\rtf1invalid}','plain text','{\\rtf1'])assert.throws(()=>validateDocumentSignature(encode(value),'rtf'))
 })
 
 test('PDF may have a short header prefix; empty or far-off fake headers are refused',()=>{
   assert.doesNotThrow(()=>validateDocumentSignature(encode('\n%PDF-1.7\n'),'pdf'))
   assert.throws(()=>validateDocumentSignature(encode(' '.repeat(1024)+'%PDF-1.7'),'pdf'))
-  for(const extension of ['docx','odt','doc','rtf','xlsx','ods','xls','pptx','odp','ppt','pdf'])assert.throws(()=>validateDocumentSignature(new Uint8Array(),extension),/文档为空/)
+  for(const extension of ['docx','xlsx','csv','tsv','pptx','potx','ppsx','pdf'])assert.throws(()=>validateDocumentSignature(new Uint8Array(),extension),/文档为空/)
 })

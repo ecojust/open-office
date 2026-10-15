@@ -7,7 +7,9 @@ use std::{
     time::Instant,
 };
 
-pub const REPORT_LIMIT: usize = 1024 * 1024;
+// Reports carry independently inspected DOCX/XLSX/PPTX/PDF round-trip bytes.
+// Keep an explicit cap shared by IPC report storage and the failure-only HTTP route.
+pub const REPORT_LIMIT: usize = 12 * 1024 * 1024;
 
 #[derive(Clone)]
 pub struct Smoke {
@@ -83,7 +85,7 @@ impl Smoke {
             .ok_or("Smoke report requires an explicit ok boolean.")?;
         let bytes = serde_json::to_vec_pretty(report).map_err(|_| "Invalid smoke report.")?;
         if bytes.len() > REPORT_LIMIT {
-            return Err("Smoke report exceeds 1 MiB.".into());
+            return Err("Smoke report exceeds 12 MiB.".into());
         }
         atomic_write(&self.output, &bytes)?;
         self.note("report-written", if passed { "passed" } else { "failed" });
@@ -108,8 +110,6 @@ impl Smoke {
 fn parse_scope(value: Option<&str>) -> Result<&'static str, String> {
     match value {
         None | Some("full") => Ok("full"),
-        Some("word-package-ipc") => Ok("word-package-ipc"),
-        Some("rust-word-engine") => Ok("rust-word-engine"),
         _ => Err("Unknown OPEN_OFFICE_SMOKE_SCOPE.".into()),
     }
 }
@@ -138,14 +138,8 @@ mod tests {
     fn smoke_scope_defaults_to_full_and_rejects_unknown_values() {
         assert_eq!(parse_scope(None).unwrap(), "full");
         assert_eq!(parse_scope(Some("full")).unwrap(), "full");
-        assert_eq!(
-            parse_scope(Some("rust-word-engine")).unwrap(),
-            "rust-word-engine"
-        );
-        assert_eq!(
-            parse_scope(Some("word-package-ipc")).unwrap(),
-            "word-package-ipc"
-        );
+        assert!(parse_scope(Some("rust-word-engine")).is_err());
+        assert!(parse_scope(Some("word-package-ipc")).is_err());
         assert!(parse_scope(Some("")).is_err());
         assert!(parse_scope(Some("word")).is_err());
     }
@@ -164,5 +158,19 @@ mod tests {
             false
         );
         assert!(directory.path().join("diagnostics.json").is_file());
+    }
+
+    #[test]
+    fn document_round_trip_reports_remain_bounded_without_replacing_valid_evidence() {
+        let directory = tempfile::tempdir().unwrap();
+        let output = directory.path().join("report.json");
+        let smoke = Smoke::new(output.clone(), || {});
+        let valid = json!({"ok": true, "pdfBase64": "A".repeat(1024 * 1024 + 1)});
+        assert!(smoke.report(&valid).unwrap());
+        let saved = std::fs::read(&output).unwrap();
+        assert!(saved.len() > 1024 * 1024);
+        let oversized = json!({"ok": true, "pdfBase64": "A".repeat(REPORT_LIMIT)});
+        assert!(smoke.report(&oversized).is_err());
+        assert_eq!(std::fs::read(output).unwrap(), saved);
     }
 }
