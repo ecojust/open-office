@@ -54,6 +54,20 @@
 
 本轮末尾日志覆盖崩溃，未提供异常栈或具体信号，也未发现 `.ips` 文件。WebContent 退出前最近采样约 769 MiB RSS，仍不足以认定内存杀死。后续检查聚焦双击事件回调中同步进入编辑的路径，并继续读取崩溃时刻上下文。
 
+## 0.10.1 的兼容处理及候选证据
+
+后续调查在独立分支继续进行，未将 F2、LLDB、预选对照或私有进程探针纳入产品修复。原始实现的 [退出观察](https://github.com/ecojust/open-office/actions/runs/38794415036) 取得准确 WebContent PID 的 Darwin `signal=5`（SIGTRAP）、详情标志零；仍无异常栈，不能仅凭该信号确定 JIT 或内存根因。[纯定时等待对照](https://github.com/ecojust/open-office/actions/runs/38797686180) 在 A1 提交及 D6 预选之后、尚未发送 D6 鼠标事件时同样退出，排除了双击是唯一必要触发条件。
+
+产品改动使用 macOS 26.4 起公开的 [`WKWebpagePreferences.securityRestrictionMode`](https://developer.apple.com/documentation/webkit/wkwebpagepreferences/securityrestrictionmode)，首次导航前仅将 None 改为 MaximizeCompatibility。保留已有 Lockdown、未知模式及不支持接口的系统设置。此模式会关闭整个 WebContent 的 JIT，并增强内存保护；不是仅切换某一 Wasm 优化层，不能据其有效直接认定具体 JIT 缺陷。
+
+两次独立冷启动 [38797970674](https://github.com/ecojust/open-office/actions/runs/38797970674) 和 [38799367988](https://github.com/ecojust/open-office/actions/runs/38799367988) 均在 macOS 26.6.2 ARM64 完成默认 11 项真实系统输入、8 项编辑检查，保留全部标签与会话身份；网页启动一次、终止零次。配置读回均为 `before-set=0`、`after-set=1`、`created=1`。这不是用户 macOS 26.5 实机的验证。
+
+第一轮完整前端验证的 [只读归档检查](https://github.com/ecojust/open-office/actions/runs/38800091297) 确认 Word、表格、演示及 PDF 往返完成，应用正常退出。全套流程约 32 秒，其中 Word 阶段约 9.7 秒、表格约 4.8 秒、演示约 10.9 秒，包含初始化、编辑、导出、重开与清理，不能当作单次输入延迟。两轮外层检查均因 `SharedArrayBuffer` 不存在而失败，不能将原工作流结果改称成功。
+
+当前三个编辑器及 PDF 的七个 WASM 模块均使用非共享内存，没有导入共享内存；编辑器桥接无 SAB、Atomics 或 Worker，PDF.js 传递普通 ArrayBuffer，桌面 PDF 编辑使用独立原生子进程。外层检查因此将 SAB 作为布尔能力如实保留，继续要求跨源隔离、完整功能与独立文件检查。共享内存不可用仍是此模式的限制。
+
+最终发布需重新构建全部平台，并对原 ARM DMG 在 macOS 26 上执行默认真实输入和完整文档往返。实验 App 的成功不替代最终安装包验证。大型文档的性能、真实中文输入法组合及 26.5 实机仍是未覆盖范围。
+
 ## 原生检查的判定要求
 
 使用 macOS 系统级键鼠事件，校验浏览器收到的事件确为可信输入，并检查实际文档内容、全部标签和会话身份。记录测试机实际 macOS 小版本，不能将其他 26.x 小版本称为 26.5。

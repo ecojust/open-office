@@ -9,6 +9,10 @@ import { verifyMacosArmEditingProof, readMacosArmEditingProof, runMacosArmEditin
 import { EDITING_ACTIONS, EDITING_CHECKS, viewportMapping, inputForWindow } from '../scripts/macos-editing-diagnostic.mjs';
 import { inspectInstalledWordcraft, wordcraftSourceHash, validateInstalledWordcraftEvidence } from '../scripts/wordcraft-native-smoke.mjs';
 import { inspectInstalledGridcraft, gridcraftSourceHash, validateInstalledGridcraftEvidence } from '../scripts/gridcraft-native-smoke.mjs';
+import { inspectInstalledDeckcraft, deckcraftSourceHash } from '../scripts/deckcraft-native-smoke.mjs';
+import { wordcraftReport } from './helpers/wordcraft-smoke-report.mjs';
+import { gridcraftReport } from './helpers/gridcraft-smoke-report.mjs';
+import { deckcraftReport } from './helpers/deckcraft-smoke-report.mjs';
 
 // Independent native-event fixture: no OS injection or successful gate flags substitute for its model observations.
 const geometry = { actionId: 'single-a1', viewport: { width: 1200, height: 800 }, pid: 1234, windowId: 92, x: 40, y: 70,
@@ -16,6 +20,9 @@ const geometry = { actionId: 'single-a1', viewport: { width: 1200, height: 800 }
     bounds: [40, 70, 1200, 800], visibleRect: [40, 70, 1200, 800], safeAreaRect: [40, 70, 1200, 800], contentLayoutIntersection: [40, 70, 1200, 800] } };
 const request = { actionId: 'single-a1', kind: 'click', clientX: 300, clientY: 200, viewportWidth: 1200, viewportHeight: 800 };
 const permissions = { postEventAccess: true, accessibilityTrusted: true, screenCaptureAccess: false, inputSourceId: 'com.apple.keylayout.ABC' };
+const policyEvent = () => ({ phase: 'editing-webkit-policy', elapsedMs: 0, generation: 0,
+  detail: JSON.stringify({ source: 'WKWebpagePreferences.securityRestrictionMode', stage: 'created',
+    supported: true, requested: 1, actual: 1, action: 'readback' }) });
 
 function fixture() {
   const sessions = ['sheet', 'sheet', 'word'].map((kind, index) => ({ key: `tab-${index}`, kind, sessionId: `${kind}-${index}`, documentId: index + 1 }));
@@ -47,6 +54,7 @@ function fixture() {
       undoneValue: null, wordText: 'wordnative', retained: { a1: 42, bold: true, d6: 'sheetnative', pristineA1: null } },
     lastState: { ...snapshot(10, true), activeKey: sessions[1].key }, cleanup: { attempted: 3, closed: 3, ok: true } };
   const diagnostics = { schemaVersion: 1, scope: 'macos-editing', generation: 1, terminations: 0, events: [
+    policyEvent(),
     { phase: 'document-start', detail: JSON.stringify({ bootId: editing.bootId, timeOrigin: editing.timeOrigin }) },
     ...sent.flatMap(item => [{ phase: 'editing-input-request', detail: JSON.stringify(item.request) }, { phase: 'editing-window-geometry', detail: JSON.stringify(item.geometry) }]),
   ] };
@@ -60,14 +68,16 @@ function installation(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const write = (path, contents) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, contents); };
   write(join(root, 'package.json'), JSON.stringify({ version: '0.10.1' }));
-  for (const path of ['scripts/build-wordcraft.mjs', 'scripts/build-gridcraft.mjs', 'scripts/build-office-icons.mjs',
-    'vendor/wordcraft/src/lib.rs', 'vendor/gridcraft/src/lib.rs', 'assets/fonts/open-office/license.txt', 'src/icons/test.svg']) write(join(root, path), `fixture: ${path}`);
+  for (const path of ['scripts/build-wordcraft.mjs', 'scripts/build-gridcraft.mjs', 'scripts/build-deckcraft.mjs', 'scripts/build-office-icons.mjs',
+    'vendor/wordcraft/src/lib.rs', 'vendor/gridcraft/src/lib.rs', 'vendor/deckcraft/src/lib.rs',
+    'assets/fonts/open-office/license.txt', 'assets/fonts/deck/license.txt', 'src/icons/test.svg']) write(join(root, path), `fixture: ${path}`);
   const app = join(root, 'Open Office.app'), resourceRoot = join(app, 'Contents/Resources');
   write(join(app, 'Contents/MacOS/open-office'), 'ARM application fixture');
   write(join(resourceRoot, 'pdf-runtime/open-office-pdf'), 'ARM PDF fixture');
   for (const [engine, name, upstream, hash] of [
     ['wordcraft', 'WordCraft', '3292ba05d3c15c003823be6849e87a1c6e205242', wordcraftSourceHash],
     ['gridcraft', 'GridCraft', 'e6b6b349708ab4978cb3f061f6bd6ecbc25667cb', gridcraftSourceHash],
+    ['deckcraft', 'DeckCraft', '9859da39255c0262cd592bb57101d7f2fa961f72', deckcraftSourceHash],
   ]) {
     const files = { [`${engine}.js`]: Buffer.from('export const fixture=true;'), [`${engine}.d.ts`]: Buffer.from('export const fixture:boolean;'),
       [`${engine}_bg.wasm`]: Buffer.from('0061736d01000000', 'hex'), [`${engine}_bg.wasm.d.ts`]: Buffer.from('export const memory:WebAssembly.Memory;') };
@@ -81,7 +91,7 @@ function installation(t) {
   const inventory = appInventory(app);
   const proof = { schemaVersion: 1, kind: 'macos-arm-editing-gate', platformId: 'macos-arm64', target: 'aarch64-apple-darwin',
     commit, runId, ok: true, status: 'passed', releaseAcceptance: true,
-    host: { platform: 'darwin', arch: 'arm64', machine: 'arm64', productVersion: '26.0.1', buildVersion: '25A362' },
+    host: { platform: 'darwin', arch: 'arm64', machine: 'arm64', productVersion: '26.5', buildVersion: '25A362' },
     dmg: { name: 'Open-Office-0.10.1-macos-arm64.dmg', bytes: readFileSync(dmgPath).length, sha256: sha256File(dmgPath) },
     app: inventory, copiedAppPath: app, signatures, architectures: { main: 'arm64', pdfRuntime: 'arm64' },
     transfer: { readonlyMount: true, originalAppResigned: false, unchangedAppBytesAndSymlinks: true,
@@ -89,10 +99,33 @@ function installation(t) {
     cleanup: { detached: true, removedTemporaryApp: true },
     diagnostic: { schemaVersion: 1, diagnosticOnly: true, releaseAcceptance: false, commit, runId, ok: true, status: 'passed', gaps: [],
       preflight: { schemaVersion: 1, kind: 'macos-os-input-preflight', permissions: { ...permissions } },
-      process: { pid: 1234, exitCode: 0, signal: null }, system: { machine: 'arm64', swVers: 'ProductName:\tmacOS\nProductVersion:\t26.0.1\nBuildVersion:\t25A362' },
+      process: { pid: 1234, exitCode: 0, signal: null }, system: { machine: 'arm64', swVers: 'ProductName:\tmacOS\nProductVersion:\t26.5\nBuildVersion:\t25A362' },
       application: { app, executableSha256: sha256File(join(app, 'Contents/MacOS/open-office')),
         wordcraft: inspectInstalledWordcraft(resourceRoot, { root }), gridcraft: inspectInstalledGridcraft(resourceRoot, { root }) },
       frontend: scenario.frontend, nativeDiagnostics: scenario.diagnostics, actions: scenario.sent } };
+  const frontend = { ok: true, crossOriginIsolated: true, sharedArrayBuffer: false, userAgent: 'Native WebView contract test',
+    wordcraft: wordcraftReport(), gridcraft: gridcraftReport(), deckcraft: deckcraftReport(),
+    pdf: { ok: true, reopened: true, removedOldText: true, newTextPresent: true,
+      metadata: { pageCount: 1 }, text: 'NEW_NATIVE_TEXT 新的合同' } };
+  const installed = { wordcraft: inspectInstalledWordcraft(resourceRoot, { root }), gridcraft: inspectInstalledGridcraft(resourceRoot, { root }),
+    deckcraft: inspectInstalledDeckcraft(resourceRoot, { root }) };
+  for (const [engine, evidence] of Object.entries(installed)) {
+    const manifest = JSON.parse(evidence.manifestText);
+    Object.assign(frontend[engine].resources, { manifestSha256: evidence.manifestSha256, sourceHash: manifest.sourceHash,
+      files: Object.fromEntries([`${engine}.js`, `${engine}_bg.wasm`].map(name => [name, { ...evidence.files[name] }])) });
+  }
+  proof.fullSmoke = { schemaVersion: 1, kind: 'native-gui-smoke', ok: true, platformId: 'macos-arm64', target: 'aarch64-apple-darwin',
+    commit, runId, host: { platform: 'darwin', architecture: 'arm64' }, targetArch: 'arm64', hostArch: 'arm64', executionMode: 'native', timeoutMs: 300_000,
+    preflight: { installedResourceLayout: true, finalExecutable: 'open-office',
+      finalExecutableSha256: sha256File(join(app, 'Contents/MacOS/open-office')),
+      pdfExecutableSha256: sha256File(join(resourceRoot, 'pdf-runtime/open-office-pdf')), ...installed,
+      macos: { mainArchitectures: ['arm64'], pdfArchitectures: ['arm64'], cdHashes: { ...signatures },
+        strictSignatureVerification: ['app', 'main', 'pdfRuntime'], originalAppResigned: false } },
+    process: { launchExecutable: join(app, 'Contents/MacOS/open-office'), launchArguments: [], pid: 5678,
+      cleanExit: true, exitCode: 0, signal: null, timedOut: false }, frontend, errors: [],
+    nativeDiagnostics: { schemaVersion: 1, scope: 'full', generation: 1, terminations: 0,
+      events: [policyEvent(), { phase: 'document-start', detail: 'initial page', elapsedMs: 20, generation: 1 },
+        { phase: 'report-written', detail: 'passed', elapsedMs: 10000, generation: 1 }] } };
   return { root, proof, options: { commit, runId, dmgPath, root }, app };
 }
 
@@ -103,6 +136,126 @@ test('Linux publisher verifies a complete original-DMG native-editing proof with
   assert.deepEqual(value.proof, before, 'Proof verification must be read-only');
   assert.equal(value.proof.diagnostic.actions.length, 11);
   assert.equal(value.proof.diagnostic.frontend.editing.checks.length, 8);
+  assert.equal(value.proof.fullSmoke.frontend.sharedArrayBuffer, false);
+});
+
+test('publication rejects absent, failed, foreign or non-native full-editor smoke evidence', async t => {
+  const { proof, options } = installation(t);
+  const cases = [
+    ['missing report', p => { delete p.fullSmoke; }],
+    ['failure', p => { p.fullSmoke.ok = false; }],
+    ['recorded error', p => { p.fullSmoke.errors.push('failed'); }],
+    ['another commit', p => { p.fullSmoke.commit = 'b'.repeat(40); }],
+    ['another run', p => { p.fullSmoke.runId = '1'; }],
+    ['another app', p => { p.fullSmoke.process.launchExecutable += '-other'; }],
+    ['another executable', p => { p.fullSmoke.preflight.finalExecutableSha256 = 'f'.repeat(64); }],
+    ['another PDF runtime', p => { p.fullSmoke.preflight.pdfExecutableSha256 = 'f'.repeat(64); }],
+    ['another signature', p => { p.fullSmoke.preflight.macos.cdHashes.main = 'f'.repeat(40); }],
+    ['another target', p => { p.fullSmoke.target = 'x86_64-apple-darwin'; }],
+    ['another platform', p => { p.fullSmoke.platformId = 'macos-x64'; }],
+    ['another host', p => { p.fullSmoke.host.architecture = 'x64'; }],
+    ['Rosetta mode', p => { p.fullSmoke.executionMode = 'rosetta2'; }],
+    ['alternate launch arguments', p => { p.fullSmoke.process.launchArguments = ['--other']; }],
+    ['extended timeout', p => { p.fullSmoke.timeoutMs = 600_000; }],
+    ['timed out', p => { p.fullSmoke.process.timedOut = true; }],
+    ['failed exit', p => { p.fullSmoke.process.exitCode = 1; }],
+    ['signal', p => { p.fullSmoke.process.signal = 'SIGTRAP'; }],
+    ['missing clean exit', p => { delete p.fullSmoke.process.cleanExit; }],
+    ['spawn failure', p => { p.fullSmoke.process.spawnErrorCode = 'ENOENT'; }],
+    ['cleanup failure', p => { p.fullSmoke.process.cleanupError = 'failed'; }],
+  ];
+  for (const [name, mutate] of cases) await t.test(name, () => {
+    const changed = structuredClone(proof); mutate(changed);
+    assert.throws(() => verifyMacosArmEditingProof(changed, options));
+  });
+});
+
+test('full-editor functional acceptance is mandatory even without shared memory', async t => {
+  const { proof, options } = installation(t);
+  for (const available of [true, false]) {
+    const changed = structuredClone(proof); changed.fullSmoke.frontend.sharedArrayBuffer = available;
+    assert.equal(verifyMacosArmEditingProof(changed, options), true);
+  }
+  for (const engine of ['wordcraft', 'gridcraft', 'deckcraft']) await t.test(engine, () => {
+    const changed = structuredClone(proof); delete changed.fullSmoke.frontend[engine];
+    assert.throws(() => verifyMacosArmEditingProof(changed, options));
+  });
+  for (const mutate of [
+    frontend => { frontend.pdf.reopened = false; },
+    frontend => { frontend.pdf.text += ' OLD_NATIVE_TEXT'; },
+    frontend => { frontend.gridcraft.formula.value = 0; },
+    frontend => { frontend.deckcraft.failures.preserved = false; },
+    frontend => { frontend.wordcraft.reopenedDocxBase64 = Buffer.from('invalid saved document').toString('base64'); },
+    frontend => { delete frontend.sharedArrayBuffer; },
+  ]) {
+    const changed = structuredClone(proof); mutate(changed.fullSmoke.frontend);
+    assert.throws(() => verifyMacosArmEditingProof(changed, options));
+  }
+});
+
+test('a successful full-editor rerun cannot hide a page restart or WebContent termination', async t => {
+  const { proof, options } = installation(t);
+  const event = phase => ({ phase, detail: 'main', elapsedMs: 10001, generation: 1 });
+  const cases = [
+    ['missing lifecycle', p => { delete p.fullSmoke.nativeDiagnostics; }],
+    ['unpreserved diagnostics', p => { p.fullSmoke.nativeDiagnosticsError = 'diagnostics unavailable'; }],
+    ['editing scope substituted', p => { p.fullSmoke.nativeDiagnostics.scope = 'macos-editing'; }],
+    ['restarted page', p => { p.fullSmoke.nativeDiagnostics.generation = 2; }],
+    ['terminated WebContent', p => { p.fullSmoke.nativeDiagnostics.terminations = 1; }],
+    ['start lost from event history', p => { p.fullSmoke.nativeDiagnostics.events = p.fullSmoke.nativeDiagnostics.events.filter(event => event.phase !== 'document-start'); }],
+    ['second page start with stale counters', p => { p.fullSmoke.nativeDiagnostics.events.push(event('document-start')); }],
+    ['termination with stale counters', p => { p.fullSmoke.nativeDiagnostics.events.push(event('web-content-terminated')); }],
+    ['reload request with stale counters', p => { p.fullSmoke.nativeDiagnostics.events.push(event('web-content-reload-requested')); }],
+    ['startup-only snapshot', p => { p.fullSmoke.nativeDiagnostics.events = p.fullSmoke.nativeDiagnostics.events.filter(event => event.phase !== 'report-written'); }],
+    ['failed native completion', p => { p.fullSmoke.nativeDiagnostics.events.find(event => event.phase === 'report-written').detail = 'failed'; }],
+    ['report before page start', p => { p.fullSmoke.nativeDiagnostics.events.reverse(); }],
+    ['second native completion', p => { p.fullSmoke.nativeDiagnostics.events.push({ ...event('report-written'), detail: 'passed' }); }],
+    ['malformed event', p => { p.fullSmoke.nativeDiagnostics.events.push(null); }],
+    ['changed event generation', p => { p.fullSmoke.nativeDiagnostics.events.find(event => event.phase === 'report-written').generation = 2; }],
+  ];
+  for (const [name, mutate] of cases) await t.test(name, () => {
+    const changed = structuredClone(proof); mutate(changed);
+    assert.throws(() => verifyMacosArmEditingProof(changed, options));
+  });
+});
+
+test('both real editing and full smoke must read back the created WebView compatibility policy', async t => {
+  const { proof, options } = installation(t);
+  for (const report of ['diagnostic', 'fullSmoke']) for (const [name, mutate] of [
+    ['unavailable public API', policy => { policy.supported = false; }],
+    ['default mode', policy => { policy.actual = 0; }],
+    ['Lockdown preserved', policy => { policy.actual = 2; }],
+    ['unknown mode', policy => { policy.actual = 3; }],
+    ['pre-creation observation only', policy => { policy.stage = 'after-set'; }],
+    ['requested mode only', policy => { delete policy.actual; }],
+  ]) await t.test(`${report}: ${name}`, () => {
+    const changed = structuredClone(proof);
+    const event = changed[report].nativeDiagnostics.events.find(event => event.phase === 'editing-webkit-policy');
+    const policy = JSON.parse(event.detail); mutate(policy); event.detail = JSON.stringify(policy);
+    assert.throws(() => verifyMacosArmEditingProof(changed, options));
+  });
+  for (const report of ['diagnostic', 'fullSmoke']) {
+    const changed = structuredClone(proof);
+    changed[report].nativeDiagnostics.events = changed[report].nativeDiagnostics.events.filter(event => event.phase !== 'editing-webkit-policy');
+    assert.throws(() => verifyMacosArmEditingProof(changed, options));
+  }
+});
+
+test('full-editor evidence binds all installed assets and WebView resources to the tested App and checkout', t => {
+  const { proof, options, root } = installation(t);
+  for (const engine of ['wordcraft', 'gridcraft', 'deckcraft']) {
+    const changed = structuredClone(proof);
+    changed.fullSmoke.frontend[engine].resources.files[`${engine}.js`].sha256 = 'f'.repeat(64);
+    assert.throws(() => verifyMacosArmEditingProof(changed, options), /independently verified installed file/);
+  }
+  // Deck assets are only covered by the new full-editor run, not real OS editing.
+  const changed = structuredClone(proof);
+  changed.app.entries.find(entry => entry.path.endsWith('/frontend/deckcraft/deckcraft.js')).sha256 = 'f'.repeat(64);
+  changed.app.sha256 = digest(JSON.stringify(changed.app.entries));
+  changed.transfer.copiedInventorySha256 = changed.transfer.finalInventorySha256 = changed.app.sha256;
+  assert.throws(() => verifyMacosArmEditingProof(changed, options), /differs from the mounted App/);
+  writeFileSync(join(root, 'vendor/deckcraft/src/lib.rs'), 'different presentation source');
+  assert.throws(() => verifyMacosArmEditingProof(proof, options), /current checkout source/);
 });
 
 test('release success flags cannot replace OS actions, actual models, original sessions or a surviving page', async t => {
@@ -133,7 +286,7 @@ test('proof binds run, commit, macOS 26 ARM, copied executable, signatures and u
   const cases = [
     p => { p.commit = 'b'.repeat(40); }, p => { p.runId = '1'; }, p => { p.diagnostic.commit = 'b'.repeat(40); },
     p => { p.diagnostic.runId = '1'; }, p => { p.host.productVersion = '15.7'; }, p => { p.host.arch = 'x64'; },
-    p => { p.diagnostic.system.swVers = p.diagnostic.system.swVers.replace('26.0.1', '26.1'); },
+    p => { p.diagnostic.system.swVers = p.diagnostic.system.swVers.replace('26.5', '26.1'); },
     p => { p.architectures.main = 'x86_64 arm64'; }, p => { p.transfer.originalAppResigned = true; },
     p => { p.transfer.readonlyMount = false; }, p => { p.transfer.copiedInventorySha256 = 'f'.repeat(64); },
     p => { p.transfer.finalInventorySha256 = 'f'.repeat(64); }, p => { p.app.entries[0].mode++; },

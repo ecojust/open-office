@@ -1,6 +1,8 @@
 mod files;
 #[cfg(target_os = "macos")]
 mod macos_diagnostics;
+#[cfg(target_os = "macos")]
+mod macos_webview;
 mod pdf;
 mod server;
 mod smoke;
@@ -170,6 +172,10 @@ pub fn run() {
                         server::AssetServer::allows_navigation(&navigation, url)
                     })
                     .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny);
+            #[cfg(target_os = "macos")]
+            if let Some(configuration) = macos_webview::configuration(diagnostic.as_ref())? {
+                builder = builder.with_webview_configuration(configuration);
+            }
             if let Some(smoke) = &diagnostic {
                 let progress = smoke.clone();
                 builder = builder
@@ -180,6 +186,8 @@ pub fn run() {
             }
             let window = builder.build()?;
             if let Some(smoke) = &diagnostic {
+                #[cfg(target_os = "macos")]
+                macos_webview::record_created(&window, smoke);
                 smoke.note("window-created", "showing and focusing test window");
                 window.show()?;
                 window.set_focus()?;

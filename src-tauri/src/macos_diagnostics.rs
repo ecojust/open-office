@@ -6,9 +6,9 @@ use serde_json::{json, Value};
 use tauri::Manager;
 
 pub fn instrument(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
-    if std::env::var("OPEN_OFFICE_SMOKE").as_deref() != Ok("1")
-        || std::env::var("OPEN_OFFICE_SMOKE_SCOPE").as_deref() != Ok("macos-editing")
-    {
+    // Both full smoke and real-input editing need host-owned termination
+    // evidence. Production still uses Tauri's unmodified default handler.
+    if std::env::var("OPEN_OFFICE_SMOKE").as_deref() != Ok("1") {
         return builder;
     }
     builder.on_web_content_process_terminate(|webview| {

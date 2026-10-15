@@ -360,6 +360,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: arm64
+      - name: Install independent document inspectors on native ARM Python
+        run: |
+          python - <<'PY'
+          import os, platform, sys
+          assert platform.machine() == 'arm64', 'Document inspectors require native ARM Python'
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              output.write(f'OPEN_OFFICE_PYTHON={sys.executable}\n')
+          PY
+          python -m pip install -r pdf-backend/requirements.txt
       - name: Require native macOS 26 input permissions before testing the delivered package
         run: |
           test "$(uname -m)" = arm64
@@ -372,8 +385,8 @@ jobs:
         with:
           name: open-office-native-macos-arm64
           path: native-package
-      - name: Verify real operating-system input against the installed ARM DMG
-        timeout-minutes: 8
+      - name: Verify real OS input and all-editor round trips against the installed ARM DMG
+        timeout-minutes: 10
         run: |
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
@@ -396,6 +409,18 @@ jobs:
           path: |
             artifacts/macos26-editing-proof.json
             artifacts/macos-editing/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 0
+
+      - name: Retain macOS 26 full-editor report and failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-office-macos26-full-smoke
+          path: |
+            artifacts/macos-arm64-native-smoke.json
+            artifacts/macos-arm64-native-diagnostics.json
           if-no-files-found: warn
           retention-days: 14
           compression-level: 0

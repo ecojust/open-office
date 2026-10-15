@@ -4,7 +4,7 @@
 
 [下载安装包](https://github.com/ecojust/open-office/releases) · [构建记录](https://github.com/ecojust/open-office/actions/workflows/desktop-release.yml) · [开发与构建](docs/development.md)
 
-当前源码版本为 **0.10.0 Alpha**，见[更新说明](docs/releases/0.10.0.md)。本版接入 Rust 演示文稿编辑器并移除旧内核；安装包及逐平台验证状态以[发布页](https://github.com/ecojust/open-office/releases)为准。
+当前源码版本为 **0.10.1 Alpha**，见[更新说明](docs/releases/0.10.1.md)。本版针对 macOS 26 编辑后标签消失的问题增加 WebKit 兼容处理；安装包及逐平台验证状态以[发布页](https://github.com/ecojust/open-office/releases)为准。
 
 ## 工作区
 

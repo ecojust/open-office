@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { appInventory, sha256File } from './macos-intel-transfer.mjs';
 import { checkInputPreflight, runMacosEditingDiagnostic, validateEditingReport } from './macos-editing-diagnostic.mjs';
-import { validateInstalledWordcraftEvidence } from './wordcraft-native-smoke.mjs';
-import { validateInstalledGridcraftEvidence } from './gridcraft-native-smoke.mjs';
+import { validateInstalledWordcraftEvidence, validateNativeWordcraftEvidence } from './wordcraft-native-smoke.mjs';
+import { validateInstalledGridcraftEvidence, validateNativeGridcraftEvidence } from './gridcraft-native-smoke.mjs';
+import { validateNativeDeckcraftEvidence } from './deckcraft-native-smoke.mjs';
+import { runNativeSmoke, validateFrontendReport } from './native-smoke.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const LIMIT = 16 * 1024 * 1024;
@@ -53,6 +55,95 @@ function fileEntry(app, path) {
   assert.ok(Number.isSafeInteger(entry.size) && entry.size > 0);
   assert.match(entry.sha256, SHA256);
   return entry;
+}
+
+function bindInstalledFiles(app, installed, engine) {
+  const prefix = `Contents/Resources/${installed.directory}/`;
+  const manifest = fileEntry(app, `${prefix}manifest.json`);
+  assert.equal(manifest.sha256, installed.manifestSha256, 'Installed manifest differs from the mounted App');
+  assert.equal(manifest.size, Buffer.byteLength(installed.manifestText));
+  for (const [name, evidence] of Object.entries(installed.files)) {
+    const entry = fileEntry(app, prefix + name);
+    assert.equal(entry.sha256, evidence.sha256, `Installed ${engine} file differs from the mounted App`);
+    assert.equal(entry.size, evidence.bytes);
+  }
+}
+
+function validateCompatibilityPolicy(diagnostics) {
+  assert.ok(Array.isArray(diagnostics?.events), 'WebKit compatibility readback is missing');
+  const created = diagnostics.events.filter(event => event?.phase === 'editing-webkit-policy')
+    .map(event => JSON.parse(event.detail)).filter(policy => policy?.stage === 'created');
+  assert.equal(created.length, 1, 'Exactly one created WebView compatibility readback is required');
+  assert.deepEqual(created[0], { source: 'WKWebpagePreferences.securityRestrictionMode', stage: 'created',
+    supported: true, requested: 1, actual: 1, action: 'readback' }, 'The created WebView did not use the required public compatibility mode');
+}
+
+function validateFullSmokeLifecycle(report) {
+  assert.equal(report.nativeDiagnosticsError, undefined, 'Full-editor lifecycle diagnostics could not be preserved');
+  const lifecycle = report.nativeDiagnostics;
+  assert.equal(lifecycle?.schemaVersion, 1, 'Full-editor lifecycle evidence is missing');
+  assert.equal(lifecycle.scope, 'full');
+  assert.equal(lifecycle.generation, 1, 'Full-editor smoke observed a page restart');
+  assert.equal(lifecycle.terminations, 0, 'Full-editor smoke observed a WebContent termination');
+  assert.ok(Array.isArray(lifecycle.events) && lifecycle.events.length <= 256);
+  assert.ok(lifecycle.events.every(event => typeof event?.phase === 'string' && event.phase.length <= 80
+    && typeof event.detail === 'string' && event.detail.length <= 400
+    && Number.isFinite(event.elapsedMs) && event.elapsedMs >= 0 && [0, 1].includes(event.generation)), 'Invalid full-editor lifecycle event');
+  assert.equal(lifecycle.events.filter(event => event?.phase === 'document-start').length, 1, 'Full-editor smoke must retain exactly one page start');
+  assert.ok(lifecycle.events.every(event => event?.phase !== 'web-content-terminated' && event?.phase !== 'web-content-reload-requested'),
+    'Full-editor smoke recorded a WebContent termination or reload');
+  const started = lifecycle.events.findIndex(event => event.phase === 'document-start');
+  const completed = lifecycle.events.filter(event => event.phase === 'report-written');
+  assert.equal(lifecycle.events[started].generation, 1);
+  assert.equal(completed.length, 1, 'Full-editor lifecycle must include exactly one completed report');
+  assert.equal(completed[0].detail, 'passed');
+  assert.equal(completed[0].generation, 1);
+  assert.ok(lifecycle.events.indexOf(completed[0]) > started, 'Full-editor report predates its page start');
+  validateCompatibilityPolicy(lifecycle);
+}
+
+function validateFullSmoke(proof, root) {
+  const report = proof.fullSmoke;
+  assert.equal(report?.schemaVersion, 1, 'Full-editor native smoke evidence is missing');
+  assert.equal(report.kind, 'native-gui-smoke');
+  assert.equal(report.ok, true, 'Full-editor native smoke did not pass');
+  assert.deepEqual(report.errors, []);
+  assert.equal(report.commit, proof.commit, 'Full-editor smoke belongs to another source commit');
+  assert.equal(report.runId, proof.runId, 'Full-editor smoke belongs to another workflow run');
+  assert.equal(report.platformId, proof.platformId);
+  assert.equal(report.target, proof.target);
+  assert.deepEqual(report.host, { platform: 'darwin', architecture: 'arm64' });
+  assert.equal(report.hostArch, 'arm64');
+  assert.equal(report.targetArch, 'arm64');
+  assert.equal(report.executionMode, 'native', 'Full-editor smoke must run natively on ARM');
+  assert.equal(report.timeoutMs, 300_000, 'Full-editor smoke must retain its original timeout');
+  assert.equal(report.process?.launchExecutable, join(proof.copiedAppPath, 'Contents/MacOS/open-office'), 'Full-editor smoke ran another App');
+  assert.deepEqual(report.process.launchArguments, []);
+  assert.ok(Number.isSafeInteger(report.process.pid) && report.process.pid > 1);
+  assert.equal(report.process.cleanExit, true);
+  assert.equal(report.process.exitCode, 0);
+  assert.equal(report.process.signal, null);
+  assert.equal(report.process.timedOut, false);
+  assert.equal(report.process.spawnErrorCode, undefined);
+  assert.equal(report.process.cleanupError, undefined);
+  validateFullSmokeLifecycle(report);
+  const installed = report.preflight;
+  assert.equal(installed?.installedResourceLayout, true);
+  assert.equal(installed.finalExecutable, 'open-office');
+  assert.equal(installed.finalExecutableSha256, fileEntry(proof.app, 'Contents/MacOS/open-office').sha256, 'Full-editor smoke ran another executable');
+  assert.equal(installed.pdfExecutableSha256, fileEntry(proof.app, 'Contents/Resources/pdf-runtime/open-office-pdf').sha256, 'Full-editor smoke ran another PDF runtime');
+  assert.deepEqual(installed.macos?.mainArchitectures, ['arm64']);
+  assert.deepEqual(installed.macos.pdfArchitectures, ['arm64']);
+  assert.deepEqual(installed.macos.strictSignatureVerification, ['app', 'main', 'pdfRuntime']);
+  assert.deepEqual(installed.macos.cdHashes, proof.signatures, 'Full-editor smoke signatures differ from the mounted App');
+  assert.equal(installed.macos.originalAppResigned, false);
+  // Re-run the functional and independent document readback checks at publish
+  // time; an ok flag or optional shared-memory capability is not sufficient.
+  validateFrontendReport(report.frontend);
+  for (const [engine, validate] of [['wordcraft', validateNativeWordcraftEvidence], ['gridcraft', validateNativeGridcraftEvidence], ['deckcraft', validateNativeDeckcraftEvidence]]) {
+    validate(report, { root });
+    bindInstalledFiles(proof.app, installed[engine], engine);
+  }
 }
 
 /** Linux publication verifies serialized native evidence against the exact DMG
@@ -123,18 +214,12 @@ export function verifyMacosArmEditingProof(proof, { commit, runId, dmgPath, root
   for (const [engine, validate] of [['wordcraft', validateInstalledWordcraftEvidence], ['gridcraft', validateInstalledGridcraftEvidence]]) {
     const installed = report.application[engine];
     validate(installed, { root });
-    const prefix = `Contents/Resources/${installed.directory}/`;
-    const manifest = fileEntry(proof.app, `${prefix}manifest.json`);
-    assert.equal(manifest.sha256, installed.manifestSha256, 'Installed manifest differs from the mounted App');
-    assert.equal(manifest.size, Buffer.byteLength(installed.manifestText));
-    for (const [name, evidence] of Object.entries(installed.files)) {
-      const entry = fileEntry(proof.app, prefix + name);
-      assert.equal(entry.sha256, evidence.sha256, `Installed ${engine} file differs from the mounted App`);
-      assert.equal(entry.size, evidence.bytes);
-    }
+    bindInstalledFiles(proof.app, installed, engine);
   }
   validateEditingReport(report.frontend, report.nativeDiagnostics, report.actions);
   assert.ok(report.actions.every(action => action.result.pid === report.process.pid), 'OS input targeted another process');
+  validateCompatibilityPolicy(report.nativeDiagnostics);
+  validateFullSmoke(proof, root);
   return true;
 }
 
@@ -196,6 +281,7 @@ export async function runMacosArmEditingGate(args = process.argv.slice(2), env =
     proof.app = appInventory(original);
     Object.assign(proof, signaturesFor(original));
     command('/usr/bin/ditto', [original, destination], 60000);
+    destination = realpathSync(destination);
     const copied = appInventory(destination), before = signaturesFor(destination);
     assert.deepEqual(copied, proof.app, 'Copied App file bytes, permissions or symlinks changed');
     assert.deepEqual(before.signatures, proof.signatures, 'Copied App signatures changed');
@@ -203,13 +289,21 @@ export async function runMacosArmEditingGate(args = process.argv.slice(2), env =
     proof.transfer = { readonlyMount: true, originalAppResigned: false, unchangedAppBytesAndSymlinks: false,
       copiedInventorySha256: copied.sha256, copiedSignatures: before.signatures };
     proof.diagnostic = await runMacosEditingDiagnostic(['--app', destination, '--helper', options.get('--helper')], env, root);
+    assert.equal(proof.diagnostic.ok, true, proof.diagnostic.error || proof.diagnostic.blockedReason || 'Native editing did not pass');
+    validateCompatibilityPolicy(proof.diagnostic.nativeDiagnostics);
+    // Exercise all editors on the same unmodified App after real OS editing.
+    // Explicit scope prevents an inherited diagnostic scope replacing this run.
+    proof.fullSmoke = await runNativeSmoke(['--app', destination], { ...env,
+      OPEN_OFFICE_PLATFORM_ID: proof.platformId, OPEN_OFFICE_TARGET: proof.target,
+      OPEN_OFFICE_SMOKE_SCOPE: 'full', OPEN_OFFICE_ALLOW_ROSETTA: '0' }, root);
     const after = appInventory(destination), final = signaturesFor(destination);
     proof.transfer.finalInventorySha256 = after.sha256;
     proof.transfer.finalSignatures = final.signatures;
     assert.deepEqual(after, proof.app, 'App file bytes, permissions or symlinks changed during editing');
     assert.deepEqual(final.signatures, proof.signatures, 'App signatures changed during editing');
     proof.transfer.unchangedAppBytesAndSymlinks = true;
-    assert.equal(proof.diagnostic.ok, true, proof.diagnostic.error || proof.diagnostic.blockedReason || 'Native editing did not pass');
+    assert.equal(proof.fullSmoke.ok, true, proof.fullSmoke.errors?.[0] || 'Full-editor native smoke did not pass');
+    validateFullSmokeLifecycle(proof.fullSmoke);
     proof.status = 'passed'; proof.ok = true; proof.releaseAcceptance = true;
   } catch (error) { proof.error = String(error?.message || error).slice(0, 4000); }
   finally {
