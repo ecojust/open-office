@@ -11,6 +11,44 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  deferred_cell_edit:
+    name: Rust deferred cell editing regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      CARGO_TERM_COLOR: never
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: vendor/gridcraft -> target
+          key: linux-deferred-cell-edit
+          cache-on-failure: true
+      # This target drives egui::Context without a window or GPU. It does not
+      # enable the desktop eframe/winit dependencies or require display servers.
+      - name: Run the focused Rust editing behavior tests
+        run: |
+          mkdir -p artifacts/gridcraft-deferred-cell-edit
+          set -o pipefail
+          cargo test --locked --manifest-path vendor/gridcraft/Cargo.toml -p gridcraft-ui-egui --test deferred_cell_edit --test merged_cells 2>&1 | tee artifacts/gridcraft-deferred-cell-edit/cargo-test.log
+      - name: Retain the Rust regression test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gridcraft-deferred-cell-edit-regression
+          path: artifacts/gridcraft-deferred-cell-edit/
+          if-no-files-found: warn
+          retention-days: 7
+
   editing:
     name: macOS 26 Apple Silicon editing diagnostic
     runs-on: macos-26
