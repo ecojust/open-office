@@ -128,19 +128,7 @@ fn atomic_write(output: &Path, data: &[u8]) -> Result<(), String> {
 
 pub fn initialization_script(base_url: &str) -> String {
     let base = serde_json::to_string(base_url).expect("fixed URL");
-    format!(
-        r#"(() => {{
-      const base = {base};
-      if (location.href.startsWith(base) && new URL(location.href).searchParams.get('nativeSmoke') === '1') {{
-        const send = (path, body) => fetch(base + '__native-smoke/' + path, {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(body)}}).catch(() => {{}});
-        send('progress',{{phase:'document-start',detail:'native initialization script'}});
-        let failed = false;
-        const failure = (value) => {{ if(failed)return;failed=true;send('failure',{{ok:false,phase:'renderer-uncaught',error:String(value).slice(0,4000),crossOriginIsolated:globalThis.crossOriginIsolated,sharedArrayBuffer:typeof SharedArrayBuffer!=='undefined',userAgent:navigator.userAgent}}); }};
-        addEventListener('error',e=>{{if(e.message)failure(e.message);else if(e.target?.tagName==='SCRIPT')failure('Entry script failed to load')}},true);
-        addEventListener('unhandledrejection',e=>failure(e.reason?.message||e.reason));
-      }}
-    }})();"#
-    )
+    include_str!("smoke-init.js").replace("__OPEN_OFFICE_SMOKE_BASE_URL__", &base)
 }
 
 #[cfg(test)]
@@ -150,7 +138,10 @@ mod tests {
     fn smoke_scope_defaults_to_full_and_rejects_unknown_values() {
         assert_eq!(parse_scope(None).unwrap(), "full");
         assert_eq!(parse_scope(Some("full")).unwrap(), "full");
-        assert_eq!(parse_scope(Some("rust-word-engine")).unwrap(), "rust-word-engine");
+        assert_eq!(
+            parse_scope(Some("rust-word-engine")).unwrap(),
+            "rust-word-engine"
+        );
         assert_eq!(
             parse_scope(Some("word-package-ipc")).unwrap(),
             "word-package-ipc"
