@@ -75,8 +75,10 @@ export function reuseInstalledEditors(resourceRoot, { root = ROOT, copy = copyFi
       const source = inspect(resourceRoot, { root: canonicalRoot });
       const sourceDirectory = join(resourceRoot, 'frontend', engine);
       for (const name of expectedFiles(engine)) assert.ok(lstatSync(join(sourceDirectory, name)).isFile(), 'Editor resources must not be symbolic links');
-      // Stage on the same filesystem as public so promotion uses a rename.
-      stage = mkdtempSync(join(publicDirectory, '.release-editor-'));
+      // Stage beside public for rename promotion. Retained backups must stay
+      // outside public: Vite copies hidden public files into the application.
+      stage = mkdtempSync(join(canonicalRoot, '.release-editor-'));
+      assert.equal(lstatSync(stage).dev, lstatSync(publicDirectory).dev, 'Editor staging and public must share a filesystem for rename promotion');
       const stagedDirectory = join(stage, 'frontend', engine);
       mkdirSync(stagedDirectory, { recursive: true });
       for (const name of expectedFiles(engine)) copy(join(sourceDirectory, name), join(stagedDirectory, name));

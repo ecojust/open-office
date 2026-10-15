@@ -148,6 +148,10 @@ test('failed promotion restores the old directory; failed rollback retains the b
     assert.equal(result.gridcraft.status, 'fallback');
     const previous = rollbackFails ? join(result.gridcraft.retainedDirectory, 'previous', 'previous') : join(root, 'public/gridcraft/previous');
     assert.equal(readFileSync(previous, 'utf8'), 'keep');
+    if (rollbackFails) {
+      assert.equal(dirname(result.gridcraft.retainedDirectory), root, 'Retained backups must not be copied by Vite from public');
+      assert.equal(readdirSync(join(root, 'public')).some(name => name.startsWith('.release-editor-')), false);
+    }
     assert.equal(result.wordcraft.status, 'reused'); assert.equal(result.deckcraft.status, 'reused');
   });
 });
