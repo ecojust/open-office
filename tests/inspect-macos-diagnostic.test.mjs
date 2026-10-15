@@ -291,6 +291,22 @@ test('debugger evidence exposes denied attach or a bounded captured stack and st
   assert.equal(rows.find(row => row.section === 'debugger').backtraceExcerpt, undefined);
 });
 
+test('a stale preflight report does not hide a saved LLDB trace after cleanup failure', () => {
+  const marker = 'OO_LLDB_12345678-1234-1234-1234-123456789abc:';
+  const trace = [marker + JSON.stringify({ event: 'initialized', pid: 1234 }),
+    marker + JSON.stringify({ event: 'blocked', pid: 1234, reason: 'attach-denied', detail: 'Permission denied' }),
+    marker + JSON.stringify({ event: 'finished', pid: 1234, cleanup: 'not-attached' }),
+    'diagnostic tail /Users/private-person/log'].join('\n');
+  const result = inspect({ mode: 'emit', time: '', pids: '', report: { status: 'preflight-passed' },
+    evidence: { 'webcontent-lldb-Abc123/trace.txt': trace } });
+  assert.equal(result.ok, true, result.error);
+  const debuggerRow = annotations(result.value).find(row => row.section === 'debugger');
+  assert.equal(debuggerRow.recoveredFromTrace, true);
+  assert.equal(debuggerRow.events[1].reason, 'attach-denied');
+  assert.equal(debuggerRow.events[2].cleanup, 'not-attached');
+  assert.ok(!result.value.includes('private-person'));
+});
+
 test('Rust regression output includes compilation failure context and tail without emitting the full log', () => {
   const log = Array.from({ length: 70 }, (_, i) => `compile progress ${i}`);
   log[5] = 'error[E0433]: cannot find type CellEditor';

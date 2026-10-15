@@ -542,10 +542,36 @@ def crash_summaries(read, files):
     return summaries, len(names)
 
 
-def debugger_summary(read, report):
+def debugger_summary(read, report, files):
     debugger = report.get("debugger") or {}
     if debugger.get("requested") is not True:
-        return None
+        # A cleanup failure can leave the old preflight report on disk. Recover
+        # only bounded, fixed-name LLDB trace evidence, never generated code.
+        candidates = []
+        for name in files:
+            stripped = re.sub(r"^(?:artifacts/macos-editing/|macos-editing/)", "", name)
+            if re.fullmatch(r"webcontent-lldb-[A-Za-z0-9_-]{1,80}/trace\.txt", stripped):
+                candidates.append(stripped)
+        if not candidates:
+            return None
+        if len(candidates) != 1:
+            return {"recoveredFromTrace": False, "traceCount": len(candidates), "reason": "ambiguous-debugger-traces"}
+        data = read(candidates[0], 1024 * 1024, False) or b""
+        lines = data.decode("utf-8", "replace").splitlines()
+        events = []
+        for line in lines:
+            if len(line) > 8192 or not re.match(r"^OO_LLDB_[a-f0-9-]{36}:", line):
+                continue
+            try:
+                event = json.loads(line.split(":", 1)[1])
+                if isinstance(event, dict):
+                    events.append(pick(event, ["event", "pid", "reason", "detail", "cleanup", "reasons"]))
+            except json.JSONDecodeError:
+                continue
+        return {"recoveredFromTrace": True, "diagnosticOnly": True,
+            "limitation": "Final debugger report was not saved. Trace evidence cannot establish native input or application lifecycle results.",
+            "events": events[-8:], "traceBytes": len(data),
+            "traceTail": [crash_text(line, 160) for line in lines[-8:] if line.strip() and not line.startswith("OO_LLDB_")]}
     summary = {**pick(debugger, ["requested", "status", "reason", "pid", "ready", "safeToContinue", "cleanup", "captured", "continuedWithoutDebugger"]),
         "diagnosticOnly": True, "events": [pick(event, ["event", "reason", "detail", "reasons"]) for event in (debugger.get("events") or [])[-8:]],
         "trace": pick(debugger.get("trace"), ["bytes", "totalBytes", "truncated"])}
@@ -616,7 +642,7 @@ def summarize(read, files, run, artifact, expected_sha, context=None):
         "crashes": [compact_text(PurePosixPath(name).name, 100) for name in files if PurePosixPath(name).name.startswith("crash-") and name.endswith((".ips", ".crash"))][:4]})
     log = read("system-webkit.ndjson", 8 * 1024 * 1024, False)
     crashes, crash_count = crash_summaries(read, files)
-    debugger = debugger_summary(read, report)
+    debugger = debugger_summary(read, report, files)
     summary = system_log_summary(log or b"", report, samples, max_lines=4 * (4 - len(crashes) - int(debugger is not None)), native=native)
     notice("system-log", {"available": log is not None, **pick(report.get("systemLog"), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine", "stderr"]), **pick(summary, ["parsedLines", "skippedLines", "matchingLines", "firstParsedTimestamp", "lastParsedTimestamp", "timeFilterAvailable", "ownedWebContentPids", "limitation"])})
     notice("crash-evidence", {**crash_metadata(report, files), "ipsCount": crash_count, "ipsSummarized": len(crashes)})
