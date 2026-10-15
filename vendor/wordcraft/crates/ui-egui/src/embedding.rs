@@ -141,7 +141,7 @@ mod tests {
         let modifiers = egui::Modifiers::COMMAND;
         let event = egui::Event::Key { key: egui::Key::S, physical_key: Some(egui::Key::S), pressed: true, repeat: false, modifiers };
         let ctx = egui::Context::default();
-        ctx.run_ui(egui::RawInput { events: vec![event], modifiers, ..Default::default() }, |ui| {
+        ctx.run_ui(egui::RawInput { events: vec![egui::Event::ModifiersChanged(modifiers), event], ..Default::default() }, |ui| {
             crate::keys::canvas_events(&mut app, ui.ctx());
         })
         .drop_without_applying_deltas();

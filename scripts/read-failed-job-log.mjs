@@ -52,7 +52,9 @@ export function knownNodeTests(root = 'tests') {
 }
 
 export function knownRepositoryTests() {
-  return new Set([...knownRustTests(), ...knownNodeTests()]);
+  // Enumerate source roots explicitly: never scan vendored build output or target/.
+  const rustRoots = ['src-tauri/src', 'vendor/wordcraft/crates/ui-egui/src', 'vendor/wordcraft/crates/engine/src'];
+  return new Set([...rustRoots.flatMap(root => [...knownRustTests(root)]), ...knownNodeTests()]);
 }
 
 export function sanitizeFailureLog(log, knownTests) {

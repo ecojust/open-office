@@ -33,6 +33,32 @@ test('public schema rejects arbitrary fields, unknown names, and injected error 
   assert.ok(knownRustTests().has([...known][0]));
 });
 
+test('vendored Rust failures expose checked-in test names without admitting unknown payloads', () => {
+  const embedded = 'embedded_editor_save_shortcut_delegates_without_acknowledging_or_mutating';
+  const engine = 'delete_surrounding_counts_unicode_scalars_not_bytes_utf16_or_graphemes';
+  const allowlist = knownRepositoryTests();
+  for (const name of [embedded, engine]) assert.ok(allowlist.has(name), `Missing checked-in Rust test: ${name}`);
+  const unknown = 'unknown_vendor_test_not_checked_in';
+  const encoded = Buffer.from(secret).toString('base64');
+  const raw = [
+    `test embedding::tests::${embedded} ... FAILED`,
+    `test tests_typing::${engine} ... FAILED`,
+    `test embedding::tests::${unknown} ... FAILED`,
+    `test embedding::tests::${secret} ... FAILED`,
+    `test embedding::tests::${encoded} ... FAILED`,
+    `test embedding::tests::${embedded}_${secret} ... FAILED`,
+    `test embedding::tests::${embedded} ... FAILED ${secret}`,
+    `thread '${embedded}' panicked at /private/${secret}: assertion failed`,
+  ].join('\n');
+  const report = { schemaVersion: 3, runId: '123', jobId: '456', ...sanitizeFailureLog(raw, allowlist) };
+  validatePublicSummary(report, allowlist);
+  assert.deepEqual(report.failedTestNames, [embedded, engine].sort());
+  for (const value of [unknown, secret, encoded, '/private/']) assert.ok(!JSON.stringify(report).includes(value));
+  for (const name of [unknown, secret, encoded, `${embedded}_${secret}`]) {
+    assert.throws(() => validatePublicSummary({ ...report, failedTestNames: [name] }, allowlist));
+  }
+});
+
 test('read-only job access verifies ownership and isolates storage token while returning sanitized data only', async () => {
   const job = { id: 456, run_id: 123, status: 'completed', conclusion: 'failure', name: secret, steps: [{ name: secret, conclusion: 'failure' }] };
   for (const changed of [{ run_id: 124 }, { id: 457 }, { status: 'in_progress' }, { conclusion: 'success' }, { steps: [] }]) assert.throws(() => validateFailedJob({ ...job, ...changed }, '123', '456'));
