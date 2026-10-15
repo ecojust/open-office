@@ -11,13 +11,14 @@ const script = fileURLToPath(new URL('../scripts/wordcraft-smoke-docx.py', impor
 const expected = { bold: true, italic: true, underline: true, size: 16, color: '336699' }
 const namespace = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 const rpr = '<w:b/><w:i/><w:u w:val="single"/><w:sz w:val="32"/><w:color w:val="336699"/>'
+const python = process.env.OPEN_OFFICE_PYTHON || process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3')
 
 function check(mutate = () => {}, transform = bytes => bytes) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'wordcraft-smoke-docx-'))
   try {
     const filename = path.join(directory, 'specimen.docx')
     writeFileSync(filename, transform(Buffer.from(wordcraftDocx(mutate), 'base64')))
-    return spawnSync(process.env.PYTHON || 'python3', [script, filename], { encoding: 'utf8', timeout: 10000 })
+    return spawnSync(python, [script, filename], { encoding: 'utf8', timeout: 10000 })
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
