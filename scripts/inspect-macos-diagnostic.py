@@ -57,11 +57,26 @@ def bounded(value, depth=0):
 
 
 def notice(section, payload):
-    text = json.dumps({"section": section, **bounded(payload)}, ensure_ascii=False, separators=(",", ":"))
+    value = {"section": section, **bounded(payload)}
+    text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
     # Keep annotations individually retrievable and valid JSON. Never split a
     # user-controlled string into another workflow command.
-    if len(text) > 16000:
-        text = json.dumps({"section": section, "summaryError": "section exceeded annotation limit"})
+    def strings(node):
+        items = node.items() if isinstance(node, dict) else enumerate(node) if isinstance(node, list) else []
+        for key, item in items:
+            if isinstance(item, str) and len(item.encode("utf-8")) > 64:
+                yield node, key, item
+            elif isinstance(item, (dict, list)):
+                yield from strings(item)
+    while len(text.encode("utf-8")) > 2800:
+        candidates = list(strings(value))
+        if not candidates:
+            text = json.dumps({"section": section, "summaryError": "section exceeded annotation limit"})
+            break
+        parent, key, item = max(candidates, key=lambda item: len(item[2].encode("utf-8")))
+        limit = max(60, len(item.encode("utf-8")) - (len(text.encode("utf-8")) - 2800) - 8)
+        parent[key] = item.encode("utf-8")[:limit].decode("utf-8", "ignore") + "…"
+        text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
     escaped = text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
     print(f"::notice title=macOS diagnostic {section}::{escaped}", flush=True)
 
@@ -202,18 +217,30 @@ def native_timeline(events):
     )][-30:]
 
 
-def timeline_notices(native):
-    base = pick(native, ["generation", "terminations", "scope"])
-    chunks, current = [], []
+def compact_text(value, limit):
+    return scrub(value, limit).encode("utf-8")[:limit].decode("utf-8", "ignore")
+
+
+def compact_timeline(native):
+    result = []
+    names = {"editing-input-request": "input", "editing-input-complete": "complete",
+             "editing-window-geometry": "geometry", "web-content-terminated": "TERMINATED",
+             "web-content-reload-requested": "reload", "document-start": "boot"}
     for event in native_timeline(native.get("events") or []):
-        candidate = current + [event]
-        if current and (len(candidate) > 10 or len(json.dumps(bounded({**base, "recentEvents": candidate}), ensure_ascii=False)) > 12000):
-            chunks.append(current)
-            current = []
-        current.append(event)
-    chunks.append(current)
-    for index, events in enumerate(chunks):
-        notice("native", {**base, "part": index + 1, "parts": len(chunks), "recentEvents": events})
+        phase, detail = event.get("phase"), event.get("detail")
+        if phase == "editing-window-geometry" and isinstance(detail, dict):
+            viewport = detail.get("viewport") or {}
+            detail = f'{detail.get("actionId")} bounds={detail.get("width")}x{detail.get("height")} css={viewport.get("width")}x{viewport.get("height")}'
+        elif phase in ("editing-input-request", "document-start") and isinstance(detail, str):
+            try:
+                parsed = json.loads(detail)
+                detail = str(parsed.get("bootId", ""))[:12] if phase == "document-start" else f'{parsed.get("actionId")} {parsed.get("kind")} {parsed.get("text", parsed.get("key", ""))}'
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        result.append(compact_text(f'{event.get("elapsedMs")}ms g{event.get("generation")} {names.get(phase, phase)} {detail}', 80))
+    # Two bounded groups retain all 30 events without expanding the general
+    # per-array limit or spending additional GitHub annotations.
+    return [result[:15], result[15:]]
 
 
 def process_rows(samples):
@@ -288,7 +315,7 @@ def system_log_summary(data, report, samples):
         item = {"time": scrub(event.get("timestamp"), 80), "pid": pid, "process": scrub(PurePosixPath(str(event.get("processImagePath") or "unknown")).name, 100), "correlation": correlation, "message": scrub(message, 1000)}
         # Leave room for JSON grouping and notice metadata within the overall
         # 20 KB output budget, even when messages contain multibyte characters.
-        while len(json.dumps(item, ensure_ascii=False).encode("utf-8")) > 900:
+        while len(json.dumps(item, ensure_ascii=False).encode("utf-8")) > 630:
             item["message"] = item["message"][:-20]
         selected.append((bool(severe.search(message)), timestamp, item))
     # Preserve the most relevant failure messages if verbose GPU diagnostics
@@ -335,28 +362,32 @@ def summarize(read, files, run, artifact, expected_sha):
     native = read("native-diagnostics.json", 1024 * 1024) or report.get("nativeDiagnostics") or {}
     frontend = read("frontend-report.json", 12 * 1024 * 1024) or report.get("frontend") or {}
     editing = frontend.get("editing") or {}
-    notice("source", {"runId": run["id"], "headSha": expected_sha, "conclusion": run.get("conclusion"), "attempt": run.get("run_attempt"), "artifactId": artifact["id"], "bytes": artifact["size_in_bytes"], "summaryOnly": True, "establishesFix": False})
-    notice("status", {"reportPresent": bool(report), **pick(report, ["status", "ok", "error", "blockedReason", "diagnosticOnly", "releaseAcceptance", "durationMs", "gaps"])})
-    notice("system", {"system": pick(report.get("system"), ["swVers", "machine", "node"]), "host": {key: pick(host.get(key), ["status", "stdout", "stderr"]) for key in ["macOS", "macOSBuild", "hardwareArch", "appleSilicon", "swift"]}})
-    actions = report.get("actions") or []
-    notice("actions", {"sentCount": len(actions), "actions": [{"request": pick(action.get("request"), ["actionId", "kind"]), "result": pick(action.get("result"), ["ok", "kind", "eventCount", "error"])} for action in actions[:16]]})
-    timeline_notices(native)
+    # GitHub retains only ten notices per step. Spend five on compact summaries
+    # and at most five on filtered log excerpts; never emit a large JSON notice.
     state = editing.get("lastState") or {}
-    notice("frontend", {**pick(frontend, ["ok", "error", "nativeLifecycle"]), "editing": {**pick(editing, ["ok", "error", "closeError", "checks", "initialTabIds", "finalTabIds", "cleanup"]), "lastState": {**pick(state, ["activeKey", "shell"]), "tabs": [pick(tab, ["key", "kind", "dirty", "ready"]) for tab in (state.get("tabs") or [])[:8]], "sessions": [pick(session, ["key", "kind", "sessionId", "documentId", "revision", "dirty"]) for session in (state.get("sessions") or [])[:8]]}}})
-    notice("preflight", {**pick(preflight, ["schemaVersion", "kind", "ok", "error"]), "permissions": pick(preflight.get("permissions"), ["postEventAccess", "accessibilityTrusted", "screenCaptureAccess", "inputSourceId", "osVersion"])})
+    notice("status", {"runId": run["id"], "headSha": expected_sha, "conclusion": run.get("conclusion"), "artifactId": artifact["id"], "bytes": artifact["size_in_bytes"], "establishesFix": False,
+        "report": {**pick(report, ["status", "ok", "blockedReason", "durationMs"]), "error": compact_text(report.get("error") or "", 500)},
+        "frontend": {"ok": frontend.get("ok"), "error": compact_text(frontend.get("error") or "", 250), "editingError": compact_text(editing.get("error") or "", 250),
+            "lastState": {**pick(state, ["activeKey", "shell"]), "tabs": [pick(tab, ["key", "kind", "dirty", "ready"]) for tab in (state.get("tabs") or [])[:4]], "sessions": [pick(session, ["documentId", "revision", "dirty"]) for session in (state.get("sessions") or [])[:4]]}}})
+    actions = report.get("actions") or []
+    notice("overview", {"system": pick(report.get("system"), ["swVers", "machine", "node"]), "host": {key: pick(host.get(key), ["status", "stdout"]) for key in ["macOS", "macOSBuild", "hardwareArch"]},
+        "sentCount": len(actions), "actions": [{"id": (action.get("request") or {}).get("actionId"), "kind": (action.get("request") or {}).get("kind"), **pick(action.get("result"), ["ok", "eventCount", "error"])} for action in actions[:16]],
+        "preflight": {**pick(preflight, ["kind", "ok", "error"]), "permissions": pick(preflight.get("permissions"), ["postEventAccess", "accessibilityTrusted", "screenCaptureAccess", "inputSourceId", "osVersion"])}})
+    notice("native", {**pick(native, ["generation", "terminations", "scope"]), "timeline": compact_timeline(native)})
     process = report.get("process") or {}
-    notice("process", {**pick(process, ["exitCode", "signal", "spawnError"]), "stderrTail": scrub(str(process.get("stderrTail") or "")[-1500:], 1500), "crashFilenames": [PurePosixPath(name).name for name in files if PurePosixPath(name).name.startswith("crash-") and name.endswith((".ips", ".crash"))][:8], "crashGaps": pick(report.get("crashReports"), ["gaps"])})
     samples = process_rows((report.get("processSamples") or [])[-200:])
     recent = []
     for sample in samples[-6:]:
         rows = [row for row in sample["rows"] if re.search(r"open-office|Open Office|WebContent", row["process"], re.I)]
-        recent.append({"unixMs": sample["unixMs"], "relatedCount": len(rows), "totalRssKiB": sum(row["rssKiB"] for row in rows), "highestRssRows": sorted(rows, key=lambda row: row["rssKiB"], reverse=True)[:8]})
-    notice("process-samples", {"samples": recent, "limit": "Last six samples; up to 40 source rows per sample, top eight App/WebContent rows by RSS. RSS is a snapshot, not proof of a memory kill."})
+        recent.append({"t": sample["unixMs"], "count": len(rows), "rssKiB": sum(row["rssKiB"] for row in rows), "top": [[row["pid"], row["rssKiB"], row["cpuPercent"], compact_text(row["process"], 35)] for row in sorted(rows, key=lambda row: row["rssKiB"], reverse=True)[:3]]})
+    notice("process", {**pick(process, ["pid", "exitCode", "signal", "spawnError"]), "stderrTail": compact_text(str(process.get("stderrTail") or "")[-650:], 650),
+        "rssSamples": recent, "rssColumns": ["pid", "rssKiB", "cpuPercent", "process"], "rssLimit": "Last six samples; top three App/WebContent rows, at most 40 source rows. Snapshot only, not evidence of a memory kill.",
+        "crashes": [compact_text(PurePosixPath(name).name, 100) for name in files if PurePosixPath(name).name.startswith("crash-") and name.endswith((".ips", ".crash"))][:4]})
     log = read("system-webkit.ndjson", 8 * 1024 * 1024, False)
     summary = system_log_summary(log or b"", report, samples)
-    notice("system-log", {"available": log is not None, **pick(report.get("systemLog"), ["bytes", "truncated", "stderr"]), **pick(summary, ["parsedLines", "skippedLines", "matchingLines", "firstParsedTimestamp", "lastParsedTimestamp", "timeFilterAvailable", "limitation"])})
-    for offset in range(0, len(summary["lines"]), 5):
-        notice("related-system-log", {"part": offset // 5 + 1, "lines": summary["lines"][offset:offset + 5], "causalityEstablished": False})
+    notice("system-log", {"available": log is not None, **pick(report.get("systemLog"), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine", "stderr"]), **pick(summary, ["parsedLines", "skippedLines", "matchingLines", "firstParsedTimestamp", "lastParsedTimestamp", "timeFilterAvailable", "limitation"])})
+    for offset in range(0, len(summary["lines"]), 4):
+        notice("related-system-log", {"part": offset // 4 + 1, "lines": summary["lines"][offset:offset + 4], "causalityEstablished": False})
 
 
 def main():
