@@ -232,17 +232,6 @@ pub struct Perf {
     last: f64,
 }
 
-/// A double-click may arrive inside the browser's synchronous pointer-up callback. Create
-/// the TextEdit in a later frame, after that callback has finished processing the gesture.
-struct PendingCellEdit {
-    doc_uid: u64,
-    revision: u64,
-    sheet: usize,
-    cell: CellRef,
-    frame: u64,
-    input: Vec<egui::Event>,
-}
-
 pub struct SheetApp {
     pub session: Session,
     pub ui: UiState,
@@ -263,7 +252,6 @@ pub struct SheetApp {
     pub synthetic: std::collections::VecDeque<Vec<egui::Event>>,
     /// Real input after a grid/editor focus transition, replayed before newer browser input.
     deferred_editor_input: Vec<egui::Event>,
-    pending_cell_edit: Option<PendingCellEdit>,
     pub control_rx: Option<std::sync::mpsc::Receiver<ControlRequest>>,
     pub grid: grid::GridState,
     pub perf: Perf,
@@ -325,7 +313,6 @@ impl SheetApp {
             print_feedback_seen: None,
             synthetic: Default::default(),
             deferred_editor_input: Vec::new(),
-            pending_cell_edit: None,
             control_rx: None,
             grid: grid::GridState {
                 last_border: "bottom".into(),
@@ -947,7 +934,6 @@ impl SheetApp {
 
     /// Starts editing the active cell. `text` replaces the content (typing) or pre-fills it.
     pub fn begin_edit(&mut self, text: Option<String>, from_formula_bar: bool) {
-        self.pending_cell_edit = None;
         if let Err(e) = self.commit_text_box_edit() {
             self.message = Some(("Text Box".into(), clean_error(&e)));
             return;
@@ -981,76 +967,6 @@ impl SheetApp {
         }
         self.editor = Some(ed);
         self.session.mode = if replace { gridcraft_engine::Mode::Enter } else { gridcraft_engine::Mode::Edit };
-    }
-
-    pub(crate) fn defer_cell_edit(&mut self, ctx: &egui::Context, cell: CellRef) {
-        let Some(doc) = self.session.active().filter(|doc| doc.selection.active == cell) else { return };
-        self.pending_cell_edit = Some(PendingCellEdit {
-            doc_uid: doc.uid,
-            revision: doc.revision,
-            sheet: doc.wb.active_sheet,
-            cell,
-            frame: ctx.cumulative_frame_nr(),
-            input: Self::take_cell_edit_input(ctx),
-        });
-        ctx.request_repaint();
-    }
-
-    fn take_cell_edit_input(ctx: &egui::Context) -> Vec<egui::Event> {
-        // The first TextEdit pass requests focus after showing the widget. Preserve typing
-        // that arrived with the double-click or before that pass, without replaying pointers.
-        let mut events = Vec::new();
-        ctx.input_mut(|input| {
-            input.events.retain(|event| {
-                if matches!(
-                    event,
-                    egui::Event::Text(_)
-                        | egui::Event::Key { .. }
-                        | egui::Event::Ime(_)
-                        | egui::Event::Paste(_)
-                        | egui::Event::Copy
-                        | egui::Event::Cut
-                ) {
-                    events.push(event.clone());
-                    false
-                } else {
-                    true
-                }
-            });
-        });
-        events
-    }
-
-    fn begin_pending_cell_edit(&mut self, ctx: &egui::Context) {
-        // A discarded layout pass is still in the same browser callback. Wait for a whole
-        // frame to complete, not just another pass of run_ui.
-        if self.pending_cell_edit.as_ref().is_some_and(|pending| pending.frame == ctx.cumulative_frame_nr()) {
-            ctx.request_repaint();
-            return;
-        }
-        let Some(mut pending) = self.pending_cell_edit.take() else { return };
-        if self.editor.is_none()
-            && self.text_box_editor.is_none()
-            && self.dialog.is_none()
-            && self.message.is_none()
-            && self.backstage.is_none()
-            && self.session.active().is_some_and(|doc| {
-                doc.uid == pending.doc_uid
-                    && doc.revision == pending.revision
-                    && doc.wb.active_sheet == pending.sheet
-                    && doc.selection.active == pending.cell
-            })
-        {
-            self.begin_edit(None, false);
-            if self.editor.is_some() {
-                // Only validated input can enter the shared replay queue. A canceled or stale
-                // request drops its own typing, leaving newer input at the new target alone.
-                pending.input.extend(Self::take_cell_edit_input(ctx));
-                pending.input.append(&mut self.deferred_editor_input);
-                self.deferred_editor_input = pending.input;
-                ctx.request_repaint();
-            }
-        }
     }
 
     /// Commits the edit; `then` moves the selection (dr, dc) afterwards.
@@ -1107,7 +1023,6 @@ impl SheetApp {
     }
 
     pub fn cancel_edit(&mut self) {
-        self.pending_cell_edit = None;
         self.editor = None;
         self.session.mode = gridcraft_engine::Mode::Ready;
     }
@@ -1238,7 +1153,6 @@ impl SheetApp {
         if self.session.active().is_none() {
             self.session.new_workbook();
         }
-        self.begin_pending_cell_edit(ctx);
     }
 
     pub fn raw_input_hook(&mut self, raw: &mut egui::RawInput) {
@@ -1278,7 +1192,7 @@ impl SheetApp {
 
     /// The embedding host must drain these events before acknowledging a flush/save.
     pub fn has_pending_input(&self) -> bool {
-        self.pending_cell_edit.is_some() || !self.deferred_editor_input.is_empty() || !self.synthetic.is_empty()
+        !self.deferred_editor_input.is_empty() || !self.synthetic.is_empty()
     }
 
     pub(crate) fn defer_editor_input(&mut self, ctx: &egui::Context, mut events: Vec<egui::Event>) {

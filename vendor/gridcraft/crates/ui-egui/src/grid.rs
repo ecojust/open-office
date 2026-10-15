@@ -2112,7 +2112,7 @@ fn interact(app: &mut SheetApp, ui: &mut egui::Ui, resp: &egui::Response, geo: &
             app.grid.last_click = None;
             // Following a hyperlink requires a single click in Excel; double-click edits.
             let _ = app.session.run("selection.set", json!({"cell": c.a1()}));
-            app.defer_cell_edit(&ctx, c);
+            app.begin_edit(None, false);
             return;
         }
         app.grid.last_click = primary_clicked.then_some(c);
