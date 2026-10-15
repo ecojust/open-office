@@ -12,6 +12,10 @@ on:
         description: Attempt a bounded LLDB attachment to the exact WebContent process without changing system protections
         type: boolean
         default: false
+      reuse_release_editors:
+        description: Reuse verified editor WASM from the fixed 0.10.0 ARM release when it exactly matches this checkout; otherwise build normally
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -121,6 +125,13 @@ jobs:
         run: npm test 2>&1 | tee artifacts/macos-editing/tests.log
       - name: Freeze and verify the native PDF runtime
         run: node scripts/build-pdf-backend.mjs 2>&1 | tee artifacts/macos-editing/pdf-build.log
+      - name: Optionally reuse strictly verified editor resources from the fixed ARM release
+        if: inputs.reuse_release_editors
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/reuse-release-editors.mjs
+      # Reuse never bypasses the normal build or its source and dist checks.
       - name: Build the three Rust editors and complete frontend resources
         run: npm run build 2>&1 | tee artifacts/macos-editing/frontend-build.log
       - name: Verify the generated editor resources against their source
