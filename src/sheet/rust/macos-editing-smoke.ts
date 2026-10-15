@@ -37,6 +37,7 @@ interface Boot { bootId: string; timeOrigin: number }
 interface RecordedEvent { type: string; isTrusted: boolean; target: string; key?: string; detail?: number; clientX?: number; clientY?: number }
 interface Identity { key: string; kind: Kind; sessionId: string; documentId: number }
 interface Action { actionId: string; kind: string; target: string; events: RecordedEvent[]; before: unknown; after?: unknown; completed: boolean }
+interface DomTimelineScope { root: HTMLElement; canvas: Element | null; input: Element | null; actionId: string; sessionId: string }
 export interface EditingSmokeOptions { editEntry?: 'doubleclick' | 'f2' }
 export interface MacosEditingReport {
   schemaVersion: 1
@@ -84,6 +85,63 @@ async function until<T>(read: () => Promise<T>, valid: (value: T) => boolean, la
   throw Error(`macOS editing: ${label} timed out`)
 }
 const frame = () => bounded(new Promise<void>(resolve => requestAnimationFrame(() => resolve())), 'rendered frame')
+
+/** Diagnostic metadata only: never read an input value, selection text, key,
+ * label, or arbitrary DOM attribute, and never change focus or event defaults. */
+export function createEditingDomTimeline(bootId: string, enabled: boolean, emit: (detail: string) => void) {
+  const names = ['pointerdown', 'pointerup', 'dblclick', 'focus', 'blur', 'selectionchange']
+  let scope: DomTimelineScope | undefined, sequence = 0, listening = false, stopped = false
+  function classify(target: EventTarget | null): string {
+    if (!target) return 'none'
+    if (target === scope?.canvas) return 'canvas'
+    if (target === scope?.input) return 'input'
+    if (target === document) return 'document'
+    if (target === document.body) return 'body'
+    return target instanceof Node && scope?.root.contains(target) ? 'sheet' : 'outside'
+  }
+  function record(type: string, trusted: boolean, target: string) {
+    if (!scope || sequence >= 60) return
+    const detail = JSON.stringify({ seq: sequence + 1, actionId: scope.actionId, type, trusted, target,
+      activeElement: classify(document.activeElement), bootId, sessionId: scope.sessionId })
+    // Native smoke notes cap detail at 400 characters. Keep complete identities
+    // and valid JSON; never silently truncate an oversized identity.
+    if (detail.length > 400) return
+    sequence++
+    emit(detail)
+  }
+  function capture(event: Event) {
+    if (!scope || sequence >= 60) return
+    const target = classify(event.target)
+    if (event.type === 'selectionchange') {
+      if (!['canvas', 'input', 'sheet'].includes(classify(document.activeElement))) return
+    } else if (event.type === 'focus' || event.type === 'blur') {
+      if (target !== 'canvas' && target !== 'input') return
+    } else if (!['canvas', 'input', 'sheet'].includes(target)) return
+    record(event.type, event.isTrusted, target)
+  }
+  return {
+    begin(next: DomTimelineScope) {
+      scope = undefined
+      if (!enabled || stopped || sequence >= 60) return
+      // The values are generated diagnostic IDs, not user-facing document names.
+      if (!/^[a-zA-Z0-9-]{36}$/.test(bootId) || !/^[a-zA-Z0-9_-]{1,64}$/.test(next.actionId)
+        || !/^[a-zA-Z0-9_-]{1,128}$/.test(next.sessionId)) return
+      scope = next
+      if (!listening) {
+        for (const name of names) window.addEventListener(name, capture, { capture: true, passive: true })
+        listening = true
+      }
+      record('action-start', false, 'sheet')
+    },
+    end() { record('action-end', false, 'sheet'); scope = undefined },
+    stop() {
+      scope = undefined; stopped = true
+      if (listening) for (const name of names) window.removeEventListener(name, capture, true)
+      listening = false
+    },
+  }
+}
+
 function readBoot(): Boot {
   const value = (window as Window & { __OPEN_OFFICE_DIAGNOSTIC_BOOT__?: Boot }).__OPEN_OFFICE_DIAGNOSTIC_BOOT__
   // WebKit converts its monotonic origin to wall time on each getter call:
@@ -141,6 +199,7 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
   const boot = readBoot()
   const report: MacosEditingReport = { schemaVersion: 1, kind: 'macos-editing', transport: isTauri() ? 'local-wasm-in-native-webview' : 'local-wasm-in-browser', editEntry, diagnosticOnly: f2Control, ok: false, ...boot, checks: [], sessions: [], initialTabIds: [], finalTabIds: [], actions: [], observations: {}, cleanup: { attempted: 0, closed: 0, ok: true } }
   const opened: EditingSmokeMount[] = []
+  const domTimeline = createEditingDomTimeline(boot.bootId, isTauri() && smokeRequested(), detail => smokeStage('editing-dom-event', detail))
   let currentEvents: RecordedEvent[] | undefined
   const eventNames = ['pointerdown', 'pointerup', 'click', 'dblclick', 'keydown', 'keyup', 'input']
   const capture = (event: Event) => {
@@ -183,6 +242,11 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
     currentEvents = action.events
     const request: EditingInputRequest = { actionId, ...value, viewportWidth: innerWidth, viewportHeight: innerHeight }
     assert(new TextEncoder().encode(JSON.stringify(request)).length < 400, 'input request exceeds native stage bound')
+    const activeSheet = target.startsWith('sheet:') && opened.find(mount => mount.kind === 'sheet' && mount.key === adapter.activeKey())
+    const session = activeSheet && report.sessions.find(item => item.key === activeSheet.key)
+    if (activeSheet && session) domTimeline.begin({ root: activeSheet.element,
+      canvas: activeSheet.element.querySelector('[data-testid="gridcraft-canvas"]'),
+      input: activeSheet.element.querySelector('[data-testid="gridcraft-input"]'), actionId, sessionId: session.sessionId })
     try {
       await bounded(Promise.resolve(requestInput(request)), `${actionId} dispatch`)
       await until(async () => action.events, events => {
@@ -195,7 +259,7 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
       await frame(); await frame()
       action.after = await preserved(); action.completed = true
       smokeStage('editing-input-complete', actionId)
-    } finally { currentEvents = undefined }
+    } finally { currentEvents = undefined; domTimeline.end() }
   }
   try {
     assert(adapter.tabs().length === 0, 'diagnostic must start from a cold empty workbench')
@@ -265,6 +329,7 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
   } catch (cause) { report.error = cause instanceof Error ? cause.message : String(cause); report.finalTabIds = adapter.tabs().map(tab => tab.key) }
   finally {
     currentEvents = undefined
+    domTimeline.stop()
     for (const name of eventNames) window.removeEventListener(name, capture, true)
     // Report captures the original identities before controlled fixture cleanup.
     smokeStage('editing-cleanup', `attempting ${opened.length} fixture tabs`)
