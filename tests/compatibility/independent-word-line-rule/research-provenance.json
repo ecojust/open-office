@@ -1,0 +1,252 @@
+{
+  "formatVersion": 1,
+  "nativeVersion": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "sourceManifest": "source-manifest.json",
+  "sourceCommit": "2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "nativeWordRuntime": false,
+  "productCodeInvoked": false,
+  "authorPackages": 6,
+  "nativeParagraphs": 27,
+  "artifacts": [
+    {
+      "path": "original/direct.docx",
+      "sha256": "b7d2d17e35266e2936c393710fa8967dcb234fd81f923f95d62cdc6ed55e020c",
+      "stage": "source",
+      "document": "direct"
+    },
+    {
+      "path": "native/docx/direct.docx",
+      "sha256": "0f6a6140966dd10c4e1e1b76800087ed0ce4989853ef773374d9bc278315c530",
+      "stage": "docx",
+      "document": "direct"
+    },
+    {
+      "path": "native/odt/direct.odt",
+      "sha256": "f4c07582a1a029f10c8dcf065777c2e245386f51def795fdb3cc5007890719c7",
+      "stage": "odt",
+      "document": "direct"
+    },
+    {
+      "path": "native/pdf/direct.pdf",
+      "sha256": "1d135b55d45f735ec11a9b0ecc1b2c1afe5e59f38cf3fe4549e2c7103f46f1cf",
+      "stage": "pdf",
+      "document": "direct"
+    },
+    {
+      "path": "native/docx-second/direct.docx",
+      "sha256": "8cdb383be88dbc1f23266574cbab4b819ba32020e89765b585dae3eca9a41f0e",
+      "stage": "secondDocx",
+      "document": "direct"
+    },
+    {
+      "path": "native/pdf-second/direct.pdf",
+      "sha256": "9efcf30788432dbe6e25274ebd1669d65c953636884d6db171d48a3663f7c30e",
+      "stage": "secondPdf",
+      "document": "direct"
+    },
+    {
+      "path": "original/style.docx",
+      "sha256": "741054fc658f0560247b7ba7bfc0d102f145a94c73332506bc1cb4872bfd8b01",
+      "stage": "source",
+      "document": "style"
+    },
+    {
+      "path": "native/docx/style.docx",
+      "sha256": "063c2d2149fa0e5cd24467c01bb8934ab66617ebe351ac210201ad73eea98360",
+      "stage": "docx",
+      "document": "style"
+    },
+    {
+      "path": "native/odt/style.odt",
+      "sha256": "bf9be8af9922545cc5b59456b1f3d5acd348e68a5fcb2ea90f28d216cbd06a4c",
+      "stage": "odt",
+      "document": "style"
+    },
+    {
+      "path": "native/pdf/style.pdf",
+      "sha256": "8ec31a9e667ff84c1c90852744d702187d9512c0cac53bacc9e680f6a419f330",
+      "stage": "pdf",
+      "document": "style"
+    },
+    {
+      "path": "native/docx-second/style.docx",
+      "sha256": "063c2d2149fa0e5cd24467c01bb8934ab66617ebe351ac210201ad73eea98360",
+      "stage": "secondDocx",
+      "document": "style"
+    },
+    {
+      "path": "native/pdf-second/style.pdf",
+      "sha256": "39179bdf4564cc4cae8957cad0ba17b93d1de33de212c11104b58d23a777dd95",
+      "stage": "secondPdf",
+      "document": "style"
+    },
+    {
+      "path": "original/style-reverse-order.docx",
+      "sha256": "c4d8d356b4effe696213292aa590a9e893986e50a08f25453ef6f7824d8eb2b3",
+      "stage": "source",
+      "document": "style-reverse-order"
+    },
+    {
+      "path": "native/docx/style-reverse-order.docx",
+      "sha256": "94adf2eb7edea206584d938d8699b49385c23cd322ba08625f25ca07068b0a8a",
+      "stage": "docx",
+      "document": "style-reverse-order"
+    },
+    {
+      "path": "native/odt/style-reverse-order.odt",
+      "sha256": "d1988aba1060a603363600588168b050f3c1dbc0df32e8f0d2f0586f898b1cd7",
+      "stage": "odt",
+      "document": "style-reverse-order"
+    },
+    {
+      "path": "native/pdf/style-reverse-order.pdf",
+      "sha256": "7bdd7904e7829554c5185934e48ce724ecbc8fb0f3cecd2c8959726f863c517e",
+      "stage": "pdf",
+      "document": "style-reverse-order"
+    },
+    {
+      "path": "native/docx-second/style-reverse-order.docx",
+      "sha256": "94adf2eb7edea206584d938d8699b49385c23cd322ba08625f25ca07068b0a8a",
+      "stage": "secondDocx",
+      "document": "style-reverse-order"
+    },
+    {
+      "path": "native/pdf-second/style-reverse-order.pdf",
+      "sha256": "895dae7dccf836451cc27932752263a98707ec11ba63843b1f84c41bc2e5f8ff",
+      "stage": "secondPdf",
+      "document": "style-reverse-order"
+    },
+    {
+      "path": "original/defaults-exact.docx",
+      "sha256": "ba6b6240ae3eeee5339e97a283d39cb957ff53d965dc13bc4562bda804ccb362",
+      "stage": "source",
+      "document": "defaults-exact"
+    },
+    {
+      "path": "native/docx/defaults-exact.docx",
+      "sha256": "f91271d93996aaae71b71de8b33b31bf22f0b941685c789b6812fb7edb04f3ae",
+      "stage": "docx",
+      "document": "defaults-exact"
+    },
+    {
+      "path": "native/odt/defaults-exact.odt",
+      "sha256": "9a7ed628fd26cdfa0dc3fe78e9a8e41d3136f06e37452b722c28db9607be921d",
+      "stage": "odt",
+      "document": "defaults-exact"
+    },
+    {
+      "path": "native/pdf/defaults-exact.pdf",
+      "sha256": "92a0507149c99c11fcd93b26541366de864262b1f48b03b7a6c28d43f64158e3",
+      "stage": "pdf",
+      "document": "defaults-exact"
+    },
+    {
+      "path": "native/docx-second/defaults-exact.docx",
+      "sha256": "f91271d93996aaae71b71de8b33b31bf22f0b941685c789b6812fb7edb04f3ae",
+      "stage": "secondDocx",
+      "document": "defaults-exact"
+    },
+    {
+      "path": "native/pdf-second/defaults-exact.pdf",
+      "sha256": "6c96fb1c946d392988299a31628713b2e1a8aef36b98ebcec23e76b46b8c7ea9",
+      "stage": "secondPdf",
+      "document": "defaults-exact"
+    },
+    {
+      "path": "original/defaults-atLeast.docx",
+      "sha256": "523f9c936664b613e5893aded24263cd88a7dcb5c6dff02041461034ed0ddd31",
+      "stage": "source",
+      "document": "defaults-atLeast"
+    },
+    {
+      "path": "native/docx/defaults-atLeast.docx",
+      "sha256": "5ec84dd8808733cfa4d643da7524e63a8f8ff791fd5b3ec635f0889a661d1a97",
+      "stage": "docx",
+      "document": "defaults-atLeast"
+    },
+    {
+      "path": "native/odt/defaults-atLeast.odt",
+      "sha256": "a98fea41052ceee5bd3143171e5cb2a647a94575ceaa25a04561a516edbbd362",
+      "stage": "odt",
+      "document": "defaults-atLeast"
+    },
+    {
+      "path": "native/pdf/defaults-atLeast.pdf",
+      "sha256": "b074aebcdd2950f1054aedb623976b608a61a579cdbec1d329cddb5ee06d086d",
+      "stage": "pdf",
+      "document": "defaults-atLeast"
+    },
+    {
+      "path": "native/docx-second/defaults-atLeast.docx",
+      "sha256": "3080aef213b51e04a514ac881d9ab429be0a5388b917a225f46c25c9339595ff",
+      "stage": "secondDocx",
+      "document": "defaults-atLeast"
+    },
+    {
+      "path": "native/pdf-second/defaults-atLeast.pdf",
+      "sha256": "7d28317125ee5fdb6f7680c2804caf2be6490705e9079382447bf3a635d85b8e",
+      "stage": "secondPdf",
+      "document": "defaults-atLeast"
+    },
+    {
+      "path": "original/defaults-auto.docx",
+      "sha256": "8552f4582fc4b0106cfb387cee13a0213c2edf67551e1f63bdc7c44c8e37bcc7",
+      "stage": "source",
+      "document": "defaults-auto"
+    },
+    {
+      "path": "native/docx/defaults-auto.docx",
+      "sha256": "908dc0fadbdf05c949f42408f22ee038eec19503c5c62abadd96e90ace13e97f",
+      "stage": "docx",
+      "document": "defaults-auto"
+    },
+    {
+      "path": "native/odt/defaults-auto.odt",
+      "sha256": "86efef469e70fb5498e4343a2c9347035f1eee6163adcb7e5b28a4365451eece",
+      "stage": "odt",
+      "document": "defaults-auto"
+    },
+    {
+      "path": "native/pdf/defaults-auto.pdf",
+      "sha256": "a3deb8c813e1e80aa9789864ef3060a7a3c5de6d44ae6f4223f985ec3660cb1e",
+      "stage": "pdf",
+      "document": "defaults-auto"
+    },
+    {
+      "path": "native/docx-second/defaults-auto.docx",
+      "sha256": "908dc0fadbdf05c949f42408f22ee038eec19503c5c62abadd96e90ace13e97f",
+      "stage": "secondDocx",
+      "document": "defaults-auto"
+    },
+    {
+      "path": "native/pdf-second/defaults-auto.pdf",
+      "sha256": "dbf6585edbe1dd15b31c065127027865604ef6b90122e312d4cb9a53dd147f9e",
+      "stage": "secondPdf",
+      "document": "defaults-auto"
+    }
+  ],
+  "observations": "native-report.json",
+  "effectiveNativeInheritance": "resolved-native.json",
+  "expectedNativeValues": "expected.json",
+  "originalResearchEvidence": {
+    "inventorySha256": "323c56f8a0d1b5f19627153da6c0cd9d155cc342ba418a07305d059686e95728",
+    "verificationSha256": "c438ee28467ef4d0a2ac628c5fb7a4d1817c9d3ec2d9052be58f1ffdf657098a",
+    "reportSha256": "d8f3593653d7fd19f43aea154033cb830c8646788d47ea5d7edce44c660f752d",
+    "verification": {
+      "ok": true,
+      "checks": 667,
+      "nativeParagraphs": 27,
+      "authorPackages": 6,
+      "nativeWordRuntime": false,
+      "productCodeInvoked": false,
+      "scope": "rule-only import inheritance and native save/reopen; same-page soft-line PDF distances; no native keyboard or pagination assertions"
+    }
+  },
+  "portability": "All required artifacts are stored relative to this directory. native-report.json replaces the original research directory with . and the native executable with soffice in historical command records; checks never execute those command records.",
+  "limitations": [
+    "No Microsoft Word runtime was used.",
+    "No new native keyboard Enter evidence; product Enter checks reuse the existing split contract.",
+    "PDF assertions cover same-page soft-line baselines only, not pagination equality.",
+    "native-report.json odt is a historical naive merged property inventory; use independently resolved-native.json with mutually exclusive ODT line properties."
+  ]
+}

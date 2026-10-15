@@ -1,6 +1,6 @@
 [package]
 name = "open-office"
-version = "0.6.0"
+version = "0.6.1"
 description = "Local document, spreadsheet, presentation and PDF editing"
 edition = "2021"
 rust-version = "1.90"

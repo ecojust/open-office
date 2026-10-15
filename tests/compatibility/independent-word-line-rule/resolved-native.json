@@ -1,0 +1,1054 @@
+[
+  {
+    "name": "direct",
+    "first": [
+      {
+        "text": "C000 firstC000 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C001 firstC001 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C002 firstC002 second",
+        "lineRule": "atLeast",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C003 firstC003 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C004 firstC004 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C005 firstC005 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C006 firstC006 second",
+        "lineRule": "atLeast",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C007 firstC007 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C008 firstC008 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "120",
+        "after": "0"
+      },
+      {
+        "text": "C009 firstC009 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "120",
+        "after": "0"
+      },
+      {
+        "text": "C010 firstC010 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      }
+    ],
+    "second": [
+      {
+        "text": "C000 firstC000 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C001 firstC001 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C002 firstC002 second",
+        "lineRule": "atLeast",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C003 firstC003 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C004 firstC004 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C005 firstC005 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C006 firstC006 second",
+        "lineRule": "atLeast",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C007 firstC007 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C008 firstC008 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "120",
+        "after": "0"
+      },
+      {
+        "text": "C009 firstC009 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "120",
+        "after": "0"
+      },
+      {
+        "text": "C010 firstC010 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      }
+    ],
+    "odt": [
+      {
+        "text": "C000 firstC000 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false"
+        }
+      },
+      {
+        "text": "C001 firstC001 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "0.1665in"
+        }
+      },
+      {
+        "text": "C002 firstC002 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height-at-least": "0.1665in"
+        }
+      },
+      {
+        "text": "C003 firstC003 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "100%"
+        }
+      },
+      {
+        "text": "C004 firstC004 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "0.1665in"
+        }
+      },
+      {
+        "text": "C005 firstC005 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "100%"
+        }
+      },
+      {
+        "text": "C006 firstC006 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height-at-least": "0.1665in"
+        }
+      },
+      {
+        "text": "C007 firstC007 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "0.1665in"
+        }
+      },
+      {
+        "text": "C008 firstC008 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0.0835in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "100%"
+        }
+      },
+      {
+        "text": "C009 firstC009 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0.0835in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "100%"
+        }
+      },
+      {
+        "text": "C010 firstC010 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "100%"
+        }
+      }
+    ]
+  },
+  {
+    "name": "style",
+    "first": [
+      {
+        "text": "C000 firstC000 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C001 firstC001 second",
+        "lineRule": "atLeast",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C002 firstC002 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C003 firstC003 second",
+        "lineRule": "exact",
+        "line": "360",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C004 firstC004 second",
+        "lineRule": "atLeast",
+        "line": "360",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C005 firstC005 second",
+        "lineRule": "auto",
+        "line": "278",
+        "before": "0",
+        "after": "0"
+      }
+    ],
+    "second": [
+      {
+        "text": "C000 firstC000 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C001 firstC001 second",
+        "lineRule": "atLeast",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C002 firstC002 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C003 firstC003 second",
+        "lineRule": "exact",
+        "line": "360",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C004 firstC004 second",
+        "lineRule": "atLeast",
+        "line": "360",
+        "before": "0",
+        "after": "0"
+      },
+      {
+        "text": "C005 firstC005 second",
+        "lineRule": "auto",
+        "line": "278",
+        "before": "0",
+        "after": "0"
+      }
+    ],
+    "odt": [
+      {
+        "text": "C000 firstC000 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "0.1665in"
+        }
+      },
+      {
+        "text": "C001 firstC001 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height-at-least": "0.1665in"
+        }
+      },
+      {
+        "text": "C002 firstC002 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "100%"
+        }
+      },
+      {
+        "text": "C003 firstC003 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "0.25in"
+        }
+      },
+      {
+        "text": "C004 firstC004 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height-at-least": "0.25in"
+        }
+      },
+      {
+        "text": "C005 firstC005 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "116%"
+        }
+      }
+    ]
+  },
+  {
+    "name": "style-reverse-order",
+    "first": [
+      {
+        "text": "C000 firstC000 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      }
+    ],
+    "second": [
+      {
+        "text": "C000 firstC000 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "0",
+        "after": "0"
+      }
+    ],
+    "odt": [
+      {
+        "text": "C000 firstC000 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "0.1665in"
+        }
+      }
+    ]
+  },
+  {
+    "name": "defaults-exact",
+    "first": [
+      {
+        "text": "C000 firstC000 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "120",
+        "after": "80"
+      },
+      {
+        "text": "D001 firstD001 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "120",
+        "after": "0"
+      },
+      {
+        "text": "C002 firstC002 second",
+        "lineRule": "exact",
+        "line": "360",
+        "before": "120",
+        "after": "80"
+      }
+    ],
+    "second": [
+      {
+        "text": "C000 firstC000 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "120",
+        "after": "80"
+      },
+      {
+        "text": "D001 firstD001 second",
+        "lineRule": "exact",
+        "line": "240",
+        "before": "120",
+        "after": "0"
+      },
+      {
+        "text": "C002 firstC002 second",
+        "lineRule": "exact",
+        "line": "360",
+        "before": "120",
+        "after": "80"
+      }
+    ],
+    "odt": [
+      {
+        "text": "C000 firstC000 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0.0835in",
+          "margin-bottom": "0.0555in",
+          "contextual-spacing": "false",
+          "line-height": "0.1665in",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false"
+        }
+      },
+      {
+        "text": "D001 firstD001 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0.0835in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "line-height": "0.1665in",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false"
+        }
+      },
+      {
+        "text": "C002 firstC002 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0.0835in",
+          "margin-bottom": "0.0555in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "0.25in"
+        }
+      }
+    ]
+  },
+  {
+    "name": "defaults-atLeast",
+    "first": [
+      {
+        "text": "C000 firstC000 second",
+        "lineRule": "atLeast",
+        "line": "240",
+        "before": "120",
+        "after": "80"
+      },
+      {
+        "text": "D001 firstD001 second",
+        "lineRule": "atLeast",
+        "line": "240",
+        "before": "120",
+        "after": "0"
+      },
+      {
+        "text": "C002 firstC002 second",
+        "lineRule": "atLeast",
+        "line": "360",
+        "before": "120",
+        "after": "80"
+      }
+    ],
+    "second": [
+      {
+        "text": "C000 firstC000 second",
+        "lineRule": "atLeast",
+        "line": "240",
+        "before": "120",
+        "after": "80"
+      },
+      {
+        "text": "D001 firstD001 second",
+        "lineRule": "atLeast",
+        "line": "240",
+        "before": "120",
+        "after": "0"
+      },
+      {
+        "text": "C002 firstC002 second",
+        "lineRule": "atLeast",
+        "line": "360",
+        "before": "120",
+        "after": "80"
+      }
+    ],
+    "odt": [
+      {
+        "text": "C000 firstC000 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0.0835in",
+          "margin-bottom": "0.0555in",
+          "contextual-spacing": "false",
+          "line-height-at-least": "0.1665in",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false"
+        }
+      },
+      {
+        "text": "D001 firstD001 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0.0835in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "line-height-at-least": "0.1665in",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false"
+        }
+      },
+      {
+        "text": "C002 firstC002 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0.0835in",
+          "margin-bottom": "0.0555in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height-at-least": "0.25in"
+        }
+      }
+    ]
+  },
+  {
+    "name": "defaults-auto",
+    "first": [
+      {
+        "text": "C000 firstC000 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "120",
+        "after": "80"
+      },
+      {
+        "text": "D001 firstD001 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "120",
+        "after": "0"
+      },
+      {
+        "text": "C002 firstC002 second",
+        "lineRule": "auto",
+        "line": "278",
+        "before": "120",
+        "after": "80"
+      }
+    ],
+    "second": [
+      {
+        "text": "C000 firstC000 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "120",
+        "after": "80"
+      },
+      {
+        "text": "D001 firstD001 second",
+        "lineRule": "auto",
+        "line": "240",
+        "before": "120",
+        "after": "0"
+      },
+      {
+        "text": "C002 firstC002 second",
+        "lineRule": "auto",
+        "line": "278",
+        "before": "120",
+        "after": "80"
+      }
+    ],
+    "odt": [
+      {
+        "text": "C000 firstC000 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0.0835in",
+          "margin-bottom": "0.0555in",
+          "contextual-spacing": "false",
+          "line-height": "100%",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false"
+        }
+      },
+      {
+        "text": "D001 firstD001 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0.0835in",
+          "margin-bottom": "0in",
+          "contextual-spacing": "false",
+          "line-height": "100%",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false"
+        }
+      },
+      {
+        "text": "C002 firstC002 second",
+        "props": {
+          "hyphenation-ladder-count": "no-limit",
+          "hyphenation-keep": "auto",
+          "hyphenation-keep-type": "column",
+          "hyphenation-keep-line": "false",
+          "text-autospace": "ideograph-alpha",
+          "punctuation-wrap": "hanging",
+          "line-break": "strict",
+          "tab-stop-distance": "0.7874in",
+          "writing-mode": "lr-tb",
+          "margin-top": "0.0835in",
+          "margin-bottom": "0.0555in",
+          "contextual-spacing": "false",
+          "text-align": "start",
+          "justify-single-word": "false",
+          "orphans": "2",
+          "widows": "2",
+          "paragraph-composer": "false",
+          "line-height": "116%"
+        }
+      }
+    ]
+  }
+]

@@ -3,8 +3,8 @@
 
 Writer's automatic line distance uses a twip -> mm100 -> integer-percent
 conversion. Named paragraph styles and direct properties merge by component;
-line without lineRule retains the inherited rule. Rule-only is outside this
-bounded positive oracle unless already materialized by native export.
+line without lineRule retains the inherited rule. A lineRule without line
+starts a fresh 240-twip distance, independently of the inherited value.
 """
 import json
 import sys
@@ -40,13 +40,12 @@ def merge(inherited, direct):
     for name, key in [('before', 'spaceBefore'), ('after', 'spaceAfter')]:
         if name in direct:
             result[key] = int(direct[name]) / 20
-    if 'line' in direct:
+    if 'line' in direct or 'lineRule' in direct:
         rule = direct.get('lineRule', inherited['lineHeightRule'])
+        assert rule in ('auto', 'exact', 'atLeast'), 'Invalid line rule'
         result['lineHeightRule'] = rule
-        raw = int(direct['line'])
+        raw = int(direct.get('line', '240'))
         result['lineHeight'] = native_percent(raw) / 100 if rule == 'auto' else raw / 20
-    else:
-        assert 'lineRule' not in direct, 'Rule-only spacing needs a native materialized control'
     return result
 
 

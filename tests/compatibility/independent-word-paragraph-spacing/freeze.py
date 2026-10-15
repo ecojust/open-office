@@ -41,7 +41,11 @@ if __name__ == '__main__':
             native=copy(native,'libreoffice/'+name+'.docx'),
             pdf=copy(EDITING/'output'/(name+'.pdf'),'libreoffice/'+name+'.pdf'),
             expected=semantics(native),sourceExpected=semantics(source),action=action))
-    fixtures.append(dict(name='rule-only',source=copy(RESEARCH/'cases.docx','source/rule-only.docx'),expectUnsupported=True))
+    rule_source = RESEARCH/'cases.docx'; rule_native = RESEARCH/'native-docx/cases.docx'
+    fixtures.append(dict(name='rule-only',source=copy(rule_source,'source/rule-only.docx'),
+        native=copy(rule_native,'libreoffice/rule-only.docx'),
+        pdf=copy(RESEARCH/'native-pdf/cases.pdf','libreoffice/rule-only.pdf'),
+        expected=semantics(rule_native),sourceExpected=semantics(rule_source)))
     fixtures.append(dict(name='automatic-color-native',
         source=copy(OLD_EDITING/'input/two-paragraphs.docx','source/automatic-color.docx'),
         native=copy(OLD_EDITING/'output/enter-start.docx','libreoffice/automatic-color.docx'),expectUnsupported=True,

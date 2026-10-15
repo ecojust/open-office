@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "checks": 1001,
+  "nativeVersion": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "authorPackages": 6,
+  "nativeParagraphs": 27,
+  "completeArtifacts": 36,
+  "microsoftWordRuntime": false,
+  "productCodeInvoked": false,
+  "pdfReadFromActualFiles": true,
+  "externalResearchDirectoryRequired": false
+}

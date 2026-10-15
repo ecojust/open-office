@@ -63,6 +63,7 @@ npm run test:browser:word-underline
 npm run test:browser:word-underline-color
 npm run test:browser:word-baseline-offset
 npm run test:browser:word-paragraph-spacing
+npm run test:browser:word-line-rule
 npm run test:browser:word-page-settings
 npm run test:browser:word-marker
 npm run test:browser:word-spacing
@@ -83,7 +84,9 @@ npm run test:browser:word-import-performance
 
 `word-baseline-offset` 对照 Writer 的自定义基线偏移，检查半磅导入、整数百分比、改变字号后的保存取整、空段和实际格式命令的继续输入行为。它自行启动 Vite 与 Chromium，需要原生 `soffice`；测试使用完整 DOCX 原件和独立 XML 检查器，字体度量检查限于已验证的字体与当前环境，不代表原生分页一致。报告路径及运行参数见[专项语料说明](../tests/compatibility/independent-word-baseline-offset/README.md)。
 
-`word-paragraph-spacing` 检查倍数／固定值／最小值行距、段前／段后间距、默认与样式继承、真实编辑控件和换段／合段。它自行启动 Vite 与 Chromium，并调用原生 `soffice` 重存应用输出；独立 Python 检查器读取完整 ZIP/XML 与 PDF。倍数范围采用已验证的连续稳定子集，拒绝规则缺少数值及范围外输入。可用 `WORD_PARAGRAPH_SPACING_OUTPUT` 指定结果目录，详细来源与限制见[段落间距语料](../tests/compatibility/independent-word-paragraph-spacing/README.md)。
+`word-paragraph-spacing` 检查倍数／固定值／最小值行距、段前／段后间距、默认与样式继承、真实编辑控件和换段／合段。它自行启动 Vite 与 Chromium，并调用原生 `soffice` 重存应用输出；独立 Python 检查器读取完整 ZIP/XML 与 PDF。倍数范围采用已验证的连续稳定子集，拒绝非法规则和范围外输入。可用 `WORD_PARAGRAPH_SPACING_OUTPUT` 指定结果目录，详细来源与限制见[段落间距语料](../tests/compatibility/independent-word-paragraph-spacing/README.md)。
+
+`word-line-rule` 专项覆盖只写行距规则、不写数值的 DOCX，通过完整原生语料核对 Writer 缺省值和样式覆盖关系，并验证实际打开、编辑、保存重开与无效输入保护。它与旧段落间距回归分别记录，不将文件语义一致当作分页一致。
 
 `word-page-settings` 检查单节纸张尺寸、独立方向标记、四边页边距与逐字段缺省值，覆盖实际页面面板、选区和撤销恢复、完整文件保存与原生重存。测试自行启动 Vite、Chromium 和独立配置目录下的 `soffice`，Python ZIP/XML 与 PDF 检查器分别核对文件属性和页面尺寸；不将连续正文预览当作分页验证。用 `WORD_PAGE_SETTINGS_OUTPUT` 指定结果目录，见[页面设置语料](../tests/compatibility/independent-word-page-settings/README.md)。
 

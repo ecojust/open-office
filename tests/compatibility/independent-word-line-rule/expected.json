@@ -1,0 +1,203 @@
+{
+  "direct": [
+    {
+      "lineRule": "auto",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "exact",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 12
+    },
+    {
+      "lineRule": "atLeast",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "auto",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "exact",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 12
+    },
+    {
+      "lineRule": "auto",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "atLeast",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "exact",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 12
+    },
+    {
+      "lineRule": "auto",
+      "line": 240,
+      "before": 120,
+      "after": 0,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "auto",
+      "line": 240,
+      "before": 120,
+      "after": 0,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "auto",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 14
+    }
+  ],
+  "style": [
+    {
+      "lineRule": "exact",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 12
+    },
+    {
+      "lineRule": "atLeast",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "auto",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "exact",
+      "line": 360,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 18
+    },
+    {
+      "lineRule": "atLeast",
+      "line": 360,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 18
+    },
+    {
+      "lineRule": "auto",
+      "line": 278,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 16.2
+    }
+  ],
+  "style-reverse-order": [
+    {
+      "lineRule": "exact",
+      "line": 240,
+      "before": 0,
+      "after": 0,
+      "baselineDistancePt": 12
+    }
+  ],
+  "defaults-exact": [
+    {
+      "lineRule": "exact",
+      "line": 240,
+      "before": 120,
+      "after": 80,
+      "baselineDistancePt": 12
+    },
+    {
+      "lineRule": "exact",
+      "line": 240,
+      "before": 120,
+      "after": 0,
+      "baselineDistancePt": 12
+    },
+    {
+      "lineRule": "exact",
+      "line": 360,
+      "before": 120,
+      "after": 80,
+      "baselineDistancePt": 18
+    }
+  ],
+  "defaults-atLeast": [
+    {
+      "lineRule": "atLeast",
+      "line": 240,
+      "before": 120,
+      "after": 80,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "atLeast",
+      "line": 240,
+      "before": 120,
+      "after": 0,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "atLeast",
+      "line": 360,
+      "before": 120,
+      "after": 80,
+      "baselineDistancePt": 18
+    }
+  ],
+  "defaults-auto": [
+    {
+      "lineRule": "auto",
+      "line": 240,
+      "before": 120,
+      "after": 80,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "auto",
+      "line": 240,
+      "before": 120,
+      "after": 0,
+      "baselineDistancePt": 14
+    },
+    {
+      "lineRule": "auto",
+      "line": 278,
+      "before": 120,
+      "after": 80,
+      "baselineDistancePt": 16.2
+    }
+  ]
+}

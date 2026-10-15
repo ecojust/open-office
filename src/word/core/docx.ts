@@ -452,16 +452,20 @@ function paragraphProperties(node?: Element, numbering: Numbering = new Map(), a
         requireValue(numId === '0' || numbering.get(numId)?.has(ilvl), '独立文字编辑器暂不支持可见编号或带缩进的编号。'); break
       }
       case 'outlineLvl': { leaf(child); const level = numberValue(value(child), '标题级别', 0, 9); requireValue(level < 3 || level === 9, '独立文字编辑器暂支持一至三级标题。'); style.heading = level === 9 ? 0 : (level + 1) as 1 | 2 | 3; break }
-      case 'spacing':
+      case 'spacing': {
         leaf(child, ['before', 'after', 'line', 'lineRule'])
         if (child.hasAttributeNS(W, 'before')) style.spaceBefore = numberValue(child.getAttributeNS(W, 'before'), '段前间距', 0, 31680) / 20
         if (child.hasAttributeNS(W, 'after')) style.spaceAfter = numberValue(child.getAttributeNS(W, 'after'), '段后间距', 0, 31680) / 20
-        if (child.hasAttributeNS(W, 'line')) {
-          const rule = child.getAttributeNS(W, 'lineRule')
+        const hasLine = child.hasAttributeNS(W, 'line'), rule = child.getAttributeNS(W, 'lineRule')
+        if (hasLine || rule !== null) {
           requireValue(rule === null || ['auto', 'exact', 'atLeast'].includes(rule), 'DOCX 行距规则无效。')
-          line = { value: numberValue(child.getAttributeNS(W, 'line'), '行距', 1, 31680), ...(rule !== null ? { rule: rule as ParagraphStyle['lineHeightRule'] } : {}) }
-        } else requireValue(!child.hasAttributeNS(W, 'lineRule'), 'DOCX 行距规则缺少行距值。')
+          // Writer starts a fresh line-spacing item at exact 12pt. A rule
+          // alone reinterprets that 240-twip value, not the ancestor's height.
+          // Keep omitted line distinct from an explicitly empty/invalid value.
+          line = { value: hasLine ? numberValue(child.getAttributeNS(W, 'line'), '行距', 1, 31680) : 240, ...(rule !== null ? { rule: rule as ParagraphStyle['lineHeightRule'] } : {}) }
+        }
         break
+      }
       default: unsupported(`段落格式 ${name}`)
     }
   }

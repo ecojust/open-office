@@ -11,7 +11,7 @@ accept it. `freeze.py` only copies complete files and creates the inventory.
 
 The eight positive pairs cover 18 direct/inherited spacing controls, three
 document-default controls, 11 geometry controls, and five real Writer keyboard
-actions. The complete `rule-only.docx` source and original `automatic-color.docx` native output are deliberately unsupported. The initial editing author input omitted explicit color; Writer exported automatic color outside the existing color subset. That evidence is preserved unchanged. The positive editing controls use separate newly authored inputs with explicit black, then repeat the same real native actions.
+actions. The complete `rule-only.docx` source was an unsupported control at the original freeze; the later line-rule compatibility iteration now checks it as a positive without changing its bytes. The original `automatic-color.docx` native output remains unsupported. The initial editing author input omitted explicit color; Writer exported automatic color outside the existing color subset. That evidence is preserved unchanged. The positive editing controls use separate newly authored inputs with explicit black, then repeat the same real native actions.
 The native control for a keyboard action is its resulting document, so its
 expected text and spacing differ from the untouched source.
 
@@ -21,7 +21,9 @@ The bounded contract is:
 - Exact/minimum line height: 1–18576 twips (0.05–928.8 points).
 - Before/after spacing: 0–31680 twips (0–1584 points).
 - A direct line value without a rule inherits the effective paragraph rule.
-- A spacing element containing only `lineRule` remains unsupported.
+- A spacing element containing only `lineRule` uses Writer's fresh 12-point
+  value for exact/minimum, or 100% for auto, overriding an ancestor's value.
+  Dedicated source/native controls are in `independent-word-line-rule`.
 - Adjacent paragraph margins use the larger of preceding after and following
   before spacing in the continuous preview.
 

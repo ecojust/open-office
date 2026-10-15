@@ -1,0 +1,29 @@
+{
+  "commit": "2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "files": {
+    "sw/source/writerfilter/dmapper/DomainMapper.cxx": {
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/writerfilter/dmapper/DomainMapper.cxx",
+      "sha256": "9f50199f9bbee96ec81c007b1a7a91242b69821bde0fd522bb1035c9ac647264"
+    },
+    "sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx": {
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx",
+      "sha256": "6afbe8574c5f4cb71bd277cf467544a57c851673484e59069c24c2039c7cde0b"
+    },
+    "sw/source/filter/ww8/docxattributeoutput.cxx": {
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/filter/ww8/docxattributeoutput.cxx",
+      "sha256": "491795260e91aa049e87dc220349da719c64e480a4ccacb9292fefdfb8b8eb7c"
+    },
+    "sw/source/filter/ww8/ww8atr.cxx": {
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/filter/ww8/ww8atr.cxx",
+      "sha256": "3895da4595a2e5e0f8c6c7fd1a83546c62ecaaf4dc562d27904c8d7bea3a41c3"
+    },
+    "include/tools/UnitConversion.hxx": {
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/include/tools/UnitConversion.hxx",
+      "sha256": "340ffbe0df6026439ab4aaa9ca424cd144ab18863a75f7a9b374f6c4b3b454cf"
+    },
+    "include/o3tl/unit_conversion.hxx": {
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/include/o3tl/unit_conversion.hxx",
+      "sha256": "8d60b600da7e679b41db0452e126863feb6b9b283c579e1c8c3431f3a0e5a19b"
+    }
+  }
+}

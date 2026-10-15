@@ -402,7 +402,47 @@ async function main() {
     }
     pass('Corrupt ZIP and native transport errors reject once without a browser fallback');
 
-    const withoutCase = strFromU8(seedParts['word/document.xml']).replace(/<w:(?:caps|smallCaps)\b[^>]*\/>/g, '');
+    const seedDocumentXml = strFromU8(seedParts['word/document.xml']);
+    const replaceParagraphSpacing = (index, attributes) => {
+      let paragraphIndex = -1, replaced = false;
+      const xml = seedDocumentXml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, paragraph => {
+        if (++paragraphIndex !== index) return paragraph;
+        return paragraph.replace(/<w:pPr>([\s\S]*?)<\/w:pPr>/, (_, properties) => {
+          // w:spacing also occurs inside marker rPr for character tracking.
+          // Target only the paragraph spacing element, never that run property.
+          const pattern = /<w:spacing\b(?=[^>]*\bw:(?:before|after|line|lineRule)=)[^>]*\/>/;
+          assert.match(properties, pattern, 'Seed paragraph must have a paragraph-spacing control');
+          replaced = true;
+          return `<w:pPr>${properties.replace(pattern, `<w:spacing ${attributes}/>` )}</w:pPr>`;
+        });
+      });
+      assert.ok(replaced, `Seed paragraph ${index} must be replaced`);
+      return xml;
+    };
+    report.ruleOnly = [];
+    for (const rule of ['auto', 'exact', 'atLeast']) {
+      // The inherited value is exact 24pt. Native Writer creates a fresh
+      // 240-twip distance for a rule-only direct override, not that 24pt value.
+      const bytes = zipSync({ ...seedParts, 'word/document.xml': strToU8(replaceParagraphSpacing(7, `w:before="0" w:lineRule="${rule}"`)) });
+      const rows = rustOk({ operation: 'read', base64: b64(bytes) }).parts;
+      const models = [await call('browserRead', b64(bytes)), await call('partsRead', rows), await call('runtimeRead', b64(bytes))];
+      for (const model of models) {
+        const paragraph = model.paragraphs[7], value = rule === 'auto' ? 1 : 12;
+        assert.equal(paragraph.sourceParagraph.lineHeight, 24); assert.equal(paragraph.sourceParagraph.lineHeightRule, 'exact');
+        assert.equal(paragraph.style.lineHeight, value); assert.equal(paragraph.style.lineHeightRule, rule);
+        assert.equal(paragraph.directStyle.lineHeight, value); assert.equal(paragraph.directStyle.lineHeightRule, rule);
+        assert.equal(paragraph.style.spaceBefore, 0);
+        assert.deepEqual(semantic(model.paragraphs.filter((_, i) => i !== 7)), semantic(original.paragraphs.filter((_, i) => i !== 7)), 'Rule-only import must preserve other paragraphs and markers');
+        assert.deepEqual(semantic(model), semantic(models[0]));
+      }
+      const written = await call('runtimeWrite', models[2]);
+      for (const operation of ['browserRead', 'runtimeRead']) assert.deepEqual(semantic(await call(operation, written)), semantic(models[0]), `${rule}: explicit rule-only reset survives Rust write/reopen`);
+      const file = `rule-only-${rule}.docx`; fs.writeFileSync(path.join(output, file), Buffer.from(written, 'base64')); report.files.push(file);
+      report.ruleOnly.push({ rule, inherited: { lineHeight: 24, lineHeightRule: 'exact' }, expected: { lineHeight: rule === 'auto' ? 1 : 12, lineHeightRule: rule }, output: file });
+    }
+    pass('Rule-only auto/exact/atLeast overrides materialize native 240-twip values and direct provenance across Rust/browser reads, writes and reopening');
+
+    const withoutCase = seedDocumentXml.replace(/<w:(?:caps|smallCaps)\b[^>]*\/>/g, '');
     assert.notEqual(withoutCase, strFromU8(seedParts['word/document.xml']), 'Seed must contain case-effect properties');
     for (const [name, xml] of [
       ['invalid-xml', '<w:document>'],
@@ -418,9 +458,12 @@ async function main() {
       ['out-of-range-baseline-offset', strFromU8(seedParts['word/document.xml']).replace('<w:position w:val="6"/>', '<w:position w:val="201"/>')],
       ['fractional-baseline-offset', strFromU8(seedParts['word/document.xml']).replace('<w:position w:val="6"/>', '<w:position w:val="1.5"/>')],
       ['duplicate-baseline-offset', strFromU8(seedParts['word/document.xml']).replace('<w:position w:val="6"/>', '<w:position w:val="6"/><w:position w:val="-6"/>')],
-      ['unstable-native-auto-line-spacing', strFromU8(seedParts['word/document.xml']).replace(/<w:spacing\b[^>]*\/>/, '<w:spacing w:line="802" w:lineRule="auto"/>')],
-      ['overflow-native-fixed-line-spacing', strFromU8(seedParts['word/document.xml']).replace(/<w:spacing\b[^>]*\/>/, '<w:spacing w:line="18577" w:lineRule="exact"/>')],
-      ['unsupported-rule-only-line-spacing', strFromU8(seedParts['word/document.xml']).replace(/<w:spacing\b[^>]*\/>/, '<w:spacing w:lineRule="atLeast"/>')],
+      ['unstable-native-auto-line-spacing', replaceParagraphSpacing(7, 'w:line="802" w:lineRule="auto"')],
+      ['overflow-native-fixed-line-spacing', replaceParagraphSpacing(7, 'w:line="18577" w:lineRule="exact"')],
+      ['invalid-rule-only-line-spacing', replaceParagraphSpacing(7, 'w:lineRule="odd"')],
+      ['empty-rule-only-line-spacing', replaceParagraphSpacing(7, 'w:lineRule=""')],
+      ['empty-line-with-rule', replaceParagraphSpacing(7, 'w:line="" w:lineRule="exact"')],
+      ['rule-only-unsupported-attribute', replaceParagraphSpacing(7, 'w:lineRule="atLeast" w:beforeAutospacing="1"')],
       ['invalid-page-orientation', strFromU8(seedParts['word/document.xml']).replace('w:orient="landscape"', 'w:orient="diagonal"')],
       ['unsupported-page-gutter', strFromU8(seedParts['word/document.xml']).replace('w:gutter="0"', 'w:gutter="720"')],
       ['ambiguous-case-effects', withoutCase.replace('<w:rPr>', '<w:rPr><w:caps/><w:smallCaps/>')],
@@ -446,12 +489,22 @@ async function main() {
     assert.equal(report.transport.length, beforeOversize, 'Oversized native bytes must be rejected before Base64 transport');
     pass('Native Base64 protocol rejects malformed/oversized/ambiguous inputs, and runtime guards 16 MiB before invoking Rust');
 
-    const corpusFiles = ['independent-word', 'independent-word-indentation', 'independent-word-character-format', 'independent-word-highlight', 'independent-word-background', 'independent-word-underline', 'independent-word-marker', 'independent-word-spacing', 'independent-word-case', 'independent-word-kerning', 'independent-word-underline-color', 'independent-word-baseline-offset', 'independent-word-paragraph-spacing', 'independent-word-page-settings'].flatMap(directory => {
+    const corpusFiles = ['independent-word', 'independent-word-indentation', 'independent-word-character-format', 'independent-word-highlight', 'independent-word-background', 'independent-word-underline', 'independent-word-marker', 'independent-word-spacing', 'independent-word-case', 'independent-word-kerning', 'independent-word-underline-color', 'independent-word-baseline-offset', 'independent-word-paragraph-spacing', 'independent-word-page-settings', 'independent-word-line-rule'].flatMap(directory => {
       const corpus = path.join(root, 'tests/compatibility', directory);
       const manifest = JSON.parse(fs.readFileSync(path.join(corpus, 'manifest.json'), 'utf8'));
-      return [...manifest.fixtures, ...(manifest.editingFixtures || [])].map(fixture => ({ name: `${directory}-${path.basename(fixture.docx)}`, file: path.join(corpus, fixture.docx), sha256: fixture.docxSha256, expectUnsupported: fixture.expectUnsupported }));
+      return [...manifest.fixtures, ...(manifest.editingFixtures || [])].flatMap(fixture => {
+        const native = { name: `${directory}-${path.basename(fixture.docx)}`, file: path.join(corpus, fixture.docx), sha256: fixture.docxSha256, expectUnsupported: fixture.expectUnsupported };
+        if (directory !== 'independent-word-line-rule') return [native];
+        // Native output materializes the missing line value. Also send every
+        // original package through Rust so the actual rule-only XML is tested.
+        assert.ok(Array.isArray(fixture.expected) && Array.isArray(fixture.sourceExpected) && Array.isArray(fixture.provenance), `${fixture.name}: independent line-rule oracle is required`);
+        return [
+          { ...native, expectedParagraphSpacing: fixture.expected },
+          { name: `${directory}-source-${path.basename(fixture.source)}`, file: path.join(corpus, fixture.source), sha256: fixture.sourceSha256, expectedParagraphSpacing: fixture.sourceExpected, paragraphSpacingProvenance: fixture.provenance },
+        ];
+      });
     });
-    for (const { name, file: sourceFile, sha256, expectUnsupported } of corpusFiles) {
+    for (const { name, file: sourceFile, sha256, expectUnsupported, expectedParagraphSpacing, paragraphSpacingProvenance } of corpusFiles) {
       report.activeFixture = name; persist();
       assert.equal(digest(sourceFile), sha256, `${name}: native corpus must remain byte-for-byte unchanged`);
       const bytes = fs.readFileSync(sourceFile);
@@ -465,16 +518,21 @@ async function main() {
       const model = await call('browserRead', b64(bytes)), nativeModel = await call('runtimeRead', b64(bytes));
       assert.deepEqual(semantic(await call('partsRead', rows)), semantic(model), `${name}: raw Rust part import`);
       assert.deepEqual(semantic(nativeModel), semantic(model), `${name}: native runtime import`);
+      if (expectedParagraphSpacing) {
+        const spacing = style => Object.fromEntries(['spaceBefore', 'spaceAfter', 'lineHeight', 'lineHeightRule'].filter(key => style?.[key] !== undefined).map(key => [key, style[key]]));
+        assert.deepEqual(nativeModel.paragraphs.map(paragraph => ({ text: paragraph.runs.map(run => run.text).join(''), ...spacing(paragraph.style) })), expectedParagraphSpacing, `${name}: independent native spacing oracle`);
+        if (paragraphSpacingProvenance) assert.deepEqual(nativeModel.paragraphs.map(paragraph => ({ source: spacing(paragraph.sourceParagraph), direct: spacing(paragraph.directStyle) })), paragraphSpacingProvenance, `${name}: independent original source/direct provenance`);
+      }
       const changed = await call('edit', nativeModel), nativeOutput = await call('runtimeWrite', changed);
       const expected = await call('browserRead', await call('browserWrite', changed));
       assert.deepEqual(semantic(await call('browserRead', nativeOutput)), semantic(expected), `${name}: browser rereads Rust export`);
       assert.deepEqual(semantic(await call('runtimeRead', nativeOutput)), semantic(expected), `${name}: Rust rereads Rust export`);
       const file = `rust-${name}`; fs.writeFileSync(path.join(output, file), Buffer.from(nativeOutput, 'base64')); report.files.push(file);
-      report.corpus.push({ name, sha256, packageAccepted: true, semanticsAccepted: true, paragraphs: model.paragraphs.length, markers: model.paragraphs.filter(paragraph => paragraph.marker).length, markerSemanticsCompared: true, output: file });
+      report.corpus.push({ name, sha256, packageAccepted: true, semanticsAccepted: true, paragraphs: model.paragraphs.length, markers: model.paragraphs.filter(paragraph => paragraph.marker).length, markerSemanticsCompared: true, independentSpacingCompared: !!expectedParagraphSpacing, sourceSpacingProvenanceCompared: !!paragraphSpacingProvenance, output: file });
     }
     const accepted = report.corpus.filter(fixture => fixture.semanticsAccepted).length;
     const rejected = report.corpus.filter(fixture => !fixture.semanticsAccepted).length;
-    pass(`${accepted} native LibreOffice fixtures agree across Rust/browser reads, edits and writes; ${rejected} unsupported fixtures remain rejected after Rust accepts their containers`);
+    pass(`${accepted} original/native LibreOffice corpus packages agree across Rust/browser reads, edits and writes; ${rejected} unsupported fixtures remain rejected after Rust accepts their containers`);
     assert.deepEqual(report.pageErrors, []); assert.deepEqual(report.externalRequests, []);
     assert.deepEqual(sourceDigests(), report.sourceDigests, 'Product sources changed during the contract run; rerun against stable inputs');
     assert.equal(digest(cli), report.cliSha256, 'Rust CLI changed during the contract run');

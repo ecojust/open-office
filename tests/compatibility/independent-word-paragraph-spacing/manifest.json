@@ -744,10 +744,297 @@
     {
       "name": "rule-only",
       "source": "source/rule-only.docx",
-      "expectUnsupported": true,
       "sourceSha256": "69fafc2bba065d4eaef9fe318fe47c3b115b7e91c519c6e7f18363fe6fe4f496",
-      "docx": "source/rule-only.docx",
-      "docxSha256": "69fafc2bba065d4eaef9fe318fe47c3b115b7e91c519c6e7f18363fe6fe4f496"
+      "docx": "libreoffice/rule-only.docx",
+      "docxSha256": "2f5e035bb66b2bf5ca486b0efc52458d3e422bac5b95435edf5e5c45277ccf78",
+      "pdf": {
+        "path": "libreoffice/rule-only.pdf",
+        "sha256": "e9d87b23db0a7ae1a5ecc9858e9bf98fc9211ccf7a6094f445242389dff3b0fd"
+      },
+      "expected": [
+        {
+          "text": "C000 first\nC000 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C001 first\nC001 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C002 first\nC002 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C003 first\nC003 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C004 first\nC004 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C005 first\nC005 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.01,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C006 first\nC006 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.01,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C007 first\nC007 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.16,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C008 first\nC008 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C009 first\nC009 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "C010 first\nC010 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 8.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "C011 first\nC011 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C012 first\nC012 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "C013 first\nC013 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C014 first\nC014 second",
+          "spaceBefore": 6.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C015 first\nC015 second",
+          "spaceBefore": 6.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C016 first\nC016 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C017 first\nC017 second",
+          "spaceBefore": 0.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "PAIR-A",
+          "spaceBefore": 0.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "PAIR-B",
+          "spaceBefore": 18.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        }
+      ],
+      "sourceExpected": [
+        {
+          "text": "C000 first\nC000 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C001 first\nC001 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C002 first\nC002 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C003 first\nC003 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C004 first\nC004 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C005 first\nC005 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.01,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C006 first\nC006 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.01,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C007 first\nC007 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.16,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C008 first\nC008 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C009 first\nC009 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "C010 first\nC010 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 8.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "C011 first\nC011 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C012 first\nC012 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "atLeast"
+        },
+        {
+          "text": "C013 first\nC013 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C014 first\nC014 second",
+          "spaceBefore": 6.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C015 first\nC015 second",
+          "spaceBefore": 6.0,
+          "spaceAfter": 0.0,
+          "lineHeight": 1.5,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "C016 first\nC016 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "C017 first\nC017 second",
+          "spaceBefore": 0,
+          "spaceAfter": 0,
+          "lineHeight": 1.0,
+          "lineHeightRule": "auto"
+        },
+        {
+          "text": "PAIR-A",
+          "spaceBefore": 0,
+          "spaceAfter": 12.0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "PAIR-B",
+          "spaceBefore": 18.0,
+          "spaceAfter": 0,
+          "lineHeight": 12.0,
+          "lineHeightRule": "exact"
+        }
+      ]
     },
     {
       "name": "automatic-color-native",
