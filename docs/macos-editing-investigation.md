@@ -114,6 +114,8 @@ Linux WPE 的 Playwright WebKit 2336（报告版本 26.5）另做了只读对照
 
 这些毫秒值是原生服务器收到异步进度请求的时刻，不能当作同步 JavaScript 调用栈顺序。特别是探针末尾的 `query('document.inspect')` 仍通过统一 Rust 命令接口，返回前会请求重绘；等待期间稳定并不证明该探针之后没有异步绘制工作。下一轮在探针返回后增加纯定时等待，期间不再查询模型、检查元素命中或请求原生输入，以区分后续操作准备与探针已经排队的工作。
 
+[纯等待对照 38797686180](https://github.com/ecojust/open-office/actions/runs/38797686180) 使用 `47aa7201344018a730edd3c760149f0e05fa2966`，产品仍为原始实现。A1 提交完成于 13320 ms；预选 D6 后的探针记录等待 2531 ms、D6、Ready、无编辑器及画布焦点。随后纯三秒定时等待的开始标记在 15842 ms，WebContent 终止在 15873 ms，等待未完成。只有前三项系统输入，尚未执行后续命中检查、原生几何请求或 D6 点击。准确 PID 12044 的 Darwin 退出状态为 SIGTRAP（5）、详情标志零。该结果排除了后续操作准备是本轮退出的必要条件，但仍不能区分探针排队的重绘与其他异步 WebKit 工作；尚无异常栈。
+
 另一个独立候选仅在画布已经是 `document.activeElement` 且请求 `preventScroll: true` 时跳过同一画布的重复 `focus()`；真实焦点转移仍调用原生方法。默认 Chromium 编辑的 11 项动作、8 项检查及全局工具栏、跨标签、中文草稿保存回归通过。但[原生验证 38795570046](https://github.com/ecojust/open-office/actions/runs/38795570046) 使用 `d718608d3853a70746617dfe436b214846241134` 仍失败：A1 提交于 12222 ms，D6 请求在 12256 ms，12653 ms 进程终止。准确 WebContent PID 20148 的退出状态仍为 SIGTRAP（5），详情标志为零。该候选无效，已撤回，产品恢复原有焦点行为。
 
 [报告服务上下文读取 38796719449](https://github.com/ecojust/open-office/actions/runs/38796719449) 仅检查已有原始双击诊断记录，准确 SIGTRAP 时间前两秒至后十秒内没有 ReportCrash 或 osanalyticshelper 消息。未取得异常栈，不能据此判断服务配置或底层原因。
