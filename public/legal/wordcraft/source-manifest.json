@@ -1,0 +1,275 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "name": "WordCraft",
+    "repository": "https://github.com/storytold/wordcraft",
+    "commit": "3292ba05d3c15c003823be6849e87a1c6e205242",
+    "license": "MIT OR Apache-2.0",
+    "sourceDirectory": "vendor/wordcraft",
+    "localIntegrationDirectory": "vendor/wordcraft/apps/open-office-host",
+    "excluded": [
+      "docs/brand",
+      "AGENTS.md",
+      "CLAUDE.md"
+    ]
+  },
+  "gitDependencies": [
+    {
+      "name": "craft-ui",
+      "repository": "https://github.com/storytold/craft-libs",
+      "commit": "d27646a5f7c8b4fc85d9dd3213b8c88b58e0088d",
+      "license": "MIT OR Apache-2.0",
+      "licenseDirectory": "craft-libs"
+    }
+  ],
+  "scope": "Pinned upstream source, bundled asset attribution and exact license copies. This is not a compiled-crate SBOM or a claim that every upstream feature is verified in Open Office. Local changes are tracked by the Open Office source commit and generated public/wordcraft/manifest.json.",
+  "licenseFiles": [
+    {
+      "file": "LICENSE-MIT",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/LICENSE-MIT",
+      "bytes": 1101,
+      "sha256": "fc257de83c44ae49e4aad1cf777b886794be3ac9c8d00c010ef55935d5bbeba5"
+    },
+    {
+      "file": "craft-libs/LICENSE-MIT",
+      "source": "https://raw.githubusercontent.com/storytold/craft-libs/d27646a5f7c8b4fc85d9dd3213b8c88b58e0088d/LICENSE-MIT",
+      "bytes": 1102,
+      "sha256": "2f42c0cafc8ad394d91373fe1f342aee5453850b151a51405c68cae9ada86d26"
+    },
+    {
+      "file": "LICENSE-APACHE",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/LICENSE-APACHE",
+      "bytes": 10174,
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    },
+    {
+      "file": "craft-libs/LICENSE-APACHE",
+      "source": "https://raw.githubusercontent.com/storytold/craft-libs/d27646a5f7c8b4fc85d9dd3213b8c88b58e0088d/LICENSE-APACHE",
+      "bytes": 10174,
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    },
+    {
+      "file": "NOTICE",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/NOTICE",
+      "bytes": 5538,
+      "sha256": "8db865867d13975e1199a1ead02e61aeec45c7535cab0d6d48d039b8b6c72915"
+    },
+    {
+      "file": "craft-libs/NOTICE",
+      "source": "https://raw.githubusercontent.com/storytold/craft-libs/d27646a5f7c8b4fc85d9dd3213b8c88b58e0088d/NOTICE",
+      "bytes": 3187,
+      "sha256": "196012ceb021dc36a72c20fd533a5b8e7ee430b74269457ca1397bbaa0a12666"
+    },
+    {
+      "file": "ATTRIBUTION.md",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/ATTRIBUTION.md",
+      "bytes": 19409,
+      "sha256": "1780a689d7caa4a957d9ed8923734ae34b4944fd16ae3f2d27ddf38426c37a13"
+    },
+    {
+      "file": "craft-libs/ATTRIBUTION.md",
+      "source": "https://raw.githubusercontent.com/storytold/craft-libs/d27646a5f7c8b4fc85d9dd3213b8c88b58e0088d/ATTRIBUTION.md",
+      "bytes": 258,
+      "sha256": "6ecfa0fbde362c42f6e89c05ae753bd2fa4fe12ddd8c6565be857fe4e03173f3"
+    },
+    {
+      "file": "fonts/OFL-Inter.txt",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/OFL-Inter.txt",
+      "bytes": 4380,
+      "sha256": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a"
+    },
+    {
+      "file": "fonts/OFL-JetBrainsMono.txt",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/OFL-JetBrainsMono.txt",
+      "bytes": 4399,
+      "sha256": "a76abf002c49097d146e86740a3105a5d00450b1592e820a1109a8c5680cd697"
+    },
+    {
+      "file": "fonts/OFL-SourceSans3.txt",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/OFL-SourceSans3.txt",
+      "bytes": 4486,
+      "sha256": "56af9b9c6715597e458284a474dc118a50a4150e9d547c70f7b4a33c3e6a9328"
+    },
+    {
+      "file": "fonts/OFL-SourceSerif4.txt",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/OFL-SourceSerif4.txt",
+      "bytes": 4491,
+      "sha256": "c21d7293d87b6d7ab1d0229a2f55b77f33a7613a6a4e66f6693d68d7d8d09464"
+    },
+    {
+      "file": "hyphenation/pl.pat",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/hyphenation/pl.pat",
+      "bytes": 34118,
+      "sha256": "83ddbbd21bc06a44bc4f4a4c49c38782e809cff5f026b764c044daa29e818843"
+    },
+    {
+      "file": "hyphenation/pt.pat",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/hyphenation/pt.pat",
+      "bytes": 5487,
+      "sha256": "c110a39e501db372d1d755e1c64464321a2efa7d8e9617f66001000389b941f2"
+    },
+    {
+      "file": "hyphenation/it.pat",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/hyphenation/it.pat",
+      "bytes": 5011,
+      "sha256": "6ce56ed6ed2ca7c0688838e366e6595e0429f984f4fc6e96ec045cebb1e76a47"
+    },
+    {
+      "file": "fonts/open-office/LICENSE-DejaVu.txt",
+      "source": "crates/word-engine/fonts/LICENSE-DejaVu.txt",
+      "bytes": 3859,
+      "sha256": "63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9"
+    },
+    {
+      "file": "fonts/open-office/LICENSE-Noto-CJK.txt",
+      "source": "crates/word-engine/fonts/LICENSE-Noto-CJK.txt",
+      "bytes": 14712,
+      "sha256": "849f4ea9c214fa4ac3593b770c699f387534b11ce671264c1b10d85bdcb5997b"
+    },
+    {
+      "file": "fonts/open-office/LICENSE-Noto-Core.txt",
+      "source": "crates/word-engine/fonts/LICENSE-Noto-Core.txt",
+      "bytes": 5208,
+      "sha256": "075f91382875da1c4b491f1facf2586f55448705133264d98ce15cab6211b125"
+    },
+    {
+      "file": "fonts/open-office/manifest.json",
+      "source": "crates/word-engine/fonts/manifest.json",
+      "bytes": 1783,
+      "sha256": "65e6b6add6865cb92705edcf859d02dbcb37408663a931cc49ff8a0feec5e909"
+    }
+  ],
+  "upstreamBundledFonts": [
+    {
+      "file": "vendor/wordcraft/assets/fonts/Inter-Medium.ttf",
+      "family": "Inter",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-Inter.txt",
+      "bytes": 417300,
+      "sha256": "97ad806f526e41546d46365bb3a393145f75b7b1568913db74549ad8b8dba872",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/Inter-Medium.ttf"
+    },
+    {
+      "file": "vendor/wordcraft/assets/fonts/Inter-Regular.ttf",
+      "family": "Inter",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-Inter.txt",
+      "bytes": 411640,
+      "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/Inter-Regular.ttf"
+    },
+    {
+      "file": "vendor/wordcraft/assets/fonts/Inter-SemiBold.ttf",
+      "family": "Inter",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-Inter.txt",
+      "bytes": 419744,
+      "sha256": "78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/Inter-SemiBold.ttf"
+    },
+    {
+      "file": "vendor/wordcraft/assets/fonts/JetBrainsMono-Regular.ttf",
+      "family": "JetBrainsMono",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-JetBrainsMono.txt",
+      "bytes": 270224,
+      "sha256": "e6fd0d7e91550b3ed2b735d4312474362c4716edc4fc0577a0f61ed782d5aed1",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/JetBrainsMono-Regular.ttf"
+    },
+    {
+      "file": "vendor/wordcraft/assets/fonts/SourceSans3-Bold.ttf",
+      "family": "SourceSans3",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-SourceSans3.txt",
+      "bytes": 428176,
+      "sha256": "9214b9d95e4231c609802815c2646c98174e2102d0d37f88978a7f8e71006e6a",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/SourceSans3-Bold.ttf"
+    },
+    {
+      "file": "vendor/wordcraft/assets/fonts/SourceSans3-It.ttf",
+      "family": "SourceSans3",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-SourceSans3.txt",
+      "bytes": 315812,
+      "sha256": "192afd78f0f54a3c69eaf02d43f4d9a821e9d6110e41d3d25d61a7385cd580e4",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/SourceSans3-It.ttf"
+    },
+    {
+      "file": "vendor/wordcraft/assets/fonts/SourceSans3-Regular.ttf",
+      "family": "SourceSans3",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-SourceSans3.txt",
+      "bytes": 431196,
+      "sha256": "4644c81b86ec9caaa76b634889968ed3c4f4f52f054855933acc7c2b21e53b0f",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/SourceSans3-Regular.ttf"
+    },
+    {
+      "file": "vendor/wordcraft/assets/fonts/SourceSans3-Semibold.ttf",
+      "family": "SourceSans3",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-SourceSans3.txt",
+      "bytes": 425904,
+      "sha256": "a3f4f8dcf343a8f24dc61951de93f3ba1558b15cd250ba24af8a40e957081b7d",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/SourceSans3-Semibold.ttf"
+    },
+    {
+      "file": "vendor/wordcraft/assets/fonts/SourceSerif4-Bold.ttf",
+      "family": "SourceSerif4",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-SourceSerif4.txt",
+      "bytes": 271568,
+      "sha256": "7cf4f4e1ad74f45058d5bc61716b82560442fbdcd9d3654d2dea96bf6c683d86",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/SourceSerif4-Bold.ttf"
+    },
+    {
+      "file": "vendor/wordcraft/assets/fonts/SourceSerif4-BoldIt.ttf",
+      "family": "SourceSerif4",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-SourceSerif4.txt",
+      "bytes": 191832,
+      "sha256": "7b215b37f8873f5579f3f8d2ded3ca7c588e2f435cd996605ebfc5befe2cd5eb",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/SourceSerif4-BoldIt.ttf"
+    },
+    {
+      "file": "vendor/wordcraft/assets/fonts/SourceSerif4-It.ttf",
+      "family": "SourceSerif4",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-SourceSerif4.txt",
+      "bytes": 187808,
+      "sha256": "9d2950a8f1da66e21502c35d646a1d2148e79f9ea43fd2158cf02f5232e7f430",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/SourceSerif4-It.ttf"
+    },
+    {
+      "file": "vendor/wordcraft/assets/fonts/SourceSerif4-Regular.ttf",
+      "family": "SourceSerif4",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-SourceSerif4.txt",
+      "bytes": 261868,
+      "sha256": "e5a4ee6a3d87bb9024796be390c6771e2a0eb1883dae25effaf57ca01668e24b",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/SourceSerif4-Regular.ttf"
+    },
+    {
+      "file": "vendor/wordcraft/assets/fonts/SourceSerif4-Semibold.ttf",
+      "family": "SourceSerif4",
+      "license": "OFL-1.1",
+      "licenseFile": "fonts/OFL-SourceSerif4.txt",
+      "bytes": 272088,
+      "sha256": "36db62940cb5728b12b1802476dc7fcf4c6c519a7bdd476ba23a4e555fc4655f",
+      "source": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/SourceSerif4-Semibold.ttf"
+    }
+  ],
+  "additionalFontSources": {
+    "manifest": "fonts/open-office/manifest.json",
+    "note": "The local WordCraft fonts/build.rs embeds two full Chinese faces plus DejaVu Sans Regular and Noto Sans Symbols2 for selected monochrome emoji/symbol fallback. Other entries in the shared inventory belong to the previous engine; no optional craft-fonts checkout is used. These fonts do not provide complete or color emoji coverage.",
+    "embeddedFiles": [
+      "NotoSansCJKsc-Regular.otf",
+      "NotoSansCJKsc-Bold.otf",
+      "DejaVuSans.ttf",
+      "NotoSansSymbols2-Regular.ttf"
+    ]
+  },
+  "optionalCraftFonts": {
+    "included": false,
+    "note": "The optional storytold/craft-fonts checkout is not included by this integration. Its upstream NOTICE entries are retained verbatim for provenance."
+  }
+}

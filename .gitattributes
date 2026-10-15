@@ -3,3 +3,8 @@
 * text=auto eol=lf
 # Preserve upstream license bytes used by published-archive checksum evidence.
 public/legal/rust/unicode-script@0.5.8/LICENSE-* -text
+# Preserve WordCraft sources and redistributed notices byte-for-byte for the
+# source/artifact and upstream license manifests, including original CRLFs.
+vendor/wordcraft/** -text
+public/legal/rust/** -text
+public/legal/wordcraft/** -text

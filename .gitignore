@@ -1,7 +1,11 @@
 node_modules/
+node_modules
 dist/
 public/office-runtime/
+public/office-runtime
 public/word-engine/
+public/wordcraft/
+vendor/wordcraft/target/
 src-tauri/target/
 crates/*/target/
 src-tauri/pdf-runtime/

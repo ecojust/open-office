@@ -8,6 +8,7 @@
 
 | 组件 | 实际版本或构建 | 使用的许可与说明 |
 | --- | --- | --- |
+| WordCraft 文档引擎及 egui 界面 | 固定提交 `3292ba05d3c15c003823be6849e87a1c6e205242`，本地集成见下文 | MIT OR Apache-2.0；Copyright (c) 2026 ArtCraft Team and the WordCraft contributors。保留 `wordcraft/` 中的双许可、NOTICE 和 ATTRIBUTION；这是上游 Rust 内核与界面的集成，不是本项目原创内核。 |
 | ZetaOffice / LibreOffice WASM | 24.2.8.0；核心构建 `efaf0670b4d055f838a2849becb10f08aa06a257` | LibreOffice 的 MPL-2.0、LGPL-3.0 及各文件许可；完整上游法律文档保留在 `LIBREOFFICE-THIRD-PARTY-LICENSES.html`。WASM 与 Qt 静态组合还包含下述 GPL 代码。 |
 | Qt 5 / QtBase WASM 分支 | `5.15.2+wasm` | **WASM 平台插件采用 GPL 第 3 版**，并保留 Qt 原文规定的后续版本选项；不能仅以 Qt 其他部分的 LGPL 掩盖该要求。插件原文见 `QT-WASM-LICENSE-HEADER.txt`，全文见 `GPL-3.0.txt`。其余组件仍按各文件许可。 |
 | zeta.js | v1.2.0，提交 `57360bcb0e7726ffa0e66567c8041261b959f8dd` | MIT，Copyright © 2024 allotropia software GmbH and contributors。本地修复 `getSingleton` 返回值转换，并补充 UNO `TYPEDEF` 别名递归解析（含异常路径的类型描述句柄释放）；完整差异保存在 `zetajs-local-change.patch`，上游版权与许可保持不变。 |
@@ -59,7 +60,21 @@ node scripts/fetch-corresponding-sources.mjs --offline --out-dir /path/to/source
 
 更详细的源码组装说明见 [`public/legal/CORRESPONDING-SOURCE.md`](public/legal/CORRESPONDING-SOURCE.md)。
 
-## 新 Rust 文字内核的字体与基础库
+## WordCraft 来源、字体及本地改动
+
+WordCraft 源码固定在 `vendor/wordcraft/`，新增 `apps/open-office-host` 桥接 Open Office 的 Vue/Tauri 外壳、文件保存和多标签生命周期。完整来源、13 份上游字体的摘要及许可文件摘要见 [`public/legal/wordcraft/source-manifest.json`](public/legal/wordcraft/source-manifest.json)，本地改动范围见 [`OPEN-OFFICE-INTEGRATION.md`](public/legal/wordcraft/OPEN-OFFICE-INTEGRATION.md)。生成的 `public/wordcraft/manifest.json` 另外记录实际构建输入和产物指纹；本地 Git 提交记录适配代码。上游 `docs/brand/` 的受限 ArtCraft 品牌素材未复制或分发，原始 NOTICE 对其引用仅用于保留上游说明。
+
+`craft-ui` 固定来自 `storytold/craft-libs` 提交 `d27646a5f7c8b4fc85d9dd3213b8c88b58e0088d`，同样为 MIT OR Apache-2.0。其原始 NOTICE 保留 PhotoCraft、VectorCraft 等项目的代码来源，四份许可与归属文档原样放在 `public/legal/wordcraft/craft-libs/`。
+
+WordCraft 自带 Inter、JetBrains Mono、Source Sans 3、Source Serif 4 共 13 份字形文件，采用 SIL OFL 1.1；原始四份 OFL 位于 `public/legal/wordcraft/fonts/`。本集成另外使用已有 Noto Sans CJK SC Regular、Bold，供中文界面和文档绘制，并复用 DejaVu Sans Regular 与 Noto Sans Symbols2 Regular 补充部分单色 emoji／符号；保留 `fonts/open-office/` 中的来源清单、DejaVu／Bitstream Vera 和 OFL 原文。此字体组合不代表完整或彩色 emoji 支持。未使用可选的 `storytold/craft-fonts` 仓库，不将其日本字体声明为本发行物内容。英语 Moby 词表为公有领域，衍生断词模式为 CC0；波兰语、葡萄牙语和意大利语断词模式分别保留 MIT／BSD 许可原文与作者声明。
+
+egui 依赖 `epaint_default_fonts` 的内嵌字体另外保留 Noto Emoji 的 OFL、Ubuntu Light 的 Ubuntu Font Licence 1.0、Hack 的 MIT／Bitstream Vera／DejaVu 声明，以及 emoji-icon-font 的 MIT 原文，位于 `public/legal/rust/epaint_default_fonts@0.36.2/fonts/`。字体许可独立于 Rust 代码的双许可；WASM 依赖清单记录字体文件摘要。
+
+WordCraft WASM 宿主的 normal／build 依赖闭包单独记录在 [`public/legal/wordcraft-dependencies.json`](public/legal/wordcraft-dependencies.json)，按 `wasm32-unknown-unknown` 目标与锁文件生成，未将整个上游桌面／测试依赖都计为实际链接库。旧 `rust-dependencies.json` 继续描述此前三个锁文件的范围。部分发布 crate 未随包携带代码 LICENSE，已根据各自 `.cargo_vcs_info.json` 的提交从 AccessKit/accesskit、emilk/egui、aclysma/profiling、nicoburns/wuff 获取原始许可；精确 URL、字节数和 SHA-256 位于各包的 `upstreamLicenseEvidence`。
+
+WordCraft 及其通用库并不免除本发行包中其他 AGPL/GPL 等组件的义务。它也不代表所有上游功能都已在 Open Office 中通过验收。
+
+## 0.7.0 第一阶段 Rust 文字内核的字体与基础库
 
 `crates/word-engine` 使用固定的 DejaVu Sans 四种字重／样式、Noto Sans CJK SC Regular、Bold，以及 Noto Sans Symbols2 Regular。原始许可、来源与 SHA-256 位于 [`crates/word-engine/fonts`](crates/word-engine/fonts)。字体字节嵌入内核；构建时将许可与清单复制到 `word-engine/fonts/`，随前端资源分发。DejaVu 保留 Bitstream Vera 与 DejaVu 原始许可，Noto CJK 和 Noto Sans Symbols2 遵循 SIL OFL 1.1。
 

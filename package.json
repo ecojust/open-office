@@ -69,9 +69,10 @@
     "test:compatibility": "node tests/compatibility/run.cjs",
     "test:compatibility:onlyoffice": "node tests/compatibility/onlyoffice-desktop.mjs",
     "predev": "npm run word:build",
-    "word:build": "node scripts/build-word-engine.mjs",
-    "word:check": "node scripts/build-word-engine.mjs --check",
-    "test:browser:word-engine": "node tests/browser/rust-word-engine.cjs",
+    "word:build": "node scripts/build-wordcraft.mjs",
+    "word:check": "node scripts/build-wordcraft.mjs --check",
+    "test:browser:word-engine": "node tests/browser/wordcraft-engine.cjs",
+    "test:browser:wordcraft": "node tests/browser/wordcraft-engine.cjs",
     "test:native:word-engine": "node scripts/rust-word-native-smoke.mjs"
   },
   "dependencies": {

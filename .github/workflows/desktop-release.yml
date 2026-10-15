@@ -104,6 +104,8 @@ jobs:
           PY
       - name: Install frontend dependencies
         run: npm ci
+      - name: Install pinned WordCraft WASM bridge
+        run: cargo install --locked wasm-bindgen-cli --version 0.2.129
       - name: Restore verified offline office assets
         uses: actions/cache@v4
         with:

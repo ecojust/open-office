@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "provenance": "Independent literal OOXML and standard-library PNG generator; no product import/export used.",
+  "fixtures": [
+    {
+      "name": "independent-rich",
+      "source": "independent-rich.docx",
+      "sourceSha256": "f0b14d18abf7cdb671f6c8a2c57e52f33d24ae81dfd07869e5c4be5de87073a8",
+      "commands": [
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file:///tmp/wordcraft-native-core-profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "/workspace/open-office-wordcraft/tests/compatibility/wordcraft-core/native-docx",
+            "/workspace/open-office-wordcraft/tests/compatibility/wordcraft-core/independent-rich.docx"
+          ],
+          "stdout": "convert /workspace/open-office-wordcraft/tests/compatibility/wordcraft-core/independent-rich.docx as a Writer document -> /workspace/open-office-wordcraft/tests/compatibility/wordcraft-core/native-docx/independent-rich.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n",
+          "code": 0
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file:///tmp/wordcraft-native-core-profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "/workspace/open-office-wordcraft/tests/compatibility/wordcraft-core/native-pdf",
+            "/workspace/open-office-wordcraft/tests/compatibility/wordcraft-core/independent-rich.docx"
+          ],
+          "stdout": "convert /workspace/open-office-wordcraft/tests/compatibility/wordcraft-core/independent-rich.docx as a Writer document -> /workspace/open-office-wordcraft/tests/compatibility/wordcraft-core/native-pdf/independent-rich.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n",
+          "code": 0
+        }
+      ],
+      "nativeDocx": "native-docx/independent-rich.docx",
+      "nativeDocxSha256": "b1f8c74b2a85efe99845b570255e935bd94796906a7910700aaf1adb5742512e",
+      "nativePdf": "native-pdf/independent-rich.pdf",
+      "nativePdfSha256": "09222b10f82e9eaab56eebd38f803a55c1788cf20483b734db80dbdb90983e1a"
+    },
+    {
+      "name": "independent-seed",
+      "source": "independent-seed.docx",
+      "sourceSha256": "9fbd94e46aacad2670fc7607084b420d3cb916c9993ef897c3d79bbbe2c734fa"
+    }
+  ],
+  "image": {
+    "path": "colors.png",
+    "sha256": "81abc3c51515bcf28fa34050305d5f4664e92c035e35129d0c919167e7b1c41f"
+  },
+  "nativeVersion": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5"
+}

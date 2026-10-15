@@ -1352,12 +1352,12 @@ for(const route of ['native','browser'])test(`explicit ${route} compatibility Wo
 })
 
 for(const engine of ['rust','legacy'])test(`failed default Rust preflight leaves the active dirty ${engine} tab untouched without fallback`,async()=>{
-  const h=shell({rustPrepareError:'Unsupported DOCX table'}),tab=h.tab('live',{wordEngine:engine,dirty:true});h.active(tab)
+  const h=shell({rustPrepareError:'Malformed DOCX document'}),tab=h.tab('live',{wordEngine:engine,dirty:true});h.active(tab)
   const before=JSON.stringify(tab),live=h.state[engine==='rust'?'rustWordDocument':'officeDocument'].value
   h.handle.exportFile=async()=>assert.fail('Rejected source must not snapshot the current editor')
-  for(const extension of ['doc','rtf','odt'])await assert.rejects(h.state.addDocument({...rustSource('other'),extension}),/基础 DOCX/)
+  for(const extension of ['doc','rtf','odt'])await assert.rejects(h.state.addDocument({...rustSource('other'),extension}),/支持 DOCX.*兼容编辑器/)
   assert.equal(h.calls.length,0,'Unsupported extensions fail before even Rust preparation')
-  await assert.rejects(h.state.addDocument(rustSource('bad'),'bad'),/Unsupported DOCX table/)
+  await assert.rejects(h.state.addDocument(rustSource('bad'),'bad'),/Malformed DOCX document/)
   assert.equal(h.calls.length,1);assert.equal(h.calls[0][0],'rust-preflight')
   assert.equal(h.state.tabs.value.length,1);assert.equal(h.state.activeKey.value,tab.key)
   assert.equal(JSON.stringify(tab),before);assert.equal(h.state[engine==='rust'?'rustWordDocument':'officeDocument'].value,live)
@@ -1402,13 +1402,13 @@ test('failed snapshot and disposal release an undelivered Rust preparation witho
   assert.equal(disposed.rustPreparations[0].handoff.take(disposed.rustPreparations[0].source),undefined)
 })
 
-test('Rust supports DOCX-only saving and protects imported identity until a new copy succeeds',async()=>{
+test('WordCraft offers DOCX and PDF and protects imported identity until a DOCX copy succeeds',async()=>{
   const h=shell();await h.state.addDocument(rustSource('original'),'original')
   const tab=h.state.active.value;h.state.readyFor(tab.key);tab.dirty=true
   let exports=0
   h.rustWordHandle.exportFile=async()=>{exports++;return{base64:'UlVTVA==',extension:'docx',dirty:true}}
-  h.state.openSaveAs();assert.deepEqual(Array.from(h.state.saveAsOptions.value,o=>o.extension),['docx'])
-  for(const format of ['pdf','odt'])await assert.rejects(h.state.saveActive(true,format),/不支持此保存格式/)
+  h.state.openSaveAs();assert.deepEqual(Array.from(h.state.saveAsOptions.value,o=>o.extension),['docx','pdf'])
+  await assert.rejects(h.state.saveActive(true,'odt'),/不支持此保存格式/)
   h.state.saveAsDraft.value.format='odt';await h.state.confirmSaveAs();assert.match(h.state.saveAsDraft.value.error,/支持的格式/)
   assert.equal(exports,0);assert.ok(!h.calls.some(c=>c[0]==='save'));h.state.cancelSaveAs()
   const save=h.native.saveDocument
@@ -1423,6 +1423,33 @@ test('Rust supports DOCX-only saving and protects imported identity until a new 
   }
   assert.notEqual(tab.fileId,'original');assert.equal(tab.requiresSaveAs,false);assert.equal(tab.dirty,false)
   assert.equal(tab.wordEngine,'rust');assert.ok(h.calls.some(c=>c[0]==='marked'))
+  h.unmount()
+})
+
+test('WordCraft PDF export routes through its editor and never saves or replaces the imported DOCX',async()=>{
+  const h=shell();await h.state.addDocument(rustSource('original'),'original')
+  const tab=h.state.active.value;h.state.readyFor(tab.key);tab.dirty=true
+  const before=JSON.stringify(tab),entry=h.state.rustWordEntries.value[0],formats=[]
+  h.handle.exportFile=async()=>assert.fail('WordCraft PDF must not export through the compatibility editor')
+  h.independentWordHandle.exportFile=async()=>assert.fail('WordCraft PDF must not export through the lightweight editor')
+  h.rustWordHandle.exportFile=async({format})=>{formats.push(format);return{base64:'JVBERi0xLjc=',extension:'pdf',dirty:true}}
+  h.rustWordHandle.markSaved=async()=>assert.fail('A PDF copy must not mark the editable DOCX as saved')
+  const save=h.native.saveDocument
+  h.native.saveDocument=async request=>{h.calls.push(['cancelled-pdf-save',request]);return{status:'cancelled'}}
+  assert.equal(await h.state.saveActive(true,'pdf'),false)
+  assert.equal(JSON.stringify(tab),before)
+  h.native.saveDocument=save
+  assert.equal(await h.state.saveActive(true,'pdf'),true)
+  assert.equal(JSON.stringify(tab),before,'PDF success retains the DOCX bytes, dirty flag, original identity and import safeguards')
+  assert.equal(h.state.rustWordEntries.value[0],entry)
+  assert.deepEqual(formats,['pdf','pdf'])
+  const saves=h.calls.filter(c=>['save','cancelled-pdf-save'].includes(c[0]))
+  assert.equal(saves.length,2)
+  for(const [,request] of saves){
+    assert.equal(request.documentId,undefined);assert.equal(request.expectedSha256,undefined);assert.equal(request.saveAs,true)
+    assert.equal(request.extension,'pdf');assert.equal(request.name,'original - 副本.pdf');assert.equal(request.base64,'JVBERi0xLjc=')
+  }
+  assert.ok(!h.calls.some(c=>c[0]==='marked'))
   h.unmount()
 })
 
