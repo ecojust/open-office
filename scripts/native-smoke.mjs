@@ -248,7 +248,7 @@ function parseOptions(args) {
   return { app: args[1] };
 }
 
-function locateApplication(configuration, options, env, root) {
+export function locateApplication(configuration, options, env, root) {
   let app = null, resourceRoot, executable;
   if (configuration.os === 'win32') {
     requireCheck(!options.app, '--app is only supported for a final macOS .app');
@@ -269,7 +269,6 @@ function locateApplication(configuration, options, env, root) {
     containedFile(app, join(resourceRoot, 'frontend', 'index.html'));
   }
   containedFile(resourceRoot, join(resourceRoot, 'frontend', 'index.html'));
-  containedFile(resourceRoot, join(resourceRoot, 'frontend', 'office', 'host.html'));
   const pdfExecutable = containedFile(resourceRoot, join(resourceRoot, 'pdf-runtime', configuration.os === 'win32' ? 'open-office-pdf.exe' : 'open-office-pdf'));
   requireCheck(statSync(join(resourceRoot, 'pdf-runtime', '_internal')).isDirectory(), 'The installed PDF runtime is missing its onedir dependencies');
   return { app, executable, resourceRoot, pdfExecutable };
