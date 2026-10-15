@@ -24,16 +24,28 @@ jobs:
           run-id: '38656850060'
           name: open-office-native-macos-arm64
           path: evidence
-      - name: Expose saved synthetic smoke evidence to the checks API
+      - name: Expose only allowlisted stage names, numeric revisions and booleans
         run: |
           node --input-type=module <<'NODE'
           import {readFileSync,readdirSync} from 'node:fs';
           const file='evidence/macos-arm64-native-smoke.json';
           const report=JSON.parse(readFileSync(file,'utf8'));
           if(report.commit!=='073675e7003ec9b41fa598300932a92cc680f63e'||report.runId!=='38656850060') throw Error('Wrong diagnostic evidence');
-          const text=JSON.stringify(report);
-          if(text.length>200000) throw Error('Unexpected diagnostic report size');
-          const escape=s=>s.replaceAll('%','%25').replaceAll('\r','%0D').replaceAll('\n','%0A');
-          for(let i=0;i<text.length;i+=5000) console.log(`::notice title=native-evidence-${String(i/5000).padStart(3,'0')}::${escape(text.slice(i,i+5000))}`);
-          console.log('Saved artifact files:',readdirSync('evidence',{recursive:true}));
+          // Never print document text, error text, paths, environment, raw details or logs.
+          const stageNames=['word-package-ipc','office-start','office-roundtrip','pdf-roundtrip','word-workbench','sheet-workbench','presentation-workbench','office-host:request','office-host:reply','office-host:dirty'];
+          const actions=['open','export','discard','dirty','word-state','word-action','word-command','word-data','sheet-state','sheet-action','sheet-data'];
+          const kinds=['word','sheet','presentation'];
+          const pick=(list,value)=>list.find(item=>item===value)??null;
+          const events=(report.nativeDiagnostics?.events||[]).flatMap(event=>{
+            const phase=pick(stageNames,event.phase); if(!phase)return [];
+            let detail={};try{detail=JSON.parse(event.detail)}catch{}
+            const safe={phase,action:pick(actions,detail.action),kind:pick(kinds,detail.kind)};
+            for(const key of ['revision','expectedRevision']) if(Number.isSafeInteger(detail[key])&&detail[key]>=0&&detail[key]<=1000000000)safe[key]=detail[key];
+            for(const key of ['ok','dirty','hasDocument']) if(typeof detail[key]==='boolean')safe[key]=detail[key];
+            return [safe];
+          });
+          const components=Object.fromEntries(['independentWordPackage','office','pdf','wordWorkbench','sheetWorkbench','presentationWorkbench'].map(key=>[key,report.frontend?.[key]?.ok===true]));
+          const summary={components,revisionConflict:report.frontend?.error==='文档在导出后又有修改，已保留内容。请重新保存或明确放弃修改。',events};
+          const text=JSON.stringify(summary);
+          for(let i=0;i<text.length;i+=5000)console.log(`::notice title=safe-native-metadata-${String(i/5000).padStart(3,'0')}::${text.slice(i,i+5000)}`);
           NODE
