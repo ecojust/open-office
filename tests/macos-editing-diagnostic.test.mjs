@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { checkInputPreflight, parseInputRequest, inputForWindow, checkLifecycle,
-  validateEditingReport, EDITING_ACTIONS, EDITING_CHECKS } from '../scripts/macos-editing-diagnostic.mjs';
+  validateEditingReport, viewportMapping, geometryForRequest, EDITING_ACTIONS, EDITING_CHECKS } from '../scripts/macos-editing-diagnostic.mjs';
 
-const geometry = { pid: 1234, windowId: 92, x: 40, y: 70, width: 1200, height: 800, scaleFactor: 2, coordinateSpace: 'quartz-screen-points' };
+const geometry = { actionId: 'single-a1', viewport: { width: 1200, height: 800 }, pid: 1234, windowId: 92, x: 40, y: 70,
+  width: 1200, height: 800, scaleFactor: 2, coordinateSpace: 'quartz-screen-points', candidates: {
+    bounds: [40, 70, 1200, 800], visibleRect: [40, 70, 1200, 800], safeAreaRect: [40, 70, 1200, 800], contentLayoutIntersection: [40, 70, 1200, 800] } };
 const request = { actionId: 'single-a1', kind: 'click', clientX: 300, clientY: 200, viewportWidth: 1200, viewportHeight: 800 };
 const permissions = { postEventAccess: true, accessibilityTrusted: true, screenCaptureAccess: false, inputSourceId: 'com.apple.keylayout.ABC' };
 
@@ -20,7 +22,8 @@ function fixture() {
   const sent = EDITING_ACTIONS.map(([actionId, kind, , value]) => {
     const input = { actionId, kind, viewportWidth: 1200, viewportHeight: 800,
       ...(['click', 'doubleClick'].includes(kind) ? { clientX: 300, clientY: 200 } : kind === 'type' ? { text: value } : { key: value }) };
-    return { request: input, geometry: structuredClone(geometry), nativeInput: inputForWindow(input, geometry, geometry.pid),
+    const current = { ...structuredClone(geometry), actionId };
+    return { request: input, geometry: current, mapping: viewportMapping(input, current), nativeInput: inputForWindow(input, current, current.pid),
       result: { schemaVersion: 1, ok: true, actionId, kind, method: 'CGEvent-hidSystemState', physicalIME: false,
         pid: geometry.pid, windowId: geometry.windowId, eventCount: kind === 'doubleClick' ? 5 : kind === 'click' ? 3 : kind === 'key' ? 2 : value.length * 2,
         startedAt: 1700000000000, finishedAt: 1700000001000, permissions: structuredClone(permissions) } };
@@ -38,7 +41,7 @@ function fixture() {
     lastState: { ...snapshot(10, true), activeKey: sessions[1].key }, cleanup: { attempted: 3, closed: 3, ok: true } };
   const diagnostics = { schemaVersion: 1, scope: 'macos-editing', generation: 1, terminations: 0, events: [
     { phase: 'document-start', detail: JSON.stringify({ bootId: editing.bootId, timeOrigin: editing.timeOrigin }) },
-    ...sent.map(item => ({ phase: 'editing-input-request', detail: JSON.stringify(item.request) })),
+    ...sent.flatMap(item => [{ phase: 'editing-input-request', detail: JSON.stringify(item.request) }, { phase: 'editing-window-geometry', detail: JSON.stringify(item.geometry) }]),
   ] };
   return { frontend: { ok: true, nativeLifecycle: { generation: 1, terminations: 0 }, editing }, diagnostics, sent };
 }
@@ -56,7 +59,30 @@ test('posting permission and keyboard layout preflight cannot be replaced by syn
 test('Retina geometry uses native screen points and does not double the display scale', () => {
   assert.deepEqual(inputForWindow(request, geometry, 1234), { actionId: 'single-a1', kind: 'click', pid: 1234, windowId: 92, x: 340, y: 270 });
   assert.throws(() => inputForWindow(request, geometry, 5678), /belong/);
-  assert.throws(() => inputForWindow(request, { ...geometry, height: 600 }, 1234), /disagree/);
+  assert.throws(() => inputForWindow(request, { ...geometry, actionId: 'old-action' }, 1234), /stale/);
+  assert.throws(() => inputForWindow(request, { ...geometry, viewport: { width: 1200, height: 600 } }, 1234), /different viewport/);
+});
+
+test('fresh measured inset region may match the viewport without guessing titlebar dimensions', () => {
+  const input = { ...request, viewportWidth: 1024, viewportHeight: 642 };
+  const current = { ...geometry, viewport: { width: 1024, height: 642 }, x: 0, y: 31, width: 1024, height: 674,
+    candidates: { bounds: [0, 31, 1024, 674], visibleRect: [0, 31, 1024, 674],
+      safeAreaRect: [0, 63, 1024, 642], contentLayoutIntersection: [0, 63, 1024, 642] } };
+  assert.deepEqual(viewportMapping(input, current), { rect: [0, 63, 1024, 642], sources: ['safeAreaRect', 'contentLayoutIntersection'] });
+  assert.deepEqual(inputForWindow(input, current, 1234), { actionId: 'single-a1', kind: 'click', pid: 1234, windowId: 92, x: 300, y: 263 });
+  current.candidates.safeAreaRect = [0, 31, 1024, 642];
+  assert.throws(() => viewportMapping(input, current), /conflicting/);
+  current.candidates.safeAreaRect = [0, 31, 1024, 674];
+  current.candidates.contentLayoutIntersection = [0, 31, 1024, 674];
+  assert.throws(() => viewportMapping(input, current), /disagree/);
+});
+
+test('geometry must arrive after and identify the exact input request', () => {
+  const event = { phase: 'editing-input-request', detail: JSON.stringify(request) };
+  const sample = { phase: 'editing-window-geometry', detail: JSON.stringify(geometry) };
+  assert.equal(geometryForRequest(request, [sample, event]), null, 'Even a matching old sample cannot be reused');
+  assert.equal(geometryForRequest(request, [event, { ...sample, detail: JSON.stringify({ ...geometry, actionId: 'other' }) }]), null);
+  assert.deepEqual(geometryForRequest(request, [event, sample]), geometry);
 });
 
 test('progress requests reject truncated, oversized, out-of-viewport and unknown OS commands', () => {

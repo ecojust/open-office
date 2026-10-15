@@ -106,6 +106,21 @@ pub fn run() {
                     handle.exit(1);
                 });
             })?;
+            #[cfg(target_os = "macos")]
+            let diagnostic = diagnostic.map(|mut smoke| {
+                let app = app.handle().clone();
+                smoke.observe_input_requests(move |request| {
+                    if let (Some(window), Some(server)) = (
+                        app.get_webview_window("main"),
+                        app.try_state::<server::AssetServer>(),
+                    ) {
+                        if let Some(smoke) = &server.smoke {
+                            macos_diagnostics::record_input_geometry(&window, smoke, request);
+                        }
+                    }
+                });
+                smoke
+            });
             if let Some(smoke) = &diagnostic {
                 smoke.note("native-setup", "initializing document store");
             }

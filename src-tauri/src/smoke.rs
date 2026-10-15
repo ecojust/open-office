@@ -25,6 +25,7 @@ pub struct Smoke {
     started: Instant,
     lifecycle: Arc<Mutex<Lifecycle>>,
     failure: Arc<dyn Fn() + Send + Sync>,
+    input_observer: Option<Arc<dyn Fn(Value) + Send + Sync>>,
 }
 
 impl Smoke {
@@ -54,7 +55,12 @@ impl Smoke {
             started: Instant::now(),
             lifecycle: Arc::new(Mutex::new(Lifecycle::default())),
             failure: Arc::new(failure),
+            input_observer: None,
         }
+    }
+
+    pub fn observe_input_requests(&mut self, observer: impl Fn(Value) + Send + Sync + 'static) {
+        self.input_observer = Some(Arc::new(observer));
     }
 
     pub fn scope(&self) -> &'static str {
@@ -63,10 +69,15 @@ impl Smoke {
 
     pub fn note(&self, phase: &str, detail: &str) {
         let phase: String = phase.chars().filter(|c| !c.is_control()).take(80).collect();
+        let detail_limit = if self.scope == "macos-editing" && phase == "editing-window-geometry" {
+            4096
+        } else {
+            400
+        };
         let detail: String = detail
             .chars()
             .filter(|c| !c.is_control())
-            .take(400)
+            .take(detail_limit)
             .collect();
         eprintln!("OPEN_OFFICE_SMOKE {phase}: {detail}");
         let mut state = self.lifecycle.lock().unwrap_or_else(|e| e.into_inner());
@@ -91,6 +102,16 @@ impl Smoke {
                 .unwrap_or_default();
             if let Err(error) = atomic_write(&parent.join("diagnostics.json"), &data) {
                 eprintln!("OPEN_OFFICE_SMOKE diagnostic-write-failed: {error}");
+            }
+        }
+        // Sampling can synchronously publish another observation. Never call it
+        // while the shared lifecycle mutex is held.
+        drop(state);
+        if self.scope == "macos-editing" && phase == "editing-input-request" {
+            if let (Some(observer), Some(request)) =
+                (&self.input_observer, geometry_request(&detail))
+            {
+                observer(request);
             }
         }
     }
@@ -137,6 +158,29 @@ impl Smoke {
     pub fn stop_after_failure(&self) {
         (self.failure)();
     }
+}
+
+fn geometry_request(detail: &str) -> Option<Value> {
+    if detail.len() >= 400 {
+        return None;
+    }
+    let request: Value = serde_json::from_str(detail).ok()?;
+    let action = request.get("actionId")?.as_str()?;
+    if action.is_empty()
+        || action.len() > 64
+        || !action
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+    {
+        return None;
+    }
+    for name in ["viewportWidth", "viewportHeight"] {
+        let dimension = request.get(name)?.as_f64()?;
+        if !dimension.is_finite() || !(100.0..=8192.0).contains(&dimension) {
+            return None;
+        }
+    }
+    Some(request)
 }
 
 fn parse_scope(value: Option<&str>) -> Result<&'static str, String> {
@@ -225,5 +269,50 @@ mod tests {
             report["nativeLifecycle"],
             json!({"generation":2,"terminations":1})
         );
+    }
+
+    #[test]
+    fn input_geometry_is_sampled_after_each_valid_request_without_holding_the_log_lock() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut smoke = Smoke::new(directory.path().join("report.json"), || {});
+        smoke.scope = "macos-editing";
+        let observed = Arc::new(Mutex::new(Vec::new()));
+        let results = observed.clone();
+        let logger = smoke.clone();
+        smoke.observe_input_requests(move |request| {
+            results.lock().unwrap().push(request["actionId"].clone());
+            logger.note(
+                "editing-window-geometry",
+                &json!({"actionId":request["actionId"],"bounds":"x".repeat(600)}).to_string(),
+            );
+        });
+        smoke.note(
+            "editing-input-request",
+            r#"{"actionId":"first","viewportWidth":1024,"viewportHeight":642}"#,
+        );
+        smoke.note(
+            "editing-input-request",
+            r#"{"actionId":"second","viewportWidth":1024,"viewportHeight":642}"#,
+        );
+        smoke.note("editing-input-request", "invalid json");
+        smoke.note(
+            "editing-input-request",
+            r#"{"actionId":"bad!","viewportWidth":1024,"viewportHeight":642}"#,
+        );
+        smoke.note("editing-open", "first");
+        smoke.scope = "full";
+        smoke.note(
+            "editing-input-request",
+            r#"{"actionId":"normal","viewportWidth":1024,"viewportHeight":642}"#,
+        );
+        assert_eq!(
+            *observed.lock().unwrap(),
+            vec![json!("first"), json!("second")]
+        );
+        let state = smoke.lifecycle.lock().unwrap();
+        let geometry: Value =
+            serde_json::from_str(state.events[1]["detail"].as_str().unwrap()).unwrap();
+        assert_eq!(geometry["actionId"], "first");
+        assert_eq!(geometry["bounds"].as_str().unwrap().len(), 600);
     }
 }

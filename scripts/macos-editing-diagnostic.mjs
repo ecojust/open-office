@@ -79,16 +79,51 @@ export function parseInputRequest(detail) {
 }
 export function inputForWindow(request, geometry, pid) {
   assert.equal(geometry?.coordinateSpace, 'quartz-screen-points');
+  assert.equal(geometry.actionId, request.actionId, 'Window geometry is stale or belongs to another input action');
+  assert.deepEqual(geometry.viewport, { width: request.viewportWidth, height: request.viewportHeight }, 'Geometry sampled a different viewport');
   assert.equal(geometry.pid, pid, 'Window does not belong to the launched app');
   assert.ok(Number.isSafeInteger(geometry.windowId) && geometry.windowId > 0);
   for (const key of ['x', 'y', 'width', 'height', 'scaleFactor']) assert.ok(Number.isFinite(geometry[key]), 'Invalid native geometry');
   assert.ok(Math.abs(geometry.x) < 30000 && Math.abs(geometry.y) < 30000 && geometry.width >= 100 && geometry.width <= 8192 && geometry.height >= 100 && geometry.height <= 8192);
   assert.ok(geometry.scaleFactor >= 1 && geometry.scaleFactor <= 4);
-  const scaleX = geometry.width / request.viewportWidth, scaleY = geometry.height / request.viewportHeight;
-  assert.ok(scaleX >= .25 && scaleX <= 4 && Math.abs(scaleX - scaleY) < .02, 'Viewport and native WebView geometry disagree');
+  const selected = viewportMapping(request, geometry);
+  const [x, y, width] = selected.rect;
+  const scale = width / request.viewportWidth;
   return { actionId: request.actionId, kind: request.kind, pid, windowId: geometry.windowId,
-    ...(request.kind === 'click' || request.kind === 'doubleClick' ? { x: geometry.x + request.clientX * scaleX, y: geometry.y + request.clientY * scaleY } : {}),
+    ...(request.kind === 'click' || request.kind === 'doubleClick' ? { x: x + request.clientX * scale, y: y + request.clientY * scale } : {}),
     ...(request.text !== undefined ? { text: request.text } : {}), ...(request.key !== undefined ? { key: request.key } : {}) };
+}
+
+/** Only measured AppKit regions may define a CSS viewport mapping. Inconsistent
+ * origins or dimensions are a diagnostic failure, never a guessed titlebar. */
+export function viewportMapping(request, geometry) {
+  const entries = Object.entries(geometry.candidates || {});
+  assert.deepEqual(entries.map(([name]) => name).sort(), ['bounds', 'contentLayoutIntersection', 'safeAreaRect', 'visibleRect']);
+  const matches = [];
+  for (const [source, rect] of entries) {
+    assert.ok(Array.isArray(rect) && rect.length === 4 && rect.every(Number.isFinite), 'Invalid measured viewport candidate');
+    const [x, y, width, height] = rect;
+    assert.ok(Math.abs(x) < 30000 && Math.abs(y) < 30000 && width >= 0 && width <= 8192 && height >= 0 && height <= 8192);
+    if (width < 100 || height < 100) continue;
+    const scaleX = width / request.viewportWidth, scaleY = height / request.viewportHeight;
+    if (scaleX < .25 || scaleX > 4 || Math.abs(scaleX - scaleY) >= .02) continue;
+    const existing = matches.find(item => item.rect.every((value, index) => Math.abs(value - rect[index]) < .01));
+    if (existing) existing.sources.push(source); else matches.push({ rect, sources: [source] });
+  }
+  assert.ok(matches.length > 0, 'Viewport and measured native WebView regions disagree');
+  assert.equal(matches.length, 1, 'Native viewport candidates imply conflicting coordinate mappings');
+  return matches[0];
+}
+
+export function geometryForRequest(request, events) {
+  const requestIndex = events.findLastIndex(event => event.phase === 'editing-input-request' && parseInputRequest(event.detail).actionId === request.actionId);
+  if (requestIndex < 0) return null;
+  for (let index = events.length - 1; index > requestIndex; index--) {
+    if (events[index].phase !== 'editing-window-geometry') continue;
+    const geometry = JSON.parse(events[index].detail);
+    if (geometry.actionId === request.actionId) return geometry;
+  }
+  return null;
 }
 export function checkLifecycle(diagnostics, final = false) {
   assert.equal(diagnostics?.schemaVersion, 1);
@@ -154,6 +189,8 @@ export function validateEditingReport(frontend, diagnostics, sent) {
     assert.ok(INPUT_SOURCES.has(action.result.permissions.inputSourceId));
     assert.equal(action.result.eventCount, kind === 'doubleClick' ? 5 : kind === 'click' ? 3 : kind === 'key' ? 2 : value.length * 2);
     assert.deepEqual(action.nativeInput, inputForWindow(request, action.geometry, action.result.pid));
+    assert.deepEqual(action.geometry, geometryForRequest(request, diagnostics.events), 'OS input did not use its freshly sampled geometry');
+    assert.deepEqual(action.mapping, viewportMapping(request, action.geometry));
     assert.equal(action.result.windowId, action.nativeInput.windowId);
     assert.ok(Number.isFinite(action.result.startedAt) && action.result.finishedAt >= action.result.startedAt);
     assert.ok(Array.isArray(evidence.events) && evidence.events.length > 0 && evidence.events.length <= 100, 'OS action has no received event evidence');
@@ -286,15 +323,15 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
         const diagnostics = readJson(path);
         report.nativeDiagnostics = diagnostics;
         checkLifecycle(diagnostics);
-        const geometries = diagnostics.events.filter(event => event.phase === 'editing-window-geometry');
-        const geometry = geometries.length ? JSON.parse(geometries.at(-1).detail) : null;
         for (const event of diagnostics.events.filter(event => event.phase === 'editing-input-request')) {
           const request = parseInputRequest(event.detail);
-          if (sent.has(request.actionId) || !geometry) continue;
+          if (sent.has(request.actionId)) continue;
+          const geometry = geometryForRequest(request, diagnostics.events);
+          if (!geometry) continue;
           assert.ok(sent.size < 32, 'Too many OS input requests');
           const input = inputForWindow(request, geometry, app.pid);
           sent.add(request.actionId);
-          const action = { request, geometry, nativeInput: input, result: null };
+          const action = { request, geometry, mapping: viewportMapping(request, geometry), nativeInput: input, result: null };
           report.actions.push(action);
           action.result = JSON.parse(command(options['--helper'], [], { input: JSON.stringify(input), timeout: 15000 }));
           assert.equal(action.result.ok, true); assert.equal(action.result.actionId, request.actionId);

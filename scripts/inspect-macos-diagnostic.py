@@ -177,6 +177,21 @@ def pick(value, keys):
     return {key: value[key] for key in keys if key in value}
 
 
+def native_event_summary(event):
+    summary = pick(event, ["phase", "detail", "elapsedMs", "generation"])
+    detail = summary.get("detail")
+    if summary.get("phase") == "editing-window-geometry" and isinstance(detail, str) and len(detail) <= 4096:
+        try:
+            geometry = json.loads(detail)
+            if isinstance(geometry, dict):
+                # notice() still applies its normal depth, field-count and total
+                # limits, but native rectangles no longer become cut-off JSON.
+                summary["detail"] = geometry
+        except json.JSONDecodeError:
+            pass
+    return summary
+
+
 def local_evidence(directory):
     require(directory.is_dir() and not directory.is_symlink(), "Local evidence directory is missing or is a symlink")
     root = directory.resolve()
@@ -214,7 +229,7 @@ def summarize(read, files, run, artifact, expected_sha):
     notice("system", {"system": pick(report.get("system"), ["swVers", "machine", "node"]), "host": {key: pick(host.get(key), ["status", "stdout", "stderr"]) for key in ["macOS", "macOSBuild", "hardwareArch", "appleSilicon", "swift"]}})
     actions = report.get("actions") or []
     notice("actions", {"sentCount": len(actions), "actions": [{"request": pick(action.get("request"), ["actionId", "kind"]), "result": pick(action.get("result"), ["ok", "kind", "eventCount", "error"])} for action in actions[:16]]})
-    notice("native", {**pick(native, ["generation", "terminations", "scope"]), "recentEvents": [pick(event, ["phase", "detail", "elapsedMs", "generation"]) for event in (native.get("events") or [])[-10:]]})
+    notice("native", {**pick(native, ["generation", "terminations", "scope"]), "recentEvents": [native_event_summary(event) for event in (native.get("events") or [])[-10:]]})
     state = editing.get("lastState") or {}
     notice("frontend", {**pick(frontend, ["ok", "error", "nativeLifecycle"]), "editing": {**pick(editing, ["ok", "error", "closeError", "checks", "initialTabIds", "finalTabIds", "cleanup"]), "lastState": {**pick(state, ["activeKey", "shell"]), "tabs": [pick(tab, ["key", "kind", "dirty", "ready"]) for tab in (state.get("tabs") or [])[:8]], "sessions": [pick(session, ["key", "kind", "sessionId", "documentId", "revision", "dirty"]) for session in (state.get("sessions") or [])[:8]]}}})
     notice("preflight", {**pick(preflight, ["schemaVersion", "kind", "ok", "error"]), "permissions": pick(preflight.get("permissions"), ["postEventAccess", "accessibilityTrusted", "screenCaptureAccess", "inputSourceId", "osVersion"])})

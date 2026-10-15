@@ -26,6 +26,12 @@
 
 这些检查没有使用 Apple WKWebView，不能作为 macOS 26.5 已通过的证据。本地详细报告位于 `test-results/grid-edit-actions-focused/report.json` 等诊断输出中，未作为安装包内容发布。
 
+## 首次 macOS 原生诊断
+
+[诊断运行 38763519681](https://github.com/ecojust/open-office/actions/runs/38763519681) 使用提交 `cf808783494902a0db6ea93fc49d8b6ad90dc6f1`。实际系统为 macOS **26.6.2（25G83）**、Apple Silicon，并非用户的 26.5。系统输入权限与应用构建通过，两张空白表格均就绪，但首次点击前的坐标校验失败：原生采样为 1024 × 674 点，页面视口为 1024 × 642。
+
+该运行没有发出任何 CGEvent，页面启动次数为 1、WebContent 终止次数为 0；采集器在失败后主动停止应用。因此这是诊断工具的几何校验失败，既不是编辑通过，也不是复现标签消失。[只读证据摘要](https://github.com/ecojust/open-office/actions/runs/38767971505) 将关键记录保存在检查注释中。
+
 ## 原生检查的判定要求
 
 使用 macOS 系统级键鼠事件，校验浏览器收到的事件确为可信输入，并检查实际文档内容、全部标签和会话身份。记录测试机实际 macOS 小版本，不能将其他 26.x 小版本称为 26.5。
