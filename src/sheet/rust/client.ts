@@ -142,7 +142,7 @@ export class RustSheetSession {
         // eframe's 1px input needs a real content box. The shell's border-box
         // reset plus default input padding otherwise leaves zero content width;
         // Chromium then keeps committed text's DOM caret at the start.
-        Object.assign(textAgent.style, { boxSizing: 'content-box', padding: '0', margin: '0' })
+        Object.assign(textAgent.style, { boxSizing: 'content-box', padding: '0', margin: '0', opacity: '0' })
         textAgent.addEventListener('compositionstart', startComposition, true)
         textAgent.addEventListener('compositionend', endComposition, true)
         textAgent.addEventListener('focus', syncTextAgentFocus)
