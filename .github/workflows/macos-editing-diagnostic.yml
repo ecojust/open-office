@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       edit_entry:
-        description: Diagnostic edit entry; F2 is a control and cannot satisfy double-click release acceptance
+        description: Diagnostic edit entry; F2 and preselect controls cannot satisfy double-click release acceptance
         type: choice
         default: doubleClick
-        options: [doubleClick, f2]
+        options: [doubleClick, f2, preselect]
       debug_webcontent:
         description: Attempt a bounded LLDB attachment to the exact WebContent process without changing system protections
         type: boolean
@@ -80,6 +80,11 @@ jobs:
         timeout-minutes: 3
         run: |
           xcrun swiftc scripts/macos-os-input.swift -o "$RUNNER_TEMP/open-office-os-input" 2>&1 | tee artifacts/macos-editing/swift-build.log
+      - name: Verify Darwin exit observation using owned test processes
+        timeout-minutes: 2
+        env:
+          OPEN_OFFICE_MACOS_EXIT_OBSERVER_HELPER: ${{ runner.temp }}/open-office-os-input
+        run: node --test tests/macos-webcontent-exit-native.test.mjs 2>&1 | tee artifacts/macos-editing/exit-observer-selftest.log
       - name: Require OS event permissions and a supported keyboard input source
         id: preflight
         timeout-minutes: 2
@@ -152,7 +157,11 @@ jobs:
           DIAGNOSTIC_DEBUG_WEBCONTENT: ${{ inputs.debug_webcontent }}
         run: |
           args=()
-          if [[ "$DIAGNOSTIC_EDIT_ENTRY" == "f2" ]]; then args+=(--edit-entry f2); fi
+          case "$DIAGNOSTIC_EDIT_ENTRY" in
+            doubleClick) ;;
+            f2|preselect) args+=(--edit-entry "$DIAGNOSTIC_EDIT_ENTRY") ;;
+            *) echo "Unsupported diagnostic editing entry" >&2; exit 1 ;;
+          esac
           if [[ "$DIAGNOSTIC_DEBUG_WEBCONTENT" == "true" ]]; then args+=(--lldb); fi
           node scripts/macos-editing-diagnostic.mjs --helper "$RUNNER_TEMP/open-office-os-input" --app "$GITHUB_WORKSPACE/src-tauri/target/release/bundle/macos/Open Office.app" "${args[@]}"
       - name: Explain the diagnostic result and its limits

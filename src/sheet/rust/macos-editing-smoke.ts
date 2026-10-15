@@ -38,12 +38,12 @@ interface RecordedEvent { type: string; isTrusted: boolean; target: string; key?
 interface Identity { key: string; kind: Kind; sessionId: string; documentId: number }
 interface Action { actionId: string; kind: string; target: string; events: RecordedEvent[]; before: unknown; after?: unknown; completed: boolean }
 interface DomTimelineScope { root: HTMLElement; canvas: Element | null; input: Element | null; actionId: string; sessionId: string }
-export interface EditingSmokeOptions { editEntry?: 'doubleclick' | 'f2' }
+export interface EditingSmokeOptions { editEntry?: 'doubleclick' | 'f2' | 'preselect' }
 export interface MacosEditingReport {
   schemaVersion: 1
   kind: 'macos-editing'
   transport: 'local-wasm-in-native-webview' | 'local-wasm-in-browser'
-  editEntry: 'doubleclick' | 'f2'
+  editEntry: 'doubleclick' | 'f2' | 'preselect'
   diagnosticOnly: boolean
   ok: boolean
   bootId: string
@@ -72,6 +72,8 @@ export const MACOS_EDITING_CHECKS = [
 // The F2 control experiment cannot supply the double-click release check.
 export const MACOS_EDITING_F2_CHECKS = MACOS_EDITING_CHECKS.map(check =>
   check === 'sheet-double-click-native-typing' ? 'sheet-f2-native-typing' : check)
+export const MACOS_EDITING_PRESELECT_CHECKS = MACOS_EDITING_CHECKS.map(check =>
+  check === 'sheet-double-click-native-typing' ? 'sheet-preselect-native-typing' : check)
 
 function assert(value: unknown, message: string): asserts value { if (!value) throw Error(`macOS editing: ${message}`) }
 async function bounded<T>(work: Promise<T>, label: string, milliseconds = 20000): Promise<T> {
@@ -163,7 +165,7 @@ function readBoot(): Boot {
 function identity(mount: EditingSmokeMount, state: Snapshot): Identity { return { key: mount.key, kind: mount.kind, sessionId: state.sessionId, documentId: state.documentId } }
 type Cell = { value: unknown; input: string; style: { font: { bold: boolean } } }
 const cell = (mount: EditingSmokeMount, name: string) => bounded((mount.editor as GridcraftSmokeEditor).query('cell.get', { cell: name }), `read ${name}`) as Promise<Cell>
-type SheetUi = { visibleCells?: Array<{ cell: string; rect: number[] }>; drawnChrome?: Array<{ id: string; rect: number[] }>; editor?: { cell: string } | null }
+type SheetUi = { visibleCells?: Array<{ cell: string; rect: number[] }>; drawnChrome?: Array<{ id: string; rect: number[] }>; editor?: { cell: string } | null; mode?: string }
 function point(canvas: HTMLCanvasElement, rect: number[]) {
   assert(rect.length === 4 && rect.every(Number.isFinite), 'invalid canvas target bounds')
   const bounds = canvas.getBoundingClientRect()
@@ -194,10 +196,10 @@ export async function runMacosEditingSmoke(adapter: EditingSmokeAdapter, options
  * its distinct transport must never satisfy the macOS native acceptance gate. */
 export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestInput: (request: EditingInputRequest) => void | Promise<void>, options: EditingSmokeOptions = {}): Promise<MacosEditingReport> {
   const editEntry = options.editEntry ?? 'doubleclick'
-  assert(editEntry === 'doubleclick' || editEntry === 'f2', 'unsupported diagnostic edit entry')
-  const f2Control = editEntry === 'f2'
+  assert(editEntry === 'doubleclick' || editEntry === 'f2' || editEntry === 'preselect', 'unsupported diagnostic edit entry')
+  const control = editEntry !== 'doubleclick', preselect = editEntry === 'preselect'
   const boot = readBoot()
-  const report: MacosEditingReport = { schemaVersion: 1, kind: 'macos-editing', transport: isTauri() ? 'local-wasm-in-native-webview' : 'local-wasm-in-browser', editEntry, diagnosticOnly: f2Control, ok: false, ...boot, checks: [], sessions: [], initialTabIds: [], finalTabIds: [], actions: [], observations: {}, cleanup: { attempted: 0, closed: 0, ok: true } }
+  const report: MacosEditingReport = { schemaVersion: 1, kind: 'macos-editing', transport: isTauri() ? 'local-wasm-in-native-webview' : 'local-wasm-in-browser', editEntry, diagnosticOnly: control, ok: false, ...boot, checks: [], sessions: [], initialTabIds: [], finalTabIds: [], actions: [], observations: {}, cleanup: { attempted: 0, closed: 0, ok: true } }
   const opened: EditingSmokeMount[] = []
   const domTimeline = createEditingDomTimeline(boot.bootId, isTauri() && smokeRequested(), detail => smokeStage('editing-dom-event', detail))
   let currentEvents: RecordedEvent[] | undefined
@@ -235,6 +237,28 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
     await frame(); await frame()
     await preserved()
     return mount
+  }
+  async function preselectionProbe(sheet: EditingSmokeMount, phase: 'before-command' | 'after-command' | 'after-click', started?: number) {
+    // Separate model/paint work from the pointer callback, without changing
+    // focus, synthetic input, or the normal double-click acceptance scenario.
+    if (started !== undefined) {
+      while (performance.now() - started < 2500) await new Promise(resolve => setTimeout(resolve, Math.ceil(2500 - (performance.now() - started))))
+      await frame(); await frame()
+    }
+    await preserved()
+    const ui = (await bounded(sheet.editor.inspect(), 'preselection UI inspection')).ui as SheetUi
+    const model = await bounded((sheet.editor as GridcraftSmokeEditor).query('document.inspect', {}), 'preselection active cell') as { activeCell?: string }
+    const active = document.activeElement
+    const focus = active === sheet.element.querySelector('[data-testid="gridcraft-canvas"]') ? 'canvas'
+      : active === sheet.element.querySelector('[data-testid="gridcraft-input"]') ? 'input' : active === document.body ? 'body' : active ? 'other' : 'none'
+    const probe = { phase, elapsedMs: started === undefined ? 0 : performance.now() - started,
+      activeCell: model.activeCell, mode: ui?.mode, editor: ui?.editor, focus }
+    const probes = (report.observations.preselection ??= []) as unknown[]
+    probes.push(probe)
+    smokeStage('editing-preselect', JSON.stringify(probe))
+    assert(typeof probe.activeCell === 'string' && /^[A-Z]{1,3}[1-9][0-9]{0,6}$/.test(probe.activeCell)
+      && (phase === 'before-command' || probe.activeCell === 'D6') && probe.mode === 'Ready'
+      && probe.editor === null && probe.focus === 'canvas', `preselection ${phase} did not retain a Ready canvas: ${JSON.stringify(probe)}`)
   }
   async function input(actionId: string, target: string, value: Omit<EditingInputRequest, 'actionId' | 'viewportWidth' | 'viewportHeight'>) {
     const action: Action = { actionId, kind: value.kind, target, events: [], before: await preserved(), completed: false }
@@ -276,8 +300,17 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
     report.observations.singleClickValue = (await until(() => cell(sheet, 'A1'), value => value.value === 42, 'single-click edit committed')).value
     assert((await cell(first, 'A1')).value === null, 'editing second workbook changed first workbook')
     report.checks.push(MACOS_EDITING_CHECKS[1])
-    if (f2Control) {
+    if (preselect) {
+      await preselectionProbe(sheet, 'before-command')
+      smokeStage('editing-preselect-command', 'selection.set D6')
+      const started = performance.now()
+      await bounded(sheet.editor.command('selection.set', { cell: 'D6' }), 'preselect D6 model command')
+      await preselectionProbe(sheet, 'after-command', started)
+    }
+    if (control) {
+      if (preselect) smokeStage('editing-preselect-click', 'single click already-selected D6')
       await input('single-d6', 'sheet:D6', { kind: 'click', ...await sheetPoint(sheet, 'D6') })
+      if (preselect) await preselectionProbe(sheet, 'after-click', performance.now())
       await input('f2-d6', 'sheet:D6', { kind: 'key', key: 'F2' })
     } else {
       await input('double-d6', 'sheet:D6', { kind: 'doubleClick', ...await sheetPoint(sheet, 'D6') })
@@ -285,8 +318,8 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
     await until(() => sheet.editor.inspect(), value => (value.ui as SheetUi)?.editor?.cell === 'D6' && document.activeElement === sheet.element.querySelector('[data-testid="gridcraft-input"]'), `${editEntry} editor and natural input focus`)
     await input('type-d6', 'sheet:D6', { kind: 'type', text: 'sheetnative' })
     await input('enter-d6', 'sheet:D6', { kind: 'key', key: 'Enter' })
-    report.observations[f2Control ? 'f2Value' : 'doubleClickValue'] = (await until(() => cell(sheet, 'D6'), value => value.value === 'sheetnative', `${editEntry} edit committed`)).value
-    report.checks.push(f2Control ? 'sheet-f2-native-typing' : MACOS_EDITING_CHECKS[2])
+    report.observations[preselect ? 'preselectValue' : control ? 'f2Value' : 'doubleClickValue'] = (await until(() => cell(sheet, 'D6'), value => value.value === 'sheetnative', `${editEntry} edit committed`)).value
+    report.checks.push(preselect ? 'sheet-preselect-native-typing' : control ? 'sheet-f2-native-typing' : MACOS_EDITING_CHECKS[2])
     await input('select-a1', 'sheet:A1', { kind: 'click', ...await sheetPoint(sheet, 'A1') })
     await input('ribbon-bold', 'sheet:home.bold', { kind: 'click', ...await sheetPoint(sheet, 'home.bold', true) })
     report.observations.ribbonBold = (await until(() => cell(sheet, 'A1'), value => value.style.font.bold === true, 'ribbon bold style committed')).style.font.bold

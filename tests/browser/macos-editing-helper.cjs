@@ -7,12 +7,12 @@ const { execFileSync } = require('node:child_process');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
 const editEntry = process.env.MACOS_EDITING_BROWSER_ENTRY || 'doubleclick';
-assert.ok(['doubleclick', 'f2'].includes(editEntry), 'Unsupported browser diagnostic edit entry');
-const f2Control = editEntry === 'f2';
-const output = path.join(root, `test-results/macos-editing-helper-browser${f2Control ? '-f2' : ''}`);
-const report = { ok: false, runtime: 'Chromium trusted input; not native macOS acceptance', editEntry, diagnosticOnly: f2Control,
+assert.ok(['doubleclick', 'f2', 'preselect'].includes(editEntry), 'Unsupported browser diagnostic edit entry');
+const control = editEntry !== 'doubleclick', preselect = editEntry === 'preselect';
+const output = path.join(root, `test-results/macos-editing-helper-browser${control ? `-${editEntry}` : ''}`);
+const report = { ok: false, runtime: 'Chromium trusted input; not native macOS acceptance', editEntry, diagnosticOnly: control,
   requests: [], errors: [], boots: [], limitations: ['CGEvent, macOS WebContent termination, native IME and macOS 26.5 are not covered.',
-    ...(f2Control ? ['F2 is a diagnostic control; it does not validate double-click editing and cannot satisfy the ARM DMG release gate.'] : [])] };
+    ...(control ? [`${editEntry} is a diagnostic control; it does not validate double-click editing and cannot satisfy the ARM DMG release gate.`] : [])] };
 fs.mkdirSync(output, { recursive: true });
 let server, browser, page;
 (async () => {
@@ -45,26 +45,37 @@ let server, browser, page;
     await page.locator('.create-card.sheet').waitFor();
     report.helper = await page.evaluate(async editEntry => {
       const app = document.querySelector('#app').__vue_app__._instance.setupState;
-      const { runMacosEditingSmoke, verifyMacosEditing, MACOS_EDITING_CHECKS, MACOS_EDITING_F2_CHECKS } = await import('/src/sheet/rust/macos-editing-smoke.ts');
-      const options = editEntry === 'f2' ? { editEntry } : undefined;
+      const { runMacosEditingSmoke, verifyMacosEditing, MACOS_EDITING_CHECKS, MACOS_EDITING_F2_CHECKS, MACOS_EDITING_PRESELECT_CHECKS } = await import('/src/sheet/rust/macos-editing-smoke.ts');
+      const options = editEntry === 'doubleclick' ? undefined : { editEntry };
       let nativeGuardRejected = false;
       try { await runMacosEditingSmoke(app.editingSmokeAdapter(), options); }
       catch (error) { nativeGuardRejected = String(error).includes('opted-in native WebView'); }
       if (!nativeGuardRejected) throw Error('Native diagnostic accepted browser evidence');
       const value = await verifyMacosEditing(app.editingSmokeAdapter(), request => window.editingInput(request), options);
-      return { ...value, nativeGuardRejected, requiredChecks: editEntry === 'f2' ? MACOS_EDITING_F2_CHECKS : MACOS_EDITING_CHECKS };
+      return { ...value, nativeGuardRejected, requiredChecks: editEntry === 'preselect' ? MACOS_EDITING_PRESELECT_CHECKS : editEntry === 'f2' ? MACOS_EDITING_F2_CHECKS : MACOS_EDITING_CHECKS };
     }, editEntry);
     assert.equal(report.helper.ok, true, report.helper.error || report.helper.closeError);
     assert.equal(report.helper.transport, 'local-wasm-in-browser');
     assert.equal(report.helper.editEntry, editEntry);
-    assert.equal(report.helper.diagnosticOnly, f2Control);
+    assert.equal(report.helper.diagnosticOnly, control);
     assert.equal(report.helper.nativeGuardRejected, true);
     assert.deepEqual(report.helper.checks, report.helper.requiredChecks);
     assert.deepEqual(report.helper.actions.map(action => action.actionId), ['single-a1', 'type-a1', 'enter-a1',
-      ...(f2Control ? ['single-d6', 'f2-d6'] : ['double-d6']), 'type-d6', 'enter-d6', 'select-a1', 'ribbon-bold', 'global-undo', 'word-click', 'word-type']);
-    assert.equal(report.helper.observations[f2Control ? 'f2Value' : 'doubleClickValue'], 'sheetnative');
-    assert.equal(report.helper.observations[f2Control ? 'doubleClickValue' : 'f2Value'], undefined);
-    if (f2Control) {
+      ...(control ? ['single-d6', 'f2-d6'] : ['double-d6']), 'type-d6', 'enter-d6', 'select-a1', 'ribbon-bold', 'global-undo', 'word-click', 'word-type']);
+    const valueKey = preselect ? 'preselectValue' : control ? 'f2Value' : 'doubleClickValue';
+    assert.equal(report.helper.observations[valueKey], 'sheetnative');
+    for (const key of ['preselectValue', 'f2Value', 'doubleClickValue']) if (key !== valueKey) assert.equal(report.helper.observations[key], undefined);
+    if (preselect) {
+      const probes = report.helper.observations.preselection;
+      assert.deepEqual(probes.map(probe => probe.phase), ['before-command', 'after-command', 'after-click']);
+      assert.equal(probes[0].elapsedMs, 0);
+      assert.equal(probes[0].activeCell, 'A2', 'Enter must finish before the selection-only command');
+      for (const [index, probe] of probes.entries()) {
+        if (index) { assert.ok(probe.elapsedMs >= 2500); assert.equal(probe.activeCell, 'D6'); }
+        assert.equal(probe.mode, 'Ready'); assert.equal(probe.editor, null); assert.equal(probe.focus, 'canvas');
+      }
+    } else assert.equal(report.helper.observations.preselection, undefined);
+    if (control) {
       assert.ok(!report.helper.checks.includes('sheet-double-click-native-typing'));
       assert.ok(!report.requests.some(request => request.kind === 'doubleClick'));
       assert.ok(report.requests.some(request => request.actionId === 'f2-d6' && request.kind === 'key' && request.key === 'F2'));

@@ -25,7 +25,7 @@ try:
             value = evidence.get(name)
             if isinstance(value, bytes) and len(value) > limit:
                 raise ValueError('read bound exceeded')
-            return value
+            return json.loads(value) if as_json and isinstance(value, bytes) else value
         stream = io.StringIO()
         os.environ['GH_INSPECT_TOKEN'] = 'fake-test-token'
         with contextlib.redirect_stdout(stream):
@@ -387,6 +387,53 @@ test('bounded DOM event observations retain the action and native termination ti
   const timeline = rows.find(row => row.section === 'native').timeline.flat().join('\n');
   assert.match(timeline, /double-d6/); assert.match(timeline, /TERMINATED/);
   assert.ok(!result.value.includes('private cell text'));
+});
+
+test('preselection progress retains both wait boundaries in the bounded native timeline', () => {
+  const events = ['before-command', 'after-command', 'after-click'].map((phase, index) => ({
+    elapsedMs: 12000 + index * 2501, generation: 1, phase: 'editing-preselect',
+    detail: JSON.stringify({ phase, activeCell: index ? 'D6' : 'A2', elapsedMs: index ? 2500.9 : 0,
+      mode: 'Ready', editor: null, focus: 'canvas' }),
+  }));
+  const result = inspect({ mode: 'emit', time: '', pids: '', report: { nativeDiagnostics: { events } } });
+  assert.equal(result.ok, true);
+  const rows = annotations(result.value);
+  assert.ok(rows.length <= 10);
+  const timeline = rows.find(row => row.section === 'native').timeline.flat();
+  assert.deepEqual(timeline, [
+    '12000ms g1 preselect before-command A2 0ms Ready editor=none canvas',
+    '14501ms g1 preselect after-command D6 2501ms Ready editor=none canvas',
+    '17002ms g1 preselect after-click D6 2501ms Ready editor=none canvas',
+  ]);
+});
+
+test('exit observer summary preserves raw status without treating the signal as a root cause', () => {
+  const observer = { status: 'exited', pid: 15734, registered: true, registeredPid: 15734,
+    registeredAtUnixMs: 1000, cleanup: 'observer-exited',
+    exit: { pid: 15734, unixMs: 2000, receivedAtUnixMs: 2001, rawData: 139, fflags: 0x84000000,
+      waitStatusAvailable: true, waitStatus: 139, signaled: true, signal: 11, coreDumped: true,
+      detailAvailable: false, extraPrivateField: 'private cell text' } };
+  const nativeDiagnostics = { events: [{ phase: 'editing-window-geometry', detail: JSON.stringify({
+    webContent: { pid: 15734, supported: true, source: 'WKWebView._webProcessIdentifier' },
+  }) }] };
+  for (const standalone of [false, true]) {
+    const result = inspect({ mode: 'emit', time: '', pids: '', report: { nativeDiagnostics,
+      ...(standalone ? {} : { exitObserver: observer }) },
+      ...(standalone ? { evidence: { 'webcontent-exit-observer.json': JSON.stringify(observer) } } : {}) });
+    assert.equal(result.ok, true, result.error);
+    const rows = annotations(result.value);
+    assert.ok(rows.length <= 10);
+    const summary = rows.find(row => row.section === 'process').exitObserver;
+    assert.equal(summary.ownedPid, true);
+    assert.equal(summary.exit.rawData, 139);
+    assert.equal(summary.exit.signal, 11);
+    assert.equal(summary.exit.coreDumped, true);
+    assert.equal(summary.causalityEstablished, false);
+    assert.equal(summary.recoveredFromStandalone, standalone);
+    assert.ok(!result.value.includes('private cell text'));
+  }
+  const result = inspect({ mode: 'emit', time: '', pids: '', report: { exitObserver: observer } });
+  assert.equal(annotations(result.value).find(row => row.section === 'process').exitObserver.ownedPid, false);
 });
 
 test('Rust regression output includes compilation failure context and tail without emitting the full log', () => {

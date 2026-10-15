@@ -261,6 +261,16 @@ def compact_timeline(native):
                 detail = str(parsed.get("bootId", ""))[:12] if phase == "document-start" else f'{parsed.get("actionId")} {parsed.get("kind")} {parsed.get("text", parsed.get("key", ""))}'
             except (json.JSONDecodeError, AttributeError):
                 pass
+        elif phase == "editing-preselect" and isinstance(detail, str):
+            try:
+                parsed = json.loads(detail)
+                elapsed = parsed.get("elapsedMs")
+                wait = round(elapsed) if isinstance(elapsed, (int, float)) and 0 <= elapsed <= 180000 else "?"
+                editor = "none" if parsed.get("editor") is None else "present"
+                detail = f'{parsed.get("phase")} {parsed.get("activeCell")} {wait}ms {parsed.get("mode")} editor={editor} {parsed.get("focus")}'
+            except (json.JSONDecodeError, AttributeError):
+                pass
+            phase = "preselect"
         result.append(compact_text(f'{event.get("elapsedMs")}ms g{event.get("generation")} {names.get(phase, phase)} {detail}', 80))
     # Two bounded groups retain all 30 events without expanding the general
     # per-array limit or spending additional GitHub annotations.
@@ -414,6 +424,23 @@ def owned_webcontent_pids(native):
         if process.get("supported") is True and process.get("source") == "WKWebView._webProcessIdentifier" and type(pid) is int and 1 < pid <= 2147483647:
             result.add(pid)
     return result
+
+
+def exit_observer_summary(read, report, native):
+    observer = report.get("exitObserver")
+    recovered = not isinstance(observer, dict) or observer.get("status") == "pending"
+    if recovered:
+        observer = read("webcontent-exit-observer.json", 64 * 1024) or observer
+    if not isinstance(observer, dict):
+        return None
+    pid = observer.get("registeredPid")
+    exit_event = observer.get("exit") or {}
+    return {**pick(observer, ["status", "pid", "registered", "registeredPid", "registeredAtUnixMs", "cleanup"]),
+        "reason": compact_text(observer.get("reason") or "", 100),
+        "recoveredFromStandalone": recovered,
+        "ownedPid": type(pid) is int and pid in owned_webcontent_pids(native),
+        "exit": pick(exit_event, ["pid", "unixMs", "receivedAtUnixMs", "rawData", "fflags", "waitStatusAvailable", "waitStatus", "signaled", "signal", "exitCode", "coreDumped", "detailAvailable", "detailFlags", "memoryExit", "codeSigningExit", "decryptFailure"]),
+        "causalityEstablished": False}
 
 
 def system_log_summary(data, report, samples, max_lines=20, native=None):
@@ -684,13 +711,15 @@ def summarize(read, files, run, artifact, expected_sha, context=None):
         "preflight": {**pick(preflight, ["kind", "ok", "error"]), "permissions": pick(preflight.get("permissions"), ["postEventAccess", "accessibilityTrusted", "screenCaptureAccess", "inputSourceId", "osVersion"])}})
     notice("native", {**pick(native, ["generation", "terminations", "scope"]), "timeline": compact_timeline(native)})
     process = report.get("process") or {}
+    exit_observer = exit_observer_summary(read, report, native)
     samples = process_rows((report.get("processSamples") or [])[-200:])
     recent = []
-    for sample in samples[-6:]:
+    for sample in samples[-(4 if exit_observer is not None else 6):]:
         rows = [row for row in sample["rows"] if re.search(r"open-office|Open Office|WebContent", row["process"], re.I)]
         recent.append({"t": sample["unixMs"], "count": len(rows), "rssKiB": sum(row["rssKiB"] for row in rows), "top": [[row["pid"], row["rssKiB"], row["cpuPercent"], compact_text(row["process"], 35)] for row in sorted(rows, key=lambda row: row["rssKiB"], reverse=True)[:3]]})
     notice("process", {**pick(process, ["pid", "exitCode", "signal", "spawnError"]), "stderrTail": compact_text(str(process.get("stderrTail") or "")[-650:], 650),
-        "rssSamples": recent, "rssColumns": ["pid", "rssKiB", "cpuPercent", "process"], "rssLimit": "Last six samples; top three App/WebContent rows, at most 40 source rows. Snapshot only, not evidence of a memory kill.",
+        "rssSamples": recent, "rssColumns": ["pid", "rssKiB", "cpuPercent", "process"], "rssLimit": "Last six samples (four with an exit observer); top three App/WebContent rows, at most 40 source rows. Snapshot only, not evidence of a memory kill.",
+        **({"exitObserver": exit_observer} if exit_observer is not None else {}),
         "crashes": [compact_text(PurePosixPath(name).name, 100) for name in files if PurePosixPath(name).name.startswith("crash-") and name.endswith((".ips", ".crash"))][:4]})
     log, capture = read_system_logs(read, report)
     crashes, crash_count = crash_summaries(read, files)

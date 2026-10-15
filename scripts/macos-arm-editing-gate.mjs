@@ -101,6 +101,8 @@ export function verifyMacosArmEditingProof(proof, { commit, runId, dmgPath, root
   assert.equal(report?.schemaVersion, 1);
   assert.notEqual(report.debugger?.requested, true, 'Debugger experiments cannot supply release editing proof');
   assert.notEqual(report.editEntry, 'f2', 'F2 control experiments cannot supply release editing proof');
+  assert.notEqual(report.editEntry, 'preselect', 'Preselection controls cannot supply release editing proof');
+  assert.notEqual(report.frontend?.editing?.diagnosticOnly, true, 'Diagnostic-only frontend controls cannot supply release editing proof');
   assert.equal(report.commit, commit);
   assert.equal(report.runId, runId);
   assert.equal(report.diagnosticOnly, true, 'Original diagnostic semantics must remain intact');

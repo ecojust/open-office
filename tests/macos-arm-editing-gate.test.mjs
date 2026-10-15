@@ -105,11 +105,13 @@ test('Linux publisher verifies a complete original-DMG native-editing proof with
   assert.equal(value.proof.diagnostic.frontend.editing.checks.length, 8);
 });
 
-test('debugger and F2 controls cannot be promoted to release proof even with passing default evidence', async t => {
+test('debugger and diagnostic controls cannot be promoted to release proof even with passing default evidence', async t => {
   const { proof, options } = installation(t);
   const cases = [
     ['debugger requested without attachment', p => { p.diagnostic.debugger = { requested: true, attached: false }; }, /Debugger experiments/],
     ['F2 control', p => { p.diagnostic.editEntry = 'f2'; }, /F2 control experiments/],
+    ['preselection control', p => { p.diagnostic.editEntry = 'preselect'; }, /Preselection controls/],
+    ['frontend control without entry marker', p => { p.diagnostic.frontend.editing.diagnosticOnly = true; }, /Diagnostic-only frontend controls/],
   ];
   for (const [name, mutate, message] of cases) await t.test(name, () => {
     const changed = structuredClone(proof); mutate(changed);

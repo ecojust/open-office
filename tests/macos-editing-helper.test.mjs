@@ -34,6 +34,7 @@ test('native editing diagnostic requires the process opt-in even when Tauri IPC 
   const h = harness({ native: true })
   await assert.rejects(h.api.runMacosEditingSmoke(h.adapter), /opted-in native WebView/)
   await assert.rejects(h.api.runMacosEditingSmoke(h.adapter, { editEntry: 'f2' }), /opted-in native WebView/)
+  await assert.rejects(h.api.runMacosEditingSmoke(h.adapter, { editEntry: 'preselect' }), /opted-in native WebView/)
   assert.deepEqual(h.calls, [])
 })
 test('unknown editing entry is rejected before reading boot state or opening documents', async () => {
@@ -56,6 +57,21 @@ test('native F2 control is explicitly marked diagnostic-only and has no double-c
   assert.deepEqual([...h.api.MACOS_EDITING_F2_CHECKS], [...h.api.MACOS_EDITING_CHECKS].map(check =>
     check === 'sheet-double-click-native-typing' ? 'sheet-f2-native-typing' : check))
   assert.ok(!h.api.MACOS_EDITING_F2_CHECKS.includes('sheet-double-click-native-typing'))
+  assert.equal(h.listeners.size, 0)
+})
+test('preselection control is diagnostic-only and cannot touch a nonempty user workbench', async () => {
+  const h = harness({ native: true, optedIn: true, boot: { bootId, timeOrigin: 12345 },
+    existing: [{ key: 'user-unsaved-work', kind: 'sheet', dirty: true, ready: true }] })
+  const report = await h.api.runMacosEditingSmoke(h.adapter, { editEntry: 'preselect' })
+  assert.equal(report.editEntry, 'preselect')
+  assert.equal(report.diagnosticOnly, true)
+  assert.equal(report.ok, false)
+  assert.match(report.error, /cold empty workbench/)
+  assert.equal(report.cleanup.attempted, 0)
+  assert.ok(h.calls.every(([name]) => name === 'stage'))
+  assert.deepEqual([...h.api.MACOS_EDITING_PRESELECT_CHECKS], [...h.api.MACOS_EDITING_CHECKS].map(check =>
+    check === 'sheet-double-click-native-typing' ? 'sheet-preselect-native-typing' : check))
+  assert.ok(!h.api.MACOS_EDITING_PRESELECT_CHECKS.includes('sheet-double-click-native-typing'))
   assert.equal(h.listeners.size, 0)
 })
 test('native editing evidence refuses missing, malformed UUID or invalid captured timestamp markers', async () => {

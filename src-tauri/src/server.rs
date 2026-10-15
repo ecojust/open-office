@@ -43,6 +43,7 @@ fn diagnostic_editing_entry(
     match requested {
         None | Some("doubleclick") => Ok(Some("doubleclick")),
         Some("f2") => Ok(Some("f2")),
+        Some("preselect") => Ok(Some("preselect")),
         _ => Err("Invalid diagnostic editing entry.".into()),
     }
 }
@@ -884,6 +885,7 @@ mod tests {
     fn editing_control_is_only_enabled_for_the_opted_in_macos_diagnostic() {
         for scope in [None, Some("full")] {
             assert_eq!(diagnostic_editing_entry(scope, Some("f2")), Ok(None));
+            assert_eq!(diagnostic_editing_entry(scope, Some("preselect")), Ok(None));
             assert_eq!(diagnostic_editing_entry(scope, Some("invalid")), Ok(None));
         }
         assert_eq!(
@@ -898,6 +900,11 @@ mod tests {
             diagnostic_editing_entry(Some("macos-editing"), Some("f2")),
             Ok(Some("f2"))
         );
+        assert_eq!(
+            diagnostic_editing_entry(Some("macos-editing"), Some("preselect")),
+            Ok(Some("preselect"))
+        );
+        assert!(diagnostic_editing_entry(Some("macos-editing"), Some("Preselect")).is_err());
         assert!(diagnostic_editing_entry(Some("macos-editing"), Some("invalid")).is_err());
     }
 

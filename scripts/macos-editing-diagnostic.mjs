@@ -28,6 +28,7 @@ export const EDITING_ACTIONS = [
   ['word-type', 'type', 'word:page', 'wordnative'],
 ];
 export const EDITING_F2_CHECKS = EDITING_CHECKS.map(check => check === 'sheet-double-click-native-typing' ? 'sheet-f2-native-typing' : check);
+export const EDITING_PRESELECT_CHECKS = EDITING_CHECKS.map(check => check === 'sheet-double-click-native-typing' ? 'sheet-preselect-native-typing' : check);
 export const EDITING_F2_ACTIONS = [
   ...EDITING_ACTIONS.slice(0, 3), ['single-d6', 'click', 'sheet:D6'], ['f2-d6', 'key', 'sheet:D6', 'F2'],
   ...EDITING_ACTIONS.slice(4),
@@ -166,9 +167,10 @@ export function checkLifecycle(diagnostics, final = false) {
 
 /** A posted CGEvent alone is never an editing success. */
 export function validateEditingReport(frontend, diagnostics, sent, { editEntry = 'doubleclick' } = {}) {
-  assert.ok(['doubleclick', 'f2'].includes(editEntry), 'Unsupported editing validation entry');
-  const f2Control = editEntry === 'f2';
-  const expectedActions = f2Control ? EDITING_F2_ACTIONS : EDITING_ACTIONS;
+  assert.ok(['doubleclick', 'f2', 'preselect'].includes(editEntry), 'Unsupported editing validation entry');
+  const control = editEntry !== 'doubleclick';
+  const preselect = editEntry === 'preselect';
+  const expectedActions = control ? EDITING_F2_ACTIONS : EDITING_ACTIONS;
   checkLifecycle(diagnostics, true);
   assert.equal(frontend?.ok, true, frontend?.error || 'Frontend editing failed');
   assert.deepEqual(frontend.nativeLifecycle, { generation: 1, terminations: 0 });
@@ -176,16 +178,16 @@ export function validateEditingReport(frontend, diagnostics, sent, { editEntry =
   assert.equal(editing?.schemaVersion, 1);
   assert.equal(editing.kind, 'macos-editing');
   assert.equal(editing.transport, 'local-wasm-in-native-webview');
-  // Legacy double-click reports omit these markers. F2 always requires an
+  // Legacy double-click reports omit these markers. Controls always require an
   // explicit diagnostic-only marker and a separately selected validator.
   assert.equal(editing.editEntry ?? 'doubleclick', editEntry, 'Editing entry differs from the requested scenario');
-  assert.equal(editing.diagnosticOnly ?? false, f2Control, 'Control experiments cannot supply double-click acceptance');
+  assert.equal(editing.diagnosticOnly ?? false, control, 'Control experiments cannot supply double-click acceptance');
   assert.equal(editing.ok, true, editing.error || 'Editing scenarios failed');
   assert.match(editing.bootId, /^[a-f0-9-]{36}$/);
   assert.ok(Number.isFinite(editing.timeOrigin) && editing.timeOrigin > 0);
   const boots = diagnostics.events.filter(event => event.phase === 'document-start').map(event => JSON.parse(event.detail));
   assert.equal(boots.length, 1); assert.equal(boots[0].bootId, editing.bootId); assert.equal(boots[0].timeOrigin, editing.timeOrigin);
-  assert.deepEqual(editing.checks, f2Control ? EDITING_F2_CHECKS : EDITING_CHECKS, 'Editing checks are missing or out of order');
+  assert.deepEqual(editing.checks, preselect ? EDITING_PRESELECT_CHECKS : control ? EDITING_F2_CHECKS : EDITING_CHECKS, 'Editing checks are missing or out of order');
   assert.equal(editing.initialTabIds?.length, 2, 'Expected two cold workbooks before any edit');
   assert.equal(editing.finalTabIds?.length, 3);
   assert.equal(new Set(editing.finalTabIds).size, 3);
@@ -256,9 +258,25 @@ export function validateEditingReport(frontend, diagnostics, sent, { editEntry =
       previous = snapshot.sessions;
     }
   }
-  assert.deepEqual(editing.observations, { singleClickValue: 42, [f2Control ? 'f2Value' : 'doubleClickValue']: 'sheetnative', ribbonBold: true,
+  if (preselect) {
+    const probes = editing.observations?.preselection;
+    assert.ok(Array.isArray(probes) && probes.length === 3, 'Preselection needs three separated state probes');
+    const phases = ['before-command', 'after-command', 'after-click'];
+    for (const [index, probe] of probes.entries()) {
+      assert.match(probe.activeCell, /^[A-Z]{1,3}[1-9][0-9]{0,6}$/, 'Preselection active cell is invalid');
+      assert.ok(Number.isFinite(probe.elapsedMs), 'Preselection delay is invalid');
+      if (index === 0) assert.equal(probe.elapsedMs, 0);
+      else { assert.ok(probe.elapsedMs >= 2500, 'Preselection probe did not wait 2500 ms'); assert.equal(probe.activeCell, 'D6'); }
+      assert.deepEqual(probe, { phase: phases[index], elapsedMs: probe.elapsedMs, activeCell: probe.activeCell,
+        mode: 'Ready', editor: null, focus: 'canvas' }, 'Preselection state differs from the Ready canvas control');
+    }
+    assert.deepEqual(diagnostics.events.filter(event => event.phase === 'editing-preselect').map(event => JSON.parse(event.detail)),
+      probes, 'Native preselection progress and frontend state probes differ');
+  }
+  assert.deepEqual(editing.observations, { singleClickValue: 42, [preselect ? 'preselectValue' : control ? 'f2Value' : 'doubleClickValue']: 'sheetnative', ribbonBold: true,
     commandValue: 'API_SENTINEL', undoneValue: null, wordText: 'wordnative',
-    retained: { a1: 42, bold: true, d6: 'sheetnative', pristineA1: null } }, 'Actual Rust model edits or retained values differ');
+    retained: { a1: 42, bold: true, d6: 'sheetnative', pristineA1: null },
+    ...(preselect ? { preselection: editing.observations.preselection } : {}) }, 'Actual Rust model edits or retained values differ');
   assert.equal(editing.lastState?.activeKey, editing.initialTabIds[1]);
   assert.deepEqual(editing.lastState.tabs?.map(tab => tab.key), editing.finalTabIds);
   assert.deepEqual(editing.lastState.sessions?.map(identity), editing.sessions);
@@ -379,7 +397,7 @@ export function parseArgs(args) {
     else if (key === '--edit-entry') {
       assert.equal(values.editEntry, undefined, 'Editing entry was specified twice');
       values.editEntry = args[++index];
-      assert.ok(['doubleclick', 'f2'].includes(values.editEntry), '--edit-entry must be doubleclick or f2');
+      assert.ok(['doubleclick', 'f2', 'preselect'].includes(values.editEntry), '--edit-entry must be doubleclick, f2 or preselect');
     }
     else { assert.ok(['--app', '--helper'].includes(key) && values[key] === undefined); values[key] = args[++index]; assert.ok(isAbsolute(values[key] || '')); }
   }
@@ -401,7 +419,7 @@ export function debuggerTargetPid(geometry, appPid) {
 /** Cleanup failures must never hide the input/lifecycle failure which brought
  * us here, or leave the earlier preflight report masquerading as this run. */
 export async function finalizeMacosEditingDiagnostic({ report, directory, started, app, log, temporary,
-  finishLog, debuggerControl, processState }, { kill = killGroup, wait = delay, collectReports = collectCrashReports } = {}) {
+  finishLog, debuggerControl, exitObserverControl, processState }, { kill = killGroup, wait = delay, collectReports = collectCrashReports } = {}) {
   const failure = (stage, error) => {
     const detail = `${stage}: ${String(error?.code ? `${error.code}: ${error.message}` : error?.message || error).slice(0, 500)}`;
     report.gaps.push(detail);
@@ -431,6 +449,13 @@ export async function finalizeMacosEditingDiagnostic({ report, directory, starte
   if (report.nativeDiagnostics?.terminations > 0 && finishLog) {
     await attempt('system-log-checkpoint', () => { report.systemLog = finishLog(undefined, { reset: true }); });
   }
+  // Stop observing before our own shutdown can terminate WebContent. The
+  // observer first drains pending kernel events and never signals its target.
+  if (exitObserverControl) await attempt('exit-observer-cleanup', async () => {
+    await exitObserverControl.stop();
+    assert.ok(['not-started', 'observer-exited'].includes(report.exitObserver.cleanup),
+      'Exit observer shutdown was not confirmed');
+  });
   if (debuggerControl) await attempt('debugger-cleanup', async () => {
     await debuggerControl.stop();
     assert.ok(['not-started', 'not-attached', 'detached', 'target-exited'].includes(report.debugger.cleanup),
@@ -500,12 +525,14 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
     commit: env.GITHUB_SHA || null, runId: env.GITHUB_RUN_ID || null, startedAt: new Date(started).toISOString(),
     userReportedSystem: { app: '0.9.0', macOS: '26.5', processor: 'Apple Silicon' }, actions: [], gaps: [],
     limitations: ['OS CGEvent input is not physical hardware or an IME composition acceptance test.', 'Runner OS/build is reported exactly; macos-26 does not imply macOS 26.5.', 'No crash report does not prove that WebContent survived.'] };
-  let app, log, temporary, rawPath, finishLog, debuggerControl, closed = false, exitCode = null, exitSignal = null;
+  let app, log, temporary, rawPath, finishLog, debuggerControl, exitObserverControl, closed = false, exitCode = null, exitSignal = null;
   let stdout = Buffer.alloc(0), stderr = Buffer.alloc(0);
   try {
     const options = parseArgs(args);
     report.editEntry = options.editEntry;
     report.debugger = { requested: options.lldb, status: options.lldb ? 'pending' : 'not-requested', ready: false };
+    report.exitObserver = { status: 'pending', registered: false };
+    if (options.editEntry === 'preselect') report.limitations.push('Preselection is a separate diagnostic control; passing it is not evidence that normal editing is fixed.');
     if (options.editEntry === 'f2') report.limitations.push('F2 is a separate control experiment; passing it is not evidence that double-click editing is fixed.');
     if (options.lldb) report.limitations.push('Debugger attachment can change timing; this run cannot supply release acceptance.');
     assert.equal(process.platform, 'darwin', 'This diagnostic requires native macOS');
@@ -549,6 +576,20 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
           if (sent.has(request.actionId)) continue;
           const geometry = geometryForRequest(request, diagnostics.events);
           if (!geometry) continue;
+          if (report.exitObserver.status === 'pending') {
+            const pid = debuggerTargetPid(geometry, app.pid);
+            if (pid === null) {
+              report.exitObserver = { status: 'blocked', registered: false, reason: 'exact-webcontent-pid-unavailable', cleanup: 'not-started' };
+            } else {
+              const { startWebContentExitObserver } = await import('./macos-webcontent-exit.mjs');
+              exitObserverControl = await startWebContentExitObserver({ pid, helper: options['--helper'], directory });
+              report.exitObserver = exitObserverControl.report;
+            }
+            // A registration failure is evidence unavailability, not an input
+            // failure. Still reject any page replacement during registration.
+            report.nativeDiagnostics = readJson(path);
+            checkLifecycle(report.nativeDiagnostics);
+          }
           if (options.lldb && report.debugger.status === 'pending') {
             const pid = debuggerTargetPid(geometry, app.pid);
             if (pid === null) {
@@ -596,7 +637,7 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
     report.status = 'passed'; report.ok = true;
   } catch (error) { report.error = String(error?.message || error).slice(0, 4000); }
   finally {
-    await finalizeMacosEditingDiagnostic({ report, directory, started, app, log, temporary, finishLog, debuggerControl,
+    await finalizeMacosEditingDiagnostic({ report, directory, started, app, log, temporary, finishLog, debuggerControl, exitObserverControl,
       processState: () => ({ closed, exitCode, exitSignal, stdout, stderr }) });
   }
   return report;

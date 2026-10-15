@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { checkInputPreflight, parseInputRequest, inputForWindow, checkLifecycle,
   validateEditingReport, viewportMapping, geometryForRequest, captureStream, collectCrashReports,
-  finalizeMacosEditingDiagnostic, parseArgs, debuggerTargetPid, EDITING_ACTIONS, EDITING_CHECKS, EDITING_F2_ACTIONS, EDITING_F2_CHECKS } from '../scripts/macos-editing-diagnostic.mjs';
+  finalizeMacosEditingDiagnostic, parseArgs, debuggerTargetPid, EDITING_ACTIONS, EDITING_CHECKS, EDITING_F2_ACTIONS, EDITING_F2_CHECKS, EDITING_PRESELECT_CHECKS } from '../scripts/macos-editing-diagnostic.mjs';
 
 function finalizationFixture(t) {
   const directory = mkdtempSync(join(tmpdir(), 'macos-final-evidence-'));
@@ -60,6 +60,36 @@ test('EPERM during app cleanup cannot hide the original failure, OS receipts or 
   assert.ok(report.finishedAt); assert(report.durationMs >= 5000);
   assert.equal(existsSync(state.temporary), true, 'A fixture still running must retain its evidence directory');
   assert.equal(report.retainedEvidenceDirectory, state.temporary);
+});
+
+test('exit observation stops before app cleanup and retains the kernel event', async t => {
+  const fixture = finalizationFixture(t), { state } = fixture;
+  const order = [];
+  let closed = false;
+  state.processState = () => ({ closed, exitCode: closed ? 0 : null, exitSignal: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) });
+  state.report.exitObserver = { registered: true, registeredPid: 5678, status: 'observing', cleanup: 'pending' };
+  state.exitObserverControl = { stop: async () => {
+    order.push('observer-stopped');
+    Object.assign(state.report.exitObserver, { status: 'exited', cleanup: 'observer-exited', exit: { pid: 5678, waitStatus: 11, signal: 11 } });
+  } };
+  await finalizeMacosEditingDiagnostic(state, {
+    wait: async () => {}, collectReports: async () => ({ files: [] }),
+    kill: () => { order.push('app-cleanup'); closed = true; },
+  });
+  assert.deepEqual(order, ['observer-stopped', 'app-cleanup']);
+  assert.deepEqual(fixture.read().exitObserver, state.report.exitObserver);
+  assert.equal(fixture.read().error, 'Original WebContent failure');
+});
+
+test('observer cleanup failure cannot suppress the original error or app cleanup', async t => {
+  const fixture = finalizationFixture(t), { state } = fixture;
+  let closed = false;
+  state.processState = () => ({ closed, exitCode: closed ? 0 : null, exitSignal: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) });
+  state.exitObserverControl = { stop: async () => { throw Error('observer stop failed'); } };
+  await finalizeMacosEditingDiagnostic(state, { wait: async () => {}, collectReports: async () => ({ files: [] }), kill: () => { closed = true; } });
+  assert.equal(closed, true);
+  assert.equal(fixture.read().error, 'Original WebContent failure');
+  assert.ok(fixture.read().gaps.some(gap => gap.startsWith('exit-observer-cleanup:')));
 });
 
 test('debugger, crash-report and log cleanup errors are independent and cannot suppress the final report', async t => {
@@ -314,7 +344,8 @@ const request = { actionId: 'single-a1', kind: 'click', clientX: 300, clientY: 2
 const permissions = { postEventAccess: true, accessibilityTrusted: true, screenCaptureAccess: false, inputSourceId: 'com.apple.keylayout.ABC' };
 
 function fixture(editEntry = 'doubleclick') {
-  const f2 = editEntry === 'f2', expectedActions = f2 ? EDITING_F2_ACTIONS : EDITING_ACTIONS;
+  const control = editEntry !== 'doubleclick', preselect = editEntry === 'preselect';
+  const expectedActions = control ? EDITING_F2_ACTIONS : EDITING_ACTIONS;
   const sessions = ['sheet', 'sheet', 'word'].map((kind, index) => ({ key: `tab-${index}`, kind, sessionId: `${kind}-${index}`, documentId: index + 1 }));
   const snapshot = (index, after = false) => {
     const count = expectedActions[index][2].startsWith('word:') ? 3 : 2;
@@ -337,26 +368,33 @@ function fixture(editEntry = 'doubleclick') {
       ? [{ type: kind === 'doubleClick' ? 'dblclick' : 'click', target: target === 'shell:undo' ? 'button:撤销' : target.startsWith('word:') ? 'wordcraft-canvas' : 'gridcraft-canvas',
         isTrusted: true, clientX: 300, clientY: 200, detail: kind === 'doubleClick' ? 2 : 1 }]
       : (kind === 'key' ? [value] : [...value]).map(key => ({ type: 'keyup', key, isTrusted: true, target: target.startsWith('word:') ? 'wordcraft-input' : 'gridcraft-input' })) }));
-  const editing = { schemaVersion: 1, kind: 'macos-editing', transport: 'local-wasm-in-native-webview', editEntry, diagnosticOnly: f2, ok: true,
-    bootId: 'd3b1ead1-d8e1-418f-b964-cd13826da6ac', timeOrigin: 1700000000000, checks: [...(f2 ? EDITING_F2_CHECKS : EDITING_CHECKS)],
+  const editing = { schemaVersion: 1, kind: 'macos-editing', transport: 'local-wasm-in-native-webview', editEntry, diagnosticOnly: control, ok: true,
+    bootId: 'd3b1ead1-d8e1-418f-b964-cd13826da6ac', timeOrigin: 1700000000000, checks: [...(preselect ? EDITING_PRESELECT_CHECKS : control ? EDITING_F2_CHECKS : EDITING_CHECKS)],
     initialTabIds: sessions.slice(0, 2).map(item => item.key), finalTabIds: sessions.map(item => item.key), sessions, actions,
-    observations: { singleClickValue: 42, [f2 ? 'f2Value' : 'doubleClickValue']: 'sheetnative', ribbonBold: true, commandValue: 'API_SENTINEL',
+    observations: { singleClickValue: 42, [preselect ? 'preselectValue' : control ? 'f2Value' : 'doubleClickValue']: 'sheetnative', ribbonBold: true, commandValue: 'API_SENTINEL',
       undoneValue: null, wordText: 'wordnative', retained: { a1: 42, bold: true, d6: 'sheetnative', pristineA1: null } },
     lastState: { ...snapshot(expectedActions.length - 1, true), activeKey: sessions[1].key }, cleanup: { attempted: 3, closed: 3, ok: true } };
   const diagnostics = { schemaVersion: 1, scope: 'macos-editing', generation: 1, terminations: 0, events: [
     { phase: 'document-start', detail: JSON.stringify({ bootId: editing.bootId, timeOrigin: editing.timeOrigin }) },
     ...sent.flatMap(item => [{ phase: 'editing-input-request', detail: JSON.stringify(item.request) }, { phase: 'editing-window-geometry', detail: JSON.stringify(item.geometry) }]),
   ] };
+  if (preselect) {
+    editing.observations.preselection = ['before-command', 'after-command', 'after-click'].map((phase, index) => ({
+      phase, elapsedMs: index === 0 ? 0 : 2600, activeCell: index === 0 ? 'A2' : 'D6', mode: 'Ready', editor: null, focus: 'canvas',
+    }));
+    diagnostics.events.push(...editing.observations.preselection.map(probe => ({ phase: 'editing-preselect', detail: JSON.stringify(probe) })));
+  }
   return { frontend: { ok: true, nativeLifecycle: { generation: 1, terminations: 0 }, editing }, diagnostics, sent };
 }
 const validate = value => validateEditingReport(value.frontend, value.diagnostics, value.sent);
 
-test('diagnostic entry defaults to double-click and only explicit F2 or LLDB flags opt in', () => {
+test('diagnostic entry defaults to double-click and only explicit control or LLDB flags opt in', () => {
   const basic = ['--app', '/tmp/Open Office.app', '--helper', '/tmp/os-input'];
   assert.deepEqual(parseArgs(basic), { '--app': '/tmp/Open Office.app', '--helper': '/tmp/os-input', editEntry: 'doubleclick', lldb: false });
   assert.deepEqual(parseArgs([...basic, '--edit-entry', 'f2', '--lldb']), { ...parseArgs(basic), editEntry: 'f2', lldb: true });
+  assert.deepEqual(parseArgs([...basic, '--edit-entry', 'preselect']), { ...parseArgs(basic), editEntry: 'preselect' });
   assert.equal(parseArgs(['--helper', '/tmp/os-input', '--preflight']).preflight, true);
-  for (const extra of [['--edit-entry'], ['--edit-entry', 'F2'], ['--edit-entry', 'f2', '--edit-entry', 'doubleclick'], ['--lldb', '--lldb'], ['--unknown']]) {
+  for (const extra of [['--edit-entry'], ['--edit-entry', 'F2'], ['--edit-entry', 'Preselect'], ['--edit-entry', 'f2', '--edit-entry', 'doubleclick'], ['--lldb', '--lldb'], ['--unknown']]) {
     assert.throws(() => parseArgs([...basic, ...extra]));
   }
 });
@@ -390,6 +428,37 @@ test('F2 has a separate 12-action control validator and cannot stand in for a do
   ]) { const changed = structuredClone(value); mutate(changed); assert.throws(() => f2Validate(changed)); }
   const mislabeled = fixture(); mislabeled.frontend.editing.diagnosticOnly = true;
   assert.throws(() => validate(mislabeled), /Control experiments/);
+});
+
+test('preselection requires separated Ready canvas probes and cannot pass either normal control', () => {
+  const value = fixture('preselect');
+  const preselectValidate = value => validateEditingReport(value.frontend, value.diagnostics, value.sent, { editEntry: 'preselect' });
+  assert.equal(preselectValidate(value), true);
+  assert.equal(value.sent.length, 12); assert.equal(value.frontend.editing.checks.length, 8);
+  assert.throws(() => validate(value), /entry differs/);
+  assert.throws(() => validateEditingReport(value.frontend, value.diagnostics, value.sent, { editEntry: 'f2' }), /entry differs/);
+  for (const mutate of [
+    v => { v.frontend.editing.diagnosticOnly = false; },
+    v => { v.frontend.editing.checks[2] = 'sheet-f2-native-typing'; },
+    v => { v.frontend.editing.observations.f2Value = 'sheetnative'; },
+    v => { delete v.frontend.editing.observations.preselectValue; },
+    v => { delete v.frontend.editing.observations.preselection; },
+    v => { v.frontend.editing.observations.preselection.pop(); },
+    v => { v.frontend.editing.observations.preselection[0].elapsedMs = 1; },
+    v => { v.frontend.editing.observations.preselection[0].activeCell = 'invalid'; },
+    v => { v.frontend.editing.observations.preselection[1].elapsedMs = 2499; },
+    v => { v.frontend.editing.observations.preselection[2].elapsedMs = Infinity; },
+    v => { v.frontend.editing.observations.preselection[1].phase = 'after-click'; },
+    v => { v.frontend.editing.observations.preselection[1].activeCell = 'A2'; },
+    v => { v.frontend.editing.observations.preselection[2].mode = 'Edit'; },
+    v => { v.frontend.editing.observations.preselection[2].editor = {}; },
+    v => { v.frontend.editing.observations.preselection[2].focus = 'input'; },
+    v => { v.diagnostics.events = v.diagnostics.events.filter(event => event.phase !== 'editing-preselect'); },
+  ]) { const changed = structuredClone(value); mutate(changed); assert.throws(() => preselectValidate(changed)); }
+  for (const editEntry of ['doubleclick', 'f2']) {
+    const changed = fixture(editEntry); changed.frontend.editing.observations.preselection = value.frontend.editing.observations.preselection;
+    assert.throws(() => validateEditingReport(changed.frontend, changed.diagnostics, changed.sent, { editEntry }), /Actual Rust model/);
+  }
 });
 
 test('posting permission and keyboard layout preflight cannot be replaced by synthetic input', () => {
