@@ -45,6 +45,7 @@ test('WordCraft canvas evidence cannot be replaced with old IPC or success flags
   for (const value of [undefined, null, [], {}, { ok: true }]) assert.throws(() => validateWordcraftNativeReport(value), /WordCraft/);
   for (const mutate of [
     report => { report.engine = 'rust-word'; }, report => { report.transport = 'tauri-word-engine-request'; },
+    report => { report.transport = 'local-wasm-in-browser'; },
     report => { report.kind = 'core'; }, report => { report.schemaVersion = 0; }, report => { report.ok = false; },
     report => { report.checks.pop(); }, report => { report.checks.reverse(); }, report => { report.limitations = []; },
     report => { report.cleanup.closed = 1; }, report => { report.cleanup.remainingCanvas = 1; }, report => { report.cleanup.remainingInput = 1; },
