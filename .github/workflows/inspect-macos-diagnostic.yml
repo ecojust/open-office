@@ -1,0 +1,36 @@
+name: Inspect an existing macOS diagnostic
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Completed macos-editing-diagnostic.yml run ID in this repository
+        required: true
+        type: string
+      expected_sha:
+        description: Exact 40-character source commit expected on that run
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inspect:
+    name: Read bounded diagnostic evidence into check annotations
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify the source run and summarize its diagnostic artifact
+        env:
+          GH_INSPECT_TOKEN: ${{ github.token }}
+          INSPECT_RUN_ID: ${{ inputs.run_id }}
+          INSPECT_EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: >-
+          python3 scripts/inspect-macos-diagnostic.py
+          --run-id "$INSPECT_RUN_ID"
+          --expected-sha "$INSPECT_EXPECTED_SHA"
