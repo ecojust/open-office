@@ -269,6 +269,86 @@ def system_time(value):
         return None
 
 
+def parse_context(time, pids):
+    if not time and not pids:
+        return None
+    require(bool(time and pids), "Context time and PIDs must be supplied together")
+    require(re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z", time), "Context time must be an exact UTC timestamp")
+    anchor = system_time(time)
+    require(anchor is not None, "Invalid context time")
+    require(re.fullmatch(r"[1-9]\d{0,9}(?:,[1-9]\d{0,9})?", pids), "Context requires one or two comma-separated PIDs")
+    selected = [int(value) for value in pids.split(",")]
+    require(len(set(selected)) == len(selected) and all(1 < value <= 2147483647 for value in selected), "Context PIDs must be distinct process IDs")
+    return {"time": time, "anchor": anchor, "pids": selected}
+
+
+def context_log_summary(data, report, samples, context):
+    """Exact-PID messages near one instant, without the normal keyword filter.
+
+    Each PID gets its own ten-record quota so application reload chatter cannot
+    displace the terminating WebContent process's final messages.
+    """
+    start, end = system_time(report.get("startedAt")), system_time(report.get("finishedAt"))
+    anchor, pids = context["anchor"], context["pids"]
+    require(start is not None and end is not None and start <= anchor <= end, "Context time is outside the diagnostic run")
+    app_pid = (report.get("process") or {}).get("pid")
+    observed = {row["pid"] for sample in samples for row in sample["rows"]}
+    observed.add(app_pid)
+    require(all(pid in observed for pid in pids), "Context PID was not observed by this diagnostic")
+    matches = {pid: [] for pid in pids}
+    parsed, skipped, first, last = 0, 0, None, None
+    for index, line in enumerate(data.splitlines()):
+        if len(line) > 65536:
+            skipped += 1
+            continue
+        try:
+            event = json.loads(line)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            skipped += 1
+            continue
+        if not isinstance(event, dict):
+            continue
+        parsed += 1
+        timestamp = system_time(event.get("timestamp"))
+        if timestamp is not None:
+            if first is None or timestamp < first[0]:
+                first = (timestamp, event["timestamp"])
+            if last is None or timestamp > last[0]:
+                last = (timestamp, event["timestamp"])
+        pid = event.get("processID")
+        if isinstance(pid, str) and pid.isdigit():
+            pid = int(pid)
+        message = event.get("eventMessage")
+        if type(pid) is not int or pid not in matches or timestamp is None or abs(timestamp - anchor) > 1 or not isinstance(message, str):
+            continue
+        clean = scrub(message, 65536)
+        excerpt = compact_text(clean, 650)
+        item = {"time": scrub(event["timestamp"], 80), "pid": pid,
+            "process": compact_text(PurePosixPath(str(event.get("processImagePath") or "unknown")).name, 80),
+            "type": compact_text(str(event.get("messageType") or ""), 30),
+            "subsystem": compact_text(str(event.get("subsystem") or ""), 80),
+            "category": compact_text(str(event.get("category") or ""), 60),
+            "message": excerpt, "messageTruncated": excerpt != clean}
+        while len(json.dumps(item, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) > 800:
+            item["message"] = compact_text(item["message"], max(0, len(item["message"].encode("utf-8")) - 40))
+            item["messageTruncated"] = True
+        matches[pid].append((abs(timestamp - anchor), timestamp, index, item))
+    selected, counts = [], []
+    for pid in pids:
+        rows = matches[pid]
+        chosen = sorted(rows, key=lambda row: (row[0], -row[1], row[2]))[:10]
+        selected.extend(chosen)
+        counts.append({"pid": pid, "matches": len(rows), "selected": len(chosen), "omitted": len(rows) - len(chosen),
+            "firstMatch": min(rows, key=lambda row: row[1])[3]["time"] if rows else None,
+            "lastMatch": max(rows, key=lambda row: row[1])[3]["time"] if rows else None})
+    return {"time": context["time"], "pids": pids, "radiusSeconds": 1,
+        "selection": "Up to ten nearest messages per exact PID, displayed chronologically; no keyword filter.",
+        "pidCounts": counts, "parsedLines": parsed, "skippedLines": skipped,
+        "firstParsedTimestamp": first[1] if first else None, "lastParsedTimestamp": last[1] if last else None,
+        "limitation": "Selected PIDs were observed in this run; this does not establish WebContent ownership or the cause of termination.",
+        "lines": [row[3] for row in sorted(selected, key=lambda row: (row[1], row[2]))]}
+
+
 def system_log_summary(data, report, samples):
     start, end = system_time(report.get("startedAt")), system_time(report.get("finishedAt"))
     app_pid = (report.get("process") or {}).get("pid")
@@ -353,12 +433,25 @@ def local_evidence(directory):
     return read, files
 
 
-def summarize(read, files, run, artifact, expected_sha):
+def summarize(read, files, run, artifact, expected_sha, context=None):
     report = read("report.json", 12 * 1024 * 1024) or {}
     host = read("host.json", 64 * 1024) or {}
     require(not report.get("commit") or report["commit"] == expected_sha, "Report commit mismatch")
     require(not report.get("runId") or str(report["runId"]) == str(run["id"]), "Report run ID mismatch")
     require(not host.get("commit") or host["commit"] == expected_sha, "Host commit mismatch")
+    if context:
+        samples = process_rows((report.get("processSamples") or [])[-200:])
+        log = read("system-webkit.ndjson", 8 * 1024 * 1024, False)
+        summary = context_log_summary(log or b"", report, samples, context)
+        notice("context", {"runId": run["id"], "headSha": expected_sha, "artifactId": artifact["id"],
+            "establishesFix": False, "available": log is not None,
+            "systemLog": pick(report.get("systemLog"), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine"]),
+            **{key: value for key, value in summary.items() if key != "lines"}})
+        # One context notice plus at most seven excerpts stays below GitHub's
+        # ten-notice limit. Three 800-byte records fit the 2,800-byte bound.
+        for offset in range(0, len(summary["lines"]), 3):
+            notice("context-log", {"part": offset // 3 + 1, "lines": summary["lines"][offset:offset + 3], "causalityEstablished": False})
+        return
     preflight = read("preflight.json", 64 * 1024) or report.get("preflight") or {}
     native = read("native-diagnostics.json", 1024 * 1024) or report.get("nativeDiagnostics") or {}
     frontend = read("frontend-report.json", 12 * 1024 * 1024) or report.get("frontend") or {}
@@ -396,15 +489,18 @@ def main():
     parser.add_argument("--run-id")
     parser.add_argument("--expected-sha")
     parser.add_argument("--directory", type=Path, help="Summarize this run's local evidence without API access")
+    parser.add_argument("--context-time", default="", help="UTC instant for an optional fixed one-second context window")
+    parser.add_argument("--context-pids", default="", help="One or two exact, observed PIDs separated by a comma")
     args = parser.parse_args()
     try:
+        context = parse_context(args.context_time, args.context_pids)
         if args.directory:
             run_id = args.run_id or os.environ.get("GITHUB_RUN_ID", "")
             expected_sha = args.expected_sha or os.environ.get("GITHUB_SHA", "")
             require(re.fullmatch(r"[1-9][0-9]{0,19}", run_id), "Invalid local run ID")
             require(re.fullmatch(r"[a-f0-9]{40}", expected_sha), "Invalid local source SHA")
             read, files = local_evidence(args.directory)
-            summarize(read, files, {"id": int(run_id), "conclusion": "local-evidence-only", "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT")}, {"id": None, "size_in_bytes": None}, expected_sha)
+            summarize(read, files, {"id": int(run_id), "conclusion": "local-evidence-only", "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT")}, {"id": None, "size_in_bytes": None}, expected_sha, context)
             return 0
         require(bool(args.run_id and args.expected_sha), "--run-id and --expected-sha are required for remote inspection")
         token = os.environ.get("GH_INSPECT_TOKEN", "")
@@ -417,7 +513,7 @@ def main():
             download_zip(url, destination)
             with zipfile.ZipFile(destination) as archive:
                 files = archive_members(archive)
-                summarize(lambda filename, limit, as_json=True: read_evidence(archive, files, filename, limit, as_json), files, run, artifact, args.expected_sha)
+                summarize(lambda filename, limit, as_json=True: read_evidence(archive, files, filename, limit, as_json), files, run, artifact, args.expected_sha, context)
         return 0
     except Exception as error:
         # Only locally generated validation messages are exposed. URL-bearing

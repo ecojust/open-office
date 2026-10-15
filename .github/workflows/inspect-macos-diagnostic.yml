@@ -11,6 +11,16 @@ on:
         description: Exact 40-character source commit expected on that run
         required: true
         type: string
+      context_time:
+        description: Optional UTC instant for raw PID messages within one second, for example 2026-10-15T17:16:18.24Z
+        required: false
+        default: ''
+        type: string
+      context_pids:
+        description: Optional one or two observed process IDs, comma-separated; requires context_time
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -30,7 +40,11 @@ jobs:
           GH_INSPECT_TOKEN: ${{ github.token }}
           INSPECT_RUN_ID: ${{ inputs.run_id }}
           INSPECT_EXPECTED_SHA: ${{ inputs.expected_sha }}
+          INSPECT_CONTEXT_TIME: ${{ inputs.context_time }}
+          INSPECT_CONTEXT_PIDS: ${{ inputs.context_pids }}
         run: >-
           python3 scripts/inspect-macos-diagnostic.py
           --run-id "$INSPECT_RUN_ID"
           --expected-sha "$INSPECT_EXPECTED_SHA"
+          --context-time "$INSPECT_CONTEXT_TIME"
+          --context-pids "$INSPECT_CONTEXT_PIDS"
