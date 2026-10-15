@@ -113,8 +113,10 @@ def fixture(filename):
 
 
 if __name__ == "__main__":
+    # ASCII JSON survives Windows redirected stdout code pages; consumers still
+    # recover the exact Unicode sheet names and cell text when decoding JSON.
     if len(sys.argv) == 3 and sys.argv[1] == "--fixture":
         fixture(sys.argv[2])
-        print(json.dumps(inspect(sys.argv[2]), ensure_ascii=False))
+        print(json.dumps(inspect(sys.argv[2]), ensure_ascii=True))
     else:
-        print(json.dumps(inspect(sys.argv[1]), ensure_ascii=False))
+        print(json.dumps(inspect(sys.argv[1]), ensure_ascii=True))

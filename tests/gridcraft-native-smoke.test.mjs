@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { inspectInstalledGridcraft, validateNativeGridcraftEvidence, validateGridcraftNativeReport, gridcraftSourceHash } from '../scripts/gridcraft-native-smoke.mjs';
 import { gridcraftReport } from './helpers/gridcraft-smoke-report.mjs';
@@ -43,6 +45,27 @@ test('GridCraft default-canvas report independently checks both exported XLSX fi
   const result = validateGridcraftNativeReport(gridcraftReport());
   assert.equal(result.exported.sheets[0].cells.A1.value, 'Open Office 表格😀');
   assert.deepEqual(result.exported.sheets[0].cells, result.reopened.sheets[0].cells);
+});
+
+test('the XLSX inspector preserves Unicode through a Windows legacy stdout encoding', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'gridcraft-legacy-encoding-'));
+  const python = process.env.OPEN_OFFICE_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  const oracle = fileURLToPath(new URL('./browser/gridcraft-inspect-xlsx.py', import.meta.url));
+  const inspect = args => JSON.parse(execFileSync(python, [oracle, ...args], {
+    encoding: 'utf8', windowsHide: true, timeout: 15_000,
+    env: { ...process.env, PYTHONIOENCODING: 'cp1252:strict', PYTHONUTF8: '0' },
+  }));
+  try {
+    const exported = join(directory, 'export.xlsx');
+    writeFileSync(exported, Buffer.from(gridcraftXlsx(), 'base64'));
+    const evidence = inspect([exported]);
+    assert.equal(evidence.sheets[0].cells.A1.value, 'Open Office 表格😀');
+    assert.equal(evidence.sheets[0].cells.C1.value, 42);
+    const fixture = join(directory, 'fixture.xlsx');
+    const created = inspect(['--fixture', fixture]);
+    assert.deepEqual(created.sheets.map(sheet => sheet.name), ['销售', '预算']);
+    assert.deepEqual(inspect([fixture]), created);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 test('GridCraft canvas evidence cannot be replaced with old IPC or success flags', () => {
