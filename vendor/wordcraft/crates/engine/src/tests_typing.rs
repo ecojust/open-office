@@ -83,7 +83,8 @@ fn delete_surrounding_counts_unicode_scalars_not_bytes_utf16_or_graphemes() {
         let mut s = surrounding_session("A中😀e\u{301}Z");
         s.sel = crate::Selection::caret(Pos::body(0, prefix.len()));
         run(&mut s, "text.deleteSurrounding", json!({"beforeChars": before, "afterChars": after}));
-        assert_eq!(texts(&s), [expected]);
+        // Preserve case as well as Unicode scalars; texts() normalizes case for typing tests.
+        assert_eq!(paras(&s).into_iter().map(|p| p.0).collect::<Vec<_>>(), [expected]);
         assert_eq!(s.sel, crate::Selection::caret(Pos::body(0, caret.len())));
     }
 }
