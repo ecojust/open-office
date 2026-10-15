@@ -47,6 +47,7 @@ jobs:
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/actions/runs/${VERIFIED_BUILD_RUN_ID}/jobs?filter=latest&per_page=100" > source-job-pages.json
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/actions/runs/${VERIFIED_BUILD_RUN_ID}/artifacts?per_page=100" > source-artifact-pages.json
           node --input-type=module <<'NODE'
+          process.on('uncaughtExceptionMonitor', error => console.error('::error title=Verified desktop release::' + String(error.message).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')));
           import assert from 'node:assert/strict';
           import { readFileSync, writeFileSync } from 'node:fs';
           for (const [input, output, key] of [['source-job-pages.json', 'source-jobs.json', 'jobs'], ['source-artifact-pages.json', 'source-artifacts.json', 'artifacts']]) {
@@ -62,6 +63,7 @@ jobs:
           NODE
           node scripts/select-desktop-release-artifacts.mjs --run source-run.json --jobs source-jobs.json --artifacts source-artifacts.json --run-id "$VERIFIED_BUILD_RUN_ID" --now "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > selected-artifacts.json
           node --input-type=module <<'NODE'
+          process.on('uncaughtExceptionMonitor', error => console.error('::error title=Verified desktop release::' + String(error.message).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')));
           import assert from 'node:assert/strict';
           import { appendFileSync, readFileSync } from 'node:fs';
           const selection = JSON.parse(readFileSync('selected-artifacts.json', 'utf8'));
@@ -79,18 +81,94 @@ jobs:
           ref: ${{ steps.selection.outputs.head_sha }}
           path: verified-source
           persist-credentials: false
-      - name: Download only the three selected immutable artifacts
-        uses: actions/download-artifact@v4
-        with:
-          artifact-ids: ${{ steps.selection.outputs.artifact_ids }}
-          run-id: ${{ inputs.source_run_id }}
-          github-token: ${{ github.token }}
-          path: artifacts
-          merge-multiple: true
+      - name: Download and verify all three exact artifact ZIPs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          process.on('uncaughtExceptionMonitor', error => console.error('::error title=Verified desktop release::' + String(error.message).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')));
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { createWriteStream, mkdirSync, readFileSync } from 'node:fs';
+          import { Readable, Transform } from 'node:stream';
+          import { pipeline } from 'node:stream/promises';
+          const selection = JSON.parse(readFileSync('selected-artifacts.json', 'utf8'));
+          assert.equal(selection.repository, process.env.GITHUB_REPOSITORY);
+          assert.match(selection.repository, /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/);
+          assert.equal(selection.sourceRunId, process.env.VERIFIED_BUILD_RUN_ID);
+          assert.equal(selection.sourceCommit, process.env.VERIFIED_SOURCE_SHA);
+          assert.equal(selection.artifacts.length, 3);
+          assert.deepEqual(selection.artifacts.map(artifact => artifact.id), selection.artifactIds);
+          assert.equal(new Set(selection.artifactIds).size, 3);
+          assert.ok(process.env.GH_TOKEN, 'Artifact download token is missing');
+          assert.equal(process.env.GITHUB_API_URL, 'https://api.github.com');
+          mkdirSync('artifact-zips');
+          for (const artifact of selection.artifacts) {
+            assert.ok(Number.isSafeInteger(artifact.id) && artifact.id > 0);
+            assert.match(artifact.digest, /^sha256:[0-9a-f]{64}$/);
+            // Request this immutable ID directly. The download-artifact action
+            // first deduplicates names by ID, which can discard a later rerun.
+            const api = new URL(`/repos/${selection.repository}/actions/artifacts/${artifact.id}/zip`, process.env.GITHUB_API_URL);
+            const response = await fetch(api, {
+              redirect: 'manual', signal: AbortSignal.timeout(60_000),
+              headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+            });
+            assert.equal(response.status, 302, `Artifact ${artifact.id} ZIP API returned HTTP ${response.status}`);
+            const location = response.headers.get('location');
+            assert.ok(location, `Artifact ${artifact.id} ZIP API returned no download location`);
+            const destination = new URL(location);
+            assert.equal(destination.protocol, 'https:', `Artifact ${artifact.id} download must use HTTPS`);
+            assert.ok(!destination.username && !destination.password, `Artifact ${artifact.id} download contains URL credentials`);
+            // GitHub's token never reaches the signed storage URL or its redirects.
+            const download = await fetch(destination, { redirect: 'follow', credentials: 'omit', signal: AbortSignal.timeout(600_000) });
+            assert.equal(download.status, 200, `Artifact ${artifact.id} ZIP download returned HTTP ${download.status}`);
+            assert.ok(download.body, `Artifact ${artifact.id} ZIP download has no body`);
+            let size = 0;
+            const hash = createHash('sha256');
+            const digest = new Transform({ transform(chunk, _encoding, callback) { size += chunk.length; hash.update(chunk); callback(null, chunk); } });
+            await pipeline(Readable.fromWeb(download.body), digest, createWriteStream(`artifact-zips/${artifact.id}.zip`, { flags: 'wx' }));
+            assert.ok(size > 0, `Artifact ${artifact.id} ZIP download is empty`);
+            assert.equal(`sha256:${hash.digest('hex')}`, artifact.digest, `Artifact ${artifact.id} ZIP SHA-256 mismatch`);
+            console.log(`Verified artifact ${artifact.id}: ${size} ZIP bytes, ${artifact.digest}`);
+          }
+          NODE
+          python3 - <<'PYTHON'
+          import json, pathlib, shutil, stat, sys, zipfile
+          try:
+              selection = json.loads(pathlib.Path('selected-artifacts.json').read_text())
+              destination = pathlib.Path('artifacts')
+              destination.mkdir()
+              names = set()
+              for artifact in selection['artifacts']:
+                  with zipfile.ZipFile(f"artifact-zips/{artifact['id']}.zip") as archive:
+                      for entry in archive.infolist():
+                          path = pathlib.PurePosixPath(entry.filename)
+                          if not entry.filename or '\\' in entry.filename or path.is_absolute() or '..' in path.parts or not path.parts:
+                              raise ValueError(f"Artifact {artifact['id']} contains an unsafe ZIP path")
+                          if stat.S_ISLNK(entry.external_attr >> 16):
+                              raise ValueError(f"Artifact {artifact['id']} contains a ZIP symlink")
+                          output = destination.joinpath(*path.parts)
+                          if entry.is_dir():
+                              output.mkdir(parents=True, exist_ok=True)
+                              continue
+                          logical = str(path)
+                          if logical in names or output.exists():
+                              raise ValueError(f"Artifact {artifact['id']} would overwrite extracted path {logical}")
+                          names.add(logical)
+                          output.parent.mkdir(parents=True, exist_ok=True)
+                          with archive.open(entry) as source, output.open('xb') as target:
+                              shutil.copyfileobj(source, target)
+                  print(f"Extracted verified artifact {artifact['id']}")
+          except Exception as error:
+              message = str(error).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::error title=Verified desktop artifact extraction::{message}', file=sys.stderr)
+              raise
+          PYTHON
       - name: Validate all native reports and create exact source archive
         shell: bash
         run: |
           node --input-type=module <<'NODE'
+          process.on('uncaughtExceptionMonitor', error => console.error('::error title=Verified desktop release::' + String(error.message).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')));
           import assert from 'node:assert/strict';
           import { createHash } from 'node:crypto';
           import { execFileSync } from 'node:child_process';
@@ -174,6 +252,7 @@ jobs:
           发布校验记录：https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
           EOF
           node --input-type=module <<'NODE'
+          process.on('uncaughtExceptionMonitor', error => console.error('::error title=Verified desktop release::' + String(error.message).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')));
           import { appendFileSync, readFileSync } from 'node:fs';
           const selection = JSON.parse(readFileSync('selected-artifacts.json', 'utf8'));
           const rows = [['Windows x64', selection.windowsArtifactId], ['macOS ARM64', selection.macosArmArtifactId], ['macOS Intel / Rosetta', selection.macosIntelArtifactId]];
@@ -187,6 +266,7 @@ jobs:
           fi
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,targetCommitish,tagName > existing-release.json; then
             node --input-type=module <<'NODE'
+          process.on('uncaughtExceptionMonitor', error => console.error('::error title=Verified desktop release::' + String(error.message).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')));
           import assert from 'node:assert/strict';
           import { readFileSync } from 'node:fs';
           const release = JSON.parse(readFileSync('existing-release.json', 'utf8'));
@@ -199,6 +279,7 @@ jobs:
           fi
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,targetCommitish,assets > release-ready.json
           node --input-type=module <<'NODE'
+          process.on('uncaughtExceptionMonitor', error => console.error('::error title=Verified desktop release::' + String(error.message).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')));
           import assert from 'node:assert/strict';
           import { readFileSync } from 'node:fs';
           const release = JSON.parse(readFileSync('release-ready.json', 'utf8'));
