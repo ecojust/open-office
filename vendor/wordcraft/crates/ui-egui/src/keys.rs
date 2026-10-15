@@ -806,22 +806,66 @@ mod tests {
 
     #[test]
     fn browser_clipboard_cut_and_copy_dispatch_only_once() {
-        use std::sync::{Arc, Mutex};
-        let (ctx, mut app) = browser_clipboard_app();
-        let commands = Arc::new(Mutex::new(Vec::<String>::new()));
-        let observed = commands.clone();
-        app.services.host_command = Some(Box::new(move |id, _| {
-            if matches!(id, "edit.copy" | "edit.cut") {
-                observed.lock().unwrap().push(id.to_owned());
-            }
-            None
-        }));
-        app.run("select.all", json!({})).unwrap();
-        clipboard_frame(&ctx, &mut app, vec![clipboard_key(Key::C, true, false), egui::Event::Copy]);
-        clipboard_frame(&ctx, &mut app, vec![clipboard_key(Key::X, true, false), egui::Event::Cut]);
-        assert_eq!(*commands.lock().unwrap(), ["edit.copy", "edit.cut"]);
-        assert_eq!(app.session.clipboard_text, "base");
-        assert!(app.session.doc.plain_text(wordcraft_doc::StoryRef::Body).trim_end().is_empty());
+        fn copied_in_frame(ctx: &egui::Context, app: &mut WordApp, events: Vec<egui::Event>) -> Vec<String> {
+            let output = ctx.run_ui(egui::RawInput { events, ..Default::default() }, |ui| canvas_events(app, ui.ctx()));
+            let copied = output
+                .platform_output
+                .commands
+                .iter()
+                .filter_map(|command| match command {
+                    egui::OutputCommand::CopyText(text) => Some(text.clone()),
+                    _ => None,
+                })
+                .collect();
+            output.drop_without_applying_deltas();
+            copied
+        }
+
+        for split_frames in [false, true] {
+            let (ctx, mut app) = browser_clipboard_app();
+            app.ctx = Some(ctx.clone());
+            app.run("select.all", json!({})).unwrap();
+            let before = app.session.doc.clone();
+            let selection = app.session.sel.clone();
+            let depth = app.session.undo_depth();
+
+            // Observe the real platform sink: host_command is a policy hook consulted by
+            // both run and execute, so its call count is not a clipboard-operation count.
+            let copy = if split_frames {
+                assert!(copied_in_frame(&ctx, &mut app, vec![clipboard_key(Key::C, true, false)]).is_empty());
+                assert_eq!(app.session.doc, before);
+                assert_eq!(app.session.sel, selection);
+                assert_eq!(app.session.undo_depth(), depth);
+                assert_eq!(app.session.clipboard_text, "old copy", "keydown must wait for the browser's Copy event");
+                copied_in_frame(&ctx, &mut app, vec![egui::Event::Copy, clipboard_key(Key::C, false, false)])
+            } else {
+                copied_in_frame(&ctx, &mut app, vec![clipboard_key(Key::C, true, false), egui::Event::Copy, clipboard_key(Key::C, false, false)])
+            };
+            assert_eq!(copy, ["base"], "one Copy event writes to the platform clipboard once");
+            assert_eq!(app.session.clipboard_text, "base");
+            assert_eq!(app.session.doc, before, "Copy must preserve the document");
+            assert_eq!(app.session.sel, selection, "Copy must preserve the selection");
+            assert_eq!(app.session.undo_depth(), depth, "Copy must not create an undo step");
+
+            let cut = if split_frames {
+                assert!(copied_in_frame(&ctx, &mut app, vec![clipboard_key(Key::X, true, false)]).is_empty());
+                assert_eq!(app.session.doc, before, "keydown must wait for the browser's Cut event");
+                assert_eq!(app.session.sel, selection);
+                assert_eq!(app.session.undo_depth(), depth);
+                copied_in_frame(&ctx, &mut app, vec![egui::Event::Cut, clipboard_key(Key::X, false, false)])
+            } else {
+                copied_in_frame(&ctx, &mut app, vec![clipboard_key(Key::X, true, false), egui::Event::Cut, clipboard_key(Key::X, false, false)])
+            };
+            assert_eq!(cut, ["base"], "one Cut event writes to the platform clipboard once");
+            assert_eq!(app.session.clipboard_text, "base");
+            assert_eq!(app.session.doc.plain_text(wordcraft_doc::StoryRef::Body), "");
+            assert!(app.session.sel.is_collapsed());
+            assert_eq!(app.session.undo_depth(), depth + 1, "Cut creates exactly one undo step");
+            app.run("edit.undo", json!({})).unwrap();
+            assert_eq!(app.session.doc, before, "one undo restores the exact document");
+            assert_eq!(app.session.sel, selection);
+            assert_eq!(app.session.undo_depth(), depth);
+        }
     }
 
     #[test]
