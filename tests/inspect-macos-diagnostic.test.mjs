@@ -32,7 +32,7 @@ try:
             if request.get('mode') == 'rust-emit':
                 module.summarize_rust(read, {'id': 1}, {'id': 2}, 'a' * 40)
             else:
-                module.summarize(read, request.get('files', list(evidence)), {'id': 1}, {'id': 2, 'size_in_bytes': 3}, 'a' * 40, context)
+                module.summarize(read, request.get('files', list(evidence)), {'id': 1}, {'id': 2, 'size_in_bytes': 3}, 'a' * 40, context, request.get('crashReporterContext', False))
         value = stream.getvalue()
     else:
         value = module.context_log_summary(request['log'].encode(), request['report'], module.process_rows(request['report']['processSamples']), context)
@@ -73,6 +73,23 @@ function crashBody(patch = {}) {
     threads: [{ frames: [{ symbol: 'unrelated thread' }] }, { triggered: true,
       frames: Array.from({ length: 9 }, (_, i) => ({ symbol: `WebCore::focus${i}`, symbolLocation: i, imageIndex: 0 })) }],
     usedImages: [{ name: 'WebCore', path: '/Users/private-person/Frameworks/WebCore' }], ...patch };
+}
+function sigtrapReport() {
+  return {
+    startedAt: '2026-10-15T17:16:10.000Z', finishedAt: '2026-10-15T17:16:30.000Z',
+    nativeDiagnostics: { events: [{ phase: 'editing-window-geometry', detail: JSON.stringify({
+      webContent: { supported: true, pid: 15734, source: 'WKWebView._webProcessIdentifier' },
+    }) }] },
+    exitObserver: { status: 'exited', registered: true, pid: 15734, registeredPid: 15734,
+      exit: { pid: 15734, unixMs: Date.UTC(2026, 9, 15, 17, 16, 18, 240),
+        waitStatusAvailable: true, waitStatus: 5, signaled: true, signal: 5 } },
+  };
+}
+function reporterEvent(process, milliseconds, message, extra = {}) {
+  return event(700, milliseconds, message, { processImagePath: `/usr/libexec/${process}`, ...extra });
+}
+function inspectReporter(patch = {}) {
+  return inspect({ mode: 'emit', time: '', pids: '', report: sigtrapReport(), crashReporterContext: true, ...patch });
 }
 
 test('context input requires exact UTC time and one or two distinct valid PIDs', () => {
@@ -434,6 +451,105 @@ test('exit observer summary preserves raw status without treating the signal as 
   }
   const result = inspect({ mode: 'emit', time: '', pids: '', report: { exitObserver: observer } });
   assert.equal(annotations(result.value).find(row => row.section === 'process').exitObserver.ownedPid, false);
+});
+
+test('reporting context reads both log phases in the recorded SIGTRAP window without requiring service PID ownership', () => {
+  const shared = reporterEvent('ReportCrash', 240, 'Formulating fatal report');
+  const result = inspectReporter({ log: [reporterEvent('ReportCrash', -1760, 'first window boundary'), shared,
+    reporterEvent('ReportCrash', -1761, 'before window'), event(15734, 240, 'target is not a reporting service'),
+    reporterEvent('ReportCrashHelper', 240, 'not the exact reporting service')].join('\n'),
+    evidence: { 'system-reportcrash.ndjson': [shared,
+      reporterEvent('osanalyticshelper', 8000, 'Saved report at destination'),
+      reporterEvent('ReportCrash', 10240, 'last window boundary'),
+      reporterEvent('ReportCrash', 10241, 'after window')].join('\n') } });
+  assert.equal(result.ok, true, result.error);
+  const rows = annotations(result.value);
+  assert.equal(rows[0].section, 'crash-reporter-context');
+  assert.equal(rows[0].exitPid, 15734);
+  assert.equal(rows[0].exitUnixMs, sigtrapReport().exitObserver.exit.unixMs);
+  assert.equal(rows[0].beforeSeconds, 2); assert.equal(rows[0].afterSeconds, 10);
+  assert.equal(rows[0].duplicateLines, 1);
+  assert.deepEqual(rows[0].sources.map(source => source.available), [true, true]);
+  assert.equal(rows[0].establishesFix, false);
+  assert.ok(rows.every(row => row.causalityEstablished === false));
+  assert.deepEqual(rows.slice(1).flatMap(row => row.lines).map(row => row.message),
+    ['first window boundary', 'Formulating fatal report', 'Saved report at destination', 'last window boundary']);
+  assert.ok(rows.slice(1).flatMap(row => row.lines).every(row => row.pid === 700));
+  assert.match(rows[0].limitation, /other processes/);
+});
+
+test('reporting context refuses absent, unowned, mismatched and non-SIGTRAP exit evidence', () => {
+  const variants = [
+    report => { delete report.exitObserver; },
+    report => { delete report.nativeDiagnostics; },
+    report => { report.exitObserver.registered = false; },
+    report => { report.exitObserver.status = 'observing'; },
+    report => { report.exitObserver.exit.pid = 987; },
+    report => { report.exitObserver.registeredPid = 987; report.exitObserver.exit.pid = 987; },
+    report => { report.exitObserver.exit.waitStatusAvailable = false; },
+    report => { report.exitObserver.exit.waitStatus = 6; },
+    report => { report.exitObserver.exit.signal = 6; },
+    report => { report.exitObserver.exit.signaled = false; },
+    report => { report.exitObserver.exit.unixMs = true; },
+    report => { report.exitObserver.exit.unixMs -= 30000; },
+    report => { report.exitObserver.exit.unixMs += 30000; },
+  ];
+  for (const patch of variants) {
+    const report = sigtrapReport(); patch(report);
+    assert.equal(inspectReporter({ report }).ok, false, patch.toString());
+  }
+});
+
+test('reporting context recovers a separately checkpointed exit and distinguishes absent logs from no matches', () => {
+  const report = sigtrapReport(), observer = report.exitObserver;
+  report.exitObserver = { status: 'pending' };
+  const evidence = { 'webcontent-exit-observer.json': JSON.stringify(observer) };
+  const absent = inspectReporter({ report, log: null, evidence });
+  assert.equal(absent.ok, true, absent.error);
+  const rows = annotations(absent.value);
+  assert.equal(rows.length, 1); assert.equal(rows[0].available, false);
+  assert.deepEqual(rows[0].processCounts.map(row => row.matches), [0, 0]);
+  const empty = inspectReporter({ report, log: '', evidence });
+  assert.equal(annotations(empty.value)[0].available, true);
+  assert.match(annotations(empty.value)[0].limitation, /original capture filter/);
+});
+
+test('reporting context reserves both services and bounds untrusted content to twenty records and eight notices', () => {
+  const message = 'fake-test-token https://private.test/query ghp_abcdefghijk TOKEN=value\n::error::injected\n' + '文'.repeat(4000);
+  const log = ['tail fragment', 'x'.repeat(65537),
+    ...Array.from({ length: 30 }, (_, i) => reporterEvent('ReportCrash', 240 + i, message)),
+    ...Array.from({ length: 12 }, (_, i) => reporterEvent('osanalyticshelper', 5000 + i, message))].join('\n');
+  const result = inspectReporter({ log });
+  assert.equal(result.ok, true, result.error);
+  const rows = annotations(result.value);
+  assert.equal(rows.length, 8); assert.ok(rows.every(row => !row.summaryError));
+  assert.equal(rows[0].skippedLines, 2);
+  assert.deepEqual(rows[0].processCounts.map(row => [row.matches, row.selected, row.omitted]), [[30, 10, 20], [12, 10, 2]]);
+  const messages = rows.slice(1).flatMap(row => row.lines);
+  assert.equal(messages.length, 20); assert.ok(messages.every(row => row.messageTruncated));
+  assert.deepEqual(messages.map(row => row.time), messages.map(row => row.time).sort());
+  for (const omitted of ['fake-test-token', 'https://private.test', 'ghp_abcdefghijk', 'TOKEN=value']) {
+    assert.ok(!result.value.includes(omitted), omitted);
+  }
+  const oneService = inspectReporter({ log: Array.from({ length: 24 }, (_, i) => reporterEvent('ReportCrash', 240 + i, 'report')).join('\n') });
+  assert.equal(annotations(oneService.value)[0].processCounts[0].selected, 20);
+  assert.equal(inspectReporter({ evidence: { 'system-reportcrash.ndjson': 'x'.repeat(8 * 1024 * 1024 + 1) } }).ok, false);
+});
+
+test('reporting context remains optional and cannot be combined with raw PID or Rust modes', () => {
+  assert.equal(inspectReporter({ time: '2026-10-15T17:16:18.24Z', pids: '15734' }).ok, false);
+  for (const extra of [['--rust-regression'], ['--context-time', '2026-10-15T17:16:18.24Z', '--context-pids', '15734']]) {
+    const result = spawnSync(process.platform === 'win32' ? 'python' : 'python3',
+      ['scripts/inspect-macos-diagnostic.py', '--crash-reporter-context', ...extra],
+      { cwd: root, encoding: 'utf8', timeout: 10000, maxBuffer: 4096 });
+    assert.equal(result.status, 1, result.error?.message);
+    const rows = annotations(result.stdout);
+    assert.equal(rows.length, 1); assert.match(rows[0].error, /cannot use/);
+  }
+  const result = inspect({ mode: 'emit', time: '', pids: '', report: sigtrapReport(),
+    log: reporterEvent('ReportCrash', 240, 'unrelated reporting-service context') });
+  assert.equal(result.ok, true);
+  assert.ok(!annotations(result.value).some(row => row.section.startsWith('crash-reporter-')));
 });
 
 test('Rust regression output includes compilation failure context and tail without emitting the full log', () => {

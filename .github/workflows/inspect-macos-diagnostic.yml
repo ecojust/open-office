@@ -26,6 +26,11 @@ on:
         required: false
         default: false
         type: boolean
+      crash_reporter_context:
+        description: Inspect reporting-service logs from 2 seconds before to 10 seconds after the recorded WebContent SIGTRAP
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -48,9 +53,11 @@ jobs:
           INSPECT_CONTEXT_TIME: ${{ inputs.context_time }}
           INSPECT_CONTEXT_PIDS: ${{ inputs.context_pids }}
           INSPECT_RUST_REGRESSION: ${{ inputs.rust_regression }}
+          INSPECT_CRASH_REPORTER_CONTEXT: ${{ inputs.crash_reporter_context }}
         run: |
           args=()
           if [[ "$INSPECT_RUST_REGRESSION" == "true" ]]; then args+=(--rust-regression); fi
+          if [[ "$INSPECT_CRASH_REPORTER_CONTEXT" == "true" ]]; then args+=(--crash-reporter-context); fi
           python3 scripts/inspect-macos-diagnostic.py \
             --run-id "$INSPECT_RUN_ID" \
             --expected-sha "$INSPECT_EXPECTED_SHA" \

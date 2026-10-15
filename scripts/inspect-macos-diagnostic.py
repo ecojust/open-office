@@ -443,6 +443,83 @@ def exit_observer_summary(read, report, native):
         "causalityEstablished": False}
 
 
+def crash_reporter_context_summary(data, report, observer):
+    """Reporting-service messages near a verified WebContent SIGTRAP.
+
+    These processes need not mention the target PID. Time proximity is only
+    reporting-pipeline context and never establishes process ownership/cause.
+    """
+    observer = observer or {}
+    exit_event = observer.get("exit") or {}
+    pid = observer.get("registeredPid")
+    require(observer.get("status") == "exited" and observer.get("registered") is True
+        and observer.get("ownedPid") is True and observer.get("pid") == pid and exit_event.get("pid") == pid,
+        "Crash-reporter context requires an exit observed for the exact native WebContent PID")
+    status = exit_event.get("waitStatus")
+    require(exit_event.get("waitStatusAvailable") is True and type(status) is int and 0 <= status <= 65535
+        and status & 0x7f == 5 and exit_event.get("signaled") is True and exit_event.get("signal") == 5,
+        "Crash-reporter context requires a recorded SIGTRAP wait status")
+    start, end = system_time(report.get("startedAt")), system_time(report.get("finishedAt"))
+    milliseconds = exit_event.get("unixMs")
+    require(type(milliseconds) in (int, float) and start is not None and end is not None
+        and start * 1000 <= milliseconds <= end * 1000,
+        "Recorded SIGTRAP time is outside the diagnostic run")
+    anchor = milliseconds / 1000
+    processes = ("ReportCrash", "osanalyticshelper")
+    matches = {process: [] for process in processes}
+    parsed, skipped = 0, 0
+    for index, line in enumerate(data.splitlines()):
+        if len(line) > 65536:
+            skipped += 1
+            continue
+        try:
+            event = json.loads(line)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            skipped += 1
+            continue
+        if not isinstance(event, dict):
+            continue
+        parsed += 1
+        process = PurePosixPath(str(event.get("processImagePath") or "")).name
+        timestamp = system_time(event.get("timestamp"))
+        message = event.get("eventMessage")
+        if process not in matches or timestamp is None or not isinstance(message, str):
+            continue
+        if not (start <= timestamp <= end and anchor - 2 <= timestamp <= anchor + 10):
+            continue
+        process_pid = event.get("processID")
+        if isinstance(process_pid, str) and process_pid.isdigit():
+            process_pid = int(process_pid)
+        if type(process_pid) is not int or not 1 < process_pid <= 2147483647:
+            process_pid = None
+        clean = scrub(message, 65536)
+        excerpt = compact_text(clean, 650)
+        item = {"time": scrub(event["timestamp"], 80), "pid": process_pid, "process": process,
+            "type": compact_text(str(event.get("messageType") or ""), 30),
+            "message": excerpt, "messageTruncated": excerpt != clean}
+        while len(json.dumps(item, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) > 800:
+            item["message"] = compact_text(item["message"], max(0, len(item["message"].encode("utf-8")) - 40))
+            item["messageTruncated"] = True
+        matches[process].append((abs(timestamp - anchor), timestamp, index, item))
+    # Give each reporting service a quota, then share unused slots. A noisy
+    # ReportCrash cannot hide osanalyticshelper's report destination/failure.
+    selected, remaining, counts = [], [], []
+    for process in processes:
+        rows = sorted(matches[process], key=lambda row: (row[0], row[1], row[2]))
+        selected.extend(rows[:10])
+        remaining.extend(rows[10:])
+    selected.extend(sorted(remaining, key=lambda row: (row[0], row[1], row[2]))[:20 - len(selected)])
+    for process in processes:
+        count = sum(row[3]["process"] == process for row in selected)
+        counts.append({"process": process, "matches": len(matches[process]), "selected": count,
+            "omitted": len(matches[process]) - count})
+    return {"exitPid": pid, "exitUnixMs": milliseconds, "signal": 5, "beforeSeconds": 2, "afterSeconds": 10,
+        "processCounts": counts, "parsedLines": parsed, "skippedLines": skipped,
+        "selection": "Up to twenty nearest reporting-service records, reserving ten per service; chronological display, no keyword or target-PID filter.",
+        "limitation": "Time proximity only. These service messages may describe other processes; no ownership or crash cause is inferred. Missing messages may reflect the original capture filter.",
+        "lines": [row[3] for row in sorted(selected, key=lambda row: (row[1], row[2]))]}
+
+
 def system_log_summary(data, report, samples, max_lines=20, native=None):
     start, end = system_time(report.get("startedAt")), system_time(report.get("finishedAt"))
     app_pid = (report.get("process") or {}).get("pid")
@@ -675,12 +752,26 @@ def debugger_summary(read, report, files):
     return summary
 
 
-def summarize(read, files, run, artifact, expected_sha, context=None):
+def summarize(read, files, run, artifact, expected_sha, context=None, crash_reporter_context=False):
     report = read("report.json", 12 * 1024 * 1024) or {}
     host = read("host.json", 64 * 1024) or {}
     require(not report.get("commit") or report["commit"] == expected_sha, "Report commit mismatch")
     require(not report.get("runId") or str(report["runId"]) == str(run["id"]), "Report run ID mismatch")
     require(not host.get("commit") or host["commit"] == expected_sha, "Host commit mismatch")
+    require(not (context and crash_reporter_context), "Crash-reporter context cannot use macOS PID context")
+    if crash_reporter_context:
+        native = read("native-diagnostics.json", 1024 * 1024) or report.get("nativeDiagnostics") or {}
+        observer = exit_observer_summary(read, report, native)
+        log, capture = read_system_logs(read, report)
+        summary = crash_reporter_context_summary(log, report, observer)
+        notice("crash-reporter-context", {"runId": run["id"], "headSha": expected_sha, "artifactId": artifact["id"],
+            "establishesFix": False, "causalityEstablished": False,
+            "available": any(source["available"] for source in capture["sources"]), **capture,
+            **{key: value for key, value in summary.items() if key != "lines"}})
+        for offset in range(0, len(summary["lines"]), 3):
+            notice("crash-reporter-log", {"part": offset // 3 + 1, "lines": summary["lines"][offset:offset + 3],
+                "causalityEstablished": False})
+        return
     if context:
         samples = process_rows((report.get("processSamples") or [])[-200:])
         log, capture = read_system_logs(read, report)
@@ -768,11 +859,14 @@ def main():
     parser.add_argument("--directory", type=Path, help="Summarize this run's local evidence without API access")
     parser.add_argument("--context-time", default="", help="UTC instant for an optional fixed one-second context window")
     parser.add_argument("--context-pids", default="", help="One or two exact, observed PIDs separated by a comma")
+    parser.add_argument("--crash-reporter-context", action="store_true", help="Read reporting-service logs from two seconds before to ten seconds after the recorded native WebContent SIGTRAP")
     parser.add_argument("--rust-regression", action="store_true", help="Read only the fixed Grid Rust regression artifact's bounded Cargo log")
     args = parser.parse_args()
     try:
         context = parse_context(args.context_time, args.context_pids)
         require(not (args.rust_regression and context), "Rust regression mode cannot use macOS PID context")
+        require(not (args.crash_reporter_context and (args.rust_regression or context)),
+            "Crash-reporter context cannot use Rust regression or macOS PID context")
         if args.directory:
             run_id = args.run_id or os.environ.get("GITHUB_RUN_ID", "")
             expected_sha = args.expected_sha or os.environ.get("GITHUB_SHA", "")
@@ -784,7 +878,7 @@ def main():
             if args.rust_regression:
                 summarize_rust(read, run, artifact, expected_sha)
             else:
-                summarize(read, files, run, artifact, expected_sha, context)
+                summarize(read, files, run, artifact, expected_sha, context, args.crash_reporter_context)
             return 0
         require(bool(args.run_id and args.expected_sha), "--run-id and --expected-sha are required for remote inspection")
         token = os.environ.get("GH_INSPECT_TOKEN", "")
@@ -802,7 +896,7 @@ def main():
                 if args.rust_regression:
                     summarize_rust(read, run, artifact, args.expected_sha)
                 else:
-                    summarize(read, files, run, artifact, args.expected_sha, context)
+                    summarize(read, files, run, artifact, args.expected_sha, context, args.crash_reporter_context)
         return 0
     except Exception as error:
         # Only locally generated validation messages are exposed. URL-bearing

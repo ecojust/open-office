@@ -106,6 +106,10 @@ Linux WPE 的 Playwright WebKit 2336（报告版本 26.5）另做了只读对照
 
 诊断另用 `EVFILT_PROC` 在首次输入前观察 WKWebView 明确报告的 WebContent PID，保留 Darwin 原始退出状态和退出详情，不附加调试器、不向目标发送信号。权限拒绝或目标已退出均明确记录；观察器在应用收尾前停止，避免将测试清理计为产品故障。原生自检仅创建本测试的子进程，校验正常退出、信号退出以及停止观察后目标仍存活。单独取得某个信号仍不能确定根因。
 
+[原始双击与退出监测 38794415036](https://github.com/ecojust/open-office/actions/runs/38794415036) 使用 `25cedaa4ebcd6082d21efa65ba856374ef9944de`。四项原生观察器自检均通过、无跳过；随后准确注册原 WebContent PID 23382。A1 提交通过，D6 请求在 10941 ms、进程终止在 11300 ms。Darwin 返回 `waitStatus=5`、`signal=5`（SIGTRAP）、`detailFlags=0`；内存、签名与解密终止标志均为 false。该信号不能单独定位具体断言或 JIT 路径，也不是内存占用原因的证明。仍未取得崩溃文件。按准确退出时间读取的系统日志没有原 WebContent PID 的直接消息。
+
+[预选对照 38794370710](https://github.com/ecojust/open-office/actions/runs/38794370710) 的第一次尝试在 WASM 加载阶段遇到 `No buffer space available (os error 55)`，前端报告 `Load failed`。系统输入为零项，启动一次、WebContent 终止零次，观察器尚未注册；这不是选区或编辑行为的测试结果。已按同一提交重跑该诊断。
+
 另一个独立候选仅在画布已经是 `document.activeElement` 且请求 `preventScroll: true` 时跳过同一画布的重复 `focus()`；真实焦点转移仍调用原生方法。eframe 的 pointerup 与 Ready 帧平台输出都会请求画布聚焦，当前实验用于区分这条重复调用路径。默认 Chromium 编辑的 11 项动作、8 项检查及全局工具栏、跨标签、中文草稿保存回归通过；原生结果仍待取得，尚不能称为修复。
 
 ## 原生检查的判定要求
