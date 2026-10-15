@@ -1,0 +1,147 @@
+{
+  "nativeVersion": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "fixtures": [
+    {
+      "name": "basic-direct",
+      "source": "basic-direct.docx",
+      "nativeDocx": "native-docx/basic-direct.docx",
+      "nativeOdt": "native-odt/basic-direct.odt",
+      "nativePdf": "native-pdf/basic-direct.pdf",
+      "commands": [
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native-docx",
+            "./basic-direct.docx"
+          ],
+          "stdout": "convert ./basic-direct.docx as a Writer document -> ./native-docx/basic-direct.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n",
+          "code": 0
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "odt",
+            "--outdir",
+            "./native-odt",
+            "./basic-direct.docx"
+          ],
+          "stdout": "convert ./basic-direct.docx as a Writer document -> ./native-odt/basic-direct.odt using filter : writer8\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n",
+          "code": 0
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native-pdf",
+            "./basic-direct.docx"
+          ],
+          "stdout": "convert ./basic-direct.docx as a Writer document -> ./native-pdf/basic-direct.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n",
+          "code": 0
+        }
+      ]
+    },
+    {
+      "name": "basic-styles",
+      "source": "basic-styles.docx",
+      "nativeDocx": "native-docx/basic-styles.docx",
+      "nativeOdt": "native-odt/basic-styles.odt",
+      "nativePdf": "native-pdf/basic-styles.pdf",
+      "commands": [
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native-docx",
+            "./basic-styles.docx"
+          ],
+          "stdout": "convert ./basic-styles.docx as a Writer document -> ./native-docx/basic-styles.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n",
+          "code": 0
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "odt",
+            "--outdir",
+            "./native-odt",
+            "./basic-styles.docx"
+          ],
+          "stdout": "convert ./basic-styles.docx as a Writer document -> ./native-odt/basic-styles.odt using filter : writer8\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n",
+          "code": 0
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native-pdf",
+            "./basic-styles.docx"
+          ],
+          "stdout": "convert ./basic-styles.docx as a Writer document -> ./native-pdf/basic-styles.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n",
+          "code": 0
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "basic-direct.docx",
+      "sha256": "6115901c0bc94fa40756acee2bfa959644038def55f45d29ae6674c7fb651c4a"
+    },
+    {
+      "path": "basic-styles.docx",
+      "sha256": "c4f499a65978c96b55161891ba20f92a361d0990625e212ffa1e59c757bbd213"
+    },
+    {
+      "path": "native-docx/basic-direct.docx",
+      "sha256": "fc05d021dd961f7ef30f3365038920682ffc24685c2104fb8b889c86c523a588"
+    },
+    {
+      "path": "native-docx/basic-styles.docx",
+      "sha256": "de5e66dd017bcd02f78526b454d47c8228ff5b00399d0f3711c641b3c0610505"
+    },
+    {
+      "path": "native-odt/basic-direct.odt",
+      "sha256": "8b68893a734a7b17588f02d4732cc152df68eb865d21e7f13053c3cb5f5586b4"
+    },
+    {
+      "path": "native-odt/basic-styles.odt",
+      "sha256": "703e643c59265d4eafb23831aebf79f2f3b83aa6d63ef73af72af9690aadf925"
+    },
+    {
+      "path": "native-pdf/basic-direct.pdf",
+      "sha256": "a23ad36f2f3bec14fd736cd4e520279b8a9b9bfa3e5a69ef2fe4fb186294ec6e"
+    },
+    {
+      "path": "native-pdf/basic-styles.pdf",
+      "sha256": "954ccbf4cba21dd2242e1c9d895994ed629f3cff26a53f6f3313279a82fdaa72"
+    }
+  ]
+}

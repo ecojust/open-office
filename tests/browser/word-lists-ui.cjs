@@ -13,7 +13,7 @@ async function save(name,format='docx'){
  const downloading=page.waitForEvent('download',{timeout:120000});await page.getByRole('button',{name:'另存为',exact:true}).click();await page.getByTestId('save-format-'+format).check();await page.getByTestId('save-format-confirm').click()
  const file=path.join(out,name+'.'+format);await(await downloading).saveAs(file);await idle();report.files.push({name:path.basename(file),sha256:sha(fs.readFileSync(file))});return file
 }
-async function open(file){await page.getByTestId('document-open-input').setInputFiles(file);await idle();await page.locator('.ow-word>.ow-ribbon').getByRole('tab',{name:'开始',exact:true}).click();await page.getByLabel('段落样式',{exact:true}).waitFor()}
+async function open(file){await page.locator('input[type="file"][accept=".docx,.odt,.doc,.rtf"]').setInputFiles(file);await idle();await page.locator('.ow-word>.ow-ribbon').getByRole('tab',{name:'开始',exact:true}).click();await page.getByLabel('段落样式',{exact:true}).waitFor()}
 async function locate(text){
  const ribbon=page.locator('.ow-word>.ow-ribbon');await ribbon.getByRole('tab',{name:'审阅',exact:true}).click();if(!await page.getByLabel('查找内容',{exact:true}).count())await ribbon.getByRole('button',{name:'查找与替换',exact:true}).click()
  await page.getByLabel('查找内容',{exact:true}).fill(text);await page.getByRole('button',{name:'查找下一处',exact:true}).click();await idle();assert.equal((await state()).selection.text,text)

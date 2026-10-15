@@ -22,8 +22,56 @@ const PLATFORMS = Object.freeze({
   'macos-arm64': { os: 'darwin', arch: 'arm64', nativeArch: 'arm64', target: 'aarch64-apple-darwin' },
 });
 
+export const REQUIRED_RUST_WORD_CHECKS = Object.freeze([
+  'Real IPC creates a clean Rust-owned document',
+  'Chinese and emoji insertion, paragraph breaks and history stay in Rust',
+  'Real IPC selection, bold/italic/size/color, alignment and undo/redo match snapshots',
+  'Real IPC DOCX export/reopen preserves text and formatting with Rust glyph paths',
+  'Saved-state tracking and stale-revision failure preserve the current Rust session',
+]);
+
 function requireCheck(value, message) {
   assert.ok(value, message);
+}
+
+/** Native IPC evidence and independent exported-byte validation, not UI acceptance. */
+export function validateRustWordEngineReport(report) {
+  requireCheck(report && typeof report === 'object' && !Array.isArray(report), 'Rust Word engine native IPC report is missing');
+  requireCheck(report.schemaVersion === 1 && report.ok === true, 'Rust Word engine native IPC checks failed');
+  requireCheck(report.transport === 'tauri-word-engine-request', 'Rust Word engine requires real Tauri IPC transport');
+  assert.deepEqual(report.checks, [...REQUIRED_RUST_WORD_CHECKS], 'Rust Word engine requires all five ordered IPC checks');
+  requireCheck(report.paragraphs === 2, 'Rust Word engine paragraph count changed');
+  for (const key of ['pages', 'glyphPaths']) {
+    requireCheck(Number.isSafeInteger(report[key]) && report[key] > 0, `Rust Word engine returned invalid ${key}`);
+  }
+  assert.deepEqual(report.cleanup, { attempted: 2, closed: 2, ok: true }, 'Rust Word engine did not close both native sessions');
+  requireCheck(report.error === undefined && report.closeError === undefined, 'Rust Word engine reported an operation or cleanup error');
+  const base64 = report.docxBase64;
+  requireCheck(typeof base64 === 'string' && base64.length > 0 && base64.length < MAX_REPORT_BYTES
+    && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64), 'Rust Word engine DOCX Base64 is missing or invalid');
+  const bytes = Buffer.from(base64, 'base64');
+  requireCheck(bytes.length > 100 && bytes.subarray(0, 4).equals(Buffer.from('504b0304', 'hex'))
+    && bytes.toString('base64') === base64, 'Rust Word engine produced no valid DOCX ZIP bytes');
+  // CI provides Python in all native and publication jobs. No npm package or
+  // application codec participates in this independent ZIP/XML readback.
+  const python = process.env.OPEN_OFFICE_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+  const directory = mkdtempSync(join(tmpdir(), 'open-office-rust-docx-readback-'));
+  let result;
+  try {
+    const path = join(directory, 'export.docx');
+    writeFileSync(path, bytes, { flag: 'wx' });
+    result = spawnSync(python, [join(PROJECT_ROOT, 'scripts', 'rust-word-smoke-docx.py'), path], {
+      stdio: ['ignore', 'pipe', 'pipe'], shell: false, encoding: 'utf8', timeout: 15_000, maxBuffer: 64 * 1024, windowsHide: true,
+    });
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+  requireCheck(!result.error && result.status === 0 && !result.signal,
+    `Rust Word engine independent DOCX verification failed: ${String(result.stderr || result.error?.message || 'invalid ZIP/XML').trim().slice(0, 500)}`);
+  let evidence;
+  try { evidence = JSON.parse(result.stdout); } catch { throw Error('Rust Word engine independent DOCX verification returned invalid evidence'); }
+  requireCheck(evidence?.ok === true && evidence.docxBytes === bytes.length, 'Rust Word engine independent DOCX byte evidence is invalid');
+  assert.deepEqual(evidence.paragraphs, ['Rust 正文 中文😀', 'Second paragraph'], 'Rust Word engine independent DOCX text differs');
+  assert.deepEqual(evidence.firstParagraphFormat, { bold: true, italic: true, fontSize: 14, color: '#C00000', align: 'center' }, 'Rust Word engine independent DOCX formatting differs');
+  return evidence;
 }
 
 export function validateOfficeWorkbenches(report) {
@@ -201,9 +249,11 @@ export function validateFrontendReport(report) {
   requireCheck(workbench.transition === 'fade' && workbench.mediaBytes === 3244 && typeof workbench.mediaDuration === 'number' && Math.abs(workbench.mediaDuration - .2) < .05, 'Presentation workbench transition or native media metadata failed');
   requireCheck(JSON.stringify(workbench.pdfCanvasPages) === '[0,1]', 'Presentation workbench actual canvas navigation failed');
   const officeWorkbenchChecks = validateOfficeWorkbenches(report);
+  validateRustWordEngineReport(report.rustWordEngine);
 
   return {
     ...officeWorkbenchChecks,
+    rustWordEngineIpc: true, rustWordEngineDocxReadback: true, rustWordEngineSessionCleanup: true,
     independentWordPackageIpc: true,
     presentationWorkbenchRoundTrip: true, presentationMediaMetadata: true, presentationCanvasNavigation: true,
     crossOriginIsolated: true, sharedArrayBuffer: true, writerOriginalTextRoundTrip: true,

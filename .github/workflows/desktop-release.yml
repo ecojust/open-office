@@ -82,6 +82,8 @@ jobs:
           cache: pip
           cache-dependency-path: pdf-backend/requirements.txt
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
@@ -121,6 +123,8 @@ jobs:
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml -- --include-ignored
       - name: Verify independent DOCX package core
         run: cargo test --locked --manifest-path crates/word-package/Cargo.toml
+      - name: Verify Rust document, editing and layout engine
+        run: cargo test --locked --manifest-path crates/word-engine/Cargo.toml
       - name: Build native installation package
         run: npm run desktop:build -- --bundles ${{ matrix.bundles }}
       - name: Install Windows package to verify the delivered resource layout
@@ -219,6 +223,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Require an ARM verification host and available Rosetta translation
         run: |
           test "$(uname -m)" = arm64
@@ -296,6 +303,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: actions/download-artifact@v4
         with:
           pattern: open-office-native-*

@@ -109,6 +109,7 @@ fn parse_scope(value: Option<&str>) -> Result<&'static str, String> {
     match value {
         None | Some("full") => Ok("full"),
         Some("word-package-ipc") => Ok("word-package-ipc"),
+        Some("rust-word-engine") => Ok("rust-word-engine"),
         _ => Err("Unknown OPEN_OFFICE_SMOKE_SCOPE.".into()),
     }
 }
@@ -149,6 +150,7 @@ mod tests {
     fn smoke_scope_defaults_to_full_and_rejects_unknown_values() {
         assert_eq!(parse_scope(None).unwrap(), "full");
         assert_eq!(parse_scope(Some("full")).unwrap(), "full");
+        assert_eq!(parse_scope(Some("rust-word-engine")).unwrap(), "rust-word-engine");
         assert_eq!(
             parse_scope(Some("word-package-ipc")).unwrap(),
             "word-package-ipc"

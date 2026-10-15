@@ -217,7 +217,7 @@ async function run(kind, dpr) {
     phase = current.label + ' open';
     await page.goto(process.env.OFFICE_WORKBENCH_URL || 'http://127.0.0.1:4299/');
     const fixture = path.join(fixtures, kind === 'word' ? 'viewport-source.docx' : 'viewport-source.xlsx');
-    await page.getByTestId('document-open-input').setInputFiles(fixture);
+    await (kind === 'word' ? page.locator('input[type="file"][accept=".docx,.odt,.doc,.rtf"]') : page.getByTestId('document-open-input')).setInputFiles(fixture);
     await idle();
     await page.getByLabel(kind === 'word' ? '段落样式' : '单元格字体', { exact: true }).waitFor();
     current.documentId = (await state()).documentId;

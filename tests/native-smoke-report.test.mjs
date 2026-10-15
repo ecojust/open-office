@@ -1,10 +1,35 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { validateFrontendReport } from '../scripts/native-smoke.mjs';
+import { strToU8, zipSync } from 'fflate';
+import { REQUIRED_RUST_WORD_CHECKS, validateFrontendReport, validateRustWordEngineReport } from '../scripts/native-smoke.mjs';
 import { REQUIRED_CHECKS } from '../scripts/word-package-native-smoke.mjs';
 
 // These fixtures test the release report contract, not Office functionality.
 // The native CI separately runs the actual packaged GUI and real file round trips.
+function rustWordParts() {
+  const w = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const rel = 'http://schemas.openxmlformats.org/package/2006/relationships';
+  const r = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  // Hand-written OPC/XML fixtures. No product model, serializer, or parser.
+  const run = (text, formatted) => `<w:r><w:rPr><w:rFonts w:ascii="DejaVu Sans" w:hAnsi="DejaVu Sans" w:eastAsia="DejaVu Sans" w:cs="DejaVu Sans"/><w:b w:val="${formatted ? 1 : 0}"/><w:i w:val="${formatted ? 1 : 0}"/><w:sz w:val="${formatted ? 28 : 24}"/><w:color w:val="${formatted ? 'C00000' : '20242B'}"/></w:rPr><w:t xml:space="preserve">${text}</w:t></w:r>`;
+  return {
+    '[Content_Types].xml': '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>',
+    '_rels/.rels': `<Relationships xmlns="${rel}"><Relationship Id="office" Type="${r}/officeDocument" Target="word/document.xml"/></Relationships>`,
+    'word/document.xml': `<w:document xmlns:w="${w}"><w:body><w:p><w:pPr><w:jc w:val="center"/></w:pPr>${run('Rust 正文 中文😀', true)}</w:p><w:p><w:pPr><w:jc w:val="left"/></w:pPr>${run('Second paragraph', false)}</w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:bottom="1440" w:left="1440" w:right="1440"/></w:sectPr></w:body></w:document>`,
+    'word/_rels/document.xml.rels': `<Relationships xmlns="${rel}"><Relationship Id="settings" Type="${r}/settings" Target="settings.xml"/></Relationships>`,
+    'word/settings.xml': `<w:settings xmlns:w="${w}"><w:defaultTabStop w:val="720"/></w:settings>`,
+  };
+}
+function rustWordDocx(mutate = () => {}) {
+  const parts = rustWordParts(); mutate(parts);
+  return Buffer.from(zipSync(Object.fromEntries(Object.entries(parts).map(([name, xml]) => [name, strToU8(xml)])), { level: 0 })).toString('base64');
+}
+const RUST_WORD_DOCX = rustWordDocx();
+function rustWordReport() {
+  return { schemaVersion: 1, ok: true, transport: 'tauri-word-engine-request', checks: [...REQUIRED_RUST_WORD_CHECKS],
+    paragraphs: 2, pages: 1, glyphPaths: 27, docxBase64: RUST_WORD_DOCX, cleanup: { attempted: 2, closed: 2, ok: true } };
+}
+
 function wordPackageReport() {
   const suffix = '\n上标中文😀下标中文😀\n明确取消中文😀取消高亮保留背景';
   return {
@@ -37,6 +62,7 @@ function completeReport() {
     ok: true, crossOriginIsolated: true, sharedArrayBuffer: true,
     userAgent: 'Native WebView contract test',
     independentWordPackage: wordPackageReport(),
+    rustWordEngine: rustWordReport(),
     office: {
       ok: true, engine: 'ZetaOffice / LibreOffice 24.2.8.0',
       writer: {
@@ -84,10 +110,80 @@ test('a complete four-workspace report preserves old checks and requires Impress
   const checks = validateFrontendReport(completeReport());
   for (const required of [
     'independentWordPackageIpc',
+    'rustWordEngineIpc', 'rustWordEngineDocxReadback', 'rustWordEngineSessionCleanup',
     'writerOriginalTextRoundTrip', 'writerPdfExport', 'calcFormulaRoundTrip', 'calcPdfExport',
     'pdfOriginalTextReplacementRoundTrip', 'impressOriginalTextRoundTrip', 'impressOdpRoundTrip',
     'impressPdfExport', 'impressPdfPageCount',
   ]) assert.equal(checks[required], true);
+});
+
+test('full release smoke requires the new real Rust Word engine IPC report', () => {
+  for (const value of [undefined, null, [], {}, { ok: true }, { ...rustWordReport(), ok: false }]) {
+    const report = completeReport(); report.rustWordEngine = value;
+    assert.throws(() => validateFrontendReport(report), /Rust Word engine/);
+  }
+});
+
+test('Rust Word report cannot replace native transport, all five checks, layout, or cleanup with success flags', () => {
+  for (const mutate of [
+    word => { word.schemaVersion = 0; }, word => { word.transport = 'wasm-worker'; },
+    word => { word.transport = 'rust-cli'; }, word => { word.checks.pop(); },
+    word => { word.checks[4] = word.checks[0]; }, word => { word.checks.reverse(); },
+    word => { word.paragraphs = '2'; }, word => { word.pages = 0; },
+    word => { word.glyphPaths = '27'; }, word => { word.glyphPaths = 1.5; },
+    word => { word.pages = Infinity; }, word => { delete word.cleanup; },
+    word => { word.cleanup.closed = 1; }, word => { word.cleanup.attempted = 1; },
+    word => { word.cleanup.ok = false; }, word => { word.closeError = 'close failed'; },
+    word => { word.error = 'stale revision changed the document'; },
+  ]) {
+    const report = rustWordReport(); mutate(report);
+    assert.throws(() => validateRustWordEngineReport(report), /Rust Word engine/);
+  }
+});
+
+test('Rust Word independent ZIP/XML readback verifies the hand-written complete DOCX fixture', () => {
+  const evidence = validateRustWordEngineReport(rustWordReport());
+  assert.equal(evidence.ok, true);
+  assert.deepEqual(evidence.paragraphs, ['Rust 正文 中文😀', 'Second paragraph']);
+  assert.equal(evidence.zipEntries.length, 5);
+});
+
+test('Rust Word DOCX evidence must contain a bounded, canonical and CRC-valid ZIP', () => {
+  const crcInvalid = Buffer.from(RUST_WORD_DOCX, 'base64');
+  const token = Buffer.from('Rust 正文 中文😀');
+  const offset = crcInvalid.indexOf(token); assert.ok(offset > 0);
+  crcInvalid[offset] = 0x42;
+  for (const base64 of [undefined, '', '%%%invalid', RUST_WORD_DOCX + '\n', 'A'.repeat(1024 * 1024),
+    Buffer.from('PK\x03\x04' + 'x'.repeat(200)).toString('base64'), crcInvalid.toString('base64'),
+    Buffer.from(RUST_WORD_DOCX, 'base64').subarray(0, 250).toString('base64')]) {
+    const report = rustWordReport(); report.docxBase64 = base64;
+    assert.throws(() => validateRustWordEngineReport(report), /Rust Word engine/);
+  }
+});
+
+test('successful IPC flags cannot hide altered text, format, OPC metadata, or unsupported extra content', () => {
+  for (const mutate of [
+    parts => { delete parts['[Content_Types].xml']; },
+    parts => { parts['word/hidden.xml'] = '<secret/>'; },
+    parts => { parts['_rels/.rels'] = parts['_rels/.rels'].replace('word/document.xml', 'other.xml'); },
+    parts => { parts['_rels/.rels'] = parts['_rels/.rels'].replace('Target=', 'TargetMode="External" Target='); },
+    parts => { parts['[Content_Types].xml'] = parts['[Content_Types].xml'].replace('document.main+xml', 'template.main+xml'); },
+    parts => { parts['word/settings.xml'] = parts['word/settings.xml'].replace('720', '360'); },
+    ...[
+      ['Rust 正文 中文😀', 'Rust 正文 中文'], ['Second paragraph', 'Stale paragraph'],
+      ['w:val="center"', 'w:val="left"'], ['<w:b w:val="1"/>', '<w:b w:val="0"/>'],
+      ['<w:i w:val="1"/>', '<w:i w:val="0"/>'], ['w:val="28"', 'w:val="14"'],
+      ['w:val="C00000"', 'w:val="000000"'], ['w:val="C00000"', 'w:val="C00000" w:themeColor="accent1"'],
+      ['w:val="20242B"', 'w:val="C00000"'], ['DejaVu Sans', 'Arial'],
+      ['</w:body>', '<w:p/></w:body>'], ['</w:p>', '<w:hyperlink><w:r><w:t>hidden</w:t></w:r></w:hyperlink></w:p>'],
+      ['<w:t xml:space="preserve">', '<evil:t xmlns:evil="urn:wrong">'],
+      ['<w:document', '<!DOCTYPE document [<!ENTITY text "wrong">]><w:document'],
+      ['w:w="11906"', 'w:w="1"'],
+    ].map(([before, after]) => parts => { parts['word/document.xml'] = parts['word/document.xml'].replace(before, after); }),
+  ]) {
+    const report = rustWordReport(); report.docxBase64 = rustWordDocx(mutate);
+    assert.throws(() => validateRustWordEngineReport(report), /Rust Word engine independent DOCX verification failed/);
+  }
 });
 
 test('full release smoke cannot pass without the independent Word native package report', () => {

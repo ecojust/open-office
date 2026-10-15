@@ -1,0 +1,31 @@
+[package]
+name = "word-engine"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "word-engine-cli"
+path = "src/bin/word-engine-cli.rs"
+
+[dependencies]
+base64 = "0.22.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+unicode-segmentation = "1.12"
+unicode-linebreak = "0.1.5"
+unicode-script = "0.5"
+rustybuzz = "0.20"
+ttf-parser = "0.25"
+roxmltree = "0.21.1"
+word-package = { path = "../word-package" }
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "s"
+panic = "abort"
+strip = true

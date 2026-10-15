@@ -1,6 +1,6 @@
 [package]
 name = "open-office"
-version = "0.6.2"
+version = "0.7.0"
 description = "Local document, spreadsheet, presentation and PDF editing"
 edition = "2021"
 rust-version = "1.90"
@@ -26,6 +26,7 @@ hex = "0.4"
 tempfile = "3"
 percent-encoding = "2"
 word-package = { path = "../crates/word-package" }
+word-engine = { path = "../crates/word-engine" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

@@ -16,7 +16,7 @@ async function find(value){await tab('审阅');const panel=page.getByRole('compl
  page.on('pageerror',e=>report.errors.push(e.message));await page.routeWebSocket('**',()=>{})
  await page.route('**/__native-smoke/*',route=>route.fulfill({status:204,body:''}))
  await page.goto(process.env.OFFICE_WORKBENCH_URL||'http://127.0.0.1:5198/')
- await page.getByTestId('document-open-input').setInputFiles(path.join(root,'test-results/writer-completion/completion-formatted.docx'))
+ await page.locator('input[type="file"][accept=".docx,.odt,.doc,.rtf"]').setInputFiles(path.join(root,'test-results/writer-completion/completion-formatted.docx'))
  await idle();await page.getByLabel('段落样式',{exact:true}).waitFor()
  await find('Beta');await page.getByLabel('替换为',{exact:true}).fill('Alpha');await act(page.getByRole('button',{name:'替换',exact:true}))
  await find('Alpha');await act(page.getByRole('button',{name:'替换',exact:true}));await page.getByLabel('替换为',{exact:true}).fill('alpha');await act(page.getByRole('button',{name:'替换',exact:true}));await act(page.getByRole('button',{name:'替换',exact:true}))

@@ -11,14 +11,14 @@ import * as textColor from '../src/word/core/text-color.ts'
 
 // Run the real App.vue setup logic with Vue's real reactivity. Editors and native
 // file dialogs are controlled doubles: these are shell-state regressions, not
-// LibreOffice/PDF engine or native WebView compatibility tests.
+// Rust/WASM, LibreOffice/PDF engine or native WebView compatibility tests.
 const app = (await readFile(new URL('../src/App.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
 const utilities = await readFile(new URL('../src/shared/document.ts', import.meta.url), 'utf8')
 const dialogFocus = await readFile(new URL('../src/shared/dialog-focus.ts', import.meta.url), 'utf8')
 const preparedSource = await readFile(new URL('../src/word/core/prepared.ts', import.meta.url), 'utf8')
 const paperSource = await readFile(new URL('../src/word/core/paper.ts', import.meta.url), 'utf8')
 const independentEditor = (await readFile(new URL('../src/components/StandaloneWordEditor.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
-const names = 'tabs,activeKey,active,home,tabBar,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,officeDocument,pdfDocument,presentationDocument,independentWordDocument,independentWordPrepared,officeEditor,pdfEditor,presentationEditor,independentWordEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,browserFile,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest'
+const names = 'tabs,activeKey,active,home,tabBar,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,officeDocument,pdfDocument,presentationDocument,independentWordDocument,independentWordPrepared,rustWordDocument,rustWordPrepared,rustWordEntries,rustWordHandles,setRustWordHandle,officeEditor,pdfEditor,presentationEditor,independentWordEditor,rustWordEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,openLegacyWord,browserFile,browserLegacyWord,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest'
 
 function compile(source, require, extra = {}) {
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
@@ -31,13 +31,14 @@ function compile(source, require, extra = {}) {
 const { prepareWordDocument } = compile(preparedSource, () => { throw Error('Unexpected prepared import') })
 const paper = compile(paperSource, () => { throw Error('Unexpected paper import') })
 
-function shell({nativeEnabled = true, smoke = false, independentImportError, independentImport, wordSmokeError, wordSmokeReport, wordSmokeRun} = {}) {
-  const independentModels = [], preparations = []
+function shell({nativeEnabled = true, smoke = false, independentImportError, independentImport, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, rustSmokeError, rustSmokeReport, rustSmokeRun} = {}) {
+  const independentModels = [], preparations = [], rustPreparations = []
   const calls = [], mounted = [], beforeUnmount = [], observers = [], reviews = [], native = {
     isTauri: () => nativeEnabled,
     onCloseRequested: async () => () => {},
     bootstrap: async () => ({smokeMode:false}),
     listRecentDocuments: async () => [],
+    openDocument: async () => null,
     confirmClose: async () => { calls.push(['close']) },
     saveDocument: async request => {
       calls.push(['save', request])
@@ -78,10 +79,27 @@ function shell({nativeEnabled = true, smoke = false, independentImportError, ind
     if (name === './word/core/prepared') return { prepareWordDocument(source, model) {
       const handoff=prepareWordDocument(source,model);preparations.push({source:{...source},model,handoff});return handoff
     } }
+    // This double verifies shell routing, preparation ownership and transaction
+    // ordering only. Real Rust parsing, layout and WASM are tested separately.
+    if (name === './word/rust/client') return { async prepareRustWordDocument(source) {
+      const captured={...source}
+      calls.push(['rust-preflight',captured])
+      if(rustPrepareError)throw Error(rustPrepareError)
+      const session=rustPrepare?await rustPrepare(captured):{testRustSession:rustPreparations.length}
+      let pending=session
+      const record={source:captured,session,discarded:0,takes:[]}
+      const handoff={
+        take(target){record.takes.push({...target});const value=pending;pending=undefined;return captured.id===target.id&&captured.base64===target.base64?value:undefined},
+        discard(){record.discarded++;pending=undefined},
+      }
+      rustPreparations.push(Object.assign(record,{handoff}));calls.push(['rust-prepared',captured.id])
+      return handoff
+    } }
     // These tests verify the shell's preflight ordering and rejection handling;
     // the real DOCX parser has separate codec and browser round-trip coverage.
     if (name === './word/core/runtime') return {async importWordDocument(bytes){calls.push(['independent-preflight',bytes.length]);if(independentImportError)throw Error(independentImportError);const model=independentImport?await independentImport(bytes):{paragraphs:[],testImport:independentModels.length};independentModels.push(model);return model}}
     if (name === './word/core/native-package-smoke') return {async runNativeWordPackageSmoke(){calls.push(['word-native-smoke']);if(wordSmokeError)throw Error(wordSmokeError);if(wordSmokeRun)return wordSmokeRun();return wordSmokeReport??{ok:true,kind:'word-package-ipc'}}}
+    if (name === './word/rust/native-smoke') return {async runNativeRustWordSmoke(){calls.push(['rust-native-smoke']);if(rustSmokeError)throw Error(rustSmokeError);if(rustSmokeRun)return rustSmokeRun();return rustSmokeReport??{schemaVersion:1,ok:true,transport:'tauri-word-engine-request'}}}
     if (name === '@tauri-apps/api/core') return { invoke: async (command,args) => { calls.push(['invoke',command,args]) } }
     if (name.endsWith('.vue')) return {}
     throw Error(`Unexpected setup import ${name}`)
@@ -95,20 +113,24 @@ function shell({nativeEnabled = true, smoke = false, independentImportError, ind
   state.pdfEditor.value = handle
   const independentWordHandle = Object.create(handle)
   state.independentWordEditor.value = independentWordHandle
+  const rustWordHandle = Object.create(handle)
+  state.rustWordEditor.value = rustWordHandle
   const presentationHandle = Object.assign(Object.create(handle), {
     assertNoPendingEdits() {}, discardDrafts() {}, stopPresentation() { calls.push(['stop-presentation']) },
     getPresentationState: async () => ({ documentId: state.activeKey.value, revision: 1 }),
   })
   state.presentationEditor.value = presentationHandle
   function tab(id, { ready = true, dirty = false, fileId = id, kind = 'word', wordEngine } = {}) {
+    assert.ok(kind!=='word'||['legacy','independent','rust'].includes(wordEngine),'Word fixtures must select their engine explicitly')
     const extension = {word:'docx',sheet:'xlsx',presentation:'pptx',pdf:'pdf'}[kind]
-    state.tabs.value.push({ key: id, ready, dirty, fileId, wordEngine, document: { id, kind, extension,
+    state.tabs.value.push({ key: id, ready, dirty, fileId, wordEngine:kind==='word'?wordEngine:undefined, document: { id, kind, extension,
       name: `${id}.${extension}`, base64: 'T0xE', sha256: 'old-hash', sizeBytes: 3 } })
     return state.tabs.value.at(-1)
   }
   function active(tab) {
     state.activeKey.value = tab.key
-    if (tab.wordEngine === 'independent') state.independentWordDocument.value = tab.document
+    if (tab.wordEngine === 'rust') state.rustWordDocument.value = tab.document
+    else if (tab.wordEngine === 'independent') state.independentWordDocument.value = tab.document
     else if (tab.document.kind === 'pdf') state.pdfDocument.value = tab.document
     else if (tab.document.kind === 'presentation') state.presentationDocument.value = tab.document
     else state.officeDocument.value = tab.document
@@ -117,7 +139,7 @@ function shell({nativeEnabled = true, smoke = false, independentImportError, ind
     for (let n = 0; n < 50 && state.busy.value; n++) { await Promise.resolve(); await vue.nextTick() }
     assert.equal(state.busy.value, '', 'The shell task should finish')
   }
-  return { state, native, calls, reviews, independentModels, preparations, handle, presentationHandle, independentWordHandle, tab, active, idle, browser, observers,
+  return { state, native, calls, reviews, independentModels, preparations, rustPreparations, handle, presentationHandle, independentWordHandle, rustWordHandle, tab, active, idle, browser, observers,
     async mount() { for (const callback of mounted) await callback() },
     unmount() { for (const callback of beforeUnmount) callback(); scope.stop() },
   }
@@ -146,7 +168,7 @@ function wordLoader(document, prepared) {
 }
 
 test('save-as exposes supported formats, preserves cancelled drafts and saves a named converted copy', async () => {
-  const h=shell(), a=h.tab('report',{dirty:true});h.active(a)
+  const h=shell(), a=h.tab('report',{wordEngine:'legacy',dirty:true});h.active(a)
   h.handle.exportFile=async({format})=>({base64:'TkVX',extension:format,dirty:true})
   h.state.openSaveAs()
   assert.deepEqual(Array.from(h.state.saveAsOptions.value,option=>option.extension),['docx','odt','pdf'])
@@ -167,7 +189,7 @@ test('save-as exposes supported formats, preserves cancelled drafts and saves a 
 })
 
 test('save-as rejects invalid names and stale targets before export; same-format success marks the saved document',async()=>{
-  const h=shell(),a=h.tab('a',{dirty:true}),b=h.tab('b');h.active(a)
+  const h=shell(),a=h.tab('a',{wordEngine:'legacy',dirty:true}),b=h.tab('b',{wordEngine:'legacy'});h.active(a)
   let exports=0
   h.handle.exportFile=async({format})=>{exports++;return{base64:'TkVX',extension:format,dirty:true}}
   h.state.openSaveAs();h.state.saveAsDraft.value.name='../file'
@@ -184,7 +206,7 @@ test('save-as rejects invalid names and stale targets before export; same-format
 })
 
 test('save-as preserves its form and dirty state after a native conflict or export format mismatch',async()=>{
-  const h=shell(),a=h.tab('a',{dirty:true});h.active(a)
+  const h=shell(),a=h.tab('a',{wordEngine:'legacy',dirty:true});h.active(a)
   h.state.openSaveAs()
   h.handle.exportFile=async()=>({base64:'TkVX',extension:'pdf',dirty:true})
   await h.state.confirmSaveAs()
@@ -198,11 +220,11 @@ test('save-as preserves its form and dirty state after a native conflict or expo
 
 test('save-as format choices match the active engine and preserve legacy source-copy behavior',async()=>{
   for(const [kind,expected]of [['sheet',['xlsx','ods','pdf']],['presentation',['pptx','pdf']],['pdf',['pdf']]]){
-    const h=shell(),a=h.tab(kind,{kind});h.active(a);h.state.openSaveAs()
+    const h=shell(),a=h.tab(kind,{wordEngine:'legacy',kind});h.active(a);h.state.openSaveAs()
     assert.deepEqual(Array.from(h.state.saveAsOptions.value,o=>o.extension),expected)
     h.state.cancelSaveAs();assert.equal(h.state.saveAsDraft.value,null)
   }
-  const h=shell(),a=h.tab('legacy',{dirty:true});a.document.extension='doc';a.document.name='Original.doc';h.active(a)
+  const h=shell(),a=h.tab('legacy',{wordEngine:'legacy',dirty:true});a.document.extension='doc';a.document.name='Original.doc';h.active(a)
   h.state.openSaveAs();assert.equal(h.state.saveAsDraft.value.name,'Original - 副本')
   assert.equal(h.state.saveAsDraft.value.format,'docx');assert.equal(h.state.saveAsCopy.value,false)
   await h.state.confirmSaveAs()
@@ -317,12 +339,25 @@ test('process-authorized Word smoke reports without mounting the Office engine',
   h.unmount()
 })
 
+test('process-authorized Rust Word smoke reports without mounting another editor', async () => {
+  const h=shell({smoke:true})
+  h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'rust-word-engine'})
+  await h.mount()
+  assert.equal(h.state.error.value,'')
+  assert.equal(h.calls.filter(call=>call[0]==='rust-native-smoke').length,1)
+  assert.ok(!h.calls.some(call=>call[0]==='word-native-smoke'))
+  const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')?.[2].report
+  assert.equal(report?.transport,'tauri-word-engine-request');assert.equal(report?.ok,true)
+  assert.equal(h.state.tabs.value.length,0);assert.equal(h.state.officeDocument.value,undefined)
+  h.unmount()
+})
+
 test('Word smoke cannot start when the process has not enabled smoke mode', async () => {
-  for(const requested of [false,true]) {
+  for(const scope of ['word-package-ipc','rust-word-engine','full']) for(const requested of [false,true]) {
     const h=shell({smoke:requested})
-    h.native.bootstrap=async()=>({smokeMode:false,smokeScope:'word-package-ipc'})
+    h.native.bootstrap=async()=>({smokeMode:false,smokeScope:scope})
     await h.mount()
-    assert.ok(!h.calls.some(call=>call[0]==='word-native-smoke'||call[0]==='invoke'))
+    assert.ok(!h.calls.some(call=>call[0]==='word-native-smoke'||call[0]==='rust-native-smoke'||call[0]==='invoke'))
     assert.equal(h.state.tabs.value.length,0)
     if(requested)assert.match(h.state.error.value,/not enabled by the process/)
     else assert.equal(h.state.error.value,'')
@@ -357,12 +392,51 @@ test('full native smoke awaits independent Word evidence before creating the Off
   const independent = {ok:true,kind:'word-package-ipc',checks:['controlled shell evidence']}
   release(independent)
   await mounting
+  assert.ok(h.calls.findIndex(call=>call[0]==='rust-native-smoke') < h.calls.findIndex(call=>call[0]==='word-native-smoke'))
   assert.ok(h.calls.findIndex(call=>call[0]==='word-native-smoke') < h.calls.findIndex(call=>call[0]==='office-document-created'))
   assert.equal(h.calls.filter(call=>call[0]==='office-native-smoke').length,1)
   const report = h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')?.[2].report
   assert.equal(report.independentWordPackage,independent)
+  assert.equal(report.rustWordEngine.transport,'tauri-word-engine-request')
   assert.equal(report.ok,false);assert.match(report.error,/controlled Office failure after Word gate/)
   stop();h.unmount()
+})
+
+test('full native smoke awaits Rust Word evidence before starting the old package or Office gates', async () => {
+  let release, started
+  const gate=new Promise(resolve=>{release=resolve}),entered=new Promise(resolve=>{started=resolve})
+  const h=shell({smoke:true,rustSmokeRun:async()=>{started();return gate},wordSmokeError:'controlled failure after Rust engine'})
+  h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'})
+  const mounting=h.mount()
+  await entered
+  assert.ok(!h.calls.some(call=>call[0]==='word-native-smoke'||call[0]==='invoke'))
+  assert.equal(h.state.tabs.value.length,0);assert.equal(h.state.officeDocument.value,undefined)
+  const rust={schemaVersion:1,ok:true,transport:'tauri-word-engine-request',checks:['controlled shell evidence']}
+  release(rust)
+  await mounting
+  assert.equal(h.calls.filter(call=>call[0]==='rust-native-smoke').length,1)
+  assert.equal(h.calls.filter(call=>call[0]==='word-native-smoke').length,1)
+  const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')?.[2].report
+  assert.equal(report.rustWordEngine,rust);assert.equal(report.ok,false)
+  assert.match(report.error,/controlled failure after Rust engine/)
+  h.unmount()
+})
+
+test('full native smoke stops before other gates for failed Rust Word reports and thrown IPC failures', async () => {
+  for(const mode of ['reported','cleanup','thrown']) {
+    const rust={schemaVersion:1,ok:false,transport:'tauri-word-engine-request',...(mode==='cleanup'?{closeError:'controlled Rust engine cleanup failure'}:{error:'controlled Rust engine failure'})}
+    const h=shell({smoke:true,...(mode==='thrown'?{rustSmokeError:rust.error}:{rustSmokeReport:rust})})
+    h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'})
+    await h.mount()
+    assert.equal(h.calls.filter(call=>call[0]==='rust-native-smoke').length,1)
+    assert.ok(!h.calls.some(call=>call[0]==='word-native-smoke'))
+    assert.equal(h.state.tabs.value.length,0);assert.equal(h.state.officeDocument.value,undefined)
+    const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')?.[2].report
+    assert.equal(report.ok,false);assert.match(report.error,/controlled Rust engine/)
+    if(mode==='thrown')assert.equal(report.rustWordEngine,undefined)
+    else assert.equal(report.rustWordEngine,rust)
+    h.unmount()
+  }
 })
 
 test('full native smoke stops before Office for failed Word reports and thrown IPC failures', async () => {
@@ -382,7 +456,7 @@ test('full native smoke stops before Office for failed Word reports and thrown I
 })
 
 test('draft review reads a real fresh Writer state without discarding pending inputs', async () => {
-  const h=shell(),a=h.tab('A');h.active(a);await vue.nextTick()
+  const h=shell(),a=h.tab('A',{wordEngine:'legacy'});h.active(a);await vue.nextTick()
   let reads=0
   const fresh={documentId:'A',revision:7}
   h.handle.getWriterState=async()=>{reads++;return fresh}
@@ -395,7 +469,7 @@ test('draft review reads a real fresh Writer state without discarding pending in
 
 test('late draft review cannot use a different document or editor result', async () => {
   for(const changed of ['tab','editor','result']) {
-    const h=shell(),a=h.tab('A'),b=h.tab('B');h.active(a);await vue.nextTick()
+    const h=shell(),a=h.tab('A',{wordEngine:'legacy'}),b=h.tab('B',{wordEngine:'legacy'});h.active(a);await vue.nextTick()
     let finish
     h.handle.getWriterState=()=>new Promise(resolve=>{finish=resolve})
     const reading=h.state.readFreshWriterState()
@@ -408,7 +482,7 @@ test('late draft review cannot use a different document or editor result', async
 })
 
 test('immediate Writer commands cannot consume drafts or retry a rejected target', async () => {
-  const h=shell(),a=h.tab('A');h.active(a);await vue.nextTick()
+  const h=shell(),a=h.tab('A',{wordEngine:'legacy'});h.active(a);await vue.nextTick()
   const command={action:{type:'format-text',bold:true},target:{documentId:'A',revision:4}},calls=[]
   h.handle.writerCommand=async input=>{calls.push(input);throw Error('Command target changed')}
   h.state.wordWorkbench.value={assertNoPendingEdits(){throw Error('Pending draft')}}
@@ -434,18 +508,18 @@ test('native smoke startup IPC rejection reaches the HTTP failure fallback', asy
 })
 
 test('not-ready and failed documents cannot export or overwrite the old loaded model', async () => {
-  const h = shell(), a = h.tab('A', { ready: false }); h.active(a)
+  const h = shell(), a = h.tab('A', {wordEngine:'legacy', ready: false }); h.active(a)
   let exported = 0; h.handle.exportFile = async () => { exported++; return { base64: 'wrong', extension: 'docx' } }
   await assert.rejects(h.state.saveActive(), /仍在打开/)
   h.state.editorError('A', 'Cannot load A')
   await assert.rejects(h.state.saveActive(), /未成功打开/)
   assert.equal(exported, 0); assert.equal(h.calls.length, 0)
-  const b = h.tab('B'); await h.state.activate(b)
+  const b = h.tab('B',{wordEngine:'legacy'}); await h.state.activate(b)
   assert.equal(h.state.activeKey.value, 'B', 'A failed tab must not trap the user')
 })
 
 test('switching snapshots authoritative dirty state even before a dirty event arrives', async () => {
-  const h = shell(), a = h.tab('A'), b = h.tab('B'); h.active(a)
+  const h = shell(), a = h.tab('A',{wordEngine:'legacy'}), b = h.tab('B',{wordEngine:'legacy'}); h.active(a)
   h.handle.exportFile = async () => ({ base64: 'RURJVA==', extension: 'docx', dirty: true })
   await h.state.activate(b)
   assert.equal(a.document.base64, 'RURJVA=='); assert.equal(a.dirty, true)
@@ -455,7 +529,7 @@ test('switching snapshots authoritative dirty state even before a dirty event ar
 
 test('revision mismatch or pending PDF edits reject switching without replacing snapshots', async () => {
   for (const pending of [false, true]) {
-    const h = shell(), a = h.tab('A'), b = h.tab('B'); h.active(a)
+    const h = shell(), a = h.tab('A',{wordEngine:'legacy'}), b = h.tab('B',{wordEngine:'legacy'}); h.active(a)
     if (pending) h.handle.exportFile = async () => { throw Error('Apply pending PDF edits') }
     else h.handle.discardChanges = async () => { throw Error('Revision changed') }
     await assert.rejects(h.state.activate(b), pending ? /pending PDF/ : /Revision/)
@@ -465,7 +539,7 @@ test('revision mismatch or pending PDF edits reject switching without replacing 
 
 test('cancelled save and external conflict preserve dirty state and original identity', async () => {
   for (const result of [{ status: 'cancelled' }, { status: 'conflict', message: 'External change' }]) {
-    const h = shell(), a = h.tab('A', { dirty: true }); h.active(a)
+    const h = shell(), a = h.tab('A', {wordEngine:'legacy', dirty: true }); h.active(a)
     h.native.saveDocument = async () => result
     assert.equal(await h.state.saveActive(), false)
     assert.equal(a.dirty, true); assert.equal(a.fileId, 'A'); assert.equal(a.document.sha256, 'old-hash')
@@ -475,7 +549,7 @@ test('cancelled save and external conflict preserve dirty state and original ide
 
 test('legacy imports save only as modern copies without an original-file overwrite token', async () => {
   for(const [extension,modern,kind] of [['doc','docx','word'],['rtf','docx','word'],['xls','xlsx','sheet']]) {
-    const h=shell(),a=h.tab('original',{dirty:true,kind});h.active(a)
+    const h=shell(),a=h.tab('original',{wordEngine:'legacy',dirty:true,kind});h.active(a)
     a.document.extension=extension;a.document.name=`Original.${extension}`
     let requested
     h.handle.exportFile=async options=>{requested=options;return{base64:'TkVX',extension:modern,name:`Original.${extension}`}}
@@ -490,7 +564,7 @@ test('legacy imports save only as modern copies without an original-file overwri
 })
 
 test('legacy Save As protection survives a modern in-memory snapshot and a cancelled dialog', async () => {
-  const h=shell(),a=h.tab('legacy',{dirty:true});h.active(a)
+  const h=shell(),a=h.tab('legacy',{wordEngine:'legacy',dirty:true});h.active(a)
   a.document.extension='doc';a.document.name='Legacy.doc'
   await h.state.stash()
   assert.equal(a.document.extension,'docx');assert.equal(a.document.name,'Legacy.docx')
@@ -513,7 +587,7 @@ test('legacy Save As protection survives a modern in-memory snapshot and a cance
 
 test('legacy source protection is set at import and unsafe legacy exports never reach the file bridge', async () => {
   const h=shell()
-  await h.state.addDocument({id:'source',kind:'word',extension:'doc',name:'Source.doc',base64:'OLD',sha256:'old-hash',sizeBytes:3},'source')
+  await h.state.addDocument({id:'source',kind:'word',extension:'doc',name:'Source.doc',base64:'OLD',sha256:'old-hash',sizeBytes:3},'source','legacy')
   const a=h.state.tabs.value[0];a.ready=true
   assert.equal(a.requiresSaveAs,true)
   let exports=0
@@ -526,12 +600,12 @@ test('legacy source protection is set at import and unsafe legacy exports never 
   assert.equal(a.requiresSaveAs,true)
 })
 
-test('browser import checks document bytes before creating a tab', async () => {
+test('browser compatibility import checks document bytes before creating a tab', async () => {
   const h=shell({nativeEnabled:false})
   const open=async(name,contents)=>{
     const bytes=new TextEncoder().encode(contents)
     const input={value:name,files:[{name,size:bytes.length,arrayBuffer:async()=>bytes.buffer}]}
-    await h.state.browserFile({target:input});assert.equal(input.value,'')
+    await h.state.browserLegacyWord({target:input});assert.equal(input.value,'')
   }
   await open('renamed.doc','This is not an OLE document')
   assert.equal(h.state.tabs.value.length,0);assert.match(h.state.error.value,/格式不符/)
@@ -550,7 +624,7 @@ test('risky XLSX is inspected once and requires Save As after switching or cance
   await h.state.addDocument(original,'source')
   assert.equal(h.reviews.length,1,'Reactivating an already-open source does not rebind its original review')
   h.handle.exportFile=async()=>({base64:'TkVX',extension:'xlsx',dirty:true})
-  const b=h.tab('B');await h.state.activate(b);b.ready=true;await h.state.activate(a);a.ready=true
+  const b=h.tab('B',{wordEngine:'legacy'});await h.state.activate(b);b.ready=true;await h.state.activate(a);a.ready=true
   assert.equal(a.requiresSaveAs,true);assert.equal(a.importWarnings.length,2)
   assert.equal(h.reviews.length,1,'A modern snapshot must not erase the source review')
   const saved=h.native.saveDocument,requests=[]
@@ -579,7 +653,7 @@ test('the browser import path applies the same XLSX warning and source-copy safe
 
 for(const mode of ['legacy','transitional','strict'])test(`DOCX ${mode} embedded attachment warning survives snapshots and cancelled saving until a new copy succeeds`,async()=>{
   const h=shell(),bytes=attachedWordDocument(mode)
-  await h.state.addDocument({id:'word-source',kind:'word',extension:'docx',name:'Attachments.docx',base64:Buffer.from(bytes).toString('base64'),sha256:'source-hash',sizeBytes:bytes.length},'word-source')
+  await h.state.addDocument({id:'word-source',kind:'word',extension:'docx',name:'Attachments.docx',base64:Buffer.from(bytes).toString('base64'),sha256:'source-hash',sizeBytes:bytes.length},'word-source','legacy')
   const a=h.state.tabs.value[0];a.ready=true;a.dirty=true
   assert.equal(h.reviews.length,1);assert.equal(a.requiresSaveAs,true);assert.match(a.importWarnings[0],/嵌入附件/)
   await h.state.stash()
@@ -596,8 +670,8 @@ for(const mode of ['legacy','transitional','strict'])test(`DOCX ${mode} embedded
 })
 
 test('reopening an already-open file retains its in-memory edits', async () => {
-  const h = shell(), a = h.tab('A', { dirty: true }); h.active(a)
-  await h.state.addDocument({ ...a.document, base64: 'disk-version' }, 'A')
+  const h = shell(), a = h.tab('A', {wordEngine:'legacy', dirty: true }); h.active(a)
+  await h.state.addDocument({ ...a.document, base64: 'disk-version' }, 'A', 'legacy')
   assert.equal(h.state.tabs.value.length, 1); assert.equal(a.document.base64, 'T0xE'); assert.equal(a.dirty, true)
 })
 
@@ -612,7 +686,7 @@ test('a nominally clean tab with un-applied draft requires close confirmation', 
 })
 
 test('closing the active Office tab releases its engine even when a PDF remains open', async () => {
-  const h=shell(), a=h.tab('office'), pdf=h.tab('pdf',{kind:'pdf'});h.active(a)
+  const h=shell(), a=h.tab('office',{wordEngine:'legacy'}), pdf=h.tab('pdf',{kind:'pdf'});h.active(a)
   h.state.closeTab(a);await h.idle()
   assert.equal(h.state.activeKey.value,pdf.key)
   assert.equal(h.state.tabs.value.length,1)
@@ -621,7 +695,7 @@ test('closing the active Office tab releases its engine even when a PDF remains 
 })
 
 test('closing a hidden Office model releases only the closed tab and leaves the active PDF intact', async () => {
-  const h=shell(), a=h.tab('office'), other=h.tab('other'), pdf=h.tab('pdf',{kind:'pdf'});h.active(a)
+  const h=shell(), a=h.tab('office',{wordEngine:'legacy'}), other=h.tab('other',{wordEngine:'legacy'}), pdf=h.tab('pdf',{kind:'pdf'});h.active(a)
   await h.state.activate(pdf);h.state.readyFor(pdf.key)
   const pdfDocument=h.state.pdfDocument.value, discardCount=h.calls.filter(call=>call[0]==='discard').length
   h.state.closeTab(a);await h.idle()
@@ -633,7 +707,7 @@ test('closing a hidden Office model releases only the closed tab and leaves the 
 })
 
 test('closing another background Office tab keeps the loaded model and its undo history', async () => {
-  const h=shell(), a=h.tab('office'), other=h.tab('other'), pdf=h.tab('pdf',{kind:'pdf'});h.active(a)
+  const h=shell(), a=h.tab('office',{wordEngine:'legacy'}), other=h.tab('other',{wordEngine:'legacy'}), pdf=h.tab('pdf',{kind:'pdf'});h.active(a)
   await h.state.activate(pdf);h.state.readyFor(pdf.key)
   const document=h.state.officeDocument.value
   h.state.closeTab(other);await h.idle()
@@ -642,7 +716,7 @@ test('closing another background Office tab keeps the loaded model and its undo 
 })
 
 test('Office to PDF and back reuses the same live editor after capturing unsaved content', async () => {
-  const h=shell(), a=h.tab('office'), pdf=h.tab('pdf',{kind:'pdf'});h.active(a)
+  const h=shell(), a=h.tab('office',{wordEngine:'legacy'}), pdf=h.tab('pdf',{kind:'pdf'});h.active(a)
   const handle=h.state.officeEditor.value
   h.handle.exportFile=async()=>({base64:'RURJVA==',extension:'docx',dirty:true})
   await h.state.activate(pdf);h.state.readyFor(pdf.key)
@@ -656,7 +730,7 @@ test('Office to PDF and back reuses the same live editor after capturing unsaved
 })
 
 for(const failure of ['draft','cancelled','conflict','save-error']) test(`failed Office close retains the live engine and content after ${failure}`,async()=>{
-  const h=shell(), a=h.tab('office',{dirty:true});h.tab('pdf',{kind:'pdf'});h.active(a)
+  const h=shell(), a=h.tab('office',{wordEngine:'legacy',dirty:true});h.tab('pdf',{kind:'pdf'});h.active(a)
   const original=h.state.officeDocument.value
   if(failure==='draft')h.state.wordWorkbench.value={assertNoPendingEdits(){throw Error('Pending draft')},discardDrafts(){assert.fail('Draft must remain')}}
   else h.native.saveDocument=async()=>{
@@ -671,7 +745,7 @@ for(const failure of ['draft','cancelled','conflict','save-error']) test(`failed
 })
 
 test('confirmed Office discard releases its model after dropping the explicitly abandoned drafts',async()=>{
-  const h=shell(),a=h.tab('office',{dirty:true});h.tab('pdf',{kind:'pdf'});h.active(a)
+  const h=shell(),a=h.tab('office',{wordEngine:'legacy',dirty:true});h.tab('pdf',{kind:'pdf'});h.active(a)
   let discarded=0;h.state.wordWorkbench.value={discardDrafts(){discarded++}}
   h.state.closeTarget.value=a;await h.state.resolveClose('discard')
   assert.equal(discarded,1);assert.equal(h.state.officeDocument.value,undefined)
@@ -680,7 +754,7 @@ test('confirmed Office discard releases its model after dropping the explicitly 
 })
 
 test('save-and-close of a background tab waits for its own editor to become ready', async () => {
-  const h = shell(), a = h.tab('A'), b = h.tab('B', { dirty: true }); h.active(a)
+  const h = shell(), a = h.tab('A',{wordEngine:'legacy'}), b = h.tab('B', {wordEngine:'legacy', dirty: true }); h.active(a)
   h.state.closeTarget.value = b
   const closing = h.state.resolveClose('save')
   for (let n = 0; n < 15 && h.state.activeKey.value !== 'B'; n++) { await Promise.resolve(); await vue.nextTick() }
@@ -692,7 +766,7 @@ test('save-and-close of a background tab waits for its own editor to become read
 })
 
 test('cancel during save-all keeps the window and unsaved tabs open', async () => {
-  const h = shell(), a = h.tab('A', { dirty: true }); h.active(a)
+  const h = shell(), a = h.tab('A', {wordEngine:'legacy', dirty: true }); h.active(a)
   h.native.saveDocument = async () => ({ status: 'cancelled' })
   h.state.closeTarget.value = 'window'; await h.state.resolveClose('save')
   assert.equal(h.state.closeTarget.value, 'window'); assert.equal(a.dirty, true)
@@ -731,7 +805,7 @@ test('native helper export uses the same guarded transaction and never swallows 
   assert.equal(called,true,'Captured edit intents must forward synchronously without a new render/focus await')
   assert.equal((await nativeEditor.exportFile()).revision,7)
   assert.equal(h.state.busy.value,'')
-  const a=h.tab('A'),b=h.tab('B');h.active(a)
+  const a=h.tab('A',{wordEngine:'legacy'}),b=h.tab('B',{wordEngine:'legacy'});h.active(a)
   h.handle.discardChanges=async()=>{assert.equal(h.state.busy.value.length>0,true);throw Error('Revision changed')}
   await assert.rejects(h.state.editorTransaction('switching',()=>h.state.activate(b)),/Revision changed/)
   assert.equal(h.state.activeKey.value,'A');assert.equal(a.document.base64,'T0xE')
@@ -756,7 +830,7 @@ test('presentation PDF export stays a copy and never replaces the editable PPTX 
 
 test('unsupported PPT and ODP imports are rejected before replacing any loaded document', async () => {
   for (const extension of ['ppt', 'odp']) {
-    const h=shell(),a=h.tab('existing',{dirty:true});h.active(a)
+    const h=shell(),a=h.tab('existing',{wordEngine:'legacy',dirty:true});h.active(a)
     const original=h.state.officeDocument.value;let exports=0
     h.handle.exportFile=async()=>{exports++;return {base64:'NEW',extension:'docx'}}
     await assert.rejects(h.state.addDocument({id:'legacy',kind:'presentation',extension,name:`Legacy.${extension}`,base64:'SOURCE',sha256:'source-hash',sizeBytes:6},'legacy'),/PPTX/)
@@ -787,7 +861,7 @@ test('adding a presentation routes only to its independent editor and never moun
 })
 
 test('presentation and Office/PDF switches preserve separate model identities and route each export', async () => {
-  const h=shell(),deck=h.tab('deck',{kind:'presentation'}),office=h.tab('office'),pdf=h.tab('pdf',{kind:'pdf'})
+  const h=shell(),deck=h.tab('deck',{kind:'presentation'}),office=h.tab('office',{wordEngine:'legacy'}),pdf=h.tab('pdf',{kind:'pdf'})
   h.active(office);await vue.nextTick();const officeDocument=h.state.officeDocument.value
   const exports=[]
   h.handle.exportFile=async()=>{exports.push(h.state.active.value.document.kind);return {base64:'T0ZGSUNF',extension:h.state.active.value.document.extension}}
@@ -808,7 +882,7 @@ test('presentation and Office/PDF switches preserve separate model identities an
 
 test('closing the final presentation releases its model while retaining the active Office/PDF editor', async () => {
   for (const kind of ['word','pdf']) {
-    const h=shell(),deck=h.tab('deck',{kind:'presentation'}),other=h.tab('other',{kind});h.active(deck)
+    const h=shell(),deck=h.tab('deck',{kind:'presentation'}),other=h.tab('other',{wordEngine:'legacy',kind});h.active(deck)
     await h.state.activate(other);h.state.readyFor(other.key)
     const field=kind==='pdf'?'pdfDocument':'officeDocument', retained=h.state[field].value
     const discards=h.calls.filter(call=>call[0]==='discard').length
@@ -865,7 +939,7 @@ test('native window close exits presentation preview before showing unsaved conf
 
 test('pending presentation text or transition drafts prevent saving and tab switching', async () => {
   for (const panel of ['text', 'transition']) {
-    const h = shell(), a = h.tab('A', { kind: 'presentation' }), b = h.tab('B'); h.active(a)
+    const h = shell(), a = h.tab('A', { kind: 'presentation' }), b = h.tab('B',{wordEngine:'legacy'}); h.active(a)
     let exports = 0
     h.handle.exportFile = async () => { exports++; return {base64:'NEW',extension:'pptx'} }
     h.presentationHandle.assertNoPendingEdits = () => { throw Error(`Unapplied ${panel}`) }
@@ -913,7 +987,7 @@ test('native duplicate-slide request uses the metadata-aware editor and respects
 
 for (const [kind,panel] of [['word','wordWorkbench'],['sheet','sheetWorkbench']]) {
   test(`${kind} pending inputs prevent export and tab switching until applied or explicitly discarded`, async () => {
-    const h=shell(), a=h.tab('A',{kind,dirty:true}), b=h.tab('B');h.active(a)
+    const h=shell(), a=h.tab('A',{wordEngine:'legacy',kind,dirty:true}), b=h.tab('B',{wordEngine:'legacy'});h.active(a)
     let exports=0,discarded=0
     h.handle.exportFile=async()=>{exports++;return {base64:'NEW',extension:kind==='word'?'docx':'xlsx'}}
     h.state[panel].value={assertNoPendingEdits(){throw Error('Unapplied workspace input')},discardDrafts(){discarded++}}
@@ -929,7 +1003,7 @@ for (const [kind,panel] of [['word','wordWorkbench'],['sheet','sheetWorkbench']]
 
 for(const [kind,getter,field] of [['word','getWriterState','writerState'],['sheet','getCalcState','calcState'],['presentation','getPresentationState','presentationState']]) {
  test(`${kind} toolbar refreshes when returning from PDF to its retained editor`,async()=>{
-   const h=shell(),office=h.tab('office',{kind}),pdf=h.tab('pdf',{kind:'pdf'});h.active(pdf)
+   const h=shell(),office=h.tab('office',{wordEngine:'legacy',kind}),pdf=h.tab('pdf',{kind:'pdf'});h.active(pdf)
    const documentField=kind==='presentation'?'presentationDocument':'officeDocument'
    h.state[documentField].value=office.document
    const reopened=[]
@@ -944,7 +1018,7 @@ for(const [kind,getter,field] of [['word','getWriterState','writerState'],['shee
 }
 
 test('native clean notifications never clear a tab with unsaved user content', () => {
-  const h = shell(), tab = h.tab('A', { dirty: true })
+  const h = shell(), tab = h.tab('A', {wordEngine:'legacy', dirty: true })
   h.state.tabs.value = [tab]; h.state.activeKey.value = 'A'
   h.state.dirtyFor('A', false)
   assert.equal(tab.dirty, true)
@@ -953,9 +1027,9 @@ test('native clean notifications never clear a tab with unsaved user content', (
   assert.equal(tab.dirty, true)
 })
 
-test('independent Word new/save uses only its editor while the original Word entry keeps its existing route', async () => {
-  const original=shell();original.state.newDocument('word');await original.idle()
-  assert.equal(original.state.tabs.value[0].wordEngine,undefined)
+test('independent Word new/save uses only its editor while explicit compatibility keeps its Office route', async () => {
+  const original=shell();original.state.newDocument('word','legacy');await original.idle()
+  assert.equal(original.state.tabs.value[0].wordEngine,'legacy')
   assert.equal(original.state.officeDocument.value.id,original.state.activeKey.value)
   assert.equal(original.state.independentWordDocument.value,undefined)
   const h=shell();let exports=0,marked=0
@@ -1163,14 +1237,14 @@ test('independent Word rejects unsupported imports before snapshotting or replac
 })
 
 test('the same file can have separate Word engines and reopening the same engine retains its live snapshot', async () => {
-  const h=shell(),original=h.tab('original',{fileId:'same-file'});h.active(original)
+  const h=shell(),original=h.tab('original',{wordEngine:'legacy',fileId:'same-file'});h.active(original)
   const source={id:'same-file',kind:'word',extension:'docx',name:'Same.docx',base64:'T0xE',sha256:'',sizeBytes:3}
   await h.state.addDocument(source,'same-file','independent')
   const independent=h.state.active.value;h.state.readyFor(independent.key)
   assert.notEqual(independent.key,original.key);assert.equal(h.state.tabs.value.length,2)
   assert.equal(h.state.officeDocument.value.id,original.key);assert.equal(h.state.independentWordDocument.value.id,independent.key)
   h.independentWordHandle.exportFile=async()=>({base64:'TElWRQ==',extension:'docx',dirty:true})
-  await h.state.addDocument(source,'same-file')
+  await h.state.addDocument(source,'same-file','legacy')
   assert.equal(h.state.activeKey.value,original.key);assert.equal(independent.document.base64,'TElWRQ==')
   await h.state.addDocument(source,'same-file','independent')
   assert.equal(h.state.activeKey.value,independent.key);assert.equal(h.state.tabs.value.length,2)
@@ -1221,4 +1295,185 @@ test('independent Word confirmed discard releases only its editor and cancelled 
   assert.equal(discarded,1);assert.equal(h.state.independentWordDocument.value,undefined);assert.equal(h.state.officeDocument.value,undefined)
   assert.equal(h.state.tabs.value.length,1);assert.equal(h.state.activeKey.value,pdf.key);assert.equal(h.state.pdfDocument.value.id,pdf.key)
   assert.equal(h.state.closeTarget.value,null)
+})
+
+// These cases verify App's engine selection and ownership only. The preparation
+// double intentionally does not decide whether an actual DOCX is supported.
+function rustSource(id='source') {
+  return {id,kind:'word',extension:'docx',name:`${id}.docx`,base64:'T0xE',sha256:'source-hash',sizeBytes:3}
+}
+function browserWordInput() {
+  const bytes=zipSync({'word/document.xml':strToU8('<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>')})
+  return {value:'Browser.docx',files:[{name:'Browser.docx',size:bytes.length,arrayBuffer:async()=>bytes.buffer}]}
+}
+
+test('default Word new/save routes exclusively through Rust and prepares even an empty document',async()=>{
+  const h=shell();let exports=0,marked=0
+  h.handle.exportFile=async()=>assert.fail('Default Word must not export through Office')
+  h.independentWordHandle.exportFile=async()=>assert.fail('Default Word must not export through the old lightweight editor')
+  h.rustWordHandle.exportFile=async({format})=>{exports++;assert.equal(format,'docx');return{base64:'UlVTVA==',extension:'docx',dirty:true}}
+  h.rustWordHandle.markSaved=async bytes=>{marked++;assert.equal(bytes,'UlVTVA==')}
+  h.state.newDocument('word');await h.idle()
+  const tab=h.state.active.value,prepared=h.rustPreparations[0]
+  assert.equal(tab.wordEngine,'rust');assert.equal(tab.document.extension,'docx')
+  assert.equal(h.state.officeDocument.value,undefined);assert.equal(h.state.independentWordDocument.value,undefined)
+  assert.equal(h.rustPreparations.length,1);assert.equal(prepared.source.base64,'');assert.equal(prepared.source.id,tab.key)
+  assert.equal(h.state.rustWordDocument.value.id,tab.key)
+  assert.equal(h.state.rustWordPrepared.value.take(tab.document),prepared.session)
+  assert.equal(h.state.rustWordPrepared.value.take(tab.document),undefined)
+  h.state.readyFor(tab.key);assert.equal(await h.state.saveActive(),true)
+  assert.equal(exports,1);assert.equal(marked,1);assert.equal(tab.dirty,false)
+  assert.equal(tab.document.base64,'UlVTVA==');assert.equal(tab.wordEngine,'rust')
+  h.unmount()
+})
+
+for(const route of ['native','recent','browser'])test(`generic ${route} DOCX opening selects Rust with exactly one bound preparation`,async()=>{
+  const h=shell({nativeEnabled:route!=='browser'}),source=rustSource(route)
+  if(route==='native'){h.native.openDocument=async()=>source;h.state.openFile();await h.idle()}
+  else if(route==='recent'){h.native.openRecent=async id=>{assert.equal(id,'recent');return source};h.state.openRecent({id:'recent'});await h.idle()}
+  else {const input=browserWordInput();await h.state.browserFile({target:input});assert.equal(input.value,'')}
+  const tab=h.state.active.value
+  assert.equal(tab.wordEngine,'rust');assert.equal(h.rustPreparations.length,1)
+  assert.equal(h.rustPreparations[0].source.id,tab.key);assert.equal(h.rustPreparations[0].source.base64,tab.document.base64)
+  assert.equal(h.state.rustWordPrepared.value,h.rustPreparations[0].handoff)
+  assert.equal(tab.requiresSaveAs,true);assert.equal(h.state.officeDocument.value,undefined)
+  assert.equal(h.calls.filter(c=>c[0]==='independent-preflight').length,0)
+  h.unmount()
+})
+
+for(const route of ['native','browser'])test(`explicit ${route} compatibility Word opening bypasses Rust preparation`,async()=>{
+  const h=shell({nativeEnabled:route==='native'})
+  if(route==='native'){h.native.openDocument=async()=>({...rustSource('Legacy'),extension:'doc',name:'Legacy.doc'});h.state.openLegacyWord();await h.idle()}
+  else {const input=browserWordInput();await h.state.browserLegacyWord({target:input});assert.equal(input.value,'')}
+  assert.equal(h.state.active.value.wordEngine,'legacy')
+  assert.equal(h.state.officeDocument.value.id,h.state.activeKey.value)
+  assert.equal(h.state.rustWordDocument.value,undefined);assert.equal(h.rustPreparations.length,0)
+  h.unmount()
+})
+
+for(const engine of ['rust','legacy'])test(`failed default Rust preflight leaves the active dirty ${engine} tab untouched without fallback`,async()=>{
+  const h=shell({rustPrepareError:'Unsupported DOCX table'}),tab=h.tab('live',{wordEngine:engine,dirty:true});h.active(tab)
+  const before=JSON.stringify(tab),live=h.state[engine==='rust'?'rustWordDocument':'officeDocument'].value
+  h.handle.exportFile=async()=>assert.fail('Rejected source must not snapshot the current editor')
+  for(const extension of ['doc','rtf','odt'])await assert.rejects(h.state.addDocument({...rustSource('other'),extension}),/基础 DOCX/)
+  assert.equal(h.calls.length,0,'Unsupported extensions fail before even Rust preparation')
+  await assert.rejects(h.state.addDocument(rustSource('bad'),'bad'),/Unsupported DOCX table/)
+  assert.equal(h.calls.length,1);assert.equal(h.calls[0][0],'rust-preflight')
+  assert.equal(h.state.tabs.value.length,1);assert.equal(h.state.activeKey.value,tab.key)
+  assert.equal(JSON.stringify(tab),before);assert.equal(h.state[engine==='rust'?'rustWordDocument':'officeDocument'].value,live)
+  assert.equal(h.reviews.length,0);assert.equal(h.state.independentWordDocument.value,undefined)
+  h.unmount()
+})
+
+test('successful Rust preparation precedes snapshot/discard/publication and captures immutable source bytes',async()=>{
+  let finish
+  const h=shell({rustPrepare:()=>new Promise(resolve=>{finish=resolve})}),tab=h.tab('live',{wordEngine:'legacy',dirty:true});h.active(tab)
+  h.handle.exportFile=async()=>{h.calls.push(['export-current']);return{base64:'RURJVA==',extension:'docx',dirty:true}}
+  const source=rustSource('incoming'),opening=h.state.addDocument(source,source.id)
+  await Promise.resolve()
+  assert.equal(h.state.activeKey.value,tab.key);assert.equal(h.state.tabs.value.length,1)
+  assert.equal(h.calls.length,1);assert.equal(h.calls[0][0],'rust-preflight');assert.equal(tab.document.base64,'T0xE')
+  source.base64='TkVX';finish({testRustSession:'incoming'});await opening
+  const next=h.state.active.value
+  assert.deepEqual(h.calls.map(c=>c[0]),['rust-preflight','rust-prepared','export-current','discard'])
+  assert.equal(tab.document.base64,'RURJVA==');assert.equal(tab.dirty,true)
+  assert.equal(next.document.base64,'T0xE');assert.equal(next.wordEngine,'rust');assert.notEqual(next.key,tab.key)
+  assert.equal(h.state.rustWordEntries.value.length,1);assert.equal(h.state.rustWordEntries.value[0].prepared,h.rustPreparations[0].handoff)
+  assert.equal(h.state.rustWordPrepared.value.take(next.document),h.rustPreparations[0].session)
+  assert.equal(h.state.rustWordPrepared.value.take(next.document),undefined)
+  h.unmount()
+})
+
+test('failed snapshot and disposal release an undelivered Rust preparation without publishing a tab',async()=>{
+  const h=shell(),tab=h.tab('typing',{wordEngine:'legacy',dirty:true});h.active(tab)
+  h.handle.exportFile=async()=>{throw Error('Composition pending')}
+  await assert.rejects(h.state.addDocument(rustSource('new'),'new'),/Composition pending/)
+  assert.equal(h.state.tabs.value.length,1);assert.equal(h.state.activeKey.value,tab.key)
+  assert.equal(tab.document.base64,'T0xE');assert.equal(tab.dirty,true)
+  assert.equal(h.rustPreparations[0].discarded,1)
+  assert.equal(h.rustPreparations[0].handoff.take(h.rustPreparations[0].source),undefined)
+  h.unmount()
+  let finish
+  const disposed=shell({rustPrepare:()=>new Promise(resolve=>{finish=resolve})})
+  const opening=disposed.state.addDocument(rustSource('late'),'late')
+  await Promise.resolve();disposed.unmount();finish({testRustSession:'late'});await opening
+  assert.equal(disposed.state.tabs.value.length,0);assert.equal(disposed.state.rustWordDocument.value,undefined)
+  assert.equal(disposed.rustPreparations[0].discarded,1)
+  assert.equal(disposed.rustPreparations[0].handoff.take(disposed.rustPreparations[0].source),undefined)
+})
+
+test('Rust supports DOCX-only saving and protects imported identity until a new copy succeeds',async()=>{
+  const h=shell();await h.state.addDocument(rustSource('original'),'original')
+  const tab=h.state.active.value;h.state.readyFor(tab.key);tab.dirty=true
+  let exports=0
+  h.rustWordHandle.exportFile=async()=>{exports++;return{base64:'UlVTVA==',extension:'docx',dirty:true}}
+  h.state.openSaveAs();assert.deepEqual(Array.from(h.state.saveAsOptions.value,o=>o.extension),['docx'])
+  for(const format of ['pdf','odt'])await assert.rejects(h.state.saveActive(true,format),/不支持此保存格式/)
+  h.state.saveAsDraft.value.format='odt';await h.state.confirmSaveAs();assert.match(h.state.saveAsDraft.value.error,/支持的格式/)
+  assert.equal(exports,0);assert.ok(!h.calls.some(c=>c[0]==='save'));h.state.cancelSaveAs()
+  const save=h.native.saveDocument
+  h.native.saveDocument=async request=>{h.calls.push(['cancelled-rust-save',request]);return{status:'cancelled'}}
+  assert.equal(await h.state.saveActive(),false)
+  assert.equal(tab.dirty,true);assert.equal(tab.requiresSaveAs,true);assert.equal(tab.fileId,'original');assert.equal(tab.document.sha256,'source-hash')
+  assert.ok(!h.calls.some(c=>c[0]==='marked'))
+  h.native.saveDocument=save;assert.equal(await h.state.saveActive(),true)
+  for(const request of h.calls.filter(c=>['save','cancelled-rust-save'].includes(c[0])).map(c=>c[1])){
+    assert.equal(request.documentId,undefined);assert.equal(request.expectedSha256,undefined);assert.equal(request.saveAs,true)
+    assert.equal(request.name,'original - 副本.docx')
+  }
+  assert.notEqual(tab.fileId,'original');assert.equal(tab.requiresSaveAs,false);assert.equal(tab.dirty,false)
+  assert.equal(tab.wordEngine,'rust');assert.ok(h.calls.some(c=>c[0]==='marked'))
+  h.unmount()
+})
+
+test('Rust tab switches preserve each mounted entry and use the matching editor handle',async()=>{
+  const h=shell(),exported=[],discarded=[]
+  const mountHandle=tab=>{
+    const handle={exportFile:async()=>{exported.push(tab.key);return{base64:Buffer.from(tab.key).toString('base64'),extension:'docx',dirty:true}},discardChanges:async()=>{discarded.push(tab.key)}}
+    h.state.setRustWordHandle(tab.key,handle);h.state.readyFor(tab.key);return handle
+  }
+  await h.state.addDocument(rustSource('first'),'first');const first=h.state.active.value;mountHandle(first)
+  const firstEntry=h.state.rustWordEntries.value[0]
+  await h.state.addDocument(rustSource('second'),'second');const second=h.state.active.value;mountHandle(second)
+  const secondEntry=h.state.rustWordEntries.value[1]
+  const pdf=h.tab('pdf',{kind:'pdf'})
+  h.handle.exportFile=async()=>({base64:'UERGOg==',extension:'pdf'})
+  await h.state.activate(pdf);h.state.readyFor(pdf.key);await h.state.activate(first);await h.state.activate(second)
+  assert.equal(first.ready,true);assert.equal(second.ready,true)
+  assert.equal(h.state.rustWordEntries.value[0],firstEntry);assert.equal(h.state.rustWordEntries.value[1],secondEntry)
+  assert.equal(firstEntry.document.base64,'T0xE','The mounted component input must not be replaced by snapshots')
+  assert.equal(secondEntry.document.base64,'T0xE')
+  assert.deepEqual(exported,[first.key,second.key,first.key]);assert.deepEqual(discarded,exported)
+  assert.equal(first.document.base64,Buffer.from(first.key).toString('base64'))
+  assert.equal(second.document.base64,Buffer.from(second.key).toString('base64'))
+  assert.equal(h.rustPreparations.length,2);assert.ok(h.rustPreparations.every(p=>p.discarded===0))
+  h.state.closeTarget.value=second;await h.state.resolveClose('discard')
+  assert.equal(h.state.rustWordEntries.value.length,1);assert.equal(h.state.rustWordEntries.value[0],firstEntry)
+  assert.equal(h.rustPreparations[1].discarded,1);assert.equal(h.rustPreparations[0].discarded,0)
+  h.unmount();assert.equal(h.rustPreparations[0].discarded,1)
+})
+
+test('default reopening reuses only its Rust tab while explicit compatibility may open the same file separately',async()=>{
+  const h=shell(),source=rustSource('same')
+  await h.state.addDocument(source,'same');const rust=h.state.active.value;h.state.readyFor(rust.key)
+  const entry=h.state.rustWordEntries.value[0]
+  h.rustWordHandle.exportFile=async()=>({base64:'TElWRQ==',extension:'docx',dirty:true})
+  await h.state.addDocument(source,'same','legacy');const legacy=h.state.active.value;h.state.readyFor(legacy.key)
+  assert.notEqual(legacy.key,rust.key);assert.equal(legacy.wordEngine,'legacy');assert.equal(rust.document.base64,'TElWRQ==')
+  await h.state.addDocument({...source,base64:'RElTSw=='},'same')
+  assert.equal(h.state.tabs.value.length,2);assert.equal(h.state.activeKey.value,rust.key)
+  assert.equal(rust.document.base64,'TElWRQ==');assert.equal(rust.dirty,true);assert.equal(rust.ready,true)
+  assert.equal(h.state.rustWordEntries.value[0],entry);assert.equal(h.rustPreparations.length,1)
+  h.unmount()
+})
+
+test('a failed Rust saved-revision acknowledgement cannot mark the shell tab clean',async()=>{
+  const h=shell(),tab=h.tab('editing',{wordEngine:'rust',dirty:true});h.active(tab)
+  h.rustWordHandle.exportFile=async()=>({base64:'UlVTVA==',extension:'docx',dirty:true})
+  h.rustWordHandle.markSaved=async()=>{throw Error('Saved revision is stale')}
+  await assert.rejects(h.state.saveActive(),/Saved revision is stale/)
+  assert.equal(h.calls.filter(c=>c[0]==='save').length,1,'The disk write succeeded but its revision could not be acknowledged')
+  assert.equal(tab.dirty,true,'Unacknowledged in-memory content must still prompt before closing')
+  assert.equal(tab.wordEngine,'rust');assert.equal(h.state.activeKey.value,tab.key)
+  h.unmount()
 })

@@ -49,7 +49,7 @@ async function screenshot(name){
  page.on('console',m=>{if(m.text().startsWith('WORKBENCH_RPC ')){console.log(m.text());try{report.rpc.push(JSON.parse(m.text().slice(14)))}catch{}}});
  await page.goto(process.env.OFFICE_WORKBENCH_URL||'http://127.0.0.1:5198/')
  if(process.env.OFFICE_UI_FROM!=='sheet'){
- await page.locator('.create-card.word').click();await idle();await page.getByLabel('段落样式',{exact:true}).waitFor();await page.evaluate(()=>window.originalOfficeFrame=document.querySelector('.office-frame'))
+ await page.getByTestId('legacy-word-new').click();await idle();await page.getByLabel('段落样式',{exact:true}).waitFor();await page.evaluate(()=>window.originalOfficeFrame=document.querySelector('.office-frame'))
  await wordTab('插入');await action(page.locator('.ow-word>.ow-ribbon').getByRole('button',{name:'文字',exact:true}))
  await page.getByLabel('文字内容',{exact:true}).fill('工作台真实文档 · 中文核验\n项目进展与行动计划。')
  await applyWordDraft();await page.getByTestId('word-draft-notice').waitFor({state:'hidden'})

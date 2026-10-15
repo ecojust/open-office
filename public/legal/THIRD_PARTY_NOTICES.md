@@ -2,7 +2,7 @@
 
 本应用包含具有独立版权和许可的第三方软件。根目录 `LICENSE` 适用于其注明的项目代码，不替代以下组件的许可。本发行物包含 AGPL、GPL、MPL 和 LGPL 组件，不能将整个安装包标为“全部 MIT”。本项目未购买或假定持有 Artifex、Qt 或 ZetaOffice 的商业授权。
 
-完整许可随网页和桌面资源放在 [`public/legal/`](public/legal/index.html)。这些组件按各自许可原样提供，不作保证；商标仍归原权利人所有。Open Office 不是 Apache OpenOffice、LibreOffice、Artifex 或 Qt 的官方产品，也未声称获得其背书。
+完整许可随网页和桌面资源放在 [`public/legal/`](index.html)。这些组件按各自许可原样提供，不作保证；商标仍归原权利人所有。Open Office 不是 Apache OpenOffice、LibreOffice、Artifex 或 Qt 的官方产品，也未声称获得其背书。
 
 ## 主要运行时
 
@@ -27,18 +27,18 @@
 | PDF.js | 6.4.299 | Apache-2.0；保留 Mozilla Foundation 的许可。离线 CMaps、标准字体及 WASM 编解码器另见 `pdfjs/` 下的原始许可。 |
 | pdf-lib | 1.17.1 | MIT；用于独立演示文稿的本地向量 PDF 导出，原始许可见 `npm/pdf-lib@1.17.1/LICENSE.md`。 |
 | @pdf-lib/fontkit | 1.1.1 | 包声明 MIT；用于中文字体嵌入与子集化，保留包内 README 许可声明及作者/贡献者元数据于 `npm/@pdf-lib__fontkit@1.1.1/`。 |
-| fflate | 0.8.2 | MIT；Copyright © 2023 Arjun Barrett。用于本地 PPTX ZIP 解压与原位包编辑，原始许可见 `npm/fflate@0.8.2/LICENSE`。 |
+| fflate | 0.8.2 | MIT；Copyright © 2023 Arjun Barrett。用于 PPTX ZIP 解压、原位包编辑与浏览器独立 DOCX 包读写，原始许可见 `npm/fflate@0.8.2/LICENSE`。 |
 | Noto Sans CJK SC Regular | 文件 SHA-256 `2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b` | SIL Open Font License 1.1；字体内版权为 © 2014–2021 Adobe。见 `NOTO-CJK-NOTICE.txt` 与 `OFL-1.1.txt`。 |
 | Tauri JavaScript API | 2.12.3 | Apache-2.0 OR MIT；两份原始文本均保留。 |
-| Rust / Tauri 原生依赖 | 以 `src-tauri/Cargo.lock` 为准 | 多数为 MIT / Apache-2.0；另有 MPL、BSD、ISC 等。逐项表达式和原始许可见 `rust-dependencies.json`、`rust/`。 |
+| Rust / Tauri 与文字内核依赖 | `src-tauri/Cargo.lock`、`crates/word-engine/Cargo.lock`、`crates/word-package/Cargo.lock` | 多数为 MIT / Apache-2.0；另有 MPL、BSD、ISC 等。逐项表达式、锁文件摘要和原始许可见 `rust-dependencies.json`、`rust/`。 |
 
-完整 npm 清单见 `npm-dependencies.json`，包括锁文件中的开发依赖、可选平台包和完整性摘要；`npm/` 保存已安装软件包的原始版权与许可。Rust 清单包含整个锁文件中的平台和构建依赖，**并不表示每一个包都链接进每个平台的应用**。未安装的 npm 平台二进制包使用其发行包元数据记录，不冒称已经检查其本地内容。最终原生发布仍应以各平台实际运行时清单核对附加库。
+完整 npm 清单见 `npm-dependencies.json`，包括锁文件中的开发依赖、可选平台包和完整性摘要；`npm/` 保存已安装软件包的原始版权与许可。Rust 清单取上述三份锁文件的外部依赖并集，涵盖原生、独立文字内核／WASM、平台和构建依赖，不包含本项目的本地 crate，**并不表示每一个包都链接进每个平台的应用**。新文字内核新增包的许可原文已与锁文件校验和对应的已发布 crate 归档逐字节核对，归档来源及许可文件摘要保存在索引的 `publishedArchiveEvidence`。未安装的 npm 平台二进制包使用其发行包元数据记录，不冒称已经检查其本地内容。最终原生发布仍应以各平台实际运行时清单核对附加库。
 
 PDF.js 资产的许可证并不全是 Apache-2.0：例如 Liberation 标准字体采用 OFL，Foxit 标准字体、Adobe CMaps、OpenJPEG、JBIG2 和 QCMS 各有对应的版权文本。这些文件已原样保留，不能仅保留 PDF.js 顶层 LICENSE。
 
 ## 对应源码与复现依据
 
-固定源码、下载地址、字节数、SHA-256 和关联证据保存在 [`public/legal/corresponding-sources-manifest.json`](public/legal/corresponding-sources-manifest.json)。执行：
+固定源码、下载地址、字节数、SHA-256 和关联证据保存在 [`public/legal/corresponding-sources-manifest.json`](corresponding-sources-manifest.json)。执行：
 
 ```sh
 node scripts/fetch-corresponding-sources.mjs
@@ -57,4 +57,12 @@ node scripts/fetch-corresponding-sources.mjs --offline --out-dir /path/to/source
 - 本应用源码、锁文件、构建脚本和本地 zeta.js 补丁必须随对应源码交付。仅下载这 8 个归档，不等于已经证明整个发行物的对应源码完整性。
 - 本地鼠标时间戳修改分别记录原始与派生 WASM 摘要。获取源码时会校验并复制精确转换脚本、Qt 源码等价补丁和修改说明；专项测试随完整应用源码提供。该二进制补丁不代表整个 WASM 已从源码重编译。
 
-更详细的源码组装说明见 [`public/legal/CORRESPONDING-SOURCE.md`](public/legal/CORRESPONDING-SOURCE.md)。
+更详细的源码组装说明见 [`public/legal/CORRESPONDING-SOURCE.md`](CORRESPONDING-SOURCE.md)。
+
+## 新 Rust 文字内核的字体与基础库
+
+`crates/word-engine` 使用固定的 DejaVu Sans 四种字重／样式、Noto Sans CJK SC Regular、Bold，以及 Noto Sans Symbols2 Regular。原始许可、来源与 SHA-256 位于 [`crates/word-engine/fonts`](../word-engine/fonts/manifest.json)。字体字节嵌入内核；构建时将许可与清单复制到 `word-engine/fonts/`，随前端资源分发。DejaVu 保留 Bitstream Vera 与 DejaVu 原始许可，Noto CJK 和 Noto Sans Symbols2 遵循 SIL OFL 1.1。
+
+Noto Sans Symbols2 Regular 的文件 SHA-256 为 `876598db5f1e3bef2bc77c4d94c5b0d5d2c1620be4878a06f18fb5434e331688`，来源为 Noto 字体包，保留 Google 的版权声明；原始许可见 `LICENSE-Noto-Core.txt`。该文件同时保留 Debian 包装文件的版权段落，字体本身适用其中的 OFL-1.1 条款。
+
+新内核的通用 XML、字体塑形、轮廓读取和 Unicode 基础库分别包括 roxmltree、rustybuzz、ttf-parser 与 Unicode 系列 crate；精确依赖见 `crates/word-engine/Cargo.lock` 与 `src-tauri/Cargo.lock`。它们不提供完整 Office 编辑器；其他工作区和兼容入口的既有许可要求继续适用。

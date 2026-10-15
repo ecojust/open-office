@@ -190,7 +190,7 @@ async function ready(name) {
 async function openFile(file) {
   const started = Date.now();
   phase = 'open:' + path.basename(file); console.log('OPEN', path.basename(file));
-  await page.getByTestId('document-open-input').setInputFiles(file);
+  await (/\.(?:docx|odt|doc|rtf)$/i.test(file) ? page.locator('input[type="file"][accept=".docx,.odt,.doc,.rtf"]') : page.getByTestId('document-open-input')).setInputFiles(file);
   await ready(path.basename(file));
   report.operations.push({ action: 'open', name: path.basename(file), milliseconds: Date.now() - started });
 }

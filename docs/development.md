@@ -2,12 +2,15 @@
 
 [返回项目首页](../README.md)
 
+**0.7.0** 包含 Rust 文字内核第一阶段。开发验收与发布安装包验收分别记录，安装包可用状态和本次 Actions 结果见 [0.7.0 发布说明](releases/0.7.0.md)。
+
 ## 本地开发
 
 
 需要 Node.js 24、Python 3.12、Rust stable，以及 Tauri 对应系统的原生构建依赖。macOS 需要 Xcode Command Line Tools；Windows 需要 Visual Studio C++ Build Tools 与 WebView2。
 
 ```bash
+rustup target add wasm32-unknown-unknown
 npm ci
 npm run desktop:prepare
 npm run desktop:dev
@@ -46,7 +49,30 @@ npm run test:browser:ppt-independent
 
 `test:browser:ppt-independent` 使用完整 Vue 应用验证新的独立演示工作区，检查真实 PPTX/PDF 下载、重新打开与界面操作，并确认没有加载旧办公引擎。`ppt-workbench`、`impress` 等旧测试保留为历史引擎的回归入口，不作为当前 PPT 路由的验收证据。
 
-独立文字编辑器的验证入口：
+主文字入口现由 Rust 文档内核驱动，构建会校验源码和字体指纹并生成 WASM；需要 `wasm32-unknown-unknown` 目标。桌面使用同一 crate 的原生代码，浏览器在 Worker 中运行 WASM。`roxmltree`、`rustybuzz`、`ttf-parser` 等通用 XML、字体和 Unicode 依赖，以及 DejaVu/Noto 字体的许可需要随发行保留。`public/word-engine/` 是构建产物，不提交到 Git。
+
+新 Rust 文字链的验证入口：
+
+```bash
+cargo test --locked --manifest-path crates/word-engine/Cargo.toml
+cargo build --locked --manifest-path crates/word-engine/Cargo.toml --bin word-engine-cli
+npm run word:build
+npm run word:check
+npm run test:browser:word-engine
+```
+
+`word:check` 检查 WASM 产物是否对应当前源码、字体与构建输入。浏览器专项使用真实 WASM、同一 crate 的原生 CLI、实际输入与保存重开，以及独立 Python ZIP/XML 检查器。它只证明基础 DOCX 范围：每文档 10,000 个 UTF-16 单元（含段落分隔）、500 段，同时最多 4 个 Rust 会话；未知有效语义必须拒绝并保留原会话。当前没有相对旧引擎的性能提升结论。
+
+Linux 下可另外尝试真实 Tauri 命令：
+
+```bash
+cargo build --locked --manifest-path src-tauri/Cargo.toml
+npm run test:native:word-engine -- "$PWD/src-tauri/target/debug/open-office"
+```
+
+需要完整 GTK/WebKitGTK 及可用显示会话。当前环境的原生编译通过，但因系统路径缺少 WebKit 子进程，窗口启动受阻，实际 IPC 尚未验收。浏览器和 CLI 测试不替代它，也不替代系统输入法、原生保存对话框或发布安装包检查。详细记录见 [Rust 文字内核](rust-word-engine.md)。
+
+以下独立文字测试仍只证明旧轻量入口及旧文档包模块：
 
 ```bash
 cargo test --locked --manifest-path crates/word-package/Cargo.toml
@@ -118,11 +144,13 @@ node scripts/benchmark-word-package.cjs
 
 脚本自行启动临时服务，使用原始 LibreOffice 小文件及 100／1,000／4,000 段合成正文；运行时应暂停其他浏览器测试和编译。此项不测真实 Tauri IPC 或整份文稿的打开、保存时间。参见[测量范围和结果](word-package-performance.md)。
 
-桌面发布工作流仅由 `workflow_dispatch` 触发。选择 `platform=all` 与 `publish=true`，三种安装包通过构建及应用内自检后，才发布测试版；源码推送本身不会自动发布。
+桌面发布工作流仅由 `workflow_dispatch` 触发。选择 `platform=all` 与 `publish=true`，三种安装包通过本次构建及应用内自检后，才发布测试版；源码推送本身不会自动发布。历史版本通过记录不能替代 0.7.0 本次验收。
 
 发布检查包括实际启动、文档编辑、保存重开与 PDF 独立回读。Windows x64 与 macOS ARM64 使用对应平台的真实应用；Intel 安装包原生编译后，将原封 DMG 转移到 ARM Mac，通过 Rosetta 验证 x64 应用和 PDF 进程。搬运前后校验安装包、应用文件、链接与签名，不重新构建或签名。该检查不等同于真实 Intel 显卡测试。
 
 从 0.6.0 起，完整安装包自检在加载 Office 引擎前，先执行独立 Word 的真实 Rust IPC 两轮读写、格式保留及无效输入拒绝检查，并将结果保存到 `frontend.independentWordPackage`。报告缺失、失败或内容不完整均阻止发布；随后继续执行原有工作区检查。该模块验证不包含轻量编辑器的原生文件对话框或全部 UI 操作。独立 `word-package` crate 的单元测试也在各构建平台单独运行。
+
+0.7.0 还要求新增 `word-engine` 内核的完整安装包 IPC 验收：真实应用调用 `word_engine_request`，完成新建、编辑、排版、DOCX 导出重开及无效请求保护，再继续原有工作区检查。各平台须运行 `word-engine` 的 Rust 测试，并校验必要的原生报告；失败或缺失时不得发布。此门槛与旧 `word-package` ZIP IPC 分开，只有全部必要检查通过后才提供发布附件。最终结果链接由本次发布记录提供。
 
 构建版本采用北京时间 `YYYY.MMDD.HHmm`，可通过 `OFFICE_BUILD_VERSION` 固定。每份安装包以对应 Actions 记录和提交为准。
 
@@ -133,8 +161,12 @@ node scripts/benchmark-word-package.cjs
 src/                    Vue 外壳、原生文件桥、PDF 工作室
 src/office/             办公内核消息桥与类型
 src/presentation/core/  独立 PPT 文档模型、SVG/PDF 绘制、PPTX 导入导出
-src/word/core/          独立正文模型、输入适配、OOXML 编解码与运行时桥
+src/word/core/          旧轻量文字模型、输入适配、OOXML 编解码与运行时桥
+src/word/rust/          新 Rust 文字会话协议、Worker 与原生传输适配
+src/components/RustWordEditor.vue  Rust 字形路径、光标与选区的 Vue 界面
+crates/word-engine/     新 Rust DOCX 读写、编辑事务、字体布局、分页及 CLI
 crates/word-package/    独立 Rust ZIP/CRC 核心及互通测试 CLI
+public/word-engine/     由当前 Rust 源码构建的 WASM 与清单（不入 Git）
 public/office/          独立办公内核宿主与线程适配
 public/office-runtime/  校验后下载的 WASM、数据与字体（不入 Git）
 public/legal/           随应用分发的许可文本
