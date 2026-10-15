@@ -1,6 +1,6 @@
 import { Inflate } from 'fflate'
 import { inspectPptxZip, writePptxParts } from '../../presentation/pptx-package.ts'
-import { AUTO_LINE_HEIGHT_LIMITS, createWordDocument, inheritedParagraphStyle, LETTER_SPACING_LIMITS, normalizeDocument, normalizeUnderlineColor, normalizeSourceVerticalAlign, normalizeVerticalAlign, POINT_LINE_HEIGHT_LIMITS } from './model.ts'
+import { AUTO_LINE_HEIGHT_LIMITS, createWordDocument, inheritedParagraphStyle, LETTER_SPACING_LIMITS, normalizeDocument, normalizeTextColor, normalizeUnderlineColor, normalizeSourceVerticalAlign, normalizeVerticalAlign, POINT_LINE_HEIGHT_LIMITS } from './model.ts'
 import type { ParagraphMarkerFormat, ParagraphStyle, TextStyle, WordDocument, WordParagraph, WordRun } from './model.ts'
 import { assertSupportedWordText } from './scripts.ts'
 import { isHighlightColor } from './highlight.ts'
@@ -363,7 +363,12 @@ function runProperties(node?: Element): RunProperties {
         }
         break
       }
-      case 'color': leaf(child); requireValue(/^[a-f0-9]{6}$/i.test(value(child)), '独立文字编辑器暂不支持自动颜色或主题颜色。'); style.color = `#${value(child).toLowerCase()}`; break
+      case 'color': {
+        leaf(child); const color = value(child)
+        requireValue(color === 'auto' || /^[a-f0-9]{6}$/i.test(color), 'DOCX 文字颜色必须是六位 RGB 颜色或自动颜色。')
+        style.color = normalizeTextColor(color === 'auto' ? color : `#${color}`)
+        break
+      }
       default: unsupported(`文字格式 ${name}`)
     }
   }
@@ -479,7 +484,9 @@ interface Styles {
 }
 function readStyles(parts: ParsedParts, path?: string, numbering: Numbering = new Map()): Styles {
   const definitions = new Map<string, Element>(), resolved = new Map<string, ResolvedStyle>(), resolving = new Set<string>()
-  const styles: Styles = { defaultRun: { color: '#000000' }, defaultParagraph: { spaceBefore: 0, spaceAfter: 0, lineHeight: 1, lineHeightRule: 'auto', widowControl: true }, get, next }
+  // Missing OOXML foreground is automatic too: unlike explicit black it
+  // becomes white over a dark character background in native Writer.
+  const styles: Styles = { defaultRun: { color: 'auto' }, defaultParagraph: { spaceBefore: 0, spaceAfter: 0, lineHeight: 1, lineHeightRule: 'auto', widowControl: true }, get, next }
   if (path) {
     const root = partXml(parts, path, W, 'styles'); attributes(root)
     let defaultsSeen = false
@@ -598,6 +605,7 @@ function readParagraph(node: Element, index: number, styles: Styles, numbering: 
     const characterLayers = directRun.reference ? selectedLayers : implicitCharacterLayers(selectedLayers)
     const characterSource = applyStyleLayers({}, characterLayers)
     const sourceVerticalAlign = characterSource.verticalAlign === undefined ? undefined : normalizeSourceVerticalAlign(characterSource.verticalAlign)
+    const sourceColor = characterSource.color
     if (characterId) runStyle = applyStyleLayers(runStyle, characterLayers)
     // A named style's underline item starts from docDefaults, then inherits
     // paint only within its own basedOn chain. A missing color on its w:u
@@ -628,7 +636,7 @@ function readParagraph(node: Element, index: number, styles: Styles, numbering: 
     // case-map property takes priority over this paragraph/character toggle.
     if (directRun.style.caseMap === undefined && characterSource.caseMap !== undefined && characterSource.caseMap !== 'none' && characterSource.caseMap === baseRun.caseMap) runStyle.caseMap = 'none'
     const directStyle: TextStyle = { ...directRunStyle }
-    for (const key of Object.keys(runStyle) as Array<keyof TextStyle>) if (!(key === 'verticalAlign' && sourceVerticalAlign !== undefined) && runStyle[key] !== sourceRun[key] && directStyle[key] === undefined) Object.assign(directStyle, { [key]: runStyle[key] })
+    for (const key of Object.keys(runStyle) as Array<keyof TextStyle>) if (!(key === 'verticalAlign' && sourceVerticalAlign !== undefined) && !(key === 'color' && sourceColor !== undefined) && runStyle[key] !== sourceRun[key] && directStyle[key] === undefined) Object.assign(directStyle, { [key]: runStyle[key] })
     // Explicit named-character tracking continues through Enter even when it
     // equals the paragraph base. Flatten that source into a direct override
     // before a following paragraph style can change its inherited value.
@@ -637,6 +645,9 @@ function readParagraph(node: Element, index: number, styles: Styles, numbering: 
     // must continue through a following style. Preserve its original OOXML
     // threshold even though Writer renders every positive value as enabled.
     if (directStyle.kerning === undefined && characterSource.kerning !== undefined) directStyle.kerning = runStyle.kerning
+    // Named foreground survives Enter independently of hard color: the body
+    // keeps the character style while the new mark follows its paragraph.
+    // Keep even a same-value source instead of flattening it into directStyle.
     // Keep the resolved character-style case map (including a toggle/reset)
     // explicit so Enter cannot replace it with the following paragraph base.
     if (directStyle.caseMap === undefined && characterSource.caseMap !== undefined) directStyle.caseMap = runStyle.caseMap
@@ -652,10 +663,10 @@ function readParagraph(node: Element, index: number, styles: Styles, numbering: 
       // text. A named marker size equal to the paragraph base must therefore
       // still override a differently sized body run. Keep script provenance
       // separate; false b/i style values do not toggle the inherited value.
-      if (key === 'verticalAlign' || ((key === 'bold' || key === 'italic') && !layer[key])) continue
+      if (key === 'verticalAlign' || key === 'color' || ((key === 'bold' || key === 'italic') && !layer[key])) continue
       if (directStyle[key] === undefined && runStyle[key] !== undefined) Object.assign(directStyle, { [key]: runStyle[key] })
     }
-    return { style: { ...runStyle, ...directRunStyle }, directStyle, ...(sourceVerticalAlign !== undefined ? { sourceVerticalAlign } : {}) }
+    return { style: { ...runStyle, ...directRunStyle }, directStyle, ...(sourceVerticalAlign !== undefined ? { sourceVerticalAlign } : {}), ...(sourceColor !== undefined ? { sourceColor } : {}) }
   }
   if (direct.marker) paragraph.marker = resolveCharacters(direct.marker, true)
   for (const run of nodes) {
@@ -832,7 +843,7 @@ function serializeRunProperties(style: TextStyle, direct = false, effective: Tex
   if (style.caseMap === 'upper') props.push(tag('caps', 1))
   else if (style.caseMap === 'smallCaps') props.push(tag('smallCaps', 1))
   else if (style.caseMap === 'none') props.push(tag('smallCaps', 0), tag('caps', 0))
-  if (style.color !== undefined) props.push(tag('color', style.color.replace(/^#/, '').toUpperCase()))
+  if (style.color !== undefined) props.push(tag('color', style.color === 'auto' ? 'auto' : style.color.slice(1).toUpperCase()))
   if (style.kerning !== undefined) props.push(tag('kern', Math.round(style.kerning * 2)))
   if (style.letterSpacing !== undefined) props.push(tag('spacing', Math.round(style.letterSpacing * 20)))
   if (style.fontSize !== undefined) props.push(tag('sz', Math.round(style.fontSize * 2)))
@@ -867,8 +878,12 @@ function serializeRun(run: WordRun, direct = false): string {
   const content = run.text.split(/([\t\n])/).map(text => text === '\t' ? '<w:tab/>' : text === '\n' ? '<w:br/>' : `<w:t xml:space="preserve">${escape(text)}</w:t>`).join('')
   return `<w:r>${props ? `<w:rPr>${props}</w:rPr>` : ''}${content}</w:r>`
 }
+function characterStyleId(format: ParagraphMarkerFormat): string | undefined {
+  if (format.sourceColor !== undefined) return `IndependentColor${format.sourceColor === 'auto' ? 'Auto' : format.sourceColor.slice(1)}${format.sourceVerticalAlign === undefined ? '' : `Script${format.sourceVerticalAlign}`}`
+  return format.sourceVerticalAlign !== undefined ? `IndependentScript${format.sourceVerticalAlign}` : undefined
+}
 function serializeCharacterFormat(format: ParagraphMarkerFormat, direct = false, omitEmptyOffset = false): string {
-  const characterStyle = format.sourceVerticalAlign !== undefined ? `IndependentScript${format.sourceVerticalAlign}` : undefined
+  const characterStyle = characterStyleId(format)
   const style = direct || characterStyle ? format.directStyle ?? format.style : format.style
   const exportedStyle = omitEmptyOffset && typeof style.verticalAlign === 'number' ? { ...style, verticalAlign: undefined } : style
   return (characterStyle ? tag('rStyle', characterStyle) : '') + serializeRunProperties(exportedStyle, direct || Boolean(characterStyle), format.style)
@@ -907,10 +922,15 @@ export function exportWordParts(input: WordDocument): Map<string, Uint8Array> {
   const orientation = page.orientation ?? (page.width > page.height ? 'landscape' : 'portrait')
   const section = `<w:sectPr><w:pgSz w:w="${Math.round(page.width * 20)}" w:h="${Math.round(page.height * 20)}" w:orient="${orientation}"/><w:pgMar w:top="${Math.round(page.marginTop * 20)}" w:right="${Math.round(page.marginRight * 20)}" w:bottom="${Math.round(page.marginBottom * 20)}" w:left="${Math.round(page.marginLeft * 20)}" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>`
   const styleIds = new Map<string, string>(), namedStyles: string[] = []
-  const characterScripts = new Set(model.paragraphs.flatMap(paragraph => [...paragraph.runs, ...(paragraph.marker ? [paragraph.marker] : [])].flatMap(format => format.sourceVerticalAlign === undefined ? [] : [format.sourceVerticalAlign])))
-  for (const verticalAlign of characterScripts) {
-    const id = `IndependentScript${verticalAlign}`
-    namedStyles.push(`<w:style w:type="character" w:styleId="${id}">${tag('name', id)}<w:rPr>${tag('vertAlign', verticalAlign)}</w:rPr></w:style>`)
+  const characterFormats = new Map<string, ParagraphMarkerFormat>()
+  for (const paragraph of model.paragraphs) for (const format of [...paragraph.runs, ...(paragraph.marker ? [paragraph.marker] : [])]) {
+    const id = characterStyleId(format)
+    if (id) characterFormats.set(id, format)
+  }
+  for (const [id, format] of characterFormats) {
+    const properties = (format.sourceVerticalAlign === undefined ? '' : tag('vertAlign', format.sourceVerticalAlign))
+      + (format.sourceColor === undefined ? '' : tag('color', format.sourceColor === 'auto' ? 'auto' : format.sourceColor.slice(1)))
+    namedStyles.push(`<w:style w:type="character" w:styleId="${id}">${tag('name', id)}<w:rPr>${properties}</w:rPr></w:style>`)
   }
   for (const [index, paragraph] of model.paragraphs.entries()) {
     requireValue(!model.autoHyphenation || paragraph.style.suppressAutoHyphens === true, '独立文字编辑器暂不支持启用自动断词的段落。')

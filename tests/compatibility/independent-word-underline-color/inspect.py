@@ -5,7 +5,9 @@ Native contract: mode/color form one underline item. Within a basedOn chain,
 mode-only underline inherits the base color. At a new named-character scope
 or direct override, mode-only underline instead uses docDefaults color (auto
 when absent). No underline item inherits the previous scope unchanged.
-Explicit OOXML color=auto is rejected; the model's auto means omitted color.
+Explicit underline w:u/@w:color=auto is rejected; underline auto means omitted
+color. Foreground w:color/@w:val=auto is a separate supported semantic value,
+and absent foreground inherits auto rather than an invented explicit black.
 None retains its latent RGB for later re-enabling. Markers resolve separately.
 """
 import json
@@ -20,6 +22,13 @@ q = lambda name: '{' + W + '}' + name
 
 def value(node, default=None):
     return node.get(q('val'), default) if node is not None else default
+
+
+def foreground(value):
+    if value == 'auto':
+        return value
+    assert len(value) == 6 and all(c in '0123456789abcdefABCDEF' for c in value), 'Unsupported foreground color: ' + value
+    return '#' + value.upper()
 
 
 def props(node):
@@ -43,7 +52,7 @@ def props(node):
                                 ('szCs', 'fontSizeCs', lambda v: int(v)/2),
                                 ('kern', 'kerningHalfPoints', int),
                                 ('vertAlign', 'verticalAlign', str),
-                                ('color', 'color', lambda v: '#' + v.upper())]:
+                                ('color', 'color', foreground)]:
         v = value(node.find('w:' + tag, NS))
         if v is not None:
             result[field] = convert(v)
@@ -92,7 +101,7 @@ def inspect(filename):
         paragraphs = []
         document = E.fromstring(archive.read('word/document.xml'))
         for p in document.findall('w:body/w:p', NS):
-            inherited = {'underline': False, 'underlineColor': 'auto', 'color': '#000000', 'strike': 'none', 'fontSize': 12, 'verticalAlign': 'baseline', **defaults}
+            inherited = {'underline': False, 'underlineColor': 'auto', 'color': 'auto', 'strike': 'none', 'fontSize': 12, 'verticalAlign': 'baseline', **defaults}
             for named in chain(value(p.find('w:pPr/w:pStyle', NS), default_id)):
                 inherited.update(props(named.find('w:rPr', NS)))
             marker, marker_direct = resolved(p.find('w:pPr/w:rPr', NS), inherited)

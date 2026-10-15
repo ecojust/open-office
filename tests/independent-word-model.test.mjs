@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { AUTO_LINE_HEIGHT_LIMITS, BASELINE_OFFSET_FONTS, BASELINE_OFFSET_LIMITS, createWordDocument, documentText, LETTER_SPACING_LIMITS, normalizeDocument, normalizeUnderlineColor, normalizeVerticalAlign, normalizeSourceVerticalAlign, PAGE_MARGIN_LIMITS, PAGE_SIZE_LIMITS, PARAGRAPH_SPACING_LIMITS, POINT_LINE_HEIGHT_LIMITS, WordController, withParagraphMarkerSource, paragraphInsertionFormat } from '../src/word/core/model.ts'
+import { AUTO_LINE_HEIGHT_LIMITS, BASELINE_OFFSET_FONTS, BASELINE_OFFSET_LIMITS, createWordDocument, documentText, LETTER_SPACING_LIMITS, normalizeDocument, normalizeTextColor, normalizeUnderlineColor, normalizeVerticalAlign, normalizeSourceVerticalAlign, PAGE_MARGIN_LIMITS, PAGE_SIZE_LIMITS, PARAGRAPH_SPACING_LIMITS, POINT_LINE_HEIGHT_LIMITS, WordController, withParagraphMarkerSource, paragraphInsertionFormat } from '../src/word/core/model.ts'
 import { normalizePaperDimension } from '../src/word/core/paper.ts'
 import { HIGHLIGHT_COLORS, highlightFromCss, isHighlightColor } from '../src/word/core/highlight.ts'
 import { backgroundFromCss, normalizeBackgroundColor, textBackgroundColor } from '../src/word/core/background.ts'
@@ -31,6 +31,238 @@ test('partial character format preserves surrounding runs, false values, and und
   assert.equal(c.dirty, false)
   c.redo()
   assert.equal(c.model.paragraphs[0].runs[1].style.bold, false)
+})
+
+test('automatic text color remains distinct from explicit RGB and independent decoration paint', () => {
+  assert.equal(normalizeTextColor('auto'), 'auto')
+  assert.equal(normalizeTextColor('#12abEF'), '#12ABEF')
+  const model = createWordDocument()
+  model.paragraphs[0].runs = [
+    { text: 'A', style: { color: 'auto', underline: true, underlineColor: '#123456', backgroundColor: '#000000', highlight: 'yellow' } },
+    { text: 'B', style: { color: '#000000', underline: true, underlineColor: '#123456', backgroundColor: '#000000', highlight: 'yellow' } },
+  ]
+  const normalized = normalizeDocument(model)
+  assert.equal(normalized.paragraphs[0].runs.length, 2, 'equal current paint must not collapse different future foreground semantics')
+  assert.deepEqual(normalized.paragraphs[0].runs.map(run => run.style.color), ['auto', '#000000'])
+  assert.equal(normalized.paragraphs[0].runs[0].style.underlineColor, '#123456')
+  assert.equal(normalized.paragraphs[0].runs[0].style.backgroundColor, '#000000')
+  assert.equal(normalized.paragraphs[0].runs[0].style.highlight, 'yellow')
+})
+
+test('partial automatic foreground edits preserve other paint layers and undo selection', () => {
+  const model = createWordDocument(), original = { color: '#123456', backgroundColor: '#000000', highlight: 'yellow', underline: 'double', underlineColor: '#00FF00', strike: 'double' }
+  model.paragraphs[0].runs = [{ text: 'A中文😀Z', style: original }]
+  const c = new WordController(model), before = c.model, selected = range(0, 1, 5)
+  c.formatText(selected, { color: 'auto' })
+  assert.deepEqual(c.model.paragraphs[0].runs, [
+    { text: 'A', style: original }, { text: '中文😀', style: { ...original, color: 'auto' } }, { text: 'Z', style: original },
+  ])
+  const automatic = c.model
+  c.formatText(selected, { color: '#000000' })
+  assert.equal(c.model.paragraphs[0].runs[1].style.color, '#000000')
+  c.undo(); assert.deepEqual(c.model, automatic)
+  c.undo(); assert.deepEqual(c.model, before)
+  c.redo(); assert.deepEqual(c.model, automatic); assert.deepEqual(c.selection, selected)
+})
+
+test('automatic foreground survives all stored character layers without being resolved to black', () => {
+  const model = createWordDocument(), style = { color: 'auto', backgroundColor: '#123456' }
+  model.paragraphs[0] = { id: 'automatic-layers', style: {}, sourceRun: style,
+    runs: [{ text: 'A', style, directStyle: { color: 'auto' } }],
+    marker: { style, directStyle: { color: 'auto' } }, sessionInsertion: { style, directStyle: { color: 'auto' } },
+    nextParagraphStyle: { paragraph: {}, run: style, sourceRun: style } }
+  const paragraph = normalizeDocument(model).paragraphs[0]
+  for (const layer of [paragraph.sourceRun, paragraph.runs[0].style, paragraph.runs[0].directStyle,
+    paragraph.marker.style, paragraph.marker.directStyle, paragraph.sessionInsertion.style,
+    paragraph.sessionInsertion.directStyle, paragraph.nextParagraphStyle.run, paragraph.nextParagraphStyle.sourceRun]) assert.equal(layer.color, 'auto')
+})
+
+test('invalid foreground values reject atomically in every stored character layer', () => {
+  const c = sample(), before = c.model, selection = c.selection
+  const invalid = ['AUTO', 'Auto', ' auto', 'auto ', '#FFF', '#12345678', '#GG0000', 'transparent', 'currentColor', 'red', '', 1, false, null, [], {}]
+  for (const color of invalid) {
+    assert.throws(() => normalizeTextColor(color), /文字颜色/)
+    assert.throws(() => c.formatText(range(0, 0, 1), { bold: true, color }), /文字颜色/)
+    for (const layer of ['style', 'directStyle', 'sourceRun', 'nextRun', 'nextSourceRun', 'markerStyle', 'markerDirect', 'sessionStyle', 'sessionDirect']) {
+      const malformed = structuredClone(before), paragraph = malformed.paragraphs[0]
+      if (layer === 'style' || layer === 'directStyle') paragraph.runs[0][layer] = { color }
+      else if (layer === 'sourceRun') paragraph.sourceRun = { color }
+      else if (layer === 'nextRun') paragraph.nextParagraphStyle = { paragraph: {}, run: { color } }
+      else if (layer === 'nextSourceRun') paragraph.nextParagraphStyle = { paragraph: {}, run: {}, sourceRun: { color } }
+      else {
+        paragraph.marker = { style: {}, directStyle: {} }
+        if (layer === 'markerStyle') paragraph.marker.style = { color }
+        else if (layer === 'markerDirect') paragraph.marker.directStyle = { color }
+        else paragraph.sessionInsertion = { style: layer === 'sessionStyle' ? { color } : {}, directStyle: layer === 'sessionDirect' ? { color } : {} }
+      }
+      assert.throws(() => c.setDocument(malformed), /文字颜色/, layer)
+    }
+    assert.deepEqual(c.model, before); assert.deepEqual(c.selection, selection)
+    assert.equal(c.revision, 0); assert.equal(c.canUndo, false)
+  }
+})
+
+test('joining paragraphs preserves automatic and explicit foreground inheritance through history', () => {
+  for (const [firstColor, secondColor] of [['#000000', 'auto'], ['auto', '#000000'], ['#123456', 'auto']]) {
+    const model = createWordDocument(), first = { color: firstColor, backgroundColor: '#000000' }, second = { color: secondColor, backgroundColor: '#000000' }
+    model.paragraphs = [
+      { id: 'first', style: {}, sourceRun: first, runs: [{ text: 'A', style: first, directStyle: {} }] },
+      { id: 'second', style: {}, sourceRun: second, runs: [{ text: 'B', style: second, directStyle: {} }] },
+    ]
+    const c = new WordController(model), before = c.model
+    c.replaceText(range(0, 1, 0, 1), '')
+    assert.equal(c.model.paragraphs[0].runs[1].style.color, secondColor)
+    assert.deepEqual(c.model.paragraphs[0].runs[1].directStyle, { color: secondColor })
+    const merged = c.model
+    c.undo(); assert.deepEqual(c.model, before)
+    c.redo(); assert.deepEqual(c.model, merged)
+  }
+})
+
+test('automatic paragraph-marker foreground stays separate from body text and empty insertion survives history', () => {
+  const model = createWordDocument(), sourceRun = { color: '#C00000', fontSize: 12 }, markerStyle = { ...sourceRun, color: 'auto', backgroundColor: '#000000' }
+  model.paragraphs[0] = { id: 'automatic-mark', style: {}, sourceRun,
+    marker: { style: markerStyle, directStyle: { color: 'auto', backgroundColor: '#000000' } },
+    runs: [{ text: 'Red', style: sourceRun, directStyle: {} }] }
+  const c = new WordController(model), before = c.model
+  assert.equal(c.model.paragraphs[0].runs[0].style.color, '#C00000')
+  assert.equal(paragraphInsertionFormat(c.model.paragraphs[0]).style.color, 'auto')
+  c.replaceText(range(0, 3, 3), 'X')
+  assert.deepEqual(c.model.paragraphs[0].runs.map(run => [run.text, run.style.color]), [['Red', '#C00000'], ['X', 'auto']])
+  c.undo(); assert.deepEqual(c.model, before)
+  const empty = createWordDocument()
+  empty.paragraphs[0] = { id: 'empty-automatic', style: {}, sourceRun,
+    marker: { style: sourceRun, directStyle: {} }, runs: [{ text: '', style: sourceRun, directStyle: {} }] }
+  const e = new WordController(empty), emptyBefore = e.model
+  e.formatText(range(0, 0, 0), { color: 'auto' })
+  assert.equal(e.model.paragraphs[0].marker.directStyle.color, 'auto')
+  e.replaceText(e.selection, '新😀')
+  assert.equal(e.model.paragraphs[0].runs[0].style.color, 'auto')
+  assert.equal(e.model.paragraphs[0].runs[0].directStyle.color, 'auto')
+  e.undo(); e.undo(); assert.deepEqual(e.model, emptyBefore)
+})
+
+test('foreground inheritance follows the next paragraph while explicit automatic and RGB sources continue through Enter', () => {
+  // Hard foreground remains explicit, including same-value overrides.
+  // Pure paragraph inheritance stays sparse and follows the next style.
+  for (const [sourceColor, directColor, nextColor] of [
+    ['auto', undefined, '#C00000'], ['auto', 'auto', '#C00000'],
+    ['#C00000', '#C00000', '#0000CC'], ['#C00000', 'auto', '#0000CC'],
+  ]) for (const offset of [1, 2]) {
+    const model = createWordDocument(), sourceRun = { color: sourceColor, backgroundColor: '#000000' }
+    const directStyle = directColor === undefined ? {} : { color: directColor }
+    model.paragraphs[0] = { id: 'color-next', style: {}, sourceRun,
+      runs: [{ text: 'ab', style: { ...sourceRun, ...directStyle }, directStyle }],
+      nextParagraphStyle: { paragraph: {}, run: { color: nextColor, backgroundColor: '#FFFFFF' } } }
+    const c = new WordController(model), before = c.model
+    c.replaceText(range(0, offset, offset), '\n')
+    c.replaceText(c.selection, 'x')
+    const inserted = c.model.paragraphs[1].runs[0]
+    assert.equal(inserted.style.color, directColor ?? (offset === 2 ? nextColor : sourceColor))
+    assert.equal(inserted.directStyle.color, directColor)
+    assert.equal(inserted.style.backgroundColor, offset === 2 ? '#FFFFFF' : '#000000')
+    c.undo(); c.undo(); assert.deepEqual(c.model, before)
+  }
+})
+
+test('named foreground remains separate from equal hard foreground and paragraph inheritance', () => {
+  const model = createWordDocument(), sourceRun = { color: 'auto' }
+  model.paragraphs[0] = { id: 'color-provenance', style: {}, sourceRun, runs: [
+    { text: 'A', style: sourceRun, directStyle: {} },
+    { text: 'B', style: sourceRun, directStyle: {}, sourceColor: 'auto' },
+    { text: 'C', style: sourceRun, directStyle: { color: 'auto' }, sourceColor: 'auto' },
+  ] }
+  const c = new WordController(model), before = c.model
+  assert.equal(before.paragraphs[0].runs.length, 3)
+  c.formatText(range(0, 1, 2), { color: '#c00000' })
+  assert.equal(c.model.paragraphs[0].runs[1].sourceColor, 'auto')
+  assert.equal(c.model.paragraphs[0].runs[1].directStyle.color, '#C00000')
+  c.undo(); assert.deepEqual(c.model, before)
+  c.redo(); assert.equal(c.model.paragraphs[0].runs[1].sourceColor, 'auto')
+})
+
+test('named foreground Enter keeps the body source while the marker follows the next paragraph', () => {
+  for (const [color, nextColor] of [['auto', '#C00000'], ['#C00000', '#0000CC']]) {
+    for (const sourceVerticalAlign of [undefined, 'superscript', 'subscript']) {
+      const model = createWordDocument(), sourceRun = { color, fontSize: 12 }, script = sourceVerticalAlign === undefined ? {} : { verticalAlign: sourceVerticalAlign }
+      model.paragraphs[0] = { id: 'named-next', style: {}, sourceRun,
+        marker: { style: sourceRun, directStyle: {} },
+        runs: [{ text: 'A', style: { ...sourceRun, ...script }, directStyle: {}, sourceColor: color, ...(sourceVerticalAlign === undefined ? {} : { sourceVerticalAlign }) }],
+        nextParagraphStyle: { paragraph: {}, run: { color: nextColor, fontSize: 12 } } }
+      const c = new WordController(model), before = c.model
+      c.replaceText(range(0, 1, 1), '\n')
+      const empty = c.model.paragraphs[1]
+      assert.equal(empty.marker.style.color, nextColor)
+      assert.equal(empty.marker.sourceColor, undefined)
+      assert.equal(empty.marker.directStyle.color, undefined)
+      assert.equal(empty.runs[0].style.color, color)
+      assert.equal(empty.runs[0].sourceColor, color)
+      assert.equal(paragraphInsertionFormat(empty).sourceColor, color)
+      c.replaceText(c.selection, 'x')
+      assert.equal(c.model.paragraphs[1].runs[0].sourceColor, color)
+      assert.equal(c.model.paragraphs[1].runs[0].directStyle.color, undefined)
+      assert.equal(c.model.paragraphs[1].marker.style.color, nextColor)
+      c.replaceText(c.selection, '\n')
+      c.replaceText(c.selection, 'y')
+      assert.equal(c.model.paragraphs[2].runs[0].sourceColor, color)
+      assert.equal(c.model.paragraphs[2].runs[0].sourceVerticalAlign, sourceVerticalAlign)
+      assert.equal(c.model.paragraphs[2].runs[0].directStyle.verticalAlign, undefined)
+      assert.equal(c.model.paragraphs[2].marker.style.color, nextColor)
+      for (let i = 0; i < 4; i++) c.undo()
+      assert.deepEqual(c.model, before)
+    }
+  }
+})
+
+test('hard foreground Enter creates a hard marker without losing named foreground or other attributes', () => {
+  for (const color of ['auto', '#0000CC']) {
+    const model = createWordDocument(), sourceRun = { color: '#C00000', fontSize: 12 }
+    model.paragraphs[0] = { id: 'hard-next', style: {}, sourceRun,
+      runs: [{ text: 'A', style: { ...sourceRun, color, bold: true, verticalAlign: 'superscript' }, directStyle: { color, bold: true }, sourceColor: 'auto', sourceVerticalAlign: 'superscript' }],
+      nextParagraphStyle: { paragraph: {}, run: { color: '#00AA00', fontSize: 18 } } }
+    const c = new WordController(model), before = c.model
+    c.replaceText(range(0, 1, 1), '\n'); c.replaceText(c.selection, 'x')
+    const p = c.model.paragraphs[1]
+    assert.equal(p.marker.directStyle.color, color)
+    assert.equal(p.marker.sourceColor, undefined)
+    assert.equal(p.runs[0].sourceColor, 'auto')
+    assert.equal(p.runs[0].directStyle.color, color)
+    assert.equal(p.runs[0].style.fontSize, 18)
+    assert.equal(p.runs[0].style.bold, true)
+    assert.equal(p.runs[0].sourceVerticalAlign, 'superscript')
+    c.undo(); c.undo(); assert.deepEqual(c.model, before)
+  }
+})
+
+test('named marker foreground overrides body insertion without becoming hard color', () => {
+  const model = createWordDocument(), sourceRun = { color: '#C00000' }
+  model.paragraphs[0] = { id: 'named-mark', style: {}, sourceRun,
+    marker: { style: { color: 'auto' }, sourceColor: 'auto', directStyle: {} },
+    runs: [{ text: 'A', style: { color: '#0000CC' }, directStyle: { color: '#0000CC' } }] }
+  const c = new WordController(model), insertion = paragraphInsertionFormat(c.model.paragraphs[0])
+  assert.equal(insertion.sourceColor, 'auto'); assert.equal(insertion.directStyle.color, undefined)
+  c.replaceText(range(0, 1, 1), 'x')
+  assert.equal(c.model.paragraphs[0].runs[1].sourceColor, 'auto')
+  assert.equal(c.model.paragraphs[0].runs[1].directStyle.color, undefined)
+  const marker = withParagraphMarkerSource(c.model.paragraphs[0].marker, { color: '#00AA00' })
+  assert.equal(marker.style.color, 'auto'); assert.equal(marker.sourceColor, 'auto')
+})
+
+test('invalid named foreground rejects atomically in body, mark and live insertion provenance', () => {
+  const c = sample(), before = c.model
+  for (const sourceColor of ['AUTO', '#123', '#12345678', 'red', null, false, 0, {}, []]) {
+    for (const layer of ['run', 'marker', 'session']) {
+      const model = c.model, p = model.paragraphs[0]
+      if (layer === 'run') p.runs[0].sourceColor = sourceColor
+      else {
+        p.marker = { style: {}, directStyle: {} }
+        if (layer === 'marker') p.marker.sourceColor = sourceColor
+        else p.sessionInsertion = { style: {}, directStyle: {}, sourceColor }
+      }
+      assert.throws(() => c.setDocument(model), /文字颜色/)
+      assert.deepEqual(c.model, before); assert.equal(c.revision, 0)
+    }
+  }
 })
 
 test('replacing a backwards multi-paragraph range joins prefix and suffix without losing their styles', () => {

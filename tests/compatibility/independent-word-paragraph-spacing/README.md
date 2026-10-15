@@ -11,7 +11,7 @@ accept it. `freeze.py` only copies complete files and creates the inventory.
 
 The eight positive pairs cover 18 direct/inherited spacing controls, three
 document-default controls, 11 geometry controls, and five real Writer keyboard
-actions. The complete `rule-only.docx` source was an unsupported control at the original freeze; the later line-rule compatibility iteration now checks it as a positive without changing its bytes. The original `automatic-color.docx` native output remains unsupported. The initial editing author input omitted explicit color; Writer exported automatic color outside the existing color subset. That evidence is preserved unchanged. The positive editing controls use separate newly authored inputs with explicit black, then repeat the same real native actions.
+actions. The complete `rule-only.docx` source was an unsupported control at the original freeze; the later line-rule compatibility iteration now checks it as a positive without changing its bytes. The original `automatic-color.docx` source and native output are now positive controls in the automatic foreground-color iteration, with their original bytes and hashes unchanged. At the original freeze, the author input omitted explicit color and Writer exported automatic color outside the then-supported subset; that historical rejection is retained in the manifest. The positive editing controls use separate newly authored inputs with explicit black, then repeat the same real native actions.
 The native control for a keyboard action is its resulting document, so its
 expected text and spacing differ from the untouched source.
 

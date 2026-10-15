@@ -2,12 +2,13 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import type { NativeDocument } from '../types'
 import { base64ToBytes, bytesToBase64, type EditorExport, type Extension } from '../shared/document'
-import { createWordDocument, documentText, inheritedParagraphStyle, AUTO_LINE_HEIGHT_LIMITS, PARAGRAPH_SPACING_LIMITS, POINT_LINE_HEIGHT_LIMITS, PAGE_SIZE_LIMITS, PAGE_MARGIN_LIMITS, BASELINE_OFFSET_LIMITS, LETTER_SPACING_LIMITS, normalizeUnderlineColor, orderedSelection, paragraphInsertionFormat, paragraphText, withParagraphMarkerSource, WordController, type ParagraphMarkerFormat, type ParagraphStyle, type TextStyle, type WordDocument, type WordPage, type WordRun, type WordSelection } from '../word/core/model'
+import { createWordDocument, documentText, inheritedParagraphStyle, AUTO_LINE_HEIGHT_LIMITS, PARAGRAPH_SPACING_LIMITS, POINT_LINE_HEIGHT_LIMITS, PAGE_SIZE_LIMITS, PAGE_MARGIN_LIMITS, BASELINE_OFFSET_LIMITS, LETTER_SPACING_LIMITS, normalizeTextColor, normalizeUnderlineColor, orderedSelection, paragraphInsertionFormat, paragraphText, withParagraphMarkerSource, WordController, type ParagraphMarkerFormat, type ParagraphStyle, type TextStyle, type WordDocument, type WordPage, type WordRun, type WordSelection } from '../word/core/model'
 import { importWordDocument, exportWordDocument } from '../word/core/runtime'
 import type { PreparedWordDocument } from '../word/core/prepared'
 import { invalidateWordFontMetrics, readWordDom, readWordRange, readWordSelection, renderWordDom, restoreWordSelection } from '../word/core/dom'
 import { HIGHLIGHT_COLORS, type HighlightColor } from '../word/core/highlight'
 import { normalizeBackgroundColor } from '../word/core/background'
+import { textColorPaint } from '../word/core/text-color'
 import { normalizePaperDimension } from '../word/core/paper'
 import '../word/core/editor.css'
 
@@ -104,6 +105,11 @@ const underlineChoices: { name: 'none' | 'single' | 'double'; value: NonNullable
   { name: 'double', value: 'double', label: '双下划线' },
 ]
 let underlineSnapshot: { generation: number; revision: number; selection: WordSelection } | undefined
+const colorMenuId = `word-color-${crypto.randomUUID()}`
+const colorControl = ref<HTMLElement>(), colorMenu = ref<HTMLFormElement>(), colorMenuOpen = ref(false)
+const colorMenuStyle = ref<{ left: string; top: string; maxHeight: string }>({ left: '0px', top: '0px', maxHeight: '260px' })
+const colorMode = ref<'auto' | 'custom' | 'mixed'>('custom'), colorDraft = ref('#20242B'), colorTouched = ref(false)
+let colorSnapshot: { generation: number; revision: number; selection: WordSelection } | undefined
 const strikeMenuId = `word-strike-${crypto.randomUUID()}`
 const strikeControl = ref<HTMLElement>(), strikeMenu = ref<HTMLElement>(), strikeMenuOpen = ref(false)
 const strikeChoices: { value: NonNullable<TextStyle['strike']>; label: string }[] = [
@@ -173,7 +179,12 @@ const selectedStyles = computed(() => {
 })
 const selectionParagraph = computed(() => { selectionVersion.value; return model.value?.paragraphs[controller.value?.selection.focus.paragraph || 0] })
 const fontSize = computed(() => { const sizes = new Set(selectedStyles.value.map(style => style.fontSize || 12)); return sizes.size === 1 ? String([...sizes][0]) : '' })
-const color = computed(() => selectedStyles.value[0]?.color || '#20242b')
+const colorSelection = computed(() => {
+  const values = new Set(selectedStyles.value.map(style => style.color ?? '#20242B'))
+  return values.size > 1 ? 'mixed' : [...values][0] ?? '#20242B'
+})
+const colorLabel = computed(() => colorSelection.value === 'mixed' ? '混合' : colorSelection.value === 'auto' ? '自动' : colorSelection.value)
+const color = computed(() => textColorPaint(selectedStyles.value[0] ?? {}) ?? '#20242B')
 const marked = (key: 'bold' | 'italic') => selectedStyles.value.length > 0 && selectedStyles.value.every(style => style[key] === true)
 const underlineSelection = computed(() => {
   const values = new Set(selectedStyles.value.map(style => style.underline === 'double' ? 'double' : style.underline ? 'single' : 'none'))
@@ -248,6 +259,7 @@ function refresh() {
   if (indentSnapshot && !formatSnapshotCurrent(indentSnapshot)) closeIndentPanel()
   if (paragraphSpacingSnapshot && !formatSnapshotCurrent(paragraphSpacingSnapshot)) closeParagraphSpacingPanel()
   if (underlineSnapshot && !formatSnapshotCurrent(underlineSnapshot)) closeUnderlineMenu()
+  if (colorSnapshot && !formatSnapshotCurrent(colorSnapshot)) closeColorMenu()
   if (strikeSnapshot && !formatSnapshotCurrent(strikeSnapshot)) closeStrikeMenu()
   if (highlightSnapshot && !formatSnapshotCurrent(highlightSnapshot)) closeHighlightMenu()
   if (backgroundSnapshot && !formatSnapshotCurrent(backgroundSnapshot)) closeBackgroundMenu()
@@ -276,6 +288,7 @@ function rememberSelection() {
     if (indentSnapshot && !formatSnapshotCurrent(indentSnapshot)) closeIndentPanel()
     if (paragraphSpacingSnapshot && !formatSnapshotCurrent(paragraphSpacingSnapshot)) closeParagraphSpacingPanel()
     if (underlineSnapshot && !formatSnapshotCurrent(underlineSnapshot)) closeUnderlineMenu()
+    if (colorSnapshot && !formatSnapshotCurrent(colorSnapshot)) closeColorMenu()
     if (strikeSnapshot && !formatSnapshotCurrent(strikeSnapshot)) closeStrikeMenu()
     if (highlightSnapshot && !formatSnapshotCurrent(highlightSnapshot)) closeHighlightMenu()
     if (backgroundSnapshot && !formatSnapshotCurrent(backgroundSnapshot)) closeBackgroundMenu()
@@ -332,7 +345,7 @@ function input(event: Event) {
 }
 function startComposition() {
   if (props.disabled) return
-  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu(); rememberSelection()
+  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu(); rememberSelection()
   compositionInsertion = undefined
   const active = controller.value
   if (active) {
@@ -358,7 +371,7 @@ function blur() {
 function command(work: (active: WordController) => void) {
   if (unavailable.value) return
   closeParagraphSpacingPanel()
-  closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu()
+  closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu()
   commitInput(); rememberSelection()
   problem.value = ''; notice.value = ''; work(current()); refresh(); render(true)
 }
@@ -380,7 +393,7 @@ function closeUnderlineMenu(restore = false) {
 function toggleUnderlineMenu() {
   if (unavailable.value) return
   if (underlineMenuOpen.value) { closeUnderlineMenu(true); return }
-  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu(); commitInput(); rememberSelection()
+  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu(); commitInput(); rememberSelection()
   const active = current(), anchor = underlineControl.value?.getBoundingClientRect()
   if (!anchor) return
   const below = window.innerHeight - anchor.bottom - 12, above = anchor.top - 12
@@ -433,6 +446,53 @@ function applyUnderlineColor() {
 function underlineMenuFocusout(event: FocusEvent) {
   if (event.relatedTarget instanceof Node && !underlineControl.value?.contains(event.relatedTarget)) closeUnderlineMenu()
 }
+function closeColorMenu(restore = false) {
+  colorMenuOpen.value = false; colorSnapshot = undefined
+  if (restore && content.value && controller.value && props.active) restoreWordSelection(content.value, controller.value.selection)
+}
+function toggleColorMenu() {
+  if (unavailable.value) return
+  if (colorMenuOpen.value) { closeColorMenu(true); return }
+  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu(); commitInput(); rememberSelection()
+  const active = current(), anchor = colorControl.value?.getBoundingClientRect()
+  if (!anchor) return
+  const below = window.innerHeight - anchor.bottom - 12, above = anchor.top - 12
+  const opensAbove = below < 240 && above > below, height = Math.min(260, Math.max(80, opensAbove ? above : below))
+  colorMenuStyle.value = {
+    left: `${Math.max(8, Math.min(anchor.right - 248, window.innerWidth - 256))}px`,
+    top: `${opensAbove ? Math.max(8, anchor.top - height - 6) : anchor.bottom + 6}px`,
+    maxHeight: `${height}px`,
+  }
+  colorMode.value = colorSelection.value === 'mixed' ? 'mixed' : colorSelection.value === 'auto' ? 'auto' : 'custom'
+  colorDraft.value = color.value
+  colorTouched.value = false
+  colorSnapshot = { generation, revision: active.revision, selection: active.selection }
+  colorMenuOpen.value = true
+  void nextTick(() => {
+    if (!colorMenuOpen.value) return
+    const target = colorMenu.value?.querySelector<HTMLInputElement>('input:checked') || colorMenu.value?.querySelector('input')
+    target?.focus({ preventScroll: true })
+  })
+}
+function editColor(event: Event) {
+  colorDraft.value = normalizeTextColor((event.target as HTMLInputElement).value)
+  colorMode.value = 'custom'; colorTouched.value = true
+}
+function applyColor() {
+  if (unavailable.value || !colorSnapshot) return
+  const snapshot = colorSnapshot
+  commitInput(); rememberSelection()
+  if (!formatSnapshotCurrent(snapshot)) { closeColorMenu(); return }
+  if (!colorTouched.value || colorMode.value === 'mixed') { closeColorMenu(true); return }
+  const value = normalizeTextColor(colorMode.value === 'auto' ? 'auto' : colorDraft.value)
+  // Reapplying the effective value must not manufacture a direct override or
+  // reset a paragraph marker. Automatic and fixed RGB remain distinct values.
+  if (selectedStyles.value.every(style => (style.color ?? '#20242B') === value)) { closeColorMenu(true); return }
+  formatText({ color: value })
+}
+function colorMenuFocusout(event: FocusEvent) {
+  if (event.relatedTarget instanceof Node && !colorControl.value?.contains(event.relatedTarget)) closeColorMenu()
+}
 function toggleVertical(value: 'superscript' | 'subscript') {
   formatText({ verticalAlign: verticalPressed(value) === true ? 'baseline' : value })
 }
@@ -444,7 +504,7 @@ function closeStrikeMenu(restore = false) {
 function toggleStrikeMenu() {
   if (unavailable.value) return
   if (strikeMenuOpen.value) { closeStrikeMenu(true); return }
-  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu(); commitInput(); rememberSelection()
+  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeColorMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu(); commitInput(); rememberSelection()
   const active = current()
   strikeSnapshot = { generation, revision: active.revision, selection: active.selection }
   strikeMenuOpen.value = true
@@ -477,7 +537,7 @@ function closeHighlightMenu(restore = false) {
 function toggleHighlightMenu() {
   if (unavailable.value) return
   if (highlightMenuOpen.value) { closeHighlightMenu(true); return }
-  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeStrikeMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu(); commitInput(); rememberSelection()
+  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu(); commitInput(); rememberSelection()
   const active = current(), anchor = highlightControl.value?.getBoundingClientRect()
   if (!anchor) return
   const below = window.innerHeight - anchor.bottom - 12, above = anchor.top - 12
@@ -518,6 +578,7 @@ function outsideCharacterMenus(event: PointerEvent) {
   if (paragraphSpacingOpen.value && paragraphSpacingOverlay.value && !paragraphSpacingPanel.value?.contains(event.target)
     && !(event.target instanceof Element && event.target.closest('[data-testid="word-paragraph-spacing-toggle"]'))) closeParagraphSpacingPanel()
   if (underlineMenuOpen.value && !underlineControl.value?.contains(event.target)) closeUnderlineMenu()
+  if (colorMenuOpen.value && !colorControl.value?.contains(event.target)) closeColorMenu()
   if (strikeMenuOpen.value && !strikeControl.value?.contains(event.target)) closeStrikeMenu()
   if (highlightMenuOpen.value && !highlightControl.value?.contains(event.target)) closeHighlightMenu()
   if (backgroundMenuOpen.value && !backgroundControl.value?.contains(event.target)) closeBackgroundMenu()
@@ -527,7 +588,7 @@ function outsideCharacterMenus(event: PointerEvent) {
 }
 function resizeCharacterMenus() {
   updateParagraphSpacingHeight()
-  closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu()
+  closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu()
 }
 function closeBackgroundMenu(restore = false) {
   backgroundMenuOpen.value = false; backgroundSnapshot = undefined
@@ -536,7 +597,7 @@ function closeBackgroundMenu(restore = false) {
 function toggleBackgroundMenu() {
   if (unavailable.value) return
   if (backgroundMenuOpen.value) { closeBackgroundMenu(true); return }
-  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu(); commitInput(); rememberSelection()
+  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu(); commitInput(); rememberSelection()
   const active = current(), anchor = backgroundControl.value?.getBoundingClientRect()
   if (!anchor) return
   const below = window.innerHeight - anchor.bottom - 12, above = anchor.top - 12
@@ -579,7 +640,7 @@ function closeLetterSpacingMenu(restore = false) {
 function toggleLetterSpacingMenu() {
   if (unavailable.value) return
   if (letterSpacingMenuOpen.value) { closeLetterSpacingMenu(true); return }
-  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeCaseMenu(); closePositionMenu(); commitInput(); rememberSelection()
+  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeCaseMenu(); closePositionMenu(); commitInput(); rememberSelection()
   const active = current(), anchor = letterSpacingControl.value?.getBoundingClientRect()
   if (!anchor) return
   const below = window.innerHeight - anchor.bottom - 12, above = anchor.top - 12
@@ -635,7 +696,7 @@ function closePositionMenu(restore = false) {
 function togglePositionMenu() {
   if (unavailable.value) return
   if (positionMenuOpen.value) { closePositionMenu(true); return }
-  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); commitInput(); rememberSelection()
+  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); commitInput(); rememberSelection()
   const active = current(), anchor = positionControl.value?.getBoundingClientRect()
   if (!anchor) return
   const below = window.innerHeight - anchor.bottom - 12, above = anchor.top - 12
@@ -681,7 +742,7 @@ function closeCaseMenu(restore = false) {
 function toggleCaseMenu() {
   if (unavailable.value) return
   if (caseMenuOpen.value) { closeCaseMenu(true); return }
-  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closePositionMenu(); commitInput(); rememberSelection()
+  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closePositionMenu(); commitInput(); rememberSelection()
   const active = current(), anchor = caseControl.value?.getBoundingClientRect()
   if (!anchor) return
   const below = window.innerHeight - anchor.bottom - 12, above = anchor.top - 12
@@ -740,7 +801,7 @@ function toggleIndentPanel() {
   if (unavailable.value) return
   closePageSettings()
   closeParagraphSpacingPanel()
-  closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu()
+  closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu()
   if (indentOpen.value) { closeIndentPanel(true); return }
   commitInput(); rememberSelection()
   const active = current(), selection = active.selection, [start, end] = orderedSelection(selection)
@@ -789,7 +850,7 @@ function toggleParagraphSpacingPanel() {
   if (unavailable.value) return
   closePageSettings()
   if (paragraphSpacingOpen.value) { closeParagraphSpacingPanel(true); return }
-  closeIndentPanel(); closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu()
+  closeIndentPanel(); closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu()
   commitInput(); rememberSelection()
   const active = current(), selection = active.selection, [start, end] = orderedSelection(selection)
   const last = end.paragraph > start.paragraph && end.offset === 0 ? end.paragraph - 1 : end.paragraph
@@ -888,7 +949,7 @@ function pagePresetFor(width: number, height: number): PagePreset {
 function togglePageSettings() {
   if (unavailable.value) return
   if (pageSettingsOpen.value) { closePageSettings(true); return }
-  closeIndentPanel(); closeParagraphSpacingPanel(); closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu()
+  closeIndentPanel(); closeParagraphSpacingPanel(); closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu()
   commitInput(); rememberSelection()
   const active = current(), page = active.model.page
   for (const { key } of pageSettingsFields) pageSettingsDraft.value[key] = String(page[key])
@@ -986,7 +1047,7 @@ function changeHeading(event: Event) {
       if (paragraph.marker) paragraph.marker = withParagraphMarkerSource(paragraph.marker, sourceRun)
       paragraph.runs = paragraph.runs.map(run => {
         const directStyle = { ...(run.directStyle ?? run.style) }
-        const style: TextStyle = { ...sourceRun, ...(run.sourceVerticalAlign !== undefined ? { verticalAlign: run.sourceVerticalAlign } : {}), ...directStyle }
+        const style: TextStyle = { ...sourceRun, ...(run.sourceVerticalAlign !== undefined ? { verticalAlign: run.sourceVerticalAlign } : {}), ...(run.sourceColor !== undefined ? { color: run.sourceColor } : {}), ...directStyle }
         return { ...run, style, directStyle }
       })
       paragraph.nextParagraphStyle = { paragraph: heading ? followParagraph : { ...sourceParagraph }, run: previousFollowRun ? { ...previousFollowRun } : { ...inherited, fontSize: 12, bold: false }, sourceRun }
@@ -995,7 +1056,12 @@ function changeHeading(event: Event) {
   })
 }
 function changeAlign(event: Event) { formatParagraph({ align: (event.target as HTMLSelectElement).value as ParagraphStyle['align'] }) }
-function changeColor(event: Event) { formatText({ color: (event.target as HTMLInputElement).value }) }
+function changeColor(event: Event) {
+  const value = normalizeTextColor((event.target as HTMLInputElement).value)
+  commitInput(); rememberSelection()
+  if (selectedStyles.value.every(style => (style.color ?? '#20242B') === value)) return
+  formatText({ color: value })
+}
 function insertText(text: string) { command(active => active.replaceText(active.selection, text)) }
 
 function runSlice(runs: WordRun[], start: number, end: number): WordRun[] {
@@ -1014,7 +1080,7 @@ function insertSoftBreak() {
     const first = next.paragraphs[start.paragraph]!, last = next.paragraphs[end.paragraph]!
     const left = runSlice(first.runs, 0, start.offset), right = runSlice(last.runs, end.offset, paragraphText(last).length)
     const inherited = start.offset === paragraphText(first).length && first.marker ? paragraphInsertionFormat(first) : left.at(-1) || first.runs[0]!
-    first.runs = [...left, { text: '\n', style: { ...inherited.style }, ...(inherited.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: inherited.sourceVerticalAlign } : {}), ...(inherited.directStyle !== undefined ? { directStyle: { ...inherited.directStyle } } : {}) }, ...right]
+    first.runs = [...left, { text: '\n', style: { ...inherited.style }, ...(inherited.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: inherited.sourceVerticalAlign } : {}), ...(inherited.sourceColor !== undefined ? { sourceColor: inherited.sourceColor } : {}), ...(inherited.directStyle !== undefined ? { directStyle: { ...inherited.directStyle } } : {}) }, ...right]
     next.paragraphs.splice(start.paragraph, end.paragraph - start.paragraph + 1, first)
     const point = { paragraph: start.paragraph, offset: start.offset + 1 }
     active.setDocument(next, { anchor: point, focus: point })
@@ -1121,7 +1187,7 @@ function copyFormattedText(event: ClipboardEvent, cut = false) {
   const copiedParagraphs = start.paragraph !== end.paragraph && end.offset === 0 ? fragment.paragraphs.slice(0, -1) : fragment.paragraphs
   if (!copiedParagraphs.some(paragraph => paragraph.style.lineHeightRule === 'exact' || paragraph.runs.some(run => {
     const style = run.style
-    return run.text && (style.caseMap === 'upper' || style.caseMap === 'smallCaps'
+    return run.text && (style.color === 'auto' || style.caseMap === 'upper' || style.caseMap === 'smallCaps'
       || typeof style.verticalAlign === 'number' || style.underlineColor !== undefined || style.underline === 'double' || style.strike === 'double'
       || (style.underline && style.strike && style.strike !== 'none'))
   }))) return
@@ -1129,6 +1195,8 @@ function copyFormattedText(event: ClipboardEvent, cut = false) {
   // separately colored or double decorations into a single line style.
   // Exact line-height preview uses editor-only line boxes; clipboard output
   // must retain ordinary point line-height without those visual offsets.
+  // Automatic text color is semantic inside DOCX; external HTML receives its
+  // actual paint, without the editor metadata used to preserve that semantic.
   // Copy logical text and render its model slice to preserve independent
   // decorations and full run formatting, including partial text-node ranges.
   event.preventDefault()
@@ -1201,7 +1269,7 @@ async function redo() {
   await flushInput(); current().redo(); problem.value = ''; refresh(); render(true)
 }
 async function load() {
-  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu()
+  closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu()
   const token = ++generation
   const source = { ...props.document }
   const isCurrent = () => !disposed && generation === token && props.document.id === source.id && props.document.base64 === source.base64
@@ -1222,7 +1290,7 @@ watch(() => [props.document.id, props.document.base64] as const, ([id], previous
   // Only an unfinished import must restart when its source bytes change.
   if (!previous || id !== previous[0] || !controller.value || readyGeneration !== generation) opening = load()
 }, { immediate: true })
-watch(() => props.active && !props.disabled, value => { if (!value) { closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu() } })
+watch(() => props.active && !props.disabled, value => { if (!value) { closeIndentPanel(); closeParagraphSpacingPanel(); closePageSettings(); closeUnderlineMenu(); closeColorMenu(); closeStrikeMenu(); closeHighlightMenu(); closeBackgroundMenu(); closeLetterSpacingMenu(); closeCaseMenu(); closePositionMenu() } })
 onMounted(() => { document.addEventListener('selectionchange', rememberSelection); document.addEventListener('pointerdown', outsideCharacterMenus); window.addEventListener('resize', resizeCharacterMenus); document.fonts?.addEventListener('loadingdone', loadedFonts) })
 onBeforeUnmount(() => { disposed = true; generation++; props.prepared?.discard(); document.removeEventListener('selectionchange', rememberSelection); document.removeEventListener('pointerdown', outsideCharacterMenus); window.removeEventListener('resize', resizeCharacterMenus); document.fonts?.removeEventListener('loadingdone', loadedFonts) })
 defineExpose({ exportFile, markSaved, discardChanges, undo, redo, focus: () => content.value?.focus() })
@@ -1272,7 +1340,20 @@ defineExpose({ exportFile, markSaved, discardChanges, undo, redo, focus: () => c
         </div>
       </div>
       <div class="word-toolbar-group" role="group" aria-label="文字颜色、高亮与背景色">
-        <label class="word-color-label" title="选中文字后设置颜色"><span>文字颜色</span><input data-testid="word-color" type="color" aria-label="文字颜色" :value="color" :disabled="unavailable" @change="safely(() => changeColor($event))"></label>
+        <div ref="colorControl" class="word-background-control">
+          <label class="word-color-label" :title="`文字颜色：${colorLabel}；选择色块设置固定颜色`"><input data-testid="word-color" type="color" aria-label="文字颜色" :value="color" :disabled="unavailable" @change="safely(() => changeColor($event))"></label>
+          <button type="button" class="word-background-toggle" data-testid="word-color-menu-toggle" :data-color="colorSelection" :aria-label="`文字颜色：${colorLabel}`" :title="`文字颜色：${colorLabel}；选择自动或自定义颜色`" aria-haspopup="dialog" :aria-expanded="colorMenuOpen" :aria-controls="colorMenuId" :disabled="unavailable" @mousedown.prevent @click="safely(toggleColorMenu)" @keydown.down.prevent="safely(toggleColorMenu)"><span>{{ colorSelection === 'mixed' ? '文字颜色·混合' : colorSelection === 'auto' ? '文字颜色·自动' : '文字颜色' }}</span><span class="word-highlight-arrow" aria-hidden="true">▾</span></button>
+          <form v-if="colorMenuOpen" :id="colorMenuId" ref="colorMenu" class="word-background-menu" data-testid="word-color-menu" :style="colorMenuStyle" role="dialog" aria-label="文字颜色设置" :aria-describedby="`${colorMenuId}-help`" @submit.prevent="safely(applyColor)" @keydown.esc.prevent.stop="closeColorMenu(true)" @focusout="colorMenuFocusout">
+            <p class="word-background-caption" data-testid="word-color-status">当前：{{ colorLabel }}</p>
+            <fieldset class="word-kerning-fieldset" :disabled="unavailable">
+              <legend>文字颜色</legend>
+              <div class="word-underline-color-options"><label><input type="radio" data-testid="word-color-auto" :name="`${colorMenuId}-mode`" value="auto" :checked="colorMode === 'auto'" @change="colorMode = 'auto'; colorTouched = true">自动</label><label><input type="radio" data-testid="word-color-custom" :name="`${colorMenuId}-mode`" value="custom" :checked="colorMode === 'custom'" @change="colorMode = 'custom'; colorTouched = true">自定义</label></div>
+              <label class="word-underline-color-picker"><span>自定义颜色</span><input type="color" data-testid="word-color-input" aria-label="自定义文字颜色" :value="colorDraft" @input="safely(() => editColor($event))" @change="safely(() => editColor($event))"><output>{{ colorDraft }}</output></label>
+            </fieldset>
+            <p :id="`${colorMenuId}-help`" class="word-underline-color-help">自动颜色根据文字背景显示黑色或白色，高亮不参与自动颜色判断。混合值未修改时保留原值。</p>
+            <div class="word-background-actions"><button type="submit" class="word-background-apply" data-testid="word-color-apply" :disabled="unavailable" @mousedown.prevent>应用颜色</button><button type="button" data-testid="word-color-cancel" @mousedown.prevent @click="closeColorMenu(true)">取消</button></div>
+          </form>
+        </div>
         <div ref="highlightControl" class="word-highlight-control">
           <button type="button" class="word-highlight-toggle" data-testid="word-highlight-menu-toggle" :data-highlight="highlightSelection" :aria-label="`文字高亮：${highlightLabel}`" :title="`文字高亮：${highlightLabel}；选中文字后选择颜色`" aria-haspopup="menu" :aria-expanded="highlightMenuOpen" :aria-controls="highlightMenuId" :disabled="unavailable" @mousedown.prevent @click="safely(toggleHighlightMenu)" @keydown.down.prevent="safely(toggleHighlightMenu)"><span class="word-highlight-swatch" :class="{ 'word-highlight-none': highlightSelection === 'none', 'word-highlight-mixed': highlightSelection === 'mixed' }" :style="{ backgroundColor: selectedHighlight?.hex }" aria-hidden="true"/><span>{{ highlightSelection === 'mixed' ? '高亮·混合' : '高亮' }}</span><span class="word-highlight-arrow" aria-hidden="true">▾</span></button>
           <div v-if="highlightMenuOpen" :id="highlightMenuId" ref="highlightMenu" class="word-highlight-menu" data-testid="word-highlight-menu" :style="highlightMenuStyle" role="menu" aria-label="文字高亮颜色" @keydown="highlightMenuKeydown">

@@ -1039,11 +1039,49 @@
     {
       "name": "automatic-color-native",
       "source": "source/automatic-color.docx",
-      "expectUnsupported": true,
-      "reason": "Original independently authored editing control omitted explicit color; native output uses automatic color, outside the existing color subset.",
       "sourceSha256": "d650e9f6518f7616aaf2f9221dbf69a433013136f7b8b87f64f7eee84de4cd83",
       "docx": "libreoffice/automatic-color.docx",
-      "docxSha256": "ed09213e42a37b4d43999983d2169a222e05ca19050c2aa16459f797893af868"
+      "docxSha256": "ed09213e42a37b4d43999983d2169a222e05ca19050c2aa16459f797893af868",
+      "history": "Original independently authored editing control omitted explicit color; native output uses automatic color, outside the existing color subset.",
+      "expected": [
+        {
+          "text": "",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "ABC",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "XYZ",
+          "spaceBefore": 8.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        }
+      ],
+      "sourceExpected": [
+        {
+          "text": "ABC",
+          "spaceBefore": 6.0,
+          "spaceAfter": 12.0,
+          "lineHeight": 18.0,
+          "lineHeightRule": "exact"
+        },
+        {
+          "text": "XYZ",
+          "spaceBefore": 8.0,
+          "spaceAfter": 4.0,
+          "lineHeight": 2.0,
+          "lineHeightRule": "auto"
+        }
+      ]
     }
   ]
 }

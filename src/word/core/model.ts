@@ -23,7 +23,8 @@ export interface TextStyle {
   fontName?: string
   fontNameEastAsia?: string
   fontNameCs?: string
-  color?: string
+  /** Automatic foreground remains semantic; rendering resolves it against character shading. */
+  color?: TextColor
   highlight?: HighlightColor
   backgroundColor?: BackgroundColor
   language?: string
@@ -58,6 +59,8 @@ export interface WordRun {
   directStyle?: TextStyle
   /** Script inherited from a named character style, distinct from hard escapement. */
   sourceVerticalAlign?: ScriptAlignment
+  /** Foreground inherited from an explicit named character style, separate from hard color. */
+  sourceColor?: TextColor
 }
 /** Character format of the paragraph mark, independent of visible body runs. */
 export interface ParagraphMarkerFormat {
@@ -65,6 +68,7 @@ export interface ParagraphMarkerFormat {
   /** Undefined means style itself is direct, matching older run models. */
   directStyle?: TextStyle
   sourceVerticalAlign?: ScriptAlignment
+  sourceColor?: TextColor
 }
 export interface WordParagraph {
   id: string; runs: WordRun[]; style: ParagraphStyle
@@ -117,8 +121,16 @@ export const PAGE_MARGIN_LIMITS = { min: 0, max: 1584, step: 0.05 } as const
 export const BASELINE_OFFSET_FONTS = ['Times New Roman', 'DejaVu Sans', 'Liberation Serif'] as const
 const baselineOffsetFontNames = new Set<string>(BASELINE_OFFSET_FONTS.map(name => name.toLowerCase()))
 export type UnderlineColor = `#${string}` | 'auto'
+export type TextColor = `#${string}` | 'auto'
 
-/** The model's auto means text-color paint, not OOXML's incompatible color="auto" token. */
+/** Explicit automatic foreground differs from RGB black, even when both currently paint black. */
+export function normalizeTextColor(value: unknown): TextColor {
+  if (value === 'auto') return value
+  if (typeof value !== 'string' || !/^#[\da-f]{6}$/i.test(value)) throw Error('文字颜色必须是六位 RGB 颜色或自动颜色。')
+  return value.toUpperCase() as TextColor
+}
+
+/** Underline auto follows the text paint; OOXML w:u/@w:color="auto" has different native behavior. */
 export function normalizeUnderlineColor(value: unknown): UnderlineColor {
   if (value === 'auto') return value
   if (typeof value !== 'string' || !/^#[\da-f]{6}$/i.test(value)) throw Error('下划线颜色必须是六位 RGB 颜色或跟随文字。')
@@ -194,10 +206,7 @@ function textStyle(input: TextStyle): TextStyle {
     if (typeof font !== 'string' || !font.trim() || font.length > 200 || /[\x00-\x1f\x7f]/.test(font)) fail('字体名称无效。')
     validText(font); out[key] = font
   }
-  if (input.color !== undefined) {
-    if (typeof input.color !== 'string' || !/^#[\da-f]{6}$/i.test(input.color)) fail('文字颜色无效。')
-    out.color = input.color.toUpperCase()
-  }
+  if (input.color !== undefined) out.color = normalizeTextColor(input.color)
   if (input.highlight !== undefined) {
     if (!isHighlightColor(input.highlight)) fail('文字高亮颜色无效。')
     out.highlight = input.highlight
@@ -297,13 +306,13 @@ function compactRuns(runs: WordRun[]): WordRun[] {
   for (const run of runs) {
     if (!run.text) continue
     const previous = out.at(-1)
-    if (previous && JSON.stringify(previous.style) === JSON.stringify(run.style) && JSON.stringify(previous.directStyle) === JSON.stringify(run.directStyle) && previous.sourceVerticalAlign === run.sourceVerticalAlign) previous.text += run.text
+    if (previous && JSON.stringify(previous.style) === JSON.stringify(run.style) && JSON.stringify(previous.directStyle) === JSON.stringify(run.directStyle) && previous.sourceVerticalAlign === run.sourceVerticalAlign && previous.sourceColor === run.sourceColor) previous.text += run.text
     else out.push(copyRun(run))
   }
   return out.length ? out : [copyRun(runs[0] || { text: '', style: {} }, '')]
 }
 function copyRun(run: WordRun, text = run.text): WordRun {
-  return { text, style: { ...run.style }, ...(run.directStyle !== undefined ? { directStyle: { ...run.directStyle } } : {}), ...(run.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: run.sourceVerticalAlign } : {}) }
+  return { text, style: { ...run.style }, ...(run.directStyle !== undefined ? { directStyle: { ...run.directStyle } } : {}), ...(run.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: run.sourceVerticalAlign } : {}), ...(run.sourceColor !== undefined ? { sourceColor: run.sourceColor } : {}) }
 }
 /** Writer stores line type and paint in one underline item. When either is
  * made direct, keep its partner from the current effective item. Colorless
@@ -320,9 +329,10 @@ function underlineOverrides(effective: TextStyle, overrides: TextStyle, source: 
 export function withParagraphMarkerSource(marker: ParagraphMarkerFormat, source: TextStyle): ParagraphMarkerFormat {
   const directStyle = underlineOverrides(marker.style, marker.directStyle ?? marker.style, source)
   return {
-    style: { ...source, ...(marker.sourceVerticalAlign !== undefined ? { verticalAlign: marker.sourceVerticalAlign } : {}), ...directStyle },
+    style: { ...source, ...(marker.sourceVerticalAlign !== undefined ? { verticalAlign: marker.sourceVerticalAlign } : {}), ...(marker.sourceColor !== undefined ? { color: marker.sourceColor } : {}), ...directStyle },
     directStyle,
     ...(marker.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: marker.sourceVerticalAlign } : {}),
+    ...(marker.sourceColor !== undefined ? { sourceColor: marker.sourceColor } : {}),
   }
 }
 /** At a nonempty paragraph's end, only the mark's explicit overrides replace
@@ -337,13 +347,16 @@ export function paragraphInsertionFormat(paragraph: WordParagraph): ParagraphMar
   const run = [...paragraph.runs].reverse().find(item => item.text.length) ?? paragraph.runs[0]!
   const directStyle = { ...(run.directStyle ?? run.style) }
   const sourceVerticalAlign = marker?.sourceVerticalAlign ?? run.sourceVerticalAlign
+  const sourceColor = marker?.sourceColor ?? run.sourceColor
   if (marker?.sourceVerticalAlign !== undefined) delete directStyle.verticalAlign
+  if (marker?.sourceColor !== undefined) delete directStyle.color
   const markerOverrides = marker ? underlineOverrides(marker.style, marker.directStyle ?? marker.style, run.style) : undefined
   Object.assign(directStyle, markerOverrides)
   return {
-    style: { ...run.style, ...(marker?.sourceVerticalAlign !== undefined ? { verticalAlign: marker.sourceVerticalAlign } : {}), ...markerOverrides },
+    style: { ...run.style, ...(marker?.sourceVerticalAlign !== undefined ? { verticalAlign: marker.sourceVerticalAlign } : {}), ...(marker?.sourceColor !== undefined ? { color: marker.sourceColor } : {}), ...markerOverrides },
     ...(marker || run.directStyle !== undefined ? { directStyle } : {}),
     ...(sourceVerticalAlign !== undefined ? { sourceVerticalAlign } : {}),
+    ...(sourceColor !== undefined ? { sourceColor } : {}),
   }
 }
 /** A run's effective appearance stays authoritative when browser/model edits
@@ -351,6 +364,7 @@ export function paragraphInsertionFormat(paragraph: WordParagraph): ParagraphMar
  * direct overrides; explicit direct values equal to the base remain explicit. */
 function rebaseRun(run: WordRun, source: TextStyle): WordRun {
   if (run.sourceVerticalAlign !== undefined) source = { ...source, verticalAlign: run.sourceVerticalAlign }
+  if (run.sourceColor !== undefined) source = { ...source, color: run.sourceColor }
   const direct: TextStyle = { ...(run.directStyle ?? run.style) }
   const effective: TextStyle = { ...run.style }
   const displayed = (style: TextStyle): TextStyle => ({
@@ -376,7 +390,7 @@ function rebaseRun(run: WordRun, source: TextStyle): WordRun {
     Object.assign(direct, { [key]: desired[key] })
     Object.assign(effective, { [key]: desired[key] })
   }
-  return { text: run.text, style: textStyle(effective), directStyle: textStyle(underlineOverrides(effective, direct, source)), ...(run.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: run.sourceVerticalAlign } : {}) }
+  return { text: run.text, style: textStyle(effective), directStyle: textStyle(underlineOverrides(effective, direct, source)), ...(run.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: run.sourceVerticalAlign } : {}), ...(run.sourceColor !== undefined ? { sourceColor: run.sourceColor } : {}) }
 }
 function rebaseParagraph(style: ParagraphStyle, source: ParagraphStyle, overrides: ParagraphStyle): { style: ParagraphStyle; directStyle: ParagraphStyle } {
   const defaults: Required<ParagraphStyle> = {
@@ -408,16 +422,18 @@ export function normalizeDocument(input: WordDocument): WordDocument {
     let marker: ParagraphMarkerFormat | undefined
     if (p.marker !== undefined) {
       if (!p.marker || typeof p.marker !== 'object' || Array.isArray(p.marker)) fail('段落标记格式无效。')
-      if (Object.keys(p.marker).some(key => !['style', 'directStyle', 'sourceVerticalAlign'].includes(key))
+      if (Object.keys(p.marker).some(key => !['style', 'directStyle', 'sourceVerticalAlign', 'sourceColor'].includes(key))
         || !p.marker.style || typeof p.marker.style !== 'object' || Array.isArray(p.marker.style)
         || (p.marker.directStyle !== undefined && (!p.marker.directStyle || typeof p.marker.directStyle !== 'object' || Array.isArray(p.marker.directStyle)))) fail('段落标记格式无效。')
       const sourceVerticalAlign = p.marker.sourceVerticalAlign === undefined ? undefined : normalizeSourceVerticalAlign(p.marker.sourceVerticalAlign)
+      const sourceColor = p.marker.sourceColor === undefined ? undefined : normalizeTextColor(p.marker.sourceColor)
       const parsed = {
         text: '', style: textStyle(p.marker.style),
         ...(p.marker.directStyle !== undefined ? { directStyle: textStyle(p.marker.directStyle) } : {}),
         ...(sourceVerticalAlign !== undefined ? { sourceVerticalAlign } : {}),
+        ...(sourceColor !== undefined ? { sourceColor } : {}),
       }
-      const normalized = sourceRun === undefined && sourceVerticalAlign === undefined ? parsed : rebaseRun(parsed, sourceRun ?? {})
+      const normalized = sourceRun === undefined && sourceVerticalAlign === undefined && sourceColor === undefined ? parsed : rebaseRun(parsed, sourceRun ?? {})
       assertCustomOffsetFonts('', normalized.style)
       const { text: _text, ...format } = normalized
       marker = format
@@ -429,8 +445,9 @@ export function normalizeDocument(input: WordDocument): WordDocument {
       characters += run.text.length; runs++
       if (characters > WORD_LIMITS.characters || runs > WORD_LIMITS.runs) fail('文档超过轻量编辑器的大小限制，请使用完整文字编辑器。')
       const sourceVerticalAlign = run.sourceVerticalAlign === undefined ? undefined : normalizeSourceVerticalAlign(run.sourceVerticalAlign)
-      const normalized = { text: run.text.replace(/\r\n?/g, '\n'), style: textStyle(run.style), ...(run.directStyle !== undefined ? { directStyle: textStyle(run.directStyle) } : {}), ...(sourceVerticalAlign !== undefined ? { sourceVerticalAlign } : {}) }
-      const effective = sourceRun === undefined && sourceVerticalAlign === undefined ? normalized : rebaseRun(normalized, sourceRun ?? {})
+      const sourceColor = run.sourceColor === undefined ? undefined : normalizeTextColor(run.sourceColor)
+      const normalized = { text: run.text.replace(/\r\n?/g, '\n'), style: textStyle(run.style), ...(run.directStyle !== undefined ? { directStyle: textStyle(run.directStyle) } : {}), ...(sourceVerticalAlign !== undefined ? { sourceVerticalAlign } : {}), ...(sourceColor !== undefined ? { sourceColor } : {}) }
+      const effective = sourceRun === undefined && sourceVerticalAlign === undefined && sourceColor === undefined ? normalized : rebaseRun(normalized, sourceRun ?? {})
       assertCustomOffsetFonts(effective.text, effective.style)
       assertCaseMapText(effective.text, effective.style)
       return effective
@@ -439,13 +456,14 @@ export function normalizeDocument(input: WordDocument): WordDocument {
     if (p.sessionInsertion !== undefined) {
       const format = p.sessionInsertion
       if (!marker || !format || typeof format !== 'object' || Array.isArray(format)
-        || Object.keys(format).some(key => !['style', 'directStyle', 'sourceVerticalAlign'].includes(key))
+        || Object.keys(format).some(key => !['style', 'directStyle', 'sourceVerticalAlign', 'sourceColor'].includes(key))
         || !format.style || typeof format.style !== 'object' || Array.isArray(format.style)
         || (format.directStyle !== undefined && (!format.directStyle || typeof format.directStyle !== 'object' || Array.isArray(format.directStyle)))) fail('会话插入格式无效。')
       const sourceVerticalAlign = format.sourceVerticalAlign === undefined ? undefined : normalizeSourceVerticalAlign(format.sourceVerticalAlign)
+      const sourceColor = format.sourceColor === undefined ? undefined : normalizeTextColor(format.sourceColor)
       const normalized = rebaseRun({ text: '', style: textStyle(format.style),
         ...(format.directStyle !== undefined ? { directStyle: textStyle(format.directStyle) } : {}),
-        ...(sourceVerticalAlign !== undefined ? { sourceVerticalAlign } : {}) }, sourceRun ?? {})
+        ...(sourceVerticalAlign !== undefined ? { sourceVerticalAlign } : {}), ...(sourceColor !== undefined ? { sourceColor } : {}) }, sourceRun ?? {})
       assertCustomOffsetFonts('', normalized.style)
       const { text: _text, ...rest } = normalized
       sessionInsertion = rest
@@ -579,7 +597,7 @@ export class WordController {
     const next = normalizeDocument(model)
     const cursor = selection ? selectionFor(next, selection) : clampSelection(next, this.cursor)
     const markerOverrides = (marker: ParagraphMarkerFormat | undefined) => marker === undefined ? undefined
-      : JSON.stringify({ directStyle: marker.directStyle ?? marker.style, sourceVerticalAlign: marker.sourceVerticalAlign })
+      : JSON.stringify({ directStyle: marker.directStyle ?? marker.style, sourceVerticalAlign: marker.sourceVerticalAlign, sourceColor: marker.sourceColor })
     const oldMarkers = new Map(this.current.paragraphs.map(p => [p.id, markerOverrides(p.marker)]))
     // DOM text updates and paragraph-style rebasing retain the mark's origin.
     // Replacing its hard attributes through setDocument establishes a new mark.
@@ -649,7 +667,7 @@ export class WordController {
         // Crossing a boundary includes its mark even if no body text is
         // selected. Preserve unrelated marker attributes in this case.
         const marker = p.marker ?? (!paragraphText(p).length
-          ? { style: { ...p.runs[0]!.style }, ...(p.runs[0]!.directStyle !== undefined ? { directStyle: { ...p.runs[0]!.directStyle } } : {}), ...(p.runs[0]!.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: p.runs[0]!.sourceVerticalAlign } : {}) }
+          ? { style: { ...p.runs[0]!.style }, ...(p.runs[0]!.directStyle !== undefined ? { directStyle: { ...p.runs[0]!.directStyle } } : {}), ...(p.runs[0]!.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: p.runs[0]!.sourceVerticalAlign } : {}), ...(p.runs[0]!.sourceColor !== undefined ? { sourceColor: p.runs[0]!.sourceColor } : {}) }
           : { style: { ...p.sourceRun }, directStyle: {} })
         p.marker = { ...marker, style: { ...marker.style, ...style }, directStyle: { ...(marker.directStyle ?? marker.style), ...style } }
       }
@@ -709,6 +727,7 @@ export class WordController {
     let marks = style ? textStyle(style) : { ...inherited }
     let direct = style ? { ...marks } : inheritedRun.directStyle === undefined ? undefined : { ...inheritedRun.directStyle }
     let sessionInsertion = first.sessionInsertion !== undefined && compare(start, end) === 0 && start.offset === paragraphText(first).length
+    let sessionEscapement = sessionInsertion && (first.sessionInsertion?.style.verticalAlign ?? 'baseline') !== (first.marker?.style.verticalAlign ?? 'baseline')
     if (text === '' && start.paragraph === end.paragraph && start.offset === 0 && end.offset > 0
       && end.offset === paragraphText(first).length && typeof marks.verticalAlign === 'number' && first.marker) {
       const marker = first.marker, markerDirect = marker.directStyle ?? marker.style
@@ -728,6 +747,7 @@ export class WordController {
         // A numeric mark already records a deliberate session-wide offset;
         // its normal Enter continuation must remain distinct from deletion.
         sessionInsertion = typeof markerDirect.verticalAlign !== 'number'
+        sessionEscapement = sessionInsertion
       }
     }
     const lines = text.split('\n')
@@ -760,40 +780,52 @@ export class WordController {
       const splitSuccessor = split && index > 0
       const source = next ? { ...next.paragraph } : sourceParagraph
       const runDirect = next ? underlineOverrides(marks, direct ?? marks, next.run) : direct !== undefined ? underlineOverrides(marks, direct) : undefined
-      const runStyle = next ? { ...next.run, ...(inheritedRun.sourceVerticalAlign !== undefined ? { verticalAlign: inheritedRun.sourceVerticalAlign } : {}), ...runDirect } : { ...marks }
+      const runStyle = next ? { ...next.run, ...(inheritedRun.sourceVerticalAlign !== undefined ? { verticalAlign: inheritedRun.sourceVerticalAlign } : {}), ...(inheritedRun.sourceColor !== undefined ? { color: inheritedRun.sourceColor } : {}), ...runDirect } : { ...marks }
       if (splitAtEnd && index > 0) {
         // Writer removes hard escapement on the newly empty successor. The
         // paragraph's inherited script survives; strike and other direct
         // character attributes continue normally. A middle split keeps it.
         const inheritedScript = inheritedRun.sourceVerticalAlign ?? (next?.run ?? inheritedCharacter).verticalAlign
-        if (inheritedScript === undefined && sessionInsertion) runStyle.verticalAlign = 'baseline'
+        if (inheritedScript === undefined && sessionEscapement) runStyle.verticalAlign = 'baseline'
         else if (inheritedScript === undefined) delete runStyle.verticalAlign
         else runStyle.verticalAlign = inheritedScript
         if (runDirect !== undefined) delete runDirect.verticalAlign
         // An explicit mark escapement is different from the body's hard
         // escapement: native Enter continues the mark's script positioning.
         const markerScript = (retainedMarker?.directStyle ?? retainedMarker?.style)?.verticalAlign
-        if (markerScript !== undefined && !sessionInsertion) {
+        if (markerScript !== undefined && !sessionEscapement) {
           runStyle.verticalAlign = markerScript
           if (runDirect !== undefined) runDirect.verticalAlign = markerScript
         }
-        if (sessionInsertion && runDirect !== undefined) runDirect.verticalAlign = runStyle.verticalAlign ?? 'baseline'
+        if (sessionEscapement && runDirect !== undefined) runDirect.verticalAlign = runStyle.verticalAlign ?? 'baseline'
       }
       // Writer carries adjacent-body insertion attributes in an empty run
       // after Enter, then loses them on DOCX reopen. Materialize those actual
       // attributes in the new empty mark so this editor can save them safely.
       // The original paragraph's independent mark remains unchanged.
-      const marker = retainedMarker === undefined ? undefined : splitAtEnd && index > 0 && !sessionInsertion
-        ? { style: { ...runStyle }, ...(runDirect !== undefined ? { directStyle: { ...runDirect } } : {}), ...(inheritedRun.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: inheritedRun.sourceVerticalAlign } : {}) }
+      let marker = retainedMarker === undefined
+        ? splitAtEnd && index > 0 && runDirect?.color !== undefined
+          ? { style: { ...runStyle }, directStyle: { ...runDirect }, ...(inheritedRun.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: inheritedRun.sourceVerticalAlign } : {}) } : undefined
+        : splitAtEnd && index > 0 && !sessionEscapement
+        ? { style: { ...runStyle }, ...(runDirect !== undefined ? { directStyle: { ...runDirect } } : {}), ...(inheritedRun.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: inheritedRun.sourceVerticalAlign } : {}), ...(retainedMarker.sourceColor !== undefined ? { sourceColor: retainedMarker.sourceColor } : {}) }
         : next ? withParagraphMarkerSource(retainedMarker, next.run) : clone(retainedMarker)
+      if (marker && splitAtEnd && index > 0 && !sessionEscapement) {
+        // A named body color continues at the live caret, but it is not a
+        // hard paragraph-mark color. Only an actual mark character source or
+        // hard body/mark color can override the new paragraph's foreground.
+        marker = { ...marker, style: { ...marker.style, color: runDirect?.color ?? marker.sourceColor ?? (next?.run ?? inheritedCharacter).color } }
+      }
+      const separateColorInsertion = marker !== undefined && splitAtEnd && index > 0
+        && (inheritedRun.sourceColor !== marker.sourceColor || runStyle.color !== marker.style.color)
       return {
         id: index === 0 ? first.id : crypto.randomUUID(), style: splitSuccessor ? { ...source, ...followDirect } : { ...retainedParagraph.style },
         // The surviving text node retains its mark; a newly split node copies
         // the mark's hard attributes. Follow styles change only inheritance.
         ...(marker !== undefined ? { marker } : {}),
-        ...(sessionInsertion && index === lines.length - 1 ? { sessionInsertion: {
+        ...((sessionInsertion || separateColorInsertion) && index === lines.length - 1 ? { sessionInsertion: {
           style: { ...runStyle }, ...(runDirect !== undefined ? { directStyle: { ...runDirect } } : {}),
           ...(inheritedRun.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: inheritedRun.sourceVerticalAlign } : {}),
+          ...(inheritedRun.sourceColor !== undefined ? { sourceColor: inheritedRun.sourceColor } : {}),
         } } : {}),
         ...(next ? { sourceRun: { ...next.run } } : retainedParagraph.sourceRun !== undefined ? { sourceRun: { ...retainedParagraph.sourceRun } } : {}),
         ...(splitSuccessor ? { sourceParagraph: { ...source } } : retainedParagraph.sourceParagraph !== undefined ? { sourceParagraph: { ...retainedParagraph.sourceParagraph } } : {}),
@@ -804,6 +836,7 @@ export class WordController {
           style: runStyle,
           ...(runDirect !== undefined ? { directStyle: runDirect } : {}),
           ...(inheritedRun.sourceVerticalAlign !== undefined ? { sourceVerticalAlign: inheritedRun.sourceVerticalAlign } : {}),
+          ...(inheritedRun.sourceColor !== undefined ? { sourceColor: inheritedRun.sourceColor } : {}),
         }, ...(index === lines.length - 1 ? right : [])]),
       }
     })

@@ -48,8 +48,10 @@ if __name__ == '__main__':
         expected=semantics(rule_native),sourceExpected=semantics(rule_source)))
     fixtures.append(dict(name='automatic-color-native',
         source=copy(OLD_EDITING/'input/two-paragraphs.docx','source/automatic-color.docx'),
-        native=copy(OLD_EDITING/'output/enter-start.docx','libreoffice/automatic-color.docx'),expectUnsupported=True,
-        reason='Original independently authored editing control omitted explicit color; native output uses automatic color, outside the existing color subset.'))
+        native=copy(OLD_EDITING/'output/enter-start.docx','libreoffice/automatic-color.docx'),
+        history='Original independently authored editing control omitted explicit color; native output uses automatic color, outside the existing color subset.',
+        expected=semantics(OLD_EDITING/'output/enter-start.docx'),
+        sourceExpected=semantics(OLD_EDITING/'input/two-paragraphs.docx')))
     for fixture in fixtures:
         source=fixture['source']; fixture['source']=source['path']; fixture['sourceSha256']=source['sha256']
         native=fixture.pop('native',source); fixture['docx']=native['path']; fixture['docxSha256']=native['sha256']

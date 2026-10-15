@@ -1,7 +1,8 @@
-import { normalizeDocument, normalizeSourceVerticalAlign, normalizeUnderlineColor, normalizeVerticalAlign, paragraphInsertionFormat, type TextStyle, type UnderlineColor, type WordDocument, type WordParagraph, type WordPoint, type WordRun, type WordSelection } from './model'
+import { normalizeDocument, normalizeSourceVerticalAlign, normalizeTextColor, normalizeUnderlineColor, normalizeVerticalAlign, paragraphInsertionFormat, type TextColor, type TextStyle, type UnderlineColor, type WordDocument, type WordParagraph, type WordPoint, type WordRun, type WordSelection } from './model'
 import { wordScript } from './scripts'
 import { isHighlightColor } from './highlight'
 import { backgroundFromCss, normalizeBackgroundColor, textBackgroundColor } from './background'
+import { textColorFromCss, textColorPaint } from './text-color'
 
 const blockTags = new Set(['P', 'DIV', 'H1', 'H2', 'H3'])
 const ignoredTags = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'IMG'])
@@ -191,6 +192,18 @@ function visiblePositionOffset(style: TextStyle): number {
   return Math.trunc(Math.round(naturalFontHeight(style) * 20) * style.verticalAlign / 100) / 20
 }
 
+function cssTextColor(element: HTMLElement, inherited: TextStyle, current: TextStyle): TextColor | undefined {
+  const color = textColorFromCss(element.style.color)
+  // Native editing sometimes copies an ancestor's computed RGB into an
+  // anonymous span. Only an inherited semantic auto value can identify this
+  // matching paint as a clone; ordinary external RGB stays explicit. The
+  // toolbar and an owned RGB run can always express a same-paint override.
+  // Include this wrapper's already-resolved shading: a new black background
+  // with explicit black text must not become automatic white text on read.
+  if (color !== undefined && inherited.color === 'auto' && color === textColorPaint({ ...current, color: 'auto' })) return
+  return color
+}
+
 function inlineStyle(element: HTMLElement, inherited: TextStyle, paragraphSource: TextStyle = {}): TextStyle {
   // A paragraph marker only supplies the empty line's geometry. Its wrapper
   // must never turn that geometry (or a script's visual size) into body text
@@ -206,7 +219,7 @@ function inlineStyle(element: HTMLElement, inherited: TextStyle, paragraphSource
   // Only an element with its own run provenance may use the paragraph source;
   // ordinary nested spans inherit their parent's two independent layers.
   const direct = element.dataset.wordDirectStyle === undefined ? undefined : runDirectStyle(element)
-  const ownRunSource = direct ? { ...paragraphSource, ...direct } : undefined
+  const ownRunSource = direct ? { ...paragraphSource, ...(element.dataset.wordSourceColor !== undefined ? { color: normalizeTextColor(element.dataset.wordSourceColor) } : {}), ...direct } : undefined
   const semanticVerticalAlign = element.dataset.wordVerticalAlign !== undefined ? encodedVerticalAlign(element.dataset.wordVerticalAlign)
     : ownRunSource?.verticalAlign !== undefined ? normalizeVerticalAlign(ownRunSource.verticalAlign) : undefined
   let semanticUnderline: TextStyle['underline']
@@ -246,6 +259,12 @@ function inlineStyle(element: HTMLElement, inherited: TextStyle, paragraphSource
       if (value.highlight !== undefined && value.highlight !== 'none') throw Error('无法确定新增背景与已有高亮的关系，请使用文字背景设置。')
       value.backgroundColor = background
     }
+  }
+  if (element.dataset.wordColor !== undefined) value.color = normalizeTextColor(element.dataset.wordColor)
+  else if (ownRunSource?.color !== undefined) value.color = normalizeTextColor(ownRunSource.color)
+  else {
+    const color = cssTextColor(element, inherited, value)
+    if (color !== undefined) value.color = color
   }
   // These owned wrappers only paint a run. Reading their 58% script size or
   // independent strike decoration as direct formatting would change DOCX
@@ -328,11 +347,6 @@ function inlineStyle(element: HTMLElement, inherited: TextStyle, paragraphSource
   if (semanticUnderline !== undefined) value.underline = semanticUnderline
   if (element.dataset.wordStrike !== undefined) value.strike = element.dataset.wordStrike as TextStyle['strike']
   if (semanticVerticalAlign !== undefined) value.verticalAlign = semanticVerticalAlign
-  if (css.color) {
-    const match = css.color.match(/^rgba?\(\s*(\d+)[, ]+\s*(\d+)[, ]+\s*(\d+)/)
-    if (match) value.color = '#' + match.slice(1, 4).map(component => Number(component).toString(16).padStart(2, '0')).join('')
-    else if (/^#[\da-f]{6}$/i.test(css.color)) value.color = css.color
-  }
   return value
 }
 
@@ -348,10 +362,14 @@ function runSourceVerticalAlign(element: HTMLElement, inherited?: WordRun['sourc
   return element.dataset.wordSourceVerticalAlign === undefined ? inherited : normalizeSourceVerticalAlign(element.dataset.wordSourceVerticalAlign)
 }
 
+function runSourceColor(element: HTMLElement, inherited?: WordRun['sourceColor']): WordRun['sourceColor'] {
+  return element.dataset.wordSourceColor === undefined ? inherited : normalizeTextColor(element.dataset.wordSourceColor)
+}
+
 type UnderlineOrigin = { line: true | 'double'; color: UnderlineColor; textColor?: string }
-function runsFrom(nodes: Node[], inherited: TextStyle = {}, directStyle?: TextStyle, sourceVerticalAlign?: WordRun['sourceVerticalAlign'], paragraphSource: TextStyle = {}, underlineOrigin?: UnderlineOrigin): WordRun[] {
+function runsFrom(nodes: Node[], inherited: TextStyle = {}, directStyle?: TextStyle, sourceVerticalAlign?: WordRun['sourceVerticalAlign'], paragraphSource: TextStyle = {}, underlineOrigin?: UnderlineOrigin, sourceColor?: WordRun['sourceColor']): WordRun[] {
   const runs: WordRun[] = []
-  const makeRun = (text: string): WordRun => ({ text, style: { ...inherited }, ...(directStyle !== undefined ? { directStyle: { ...directStyle } } : {}), ...(sourceVerticalAlign !== undefined ? { sourceVerticalAlign } : {}) })
+  const makeRun = (text: string): WordRun => ({ text, style: { ...inherited }, ...(directStyle !== undefined ? { directStyle: { ...directStyle } } : {}), ...(sourceVerticalAlign !== undefined ? { sourceVerticalAlign } : {}), ...(sourceColor !== undefined ? { sourceColor } : {}) })
   for (const node of nodes) {
     if (node.nodeType === Node.TEXT_NODE) {
       if (node.textContent) runs.push(makeRun(node.textContent))
@@ -363,7 +381,19 @@ function runsFrom(nodes: Node[], inherited: TextStyle = {}, directStyle?: TextSt
       else {
         const style = inlineStyle(node, inherited, paragraphSource)
         let direct = runDirectStyle(node, directStyle)
-        const ownSource = node.dataset.wordDirectStyle !== undefined ? { ...paragraphSource, ...direct } : undefined
+        const ownSource = node.dataset.wordDirectStyle !== undefined ? { ...paragraphSource, ...(node.dataset.wordSourceColor !== undefined ? { color: normalizeTextColor(node.dataset.wordSourceColor) } : {}), ...direct } : undefined
+        if (direct !== undefined && node.dataset.wordInsertionStyle === undefined
+          && node.dataset.wordColor !== undefined && node.dataset.wordDirectStyle === undefined) {
+          // A nested semantic color is an explicit command, including RGB
+          // equal to automatic paint. Do not retain its parent's auto item.
+          direct = { ...direct, color: normalizeTextColor(node.dataset.wordColor) }
+        } else if (direct !== undefined && node.dataset.wordInsertionStyle === undefined
+          && node.dataset.wordColor === undefined && ownSource?.color === undefined) {
+          const color = cssTextColor(node, inherited, style)
+          // Preserve a real CSS override even without a paragraph source to
+          // trigger rebasing. A matching auto-paint clone adds no override.
+          if (color !== undefined) direct = { ...direct, color }
+        }
         if (direct !== undefined && !node.hasAttribute('data-word-visual') && node.dataset.wordInsertionStyle === undefined
           && node.dataset.wordUnderlineColor === undefined && ownSource?.underlineColor === undefined) {
           const color = cssUnderlineColor(node, inherited)
@@ -390,12 +420,11 @@ function runsFrom(nodes: Node[], inherited: TextStyle = {}, directStyle?: TextSt
         // CSS can draw several independent ancestor lines over the same text.
         // The native model has one underline per run, so reject conflicting
         // external origins instead of silently discarding a visible line.
-        let textColor = style.color?.toUpperCase() ?? underlineOrigin?.textColor
+        let textColor = textColorPaint(style) ?? underlineOrigin?.textColor
         if (node.style.color) {
-          // Compare explicit CSS colors even when the legacy text-color
-          // reader does not recognize their spelling (for example names).
-          try { textColor = backgroundFromCss(node.style.color) ?? node.style.color }
-          catch { textColor = node.style.color }
+          // A line drawn by an ancestor keeps that origin's actual color.
+          // Compare opaque paint here, never the semantic auto token.
+          textColor = textColorFromCss(node.style.color) ?? textColor
         }
         if (underlineOrigin?.color === 'auto' && node.style.color && textColor !== underlineOrigin.textColor) throw Error('暂不支持在跟随文字颜色的下划线内单独改变文字颜色，请使用工具栏设置。')
         const line = underlineLine(node)
@@ -406,7 +435,7 @@ function runsFrom(nodes: Node[], inherited: TextStyle = {}, directStyle?: TextSt
           if (origin && (origin.line !== next.line || paint(origin) !== paint(next))) throw Error('暂不支持叠加不同样式或颜色的下划线，请使用一种下划线格式。')
           origin = next
         }
-        runs.push(...runsFrom(Array.from(node.childNodes), style, direct, runSourceVerticalAlign(node, sourceVerticalAlign), paragraphSource, origin))
+        runs.push(...runsFrom(Array.from(node.childNodes), style, direct, runSourceVerticalAlign(node, sourceVerticalAlign), paragraphSource, origin, runSourceColor(node, sourceColor)))
       }
     }
   }
@@ -431,9 +460,10 @@ export function readWordDom(root: HTMLElement, previous: WordDocument): WordDocu
     const emptyElement = block?.firstElementChild instanceof HTMLElement ? block.firstElementChild : undefined
     const emptyDirectStyle = runs.length ? undefined : emptyElement ? runDirectStyle(emptyElement) : old?.runs[0]?.directStyle
     const emptySourceVerticalAlign = runs.length ? undefined : emptyElement ? runSourceVerticalAlign(emptyElement) : old?.runs[0]?.sourceVerticalAlign
+    const emptySourceColor = runs.length ? undefined : emptyElement ? runSourceColor(emptyElement) : old?.runs[0]?.sourceColor
     return {
       id: block?.dataset.wordParagraph || `paragraph-${crypto.randomUUID()}`,
-      runs: runs.length ? runs : [{ text: '', style: emptyElement ? inlineStyle(emptyElement, {}, old?.sourceRun) : { ...old?.runs[0]?.style }, ...(emptyDirectStyle !== undefined ? { directStyle: { ...emptyDirectStyle } } : {}), ...(emptySourceVerticalAlign !== undefined ? { sourceVerticalAlign: emptySourceVerticalAlign } : {}) }],
+      runs: runs.length ? runs : [{ text: '', style: emptyElement ? inlineStyle(emptyElement, {}, old?.sourceRun) : { ...old?.runs[0]?.style }, ...(emptyDirectStyle !== undefined ? { directStyle: { ...emptyDirectStyle } } : {}), ...(emptySourceVerticalAlign !== undefined ? { sourceVerticalAlign: emptySourceVerticalAlign } : {}), ...(emptySourceColor !== undefined ? { sourceColor: emptySourceColor } : {}) }],
       style,
       ...(directStyle !== undefined ? { directStyle } : {}),
       ...(old?.sourceRun !== undefined ? { sourceRun: { ...old.sourceRun } } : {}),
@@ -498,6 +528,7 @@ function renderParagraph(paragraph: WordParagraph, options: WordDomOptions): HTM
       const span = document.createElement('span'), style = run.style
       if (run.directStyle !== undefined) span.dataset.wordDirectStyle = JSON.stringify(run.directStyle)
       if (run.sourceVerticalAlign !== undefined) span.dataset.wordSourceVerticalAlign = run.sourceVerticalAlign
+      if (run.sourceColor !== undefined) span.dataset.wordSourceColor = run.sourceColor
       if (style.bold !== undefined) span.style.fontWeight = style.bold ? 'bold' : 'normal'
       if (style.italic !== undefined) span.style.fontStyle = style.italic ? 'italic' : 'normal'
       if (style.underline !== undefined) span.dataset.wordUnderline = String(style.underline)
@@ -527,7 +558,10 @@ function renderParagraph(paragraph: WordParagraph, options: WordDomOptions): HTM
       }
       if (style.fontNameEastAsia) span.dataset.wordFontNameEastAsia = style.fontNameEastAsia
       if (style.fontNameCs) span.dataset.wordFontNameCs = style.fontNameCs
-      if (style.color) span.style.color = style.color
+      if (style.color !== undefined) {
+        span.dataset.wordColor = style.color
+        span.style.color = textColorPaint(style)!
+      }
       if (style.highlight !== undefined) {
         span.dataset.wordHighlight = style.highlight
       }
@@ -611,6 +645,7 @@ function renderParagraph(paragraph: WordParagraph, options: WordDomOptions): HTM
         semantic.dataset.wordInsertionStyle = JSON.stringify(insertion.style)
         if (insertion.directStyle !== undefined) semantic.dataset.wordDirectStyle = JSON.stringify(insertion.directStyle)
         if (insertion.sourceVerticalAlign !== undefined) semantic.dataset.wordSourceVerticalAlign = insertion.sourceVerticalAlign
+        if (insertion.sourceColor !== undefined) semantic.dataset.wordSourceColor = insertion.sourceColor
         semantic.style.fontSize = '0pt'
         visual.dataset.wordVisual = 'paragraph-marker'
         visual.style.fontSize = `${marker.fontSize ?? 12}pt`

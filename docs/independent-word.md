@@ -14,6 +14,10 @@
 
 当前支持中英文与 emoji、段落与软换行、选区粗体/斜体/单／双下划线、上下标、单／双删除线、标准色高亮、自定义文字背景色、字号/颜色、前三个标题级别、段落对齐和撤销重做。基础 DOCX 可保留中西文字体、语言标记、默认制表位、行距、段落间距、孤行控制、与下段同页和段中不分页设置。分页属性可保存，浏览器连续视图尚不执行 Writer 的分页算法；字体显示仍取决于系统可用字体。
 
+“文字颜色”菜单从 0.6.2 起支持自动颜色和自定义 RGB，显示混合选区状态；点击应用形成一次可撤销编辑，取消或切换选区会丢弃草稿。自动颜色与固定黑色分别保存，即使当前显示相同也不会合并。仅确认相同设置不制造新的直接格式。DOCX 未指定颜色时继承上层，没有上层颜色则使用自动；应用自身新建文稿的默认颜色保持不变。
+
+自动文字颜色参照受测 Writer，依据文字底纹在黑色和白色之间选择；无底纹时按白色页面处理，高亮不参与选择。模型与 DOCX 始终保留 `auto`，改变底纹后重新计算显示颜色。默认值、段落样式、显式命名字符样式、直接格式和段落标记分别保留；同值字符样式跨 Enter 后继续生效，纯段落继承则跟随下一段样式。复制到外部的 HTML 使用当前实际 RGB，纯文本保持原文；粘贴仍采用目标格式的纯文本。主题前景色、透明色以及页面／框架背景尚不支持。
+
 “大小写显示”菜单提供原样、全部大写和小型大写。它保存字符格式，不改写原始文字；取消效果写入显式的原样格式，覆盖继承值。支持 ASCII 字母，以及无大小写映射的中文、标点和 emoji。原生 Writer 与浏览器对 `ß`、部分希腊字母等存在字符映射差异，因此启用效果时暂不接受非 ASCII 大小写字符、组合音标，或特定语言环境中的 ASCII 字母；原样文字仍按原有范围支持。常见 emoji 和汉字的变体选择符继续保留。遇到不支持的组合会拒绝此次导入、格式或输入操作并保留原文。小型大写字形取决于字体与浏览器，不承诺与原生 Writer 的字形比例、行宽和分页一致。
 
 当前暂不支持的语言规则包括土耳其语、阿塞拜疆语、希腊语、立陶宛语和爱尔兰语中的 ASCII 字母大写效果。组合标记的限制也包括键帽 emoji（如 `1️⃣`），普通 emoji、肤色、ZWJ 序列及变体选择符可继续使用。含大小写效果的选区复制、剪切时，纯文本取自原始文稿，并提供带格式的 HTML；不会把显示转换后的字符串当作正文。编辑器粘贴仍采用纯文本。
@@ -38,7 +42,7 @@
 
 下划线支持明确的 `w:u val="single/double/none"` 和不透明 RGB 线条颜色，保留段落、命名字符样式和直接格式的继承与取消。下划线菜单可选择自定义颜色或“跟随文字颜色”，颜色与正文、删除线分别保存；仅修改颜色不会自动开启下划线，取消线条后再次开启仍保留选定颜色。颜色草稿应用后形成一次可撤销编辑，取消或切换选区不应用草稿。
 
-默认字符样式中的下划线只在显式引用时应用；直接下划线在段尾 Enter 后继续保留。导入区分同一 `basedOn` 样式链中的颜色继承与新的字符样式／直接下划线覆盖；线型与颜色作为组合属性保存，防止只改颜色时丢失线型。内部的 `underlineColor: 'auto'` 表示跟随文字，导出时省略 `w:u` 的颜色属性。原始 OOXML `color="auto"` 在受测 Writer 中会变成白色，本轮继续明确拒绝；不能将它等同于省略颜色。主题色、波浪线、仅单词下划线和缺少类型仍拒绝导入。
+默认字符样式中的下划线只在显式引用时应用；直接下划线在段尾 Enter 后继续保留。导入区分同一 `basedOn` 样式链中的颜色继承与新的字符样式／直接下划线覆盖；线型与颜色作为组合属性保存，防止只改颜色时丢失线型。内部的 `underlineColor: 'auto'` 表示跟随文字，导出时省略 `w:u` 的颜色属性。原始 OOXML 下划线属性 `w:u/@w:color="auto"` 在受测 Writer 中会变成白色，本轮继续明确拒绝；不能将它等同于省略颜色。主题色、波浪线、仅单词下划线和缺少类型仍拒绝导入。
 
 选中整段正文并只改下划线颜色时，若正文线型一致，段落标记也记录该线型与新颜色，继续输入或换段保持相同效果。该行为经过 Writer 实际下划线菜单命令、保存重开与按键对照。混合线型选区改色时，应用保留各片段原有线型；这是产品自身约定，受测 Writer 在混合线型下会禁用颜色控件，不能将二者称作同一菜单行为。
 
@@ -126,7 +130,7 @@ Writer 打开 DOCX 时会将接近标准纸边长的尺寸校正为标准值。�
 
 段落标记迭代保留[完整原生语料与独立 XML 检查器](../tests/compatibility/independent-word-marker/README.md)，参考同一版本的 [独立标记属性导入](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx#L2678)、[标记导出优先级](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/filter/ww8/wrtw8nds.cxx#L3262)、[空白末行的标记字号](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/core/text/porlay.cxx#L575) 与 [默认字符样式处理](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/writerfilter/dmapper/StyleSheetTable.cxx#L431)。原生 DOCX 重存和 PDF 探针对照证实：空文字片段上的直接格式会丢失，真实标记格式得以保留；可见正文与空白末行的几何规则不同。静态原生证据覆盖 46 个案例、313 项断言；另以原生 UNO 与 `XToolkitRobot` 键盘驱动核对 52 个编辑案例、236 项断言，确认标记的输入、拆段、合段及完整选区行为。这些是固定原生版本的对照证据，与产品浏览器回归分别记录。实际产品导出的空段需经过原生重存、重新打开和继续输入验证，不能只用产品自身读写互证。
 
-字符间距迭代参考同一版本的 [DOCX 字符间距导入](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/writerfilter/dmapper/DomainMapper.cxx#L2464)、[间距导出](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/filter/ww8/docxattributeoutput.cxx#L8394)、[上下标字体比例](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/core/inc/swfont.hxx#L806) 和 [负间距显示下限](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/core/txtnode/swfont.cxx#L981)。原生逐项验证 −400 至 400 twips 共 801 个值精确往返；真实按键证据确认同值命名字符样式在换段后继续生效。[间距语料及独立检查器](../tests/compatibility/independent-word-spacing/README.md) 区分自主 ODT、人工 DOCX 输入和未经修改的完整原生输出；不支持的中文段落布局、自动断词配置及自动颜色保留为拒绝样例。
+字符间距迭代参考同一版本的 [DOCX 字符间距导入](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/writerfilter/dmapper/DomainMapper.cxx#L2464)、[间距导出](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/filter/ww8/docxattributeoutput.cxx#L8394)、[上下标字体比例](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/core/inc/swfont.hxx#L806) 和 [负间距显示下限](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/core/txtnode/swfont.cxx#L981)。原生逐项验证 −400 至 400 twips 共 801 个值精确往返；真实按键证据确认同值命名字符样式在换段后继续生效。[间距语料及独立检查器](../tests/compatibility/independent-word-spacing/README.md) 区分自主 ODT、人工 DOCX 输入和未经修改的完整原生输出；不支持的中文段落布局和自动断词配置保留为拒绝样例；四个历史自动前景色输出在 0.6.2 中转为正例，原生文件字节不变。
 
 大小写格式参考同一版本的 [跨段落与字符样式处理](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/writerfilter/dmapper/DomainMapper_Impl.cxx#L3424) 和 [Unicode 大小写映射表](https://github.com/LibreOffice/core/blob/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/i18nutil/source/utility/casefolding_data.h#L509)。例如原生将 `ß` 映射为 `ẞ`，浏览器 CSS 则可能显示为 `SS`，所以本轮明确限制效果的文字范围。[大小写语料及独立检查器](../tests/compatibility/independent-word-case/README.md) 记录完整原生文件、格式与文字检查，以及不支持的组合。
 
@@ -143,6 +147,20 @@ Writer 打开 DOCX 时会将接近标准纸边长的尺寸校正为标准值。�
 产品的 TypeScript 模型、事务、输入适配和 OOXML 编解码借鉴上述职责划分和格式行为；没有把 C++ 实现翻译或复制进这些模块。桌面通过异步 Tauri 命令调用独立 Rust crate `crates/word-package`，在后台执行受大小限制的 ZIP 读写与 CRC 校验，再由同一 OOXML 编解码器验证文档语义；原生失败不会静默切换另一实现。浏览器预览继续使用 `fflate`。当前并非全 Rust 编辑器，尚无 Rust XML、文档模型或排版引擎。参考副本保留 LibreOffice 原始许可头和来源。
 
 ## 验证
+
+### 自动文字颜色兼容迭代（0.6.2）
+
+依据固定 LibreOfficeDev `2c87e51eeaa2b413ff4ae097b2705eea1995d8e5` 的颜色导入、导出和绘制逻辑，并以[独立原生语料](../tests/compatibility/independent-word-auto-color/README.md)核验。六份完整原件共 61 段，首次与二次保存保留 30 份未经修改的原生 DOCX／ODT／PDF；另有七份真实键盘控制原件和 21 份原生编辑输出。独立检查器共通过 548 项文件证据检查，产品未生成这些原生期望值。
+
+原生 PDF 确认自动前景采用线性亮度、整数截断及固定版本的 `729FCF` 历史特例，高亮不参与选择。实际 Enter／输入确认同值命名字符颜色仍须保留来源，独立空段标记不会给现有正文重新着色。命名颜色以独立字符样式保存，可与上下标来源组合；直接颜色保留为直接格式。正文来源与段落标记分别处理：命名颜色可以延续到下一段正文，而该段标记仍取下一段样式；真正的直接颜色则会延续到新标记。实现限于白色页面及已支持的文字底纹；未增加主题、框架背景或复杂分页。该原生对照不等同于 Microsoft Word 验证。
+
+- 全量 877 项 Node、83 项 Python 测试、类型检查及生产构建通过。
+- 新专项 8 组通过：31 个完整包导入、59 段原生 PDF 绘色、14 次实际原生保存重开、7 组原生键盘编辑对照及 8 轮 DOM 往返。61 个非法输入拒绝和 6 次失败打开原子性检查通过；菜单、混合选区、撤销重做、真实 Chromium 剪贴板及窄屏截图均已检查。
+- 独立 DOM 复核 39 项通过，覆盖颜色来源丢失后的有限恢复、同色包装、底纹变化与不透明 CSS 颜色边界。已删除全部来源元数据的任意 DOM 无法保证恢复原始命名／直接格式，不属于此项承诺。
+- Rust 包协议回归 43 组通过：170 份完整语料（146 份接受、24 份语义拒绝），889 次真实 CLI 调用及 661 次受控传输。32 份自动颜色完整包各经过两轮 Rust 保存重开，七组原生编辑控制的正文与段落标记均一致。此套件使用真实 Rust CLI 和受控传输，不等同于真实 Tauri IPC／WebView；安装包另由发布流程执行平台自检。
+- 最终冻结源码的既有回归全部通过：编解码 21 组、段落间距 10 组、字符间距 10 组、LibreOffice 往返 9 组、下划线颜色 9 组、文字背景 12 组、段落标记 11 组。独立复核另验证七组实际编辑及六种颜色／上下标组合的三轮保存。记录的页面、控制台和外部请求错误均为空，产品前后哈希一致；发布前汇总见 `test-results/release-0.6.2/validation-summary.json`。
+
+实际 Rust 保存重开后的原生编辑对照发现过真实缺陷：将命名颜色与直接颜色合并后，Enter 会错误处理新段落标记。模型现保留独立 `sourceColor`，DOCX、DOM 和输入事务同步处理；七份原生控制在两轮真实 Rust 保存重开后均通过。首次并行运行的内存终止、旧测试加载器缺少新增模块、重复颜色节点错误文案断言及失败打开测试使用多次输入事务的问题，均保留原始失败记录并修正测试设施；没有修改原生文件或预期来迁就产品结果。最终专项报告位于 `test-results/word-auto-color-final/report.json`。
 
 ### 行距规则缺少数值的兼容迭代
 
@@ -186,7 +204,7 @@ Writer 打开 DOCX 时会将接近标准纸边长的尺寸校正为标准值。�
 
 原生研究独立执行 276 项检查，保留 73 个受控段落及固定 LibreOffice 源码版本。完整语料导入闸门验证 16 个正例原件／输出和 2 个负例，原始文件字节与来源哈希均保留；研究结论与产品回归分别记录，不以产品自身读写推断原生行为。
 
-初次原生编辑样例未指定明确文字颜色，输出被已有自动颜色限制正确拒绝；保留该完整文件作为负例，并重新编写显式黑色正例。两次测试脚本失败也保留：Python 检查器文件名遮蔽标准库，以及缩进脚本返回循环内局部变量。修正脚本后均完整重跑，没有放宽产品断言。最终报告位于 `word-paragraph-spacing-final-2/`、`word-paragraph-spacing-rust-final/`、`word-paragraph-spacing-indentation-final/` 等目录，具体关联见汇总文件。
+该轮初次原生编辑样例未指定明确文字颜色，输出被当时的自动颜色限制拒绝，另行编写了显式黑色正例；完整历史文件在 0.6.2 自动颜色迭代中转为正例，字节和原始失败记录保留不变。两次测试脚本失败也保留：Python 检查器文件名遮蔽标准库，以及缩进脚本返回循环内局部变量。修正脚本后均完整重跑，没有放宽产品断言。最终报告位于 `word-paragraph-spacing-final-2/`、`word-paragraph-spacing-rust-final/`、`word-paragraph-spacing-indentation-final/` 等目录，具体关联见汇总文件。
 
 ### 自定义基线偏移迭代的历史记录
 

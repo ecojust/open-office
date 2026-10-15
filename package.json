@@ -1,6 +1,6 @@
 {
   "name": "open-office",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "type": "module",
   "engines": {
@@ -57,6 +57,7 @@
     "test:browser:word-baseline-offset": "node tests/browser/independent-word-baseline-offset.cjs",
     "test:browser:word-paragraph-spacing": "node tests/browser/independent-word-paragraph-spacing.cjs",
     "test:browser:word-line-rule": "node tests/browser/independent-word-line-rule.cjs",
+    "test:browser:word-auto-color": "node tests/browser/independent-word-auto-color.cjs",
     "test:browser:word-page-settings": "node tests/browser/independent-word-page-settings.cjs",
     "test:browser:word-rust": "node tests/browser/word-rust-package.cjs",
     "test:native:word-package": "node scripts/word-package-native-smoke.mjs",

@@ -3097,9 +3097,7 @@
       "variant": "named-equal-next",
       "sourceSha256": "1afa9aeafa7f0285b7b5c3fb5596b2fdbffc62c73abc704b36a0569673c24ea0",
       "docxSha256": "c2ba712ce5c6921884de0e78e663a6afea9780fb4e5dabb1274f8c224122be0f",
-      "expectUnsupported": true,
-      "sourceSupported": true,
-      "unsupportedReason": "Author input is in current subset, but complete native edited output introduces automatic font color; preserved unchanged as a native output rejection control."
+      "history": "Author input is in current subset, but complete native edited output introduces automatic font color; preserved unchanged as a native output rejection control."
     },
     {
       "name": "supported-default-equal-next",
@@ -3161,9 +3159,7 @@
       "variant": "default-equal-next",
       "sourceSha256": "04de3f169b67687d0367f7bfbbc183d224a964482bd94747caf944b0a89d7e58",
       "docxSha256": "30a13935202fedbb263f2a54a1cc47d53af9a8cd1701cbda22c2ad9ead6f1544",
-      "expectUnsupported": true,
-      "sourceSupported": true,
-      "unsupportedReason": "Author input is in current subset, but complete native edited output introduces automatic font color; preserved unchanged as a native output rejection control."
+      "history": "Author input is in current subset, but complete native edited output introduces automatic font color; preserved unchanged as a native output rejection control."
     },
     {
       "name": "supported-named-unequal-next",
@@ -3225,9 +3221,7 @@
       "variant": "named-unequal-next",
       "sourceSha256": "7ade56a4889acf2b643d185395a81b6f0d793939ce8b1b1097138be95489b9e5",
       "docxSha256": "070026ebe36c194569a13dea5a70a8369f82fd2f3481eaa3c915f118d4c5377a",
-      "expectUnsupported": true,
-      "sourceSupported": true,
-      "unsupportedReason": "Author input is in current subset, but complete native edited output introduces automatic font color; preserved unchanged as a native output rejection control."
+      "history": "Author input is in current subset, but complete native edited output introduces automatic font color; preserved unchanged as a native output rejection control."
     },
     {
       "name": "supported-no-character-next",
@@ -3289,9 +3283,7 @@
       "variant": "no-character-next",
       "sourceSha256": "ebc8af2afb3e2b299055dc74f433611abb490e75ed18ab66554068e23632e853",
       "docxSha256": "9ada50c9e2f0cdda7432181ab506d626390df58ed084d8d019135bc084f8d021",
-      "expectUnsupported": true,
-      "sourceSupported": true,
-      "unsupportedReason": "Author input is in current subset, but complete native edited output introduces automatic font color; preserved unchanged as a native output rejection control."
+      "history": "Author input is in current subset, but complete native edited output introduces automatic font color; preserved unchanged as a native output rejection control."
     },
     {
       "name": "explicit-color-named-equal-next",

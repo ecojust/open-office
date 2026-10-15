@@ -7,6 +7,7 @@ import ts from 'typescript'
 import * as vue from 'vue'
 import { zipSync, strToU8 } from 'fflate'
 import { reviewOfficeImport } from '../src/office/import-review.ts'
+import * as textColor from '../src/word/core/text-color.ts'
 
 // Run the real App.vue setup logic with Vue's real reactivity. Editors and native
 // file dialogs are controlled doubles: these are shell-state regressions, not
@@ -137,6 +138,7 @@ function wordLoader(document, prepared) {
     if(name==='../word/core/model')return {createWordDocument:()=>({paragraphs:[],empty:true}),WordController:class {constructor(model){this.model=model;this.dirty=false}}}
     if(name==='../word/core/highlight')return {HIGHLIGHT_COLORS:[]}
     if(name==='../word/core/paper')return paper
+    if(name==='../word/core/text-color')return textColor
     if(name==='../word/core/dom'||name==='../word/core/background'||name.endsWith('.css'))return {}
     throw Error(`Unexpected independent editor import ${name}`)
   },browser).state)

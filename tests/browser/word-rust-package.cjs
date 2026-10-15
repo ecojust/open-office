@@ -38,6 +38,19 @@ const semantic = model => JSON.parse(JSON.stringify(model, (key, value) => key =
 const sourceFiles = ['src/word/core/docx.ts', 'src/word/core/model.ts', 'src/word/core/paper.ts', 'src/word/core/highlight.ts', 'src/word/core/background.ts', 'src/word/core/runtime.ts', 'src/word/core/scripts.ts', 'src/native.ts', 'src/shared/document.ts'];
 const digest = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const sourceDigests = () => Object.fromEntries(sourceFiles.map(file => [file, digest(path.join(root, file))]));
+const autoColorCorpus = path.join(root, 'tests/compatibility/independent-word-auto-color');
+const autoColorInputs = ['tests/browser/word-rust-package.cjs', 'tests/compatibility/independent-word-auto-color/manifest.json', 'tests/compatibility/independent-word-auto-color/inspect_docx.py'];
+const autoColorInputDigests = () => Object.fromEntries(autoColorInputs.map(file => [file, digest(path.join(root, file))]));
+const colorDefaults = { color: 'auto', backgroundColor: 'none', highlight: 'none', fontSize: 12, underline: false, underlineColor: 'auto', strike: 'none', verticalAlign: 'baseline' };
+const colorStyle = style => Object.fromEntries(Object.entries(colorDefaults).map(([key, value]) => [key, style?.[key] ?? value]));
+const modelColors = model => model.paragraphs.map(paragraph => paragraph.runs.flatMap(run => Array.from(run.text, character => ({ character, ...colorStyle(run.style) }))));
+const modelMarkers = model => model.paragraphs.map(paragraph => colorStyle(paragraph.marker?.style ?? paragraph.sourceRun));
+function inspectColors(file) {
+  const result = spawnSync(process.env.PYTHON || 'python3', [path.join(autoColorCorpus, 'inspect_docx.py'), file], { cwd: '/tmp', encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 30000 });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout);
+}
 function rust(request) {
   assert.ok(cli && fs.existsSync(cli), 'Build word-package-cli or set WORD_PACKAGE_CLI to its executable path');
   report.rustCalls[request.operation]++;
@@ -85,6 +98,7 @@ async function main() {
     assert.ok(cli && fs.existsSync(cli), 'Build word-package-cli or set WORD_PACKAGE_CLI');
     report.startedAt = new Date().toISOString();
     report.sourceDigests = sourceDigests(); report.cliSha256 = digest(cli);
+    report.autoColorInputDigests = autoColorInputDigests();
     const { createServer } = await import('vite');
     server = await createServer({ configFile: false, root, clearScreen: false,
       cacheDir: path.join(output, 'vite-cache'),
@@ -201,6 +215,18 @@ async function main() {
       if (operation === 'browserWrite') return encode(wordCodec.exportWordDocument(input));
       if (operation === 'runtimeWrite') return encode(await wordRuntime.exportWordDocument(input));
       if (operation === 'oversizeRead') return wordRuntime.importWordDocument(new Uint8Array(16 * 1024 * 1024 + 1));
+      if (operation === 'colorNativeEdit') {
+        const controller = new wordModel.WordController(input.model);
+        for (const action of input.actions) {
+          if (action === 'end') {
+            const end = { paragraph: 0, offset: wordModel.paragraphText(controller.model.paragraphs[0]).length };
+            controller.setSelection({ anchor: end, focus: end });
+          } else if (action === 'Enter') controller.replaceText(controller.selection, '\n');
+          else if (action === 'type:x') controller.replaceText(controller.selection, 'x');
+          else throw Error('Unknown native color editing action: ' + action);
+        }
+        return controller.model;
+      }
       if (operation === 'edit') {
         const controller = new wordModel.WordController(input), first = controller.model.paragraphs[0];
         const length = wordModel.paragraphText(first).length;
@@ -455,6 +481,16 @@ async function main() {
       ['malformed-underline-color', strFromU8(seedParts['word/document.xml']).replace(/<w:u\b[^>]*\/>/, '<w:u w:val="double" w:color="GG0000"/>')],
       ['unsupported-xml-auto-underline-color', strFromU8(seedParts['word/document.xml']).replace(/<w:u\b[^>]*\/>/, '<w:u w:val="double" w:color="auto"/>')],
       ['unsupported-theme-underline-color', strFromU8(seedParts['word/document.xml']).replace(/<w:u\b[^>]*\/>/, '<w:u w:val="double" w:color="FF0000" w:themeColor="accent1"/>')],
+      ...[
+        ['uppercase-auto', '<w:color w:val="AUTO"/>'], ['empty', '<w:color w:val=""/>'],
+        ['short-rgb', '<w:color w:val="FFF"/>'], ['alpha-rgb', '<w:color w:val="FF000080"/>'],
+        ['theme', '<w:color w:val="auto" w:themeColor="accent1"/>'], ['tint', '<w:color w:val="auto" w:themeTint="80"/>'],
+        ['shade', '<w:color w:val="auto" w:themeShade="80"/>'], ['duplicate', '<w:color w:val="auto"/><w:color w:val="000000"/>'],
+      ].map(([name, replacement]) => {
+        const xml = seedDocumentXml.replace(/<w:color\b[^>]*\/>/, replacement);
+        assert.notEqual(xml, seedDocumentXml, 'Color rejection must mutate actual character formatting');
+        return ['invalid-foreground-' + name, xml];
+      }),
       ['out-of-range-baseline-offset', strFromU8(seedParts['word/document.xml']).replace('<w:position w:val="6"/>', '<w:position w:val="201"/>')],
       ['fractional-baseline-offset', strFromU8(seedParts['word/document.xml']).replace('<w:position w:val="6"/>', '<w:position w:val="1.5"/>')],
       ['duplicate-baseline-offset', strFromU8(seedParts['word/document.xml']).replace('<w:position w:val="6"/>', '<w:position w:val="6"/><w:position w:val="-6"/>')],
@@ -473,8 +509,8 @@ async function main() {
     ]) {
       const bytes = zipSync({ ...seedParts, 'word/document.xml': typeof xml === 'string' ? strToU8(xml) : xml });
       const rows = rustOk({ operation: 'read', base64: b64(bytes) }).parts;
-      await assert.rejects(call('partsRead', rows), /XML|DTD|正文内容 tbl|编码|字符间距|字偶距|大写|布尔|开关|caps|下划线|颜色|属性|基线|重复的 position|段落|行距|纸张|装订线/);
-      await assert.rejects(call('runtimeRead', b64(bytes)), /XML|DTD|正文内容 tbl|编码|字符间距|字偶距|大写|布尔|开关|caps|下划线|颜色|属性|基线|重复的 position|段落|行距|纸张|装订线/);
+      await assert.rejects(call('partsRead', rows), /XML|DTD|正文内容 tbl|编码|字符间距|字偶距|大写|布尔|开关|caps|下划线|颜色|属性|基线|重复的 (?:position|color)|段落|行距|纸张|装订线/);
+      await assert.rejects(call('runtimeRead', b64(bytes)), /XML|DTD|正文内容 tbl|编码|字符间距|字偶距|大写|布尔|开关|caps|下划线|颜色|属性|基线|重复的 (?:position|color)|段落|行距|纸张|装订线/);
       report.checks.push(`Semantic rejection after successful Rust ZIP read: ${name}`);
     }
     pass('A valid Rust ZIP container cannot bypass TypeScript XML, DTD, encoding, underline-color, character-spacing bounds, case-effect or unsupported table validation');
@@ -489,11 +525,20 @@ async function main() {
     assert.equal(report.transport.length, beforeOversize, 'Oversized native bytes must be rejected before Base64 transport');
     pass('Native Base64 protocol rejects malformed/oversized/ambiguous inputs, and runtime guards 16 MiB before invoking Rust');
 
-    const corpusFiles = ['independent-word', 'independent-word-indentation', 'independent-word-character-format', 'independent-word-highlight', 'independent-word-background', 'independent-word-underline', 'independent-word-marker', 'independent-word-spacing', 'independent-word-case', 'independent-word-kerning', 'independent-word-underline-color', 'independent-word-baseline-offset', 'independent-word-paragraph-spacing', 'independent-word-page-settings', 'independent-word-line-rule'].flatMap(directory => {
+    const corpusFiles = ['independent-word', 'independent-word-indentation', 'independent-word-character-format', 'independent-word-highlight', 'independent-word-background', 'independent-word-underline', 'independent-word-marker', 'independent-word-spacing', 'independent-word-case', 'independent-word-kerning', 'independent-word-underline-color', 'independent-word-baseline-offset', 'independent-word-paragraph-spacing', 'independent-word-page-settings', 'independent-word-line-rule', 'independent-word-auto-color'].flatMap(directory => {
       const corpus = path.join(root, 'tests/compatibility', directory);
       const manifest = JSON.parse(fs.readFileSync(path.join(corpus, 'manifest.json'), 'utf8'));
       return [...manifest.fixtures, ...(manifest.editingFixtures || [])].flatMap(fixture => {
         const native = { name: `${directory}-${path.basename(fixture.docx)}`, file: path.join(corpus, fixture.docx), sha256: fixture.docxSha256, expectUnsupported: fixture.expectUnsupported };
+        if (directory === 'independent-word-auto-color') {
+          assert.ok(Array.isArray(fixture.sourceExpected) && Array.isArray(fixture.expected) && Array.isArray(fixture.sourceMarkers) && Array.isArray(fixture.expectedMarkers), `${fixture.name}: independent foreground and marker oracles are required`);
+          return [
+            { ...native, colorOracle: { characters: fixture.expected, markers: fixture.expectedMarkers } },
+            { name: `${directory}-source-${path.basename(fixture.source)}`, file: path.join(corpus, fixture.source), sha256: fixture.sourceSha256,
+              colorOracle: { characters: fixture.sourceExpected, markers: fixture.sourceMarkers }, colorEditing: fixture.actions ? { actions: fixture.actions, characters: fixture.expected, markers: fixture.expectedMarkers, typedColor: fixture.typedColor } : undefined },
+            ...(fixture.secondDocx ? [{ name: `${directory}-second-${path.basename(fixture.secondDocx.path)}`, file: path.join(corpus, fixture.secondDocx.path), sha256: fixture.secondDocx.sha256, colorOracle: { characters: fixture.expected } }] : []),
+          ];
+        }
         if (directory !== 'independent-word-line-rule') return [native];
         // Native output materializes the missing line value. Also send every
         // original package through Rust so the actual rule-only XML is tested.
@@ -504,7 +549,7 @@ async function main() {
         ];
       });
     });
-    for (const { name, file: sourceFile, sha256, expectUnsupported, expectedParagraphSpacing, paragraphSpacingProvenance } of corpusFiles) {
+    for (const { name, file: sourceFile, sha256, expectUnsupported, expectedParagraphSpacing, paragraphSpacingProvenance, colorOracle, colorEditing } of corpusFiles) {
       report.activeFixture = name; persist();
       assert.equal(digest(sourceFile), sha256, `${name}: native corpus must remain byte-for-byte unchanged`);
       const bytes = fs.readFileSync(sourceFile);
@@ -518,6 +563,34 @@ async function main() {
       const model = await call('browserRead', b64(bytes)), nativeModel = await call('runtimeRead', b64(bytes));
       assert.deepEqual(semantic(await call('partsRead', rows)), semantic(model), `${name}: raw Rust part import`);
       assert.deepEqual(semantic(nativeModel), semantic(model), `${name}: native runtime import`);
+      if (colorOracle) {
+        const inspected = inspectColors(sourceFile), expectedMarkers = inspected.paragraphs.map(paragraph => colorStyle(paragraph.marker));
+        assert.deepEqual(inspected.paragraphs.map(paragraph => paragraph.characters), colorOracle.characters, `${name}: immutable independent character oracle`);
+        if (colorOracle.markers) assert.deepEqual(expectedMarkers, colorOracle.markers.map(colorStyle), `${name}: immutable independent marker oracle`);
+        assert.deepEqual(modelColors(nativeModel), colorOracle.characters, `${name}: Rust import preserves automatic tokens and separate paint layers`);
+        assert.deepEqual(modelMarkers(nativeModel), expectedMarkers, `${name}: Rust import preserves independent paragraph markers`);
+        let cycle = nativeModel;
+        for (let generation = 1; generation <= 2; generation++) {
+          const saved = await call('runtimeWrite', cycle), file = `rust-color-${generation}-${name}`;
+          fs.writeFileSync(path.join(output, file), Buffer.from(saved, 'base64')); report.files.push(file);
+          const independent = inspectColors(path.join(output, file));
+          assert.deepEqual(independent.paragraphs.map(paragraph => paragraph.characters), colorOracle.characters, `${name}: actual Rust ZIP output generation ${generation}`);
+          assert.deepEqual(independent.paragraphs.map(paragraph => colorStyle(paragraph.marker)), expectedMarkers, `${name}: independent saved marker generation ${generation}`);
+          cycle = await call('runtimeRead', saved);
+          assert.deepEqual(modelColors(cycle), colorOracle.characters); assert.deepEqual(modelMarkers(cycle), expectedMarkers);
+        }
+        if (colorEditing) {
+          const edited = await call('colorNativeEdit', { model: cycle, actions: colorEditing.actions });
+          assert.deepEqual(modelColors(edited), colorEditing.characters, `${name}: controller actions agree with actual native keyboard control after two Rust cycles`);
+          const saved = await call('runtimeWrite', edited), file = `rust-color-edit-${name}`;
+          fs.writeFileSync(path.join(output, file), Buffer.from(saved, 'base64')); report.files.push(file);
+          const independent = inspectColors(path.join(output, file));
+          assert.deepEqual(independent.paragraphs.map(paragraph => paragraph.characters), colorEditing.characters, `${name}: independent native-edit output colors`);
+          assert.deepEqual(independent.paragraphs.map(paragraph => colorStyle(paragraph.marker)), colorEditing.markers.map(colorStyle), `${name}: native-edit paragraph markers remain independent`);
+          assert.deepEqual(modelColors(await call('runtimeRead', saved)), colorEditing.characters, `${name}: native-edit Rust reopen`);
+          (report.autoColorEditing ||= []).push({ name, actions: colorEditing.actions, typedColor: colorEditing.typedColor, output: file });
+        }
+      }
       if (expectedParagraphSpacing) {
         const spacing = style => Object.fromEntries(['spaceBefore', 'spaceAfter', 'lineHeight', 'lineHeightRule'].filter(key => style?.[key] !== undefined).map(key => [key, style[key]]));
         assert.deepEqual(nativeModel.paragraphs.map(paragraph => ({ text: paragraph.runs.map(run => run.text).join(''), ...spacing(paragraph.style) })), expectedParagraphSpacing, `${name}: independent native spacing oracle`);
@@ -528,14 +601,18 @@ async function main() {
       assert.deepEqual(semantic(await call('browserRead', nativeOutput)), semantic(expected), `${name}: browser rereads Rust export`);
       assert.deepEqual(semantic(await call('runtimeRead', nativeOutput)), semantic(expected), `${name}: Rust rereads Rust export`);
       const file = `rust-${name}`; fs.writeFileSync(path.join(output, file), Buffer.from(nativeOutput, 'base64')); report.files.push(file);
-      report.corpus.push({ name, sha256, packageAccepted: true, semanticsAccepted: true, paragraphs: model.paragraphs.length, markers: model.paragraphs.filter(paragraph => paragraph.marker).length, markerSemanticsCompared: true, independentSpacingCompared: !!expectedParagraphSpacing, sourceSpacingProvenanceCompared: !!paragraphSpacingProvenance, output: file });
+      report.corpus.push({ name, sha256, packageAccepted: true, semanticsAccepted: true, paragraphs: model.paragraphs.length, markers: model.paragraphs.filter(paragraph => paragraph.marker).length, markerSemanticsCompared: true, independentSpacingCompared: !!expectedParagraphSpacing, sourceSpacingProvenanceCompared: !!paragraphSpacingProvenance, independentColorAndMarkerCompared: !!colorOracle, automaticColorSaveCycles: colorOracle ? 2 : 0, output: file });
     }
     const accepted = report.corpus.filter(fixture => fixture.semanticsAccepted).length;
     const rejected = report.corpus.filter(fixture => !fixture.semanticsAccepted).length;
     pass(`${accepted} original/native LibreOffice corpus packages agree across Rust/browser reads, edits and writes; ${rejected} unsupported fixtures remain rejected after Rust accepts their containers`);
+    assert.equal(report.corpus.filter(fixture => fixture.independentColorAndMarkerCompared).length, 32, 'All 18 original/native color and 14 editing packages must traverse actual Rust');
+    assert.equal(report.autoColorEditing.length, 7, 'All seven native color editing controls must retain their semantics after Rust saves');
+    pass('32 automatic foreground packages retain semantic tokens, character paint and independent markers through two real Rust save cycles; seven native Enter/insertion controls agree after Rust reopening');
     assert.deepEqual(report.pageErrors, []); assert.deepEqual(report.externalRequests, []);
     assert.deepEqual(sourceDigests(), report.sourceDigests, 'Product sources changed during the contract run; rerun against stable inputs');
     assert.equal(digest(cli), report.cliSha256, 'Rust CLI changed during the contract run');
+    assert.deepEqual(autoColorInputDigests(), report.autoColorInputDigests, 'Automatic color corpus/oracle/test changed during the run');
     delete report.activeFixture;
     report.ok = true; report.finishedAt = new Date().toISOString(); persist(); console.log(`Report: ${path.join(output, 'report.json')}`);
   } catch (error) { report.error = error.stack || String(error); persist(); throw error; }

@@ -164,7 +164,7 @@ with zipfile.ZipFile(sys.argv[1]) as z:
 function characterStyles(paragraph) {
   return paragraph.runs.flatMap(run => Array.from(run.text).map(character => ({ character,
     bold: !!run.bold, italic: !!run.italic, underline: !!run.underline,
-    fontSize: run.fontSize ?? 12, color: !run.color || run.color === 'auto' ? '000000' : run.color.toUpperCase(),
+    fontSize: run.fontSize ?? 12, color: !run.color || run.color === 'auto' ? 'auto' : run.color.toUpperCase(),
     ...Object.fromEntries(['szCs', 'kern', 'rFonts:ascii', 'rFonts:hAnsi', 'rFonts:eastAsia', 'rFonts:cs', 'lang:val', 'lang:eastAsia', 'lang:bidi'].map(key => [key, run[key] ?? null])),
   })));
 }

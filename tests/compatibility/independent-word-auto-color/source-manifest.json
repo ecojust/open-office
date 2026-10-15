@@ -1,0 +1,53 @@
+{
+  "commit": "2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "files": [
+    {
+      "path": "include/tools/color.hxx",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/include/tools/color.hxx",
+      "sha256": "7d703cb7374972ae9d8ea2d74320130b8a62e5cd6d9a9dc6f799df46647f06ae",
+      "bytes": 14475
+    },
+    {
+      "path": "tools/source/generic/color.cxx",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/tools/source/generic/color.cxx",
+      "sha256": "a6f2339ae4bfa5e945653b92d65c5c3fe07e303994751027db581859a306b2c8",
+      "bytes": 9149
+    },
+    {
+      "path": "sw/source/writerfilter/dmapper/ThemeColorHandler.hxx",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/writerfilter/dmapper/ThemeColorHandler.hxx",
+      "sha256": "18f5bb27316b8e2962438a988c0edb6f7391aff09bbfb794bf5c9766ac264bdb",
+      "bytes": 1711
+    },
+    {
+      "path": "sw/source/core/txtnode/fntcache.cxx",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/core/txtnode/fntcache.cxx",
+      "sha256": "0134a62b092b32e3196aeb0d62412952c59cc5f7e594c5724b5e46612cbbe81a",
+      "bytes": 96737
+    },
+    {
+      "path": "sw/source/writerfilter/dmapper/DomainMapper.cxx",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/writerfilter/dmapper/DomainMapper.cxx",
+      "sha256": "9f50199f9bbee96ec81c007b1a7a91242b69821bde0fd522bb1035c9ac647264",
+      "bytes": 240947
+    },
+    {
+      "path": "sw/source/filter/ww8/docxattributeoutput.cxx",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/filter/ww8/docxattributeoutput.cxx",
+      "sha256": "491795260e91aa049e87dc220349da719c64e480a4ccacb9292fefdfb8b8eb7c",
+      "bytes": 438026
+    },
+    {
+      "path": "filter/source/msfilter/util.cxx",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/filter/source/msfilter/util.cxx",
+      "sha256": "20613a9b1aa956f03d22df6bbb7a1d80fff8db3135a66969740f589c976a28bb",
+      "bytes": 62107
+    },
+    {
+      "path": "sw/source/core/inc/swfont.hxx",
+      "url": "https://raw.githubusercontent.com/LibreOffice/core/2c87e51eeaa2b413ff4ae097b2705eea1995d8e5/sw/source/core/inc/swfont.hxx",
+      "sha256": "da38062df47c7d83709ef971cff26a95634641227b8aabb9a1de7215b7b4bcb5",
+      "bytes": 38265
+    }
+  ]
+}

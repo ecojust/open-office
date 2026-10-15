@@ -1,0 +1,2860 @@
+{
+  "version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "documents": [
+    {
+      "name": "direct",
+      "options": {},
+      "cases": [
+        {
+          "name": "auto-shade-None",
+          "direct": "<w:color w:val=\"auto\"/>",
+          "text": "C000 auto-shade-None"
+        },
+        {
+          "name": "auto-shade-FFFFFF",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"FFFFFF\"/>",
+          "text": "C001 auto-shade-FFFFFF"
+        },
+        {
+          "name": "auto-shade-000000",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "text": "C002 auto-shade-000000"
+        },
+        {
+          "name": "auto-shade-3E3E3E",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"3E3E3E\"/>",
+          "text": "C003 auto-shade-3E3E3E"
+        },
+        {
+          "name": "auto-shade-3F3F3F",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"3F3F3F\"/>",
+          "text": "C004 auto-shade-3F3F3F"
+        },
+        {
+          "name": "auto-shade-9E9E9E",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"9E9E9E\"/>",
+          "text": "C005 auto-shade-9E9E9E"
+        },
+        {
+          "name": "auto-shade-9F9F9F",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"9F9F9F\"/>",
+          "text": "C006 auto-shade-9F9F9F"
+        },
+        {
+          "name": "auto-shade-A0A0A0",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"A0A0A0\"/>",
+          "text": "C007 auto-shade-A0A0A0"
+        },
+        {
+          "name": "auto-shade-FF0000",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"FF0000\"/>",
+          "text": "C008 auto-shade-FF0000"
+        },
+        {
+          "name": "auto-shade-00FF00",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"00FF00\"/>",
+          "text": "C009 auto-shade-00FF00"
+        },
+        {
+          "name": "auto-shade-0000FF",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"0000FF\"/>",
+          "text": "C010 auto-shade-0000FF"
+        },
+        {
+          "name": "auto-shade-FFFF00",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"FFFF00\"/>",
+          "text": "C011 auto-shade-FFFF00"
+        },
+        {
+          "name": "auto-shade-729FCF",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"729FCF\"/>",
+          "text": "C012 auto-shade-729FCF"
+        },
+        {
+          "name": "auto-shade-729FCE",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"729FCE\"/>",
+          "text": "C013 auto-shade-729FCE"
+        },
+        {
+          "name": "auto-shade-729FD0",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"729FD0\"/>",
+          "text": "C014 auto-shade-729FD0"
+        },
+        {
+          "name": "foreground-None-black",
+          "direct": "<w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "text": "C015 foreground-None-black"
+        },
+        {
+          "name": "foreground-000000-black",
+          "direct": "<w:color w:val=\"000000\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "text": "C016 foreground-000000-black"
+        },
+        {
+          "name": "foreground-auto-black",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "text": "C017 foreground-auto-black"
+        },
+        {
+          "name": "shade-None-highlight-black",
+          "direct": "<w:color w:val=\"auto\"/><w:highlight w:val=\"black\"/>",
+          "text": "C018 shade-None-highlight-black"
+        },
+        {
+          "name": "shade-FFFFFF-highlight-black",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"FFFFFF\"/><w:highlight w:val=\"black\"/>",
+          "text": "C019 shade-FFFFFF-highlight-black"
+        },
+        {
+          "name": "shade-000000-highlight-white",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/><w:highlight w:val=\"white\"/>",
+          "text": "C020 shade-000000-highlight-white"
+        },
+        {
+          "name": "shade-0000FF-highlight-yellow",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"0000FF\"/><w:highlight w:val=\"yellow\"/>",
+          "text": "C021 shade-0000FF-highlight-yellow"
+        },
+        {
+          "name": "shade-FFFF00-highlight-darkBlue",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"FFFF00\"/><w:highlight w:val=\"darkBlue\"/>",
+          "text": "C022 shade-FFFF00-highlight-darkBlue"
+        },
+        {
+          "name": "shade-000000-highlight-none",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/><w:highlight w:val=\"none\"/>",
+          "text": "C023 shade-000000-highlight-none"
+        },
+        {
+          "name": "shade-auto-highlight-black",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"auto\"/><w:highlight w:val=\"black\"/>",
+          "text": "C024 shade-auto-highlight-black"
+        }
+      ],
+      "pdf": [
+        {
+          "page": 0,
+          "text": "C000 auto-shade-None",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            83.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            72.01475524902344,
+            210.24400329589844,
+            85.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C001 auto-shade-FFFFFF",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            103.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            92.01475524902344,
+            220.38397216796875,
+            105.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C002 auto-shade-000000",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            123.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            112.01475524902344,
+            224.72802734375,
+            125.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C003 auto-shade-3E3E3E",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            143.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            132.01475524902344,
+            224.56002807617188,
+            145.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C004 auto-shade-3F3F3F",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            163.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            152.01475524902344,
+            222.55599975585938,
+            165.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C005 auto-shade-9E9E9E",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            183.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            172.01475524902344,
+            224.56002807617188,
+            185.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C006 auto-shade-9F9F9F",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            203.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            192.01475524902344,
+            222.55599975585938,
+            205.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C007 auto-shade-A0A0A0",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            223.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            212.01475524902344,
+            226.4920196533203,
+            225.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C008 auto-shade-FF0000",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            243.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            232.01475524902344,
+            223.3000030517578,
+            245.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C009 auto-shade-00FF00",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            263.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            252.01475524902344,
+            223.2880096435547,
+            265.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C010 auto-shade-0000FF",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            283.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            272.0147705078125,
+            223.3000030517578,
+            285.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C011 auto-shade-FFFF00",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            303.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            292.0147705078125,
+            221.8599853515625,
+            305.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C012 auto-shade-729FCF",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            323.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            312.0147705078125,
+            224.04400634765625,
+            325.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C013 auto-shade-729FCE",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            343.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            332.0147705078125,
+            224.7160186767578,
+            345.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C014 auto-shade-729FD0",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            363.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            352.0147705078125,
+            225.62802124023438,
+            365.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C015 foreground-None-black",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            383.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            372.0147705078125,
+            245.45199584960938,
+            385.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C016 foreground-000000-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            403.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            392.0147705078125,
+            259.947998046875,
+            405.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C017 foreground-auto-black",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            423.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            412.0147705078125,
+            241.16796875,
+            425.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C018 shade-None-highlight-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            443.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            432.0147705078125,
+            272.11602783203125,
+            445.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C019 shade-FFFFFF-highlight-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            463.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            452.0147705078125,
+            282.2319641113281,
+            465.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C020 shade-000000-highlight-white",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            483.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            472.0147705078125,
+            287.6200256347656,
+            485.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C021 shade-0000FF-highlight-yellow",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            503.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            492.0147705078125,
+            291.5799560546875,
+            505.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C022 shade-FFFF00-highlight-darkBlue",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            523.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            512.0147705078125,
+            305.2839660644531,
+            525.9707641601562
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C023 shade-000000-highlight-none",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            543.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            532.0147705078125,
+            284.7160339355469,
+            545.9707641601562
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C024 shade-auto-highlight-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            563.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            552.0147705078125,
+            267.82000732421875,
+            565.9707641601562
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        }
+      ],
+      "secondPdf": [
+        {
+          "page": 0,
+          "text": "C000 auto-shade-None",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            83.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            72.01475524902344,
+            210.24400329589844,
+            85.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C001 auto-shade-FFFFFF",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            103.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            92.01475524902344,
+            220.38397216796875,
+            105.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C002 auto-shade-000000",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            123.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            112.01475524902344,
+            224.72802734375,
+            125.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C003 auto-shade-3E3E3E",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            143.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            132.01475524902344,
+            224.56002807617188,
+            145.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C004 auto-shade-3F3F3F",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            163.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            152.01475524902344,
+            222.55599975585938,
+            165.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C005 auto-shade-9E9E9E",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            183.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            172.01475524902344,
+            224.56002807617188,
+            185.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C006 auto-shade-9F9F9F",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            203.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            192.01475524902344,
+            222.55599975585938,
+            205.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C007 auto-shade-A0A0A0",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            223.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            212.01475524902344,
+            226.4920196533203,
+            225.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C008 auto-shade-FF0000",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            243.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            232.01475524902344,
+            223.3000030517578,
+            245.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C009 auto-shade-00FF00",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            263.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            252.01475524902344,
+            223.2880096435547,
+            265.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C010 auto-shade-0000FF",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            283.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            272.0147705078125,
+            223.3000030517578,
+            285.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C011 auto-shade-FFFF00",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            303.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            292.0147705078125,
+            221.8599853515625,
+            305.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C012 auto-shade-729FCF",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            323.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            312.0147705078125,
+            224.04400634765625,
+            325.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C013 auto-shade-729FCE",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            343.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            332.0147705078125,
+            224.7160186767578,
+            345.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C014 auto-shade-729FD0",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            363.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            352.0147705078125,
+            225.62802124023438,
+            365.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C015 foreground-None-black",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            383.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            372.0147705078125,
+            245.45199584960938,
+            385.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C016 foreground-000000-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            403.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            392.0147705078125,
+            259.947998046875,
+            405.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C017 foreground-auto-black",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            423.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            412.0147705078125,
+            241.16796875,
+            425.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C018 shade-None-highlight-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            443.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            432.0147705078125,
+            272.11602783203125,
+            445.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C019 shade-FFFFFF-highlight-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            463.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            452.0147705078125,
+            282.2319641113281,
+            465.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C020 shade-000000-highlight-white",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            483.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            472.0147705078125,
+            287.6200256347656,
+            485.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C021 shade-0000FF-highlight-yellow",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            503.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            492.0147705078125,
+            291.5799560546875,
+            505.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C022 shade-FFFF00-highlight-darkBlue",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            523.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            512.0147705078125,
+            305.2839660644531,
+            525.9707641601562
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C023 shade-000000-highlight-none",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            543.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            532.0147705078125,
+            284.7160339355469,
+            545.9707641601562
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C024 shade-auto-highlight-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            563.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            552.0147705078125,
+            267.82000732421875,
+            565.9707641601562
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        }
+      ],
+      "commands": [
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native/pdf",
+            "./original/direct.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/direct.docx as a Writer document -> ./native/pdf/direct.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native/docx",
+            "./original/direct.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/direct.docx as a Writer document -> ./native/docx/direct.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "odt",
+            "--outdir",
+            "./native/odt",
+            "./original/direct.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/direct.docx as a Writer document -> ./native/odt/direct.odt using filter : writer8\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native/docx-second",
+            "./native/docx/direct.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./native/docx/direct.docx as a Writer document -> ./native/docx-second/direct.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native/pdf-second",
+            "./native/docx-second/direct.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./native/docx-second/direct.docx as a Writer document -> ./native/pdf-second/direct.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        }
+      ]
+    },
+    {
+      "name": "inheritance",
+      "options": {},
+      "cases": [
+        {
+          "name": "parent-red-inherit",
+          "parent": "<w:color w:val=\"C00000\"/>",
+          "text": "C000 parent-red-inherit"
+        },
+        {
+          "name": "direct-auto-over-red",
+          "parent": "<w:color w:val=\"C00000\"/>",
+          "direct": "<w:color w:val=\"auto\"/>",
+          "text": "C001 direct-auto-over-red"
+        },
+        {
+          "name": "child-auto-over-red",
+          "parent": "<w:color w:val=\"C00000\"/>",
+          "child": "<w:color w:val=\"auto\"/>",
+          "text": "C002 child-auto-over-red"
+        },
+        {
+          "name": "named-auto-over-red",
+          "parent": "<w:color w:val=\"C00000\"/>",
+          "char": "<w:color w:val=\"auto\"/>",
+          "text": "C003 named-auto-over-red"
+        },
+        {
+          "name": "named-child-auto-over-red",
+          "charParent": "<w:color w:val=\"C00000\"/>",
+          "char": "<w:color w:val=\"auto\"/>",
+          "text": "C004 named-child-auto-over-red"
+        },
+        {
+          "name": "named-auto-shade",
+          "parent": "<w:color w:val=\"C00000\"/>",
+          "char": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "text": "C005 named-auto-shade"
+        },
+        {
+          "name": "direct-red-over-auto",
+          "parent": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "direct": "<w:color w:val=\"C00000\"/>",
+          "text": "C006 direct-red-over-auto"
+        },
+        {
+          "name": "auto-style-inherit-dark",
+          "parent": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "text": "C007 auto-style-inherit-dark"
+        },
+        {
+          "name": "auto-style-child-white",
+          "parent": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "child": "<w:shd w:val=\"clear\" w:fill=\"FFFFFF\"/>",
+          "text": "C008 auto-style-child-white"
+        },
+        {
+          "name": "auto-style-direct-clear",
+          "parent": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "direct": "<w:shd w:val=\"clear\" w:fill=\"auto\"/>",
+          "text": "C009 auto-style-direct-clear"
+        },
+        {
+          "name": "auto-character-direct-black",
+          "char": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "direct": "<w:color w:val=\"000000\"/>",
+          "text": "C010 auto-character-direct-black"
+        },
+        {
+          "name": "marker-red-run-auto",
+          "marker": "<w:color w:val=\"C00000\"/>",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "text": "C011 marker-red-run-auto"
+        },
+        {
+          "name": "marker-auto-run-red",
+          "marker": "<w:color w:val=\"auto\"/>",
+          "direct": "<w:color w:val=\"C00000\"/>",
+          "text": "C012 marker-auto-run-red"
+        }
+      ],
+      "pdf": [
+        {
+          "page": 0,
+          "text": "C000 parent-red-inherit",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            83.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            72.01475524902344,
+            214.156005859375,
+            85.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C001 direct-auto-over-red",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            103.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            92.01475524902344,
+            228.3040008544922,
+            105.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C002 child-auto-over-red",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            123.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            112.01475524902344,
+            222.24400329589844,
+            125.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C003 named-auto-over-red",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            143.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            132.01475524902344,
+            235.4080352783203,
+            145.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C004 named-child-auto-over-red",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            163.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            152.01475524902344,
+            268.1679992675781,
+            165.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C005 named-auto-shade",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            183.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            172.01475524902344,
+            220.6000213623047,
+            185.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C006 direct-red-over-auto",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            203.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            192.01475524902344,
+            228.3280029296875,
+            205.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C007 auto-style-inherit-dark",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            223.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            212.01475524902344,
+            241.57598876953125,
+            225.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C008 auto-style-child-white",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            243.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            232.01475524902344,
+            237.1479949951172,
+            245.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C009 auto-style-direct-clear",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            263.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            252.01475524902344,
+            239.9919891357422,
+            265.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C010 auto-character-direct-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            283.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            272.0147705078125,
+            270.8800354003906,
+            285.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C011 marker-red-run-auto",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            303.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            292.0147705078125,
+            230.38002014160156,
+            305.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C012 marker-auto-run-red",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            323.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            312.0147705078125,
+            230.3560333251953,
+            325.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        }
+      ],
+      "secondPdf": [
+        {
+          "page": 0,
+          "text": "C000 parent-red-inherit",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            83.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            72.01475524902344,
+            214.156005859375,
+            85.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C001 direct-auto-over-red",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            103.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            92.01475524902344,
+            228.3040008544922,
+            105.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C002 child-auto-over-red",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            123.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            112.01475524902344,
+            222.24400329589844,
+            125.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C003 named-auto-over-red",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            143.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            132.01475524902344,
+            235.4080352783203,
+            145.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C004 named-child-auto-over-red",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            163.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            152.01475524902344,
+            268.1679992675781,
+            165.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C005 named-auto-shade",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            183.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            172.01475524902344,
+            220.6000213623047,
+            185.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C006 direct-red-over-auto",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            203.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            192.01475524902344,
+            228.3280029296875,
+            205.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C007 auto-style-inherit-dark",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            223.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            212.01475524902344,
+            241.57598876953125,
+            225.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C008 auto-style-child-white",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            243.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            232.01475524902344,
+            237.1479949951172,
+            245.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C009 auto-style-direct-clear",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            263.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            252.01475524902344,
+            239.9919891357422,
+            265.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C010 auto-character-direct-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            283.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            272.0147705078125,
+            270.8800354003906,
+            285.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C011 marker-red-run-auto",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            303.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            292.0147705078125,
+            230.38002014160156,
+            305.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C012 marker-auto-run-red",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            323.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            312.0147705078125,
+            230.3560333251953,
+            325.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        }
+      ],
+      "commands": [
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native/pdf",
+            "./original/inheritance.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/inheritance.docx as a Writer document -> ./native/pdf/inheritance.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native/docx",
+            "./original/inheritance.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/inheritance.docx as a Writer document -> ./native/docx/inheritance.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "odt",
+            "--outdir",
+            "./native/odt",
+            "./original/inheritance.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/inheritance.docx as a Writer document -> ./native/odt/inheritance.odt using filter : writer8\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native/docx-second",
+            "./native/docx/inheritance.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./native/docx/inheritance.docx as a Writer document -> ./native/docx-second/inheritance.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native/pdf-second",
+            "./native/docx-second/inheritance.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./native/docx-second/inheritance.docx as a Writer document -> ./native/pdf-second/inheritance.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        }
+      ]
+    },
+    {
+      "name": "defaults-auto",
+      "options": {
+        "default": "<w:color w:val=\"auto\"/>"
+      },
+      "cases": [
+        {
+          "name": "inherit-default",
+          "text": "C000 inherit-default"
+        },
+        {
+          "name": "direct-auto",
+          "direct": "<w:color w:val=\"auto\"/>",
+          "text": "C001 direct-auto"
+        },
+        {
+          "name": "direct-black",
+          "direct": "<w:color w:val=\"000000\"/>",
+          "text": "C002 direct-black"
+        },
+        {
+          "name": "default-dark",
+          "direct": "<w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "text": "C003 default-dark"
+        },
+        {
+          "name": "paragraph-red",
+          "parent": "<w:color w:val=\"C00000\"/>",
+          "text": "C004 paragraph-red"
+        },
+        {
+          "name": "paragraph-auto",
+          "parent": "<w:color w:val=\"auto\"/>",
+          "text": "C005 paragraph-auto"
+        }
+      ],
+      "pdf": [
+        {
+          "page": 0,
+          "text": "C000 inherit-default",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            83.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            72.01475524902344,
+            192.51998901367188,
+            85.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C001 direct-auto",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            103.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            92.01475524902344,
+            173.031982421875,
+            105.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C002 direct-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            123.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            112.01475524902344,
+            177.87998962402344,
+            125.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C003 default-dark",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            143.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            132.01475524902344,
+            180.52000427246094,
+            145.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C004 paragraph-red",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            163.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            152.01475524902344,
+            193.73204040527344,
+            165.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C005 paragraph-auto",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            183.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            172.01475524902344,
+            200.81201171875,
+            185.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        }
+      ],
+      "secondPdf": [
+        {
+          "page": 0,
+          "text": "C000 inherit-default",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            83.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            72.01475524902344,
+            192.51998901367188,
+            85.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C001 direct-auto",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            103.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            92.01475524902344,
+            173.031982421875,
+            105.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C002 direct-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            123.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            112.01475524902344,
+            177.87998962402344,
+            125.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C003 default-dark",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            143.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            132.01475524902344,
+            180.52000427246094,
+            145.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C004 paragraph-red",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            163.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            152.01475524902344,
+            193.73204040527344,
+            165.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C005 paragraph-auto",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            183.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            172.01475524902344,
+            200.81201171875,
+            185.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        }
+      ],
+      "commands": [
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native/pdf",
+            "./original/defaults-auto.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/defaults-auto.docx as a Writer document -> ./native/pdf/defaults-auto.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native/docx",
+            "./original/defaults-auto.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/defaults-auto.docx as a Writer document -> ./native/docx/defaults-auto.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "odt",
+            "--outdir",
+            "./native/odt",
+            "./original/defaults-auto.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/defaults-auto.docx as a Writer document -> ./native/odt/defaults-auto.odt using filter : writer8\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native/docx-second",
+            "./native/docx/defaults-auto.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./native/docx/defaults-auto.docx as a Writer document -> ./native/docx-second/defaults-auto.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native/pdf-second",
+            "./native/docx-second/defaults-auto.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./native/docx-second/defaults-auto.docx as a Writer document -> ./native/pdf-second/defaults-auto.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        }
+      ]
+    },
+    {
+      "name": "defaults-red",
+      "options": {
+        "default": "<w:color w:val=\"C00000\"/>"
+      },
+      "cases": [
+        {
+          "name": "inherit-default",
+          "text": "C000 inherit-default"
+        },
+        {
+          "name": "direct-auto",
+          "direct": "<w:color w:val=\"auto\"/>",
+          "text": "C001 direct-auto"
+        },
+        {
+          "name": "direct-black",
+          "direct": "<w:color w:val=\"000000\"/>",
+          "text": "C002 direct-black"
+        },
+        {
+          "name": "default-dark",
+          "direct": "<w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "text": "C003 default-dark"
+        },
+        {
+          "name": "paragraph-red",
+          "parent": "<w:color w:val=\"C00000\"/>",
+          "text": "C004 paragraph-red"
+        },
+        {
+          "name": "paragraph-auto",
+          "parent": "<w:color w:val=\"auto\"/>",
+          "text": "C005 paragraph-auto"
+        }
+      ],
+      "pdf": [
+        {
+          "page": 0,
+          "text": "C000 inherit-default",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            83.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            72.01475524902344,
+            192.51998901367188,
+            85.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C001 direct-auto",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            103.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            92.01475524902344,
+            173.031982421875,
+            105.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C002 direct-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            123.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            112.01475524902344,
+            177.87998962402344,
+            125.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C003 default-dark",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            143.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            132.01475524902344,
+            180.52000427246094,
+            145.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C004 paragraph-red",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            163.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            152.01475524902344,
+            193.73204040527344,
+            165.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C005 paragraph-auto",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            183.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            172.01475524902344,
+            200.81201171875,
+            185.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        }
+      ],
+      "secondPdf": [
+        {
+          "page": 0,
+          "text": "C000 inherit-default",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            83.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            72.01475524902344,
+            192.51998901367188,
+            85.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C001 direct-auto",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            103.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            92.01475524902344,
+            173.031982421875,
+            105.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C002 direct-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            123.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            112.01475524902344,
+            177.87998962402344,
+            125.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C003 default-dark",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            143.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            132.01475524902344,
+            180.52000427246094,
+            145.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C004 paragraph-red",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            163.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            152.01475524902344,
+            193.73204040527344,
+            165.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C005 paragraph-auto",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            183.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            172.01475524902344,
+            200.81201171875,
+            185.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        }
+      ],
+      "commands": [
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native/pdf",
+            "./original/defaults-red.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/defaults-red.docx as a Writer document -> ./native/pdf/defaults-red.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native/docx",
+            "./original/defaults-red.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/defaults-red.docx as a Writer document -> ./native/docx/defaults-red.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "odt",
+            "--outdir",
+            "./native/odt",
+            "./original/defaults-red.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/defaults-red.docx as a Writer document -> ./native/odt/defaults-red.odt using filter : writer8\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native/docx-second",
+            "./native/docx/defaults-red.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./native/docx/defaults-red.docx as a Writer document -> ./native/docx-second/defaults-red.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native/pdf-second",
+            "./native/docx-second/defaults-red.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./native/docx-second/defaults-red.docx as a Writer document -> ./native/pdf-second/defaults-red.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        }
+      ]
+    },
+    {
+      "name": "default-character-auto",
+      "options": {
+        "defaultChar": "<w:color w:val=\"auto\"/>"
+      },
+      "cases": [
+        {
+          "name": "implicit",
+          "text": "C000 implicit"
+        },
+        {
+          "name": "implicit-over-red",
+          "parent": "<w:color w:val=\"C00000\"/>",
+          "text": "C001 implicit-over-red"
+        },
+        {
+          "name": "explicit-over-red",
+          "parent": "<w:color w:val=\"C00000\"/>",
+          "charRef": "DefaultChar",
+          "text": "C002 explicit-over-red"
+        },
+        {
+          "name": "implicit-dark",
+          "direct": "<w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "text": "C003 implicit-dark"
+        },
+        {
+          "name": "explicit-dark",
+          "charRef": "DefaultChar",
+          "direct": "<w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "text": "C004 explicit-dark"
+        }
+      ],
+      "pdf": [
+        {
+          "page": 0,
+          "text": "C000 implicit",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            83.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            72.01475524902344,
+            151.0240020751953,
+            85.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C001 implicit-over-red",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            103.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            92.01475524902344,
+            206.33203125,
+            105.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C002 explicit-over-red",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            123.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            112.01475524902344,
+            205.780029296875,
+            125.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C003 implicit-dark",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            143.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            132.01475524902344,
+            182.20001220703125,
+            145.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C004 explicit-dark",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            163.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            152.01475524902344,
+            181.64801025390625,
+            165.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        }
+      ],
+      "secondPdf": [
+        {
+          "page": 0,
+          "text": "C000 implicit",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            83.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            72.01475524902344,
+            151.0240020751953,
+            85.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C001 implicit-over-red",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            103.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            92.01475524902344,
+            206.33203125,
+            105.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C002 explicit-over-red",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            123.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            112.01475524902344,
+            205.780029296875,
+            125.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C003 implicit-dark",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            143.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            132.01475524902344,
+            182.20001220703125,
+            145.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C004 explicit-dark",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            163.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            152.01475524902344,
+            181.64801025390625,
+            165.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        }
+      ],
+      "commands": [
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native/pdf",
+            "./original/default-character-auto.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/default-character-auto.docx as a Writer document -> ./native/pdf/default-character-auto.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native/docx",
+            "./original/default-character-auto.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/default-character-auto.docx as a Writer document -> ./native/docx/default-character-auto.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "odt",
+            "--outdir",
+            "./native/odt",
+            "./original/default-character-auto.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/default-character-auto.docx as a Writer document -> ./native/odt/default-character-auto.odt using filter : writer8\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native/docx-second",
+            "./native/docx/default-character-auto.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./native/docx/default-character-auto.docx as a Writer document -> ./native/docx-second/default-character-auto.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native/pdf-second",
+            "./native/docx-second/default-character-auto.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./native/docx-second/default-character-auto.docx as a Writer document -> ./native/pdf-second/default-character-auto.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        }
+      ]
+    },
+    {
+      "name": "markers",
+      "options": {},
+      "cases": [
+        {
+          "name": "marker-auto",
+          "marker": "<w:color w:val=\"auto\"/>",
+          "text": "C000 marker-auto"
+        },
+        {
+          "name": "marker-auto-over-red",
+          "parent": "<w:color w:val=\"C00000\"/>",
+          "marker": "<w:color w:val=\"auto\"/>",
+          "text": "C001 marker-auto-over-red"
+        },
+        {
+          "name": "empty-marker-auto",
+          "parent": "<w:color w:val=\"C00000\"/>",
+          "marker": "<w:color w:val=\"auto\"/>",
+          "empty": true,
+          "text": ""
+        },
+        {
+          "name": "empty-marker-auto-dark",
+          "marker": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "empty": true,
+          "text": ""
+        },
+        {
+          "name": "run-auto-marker-red",
+          "marker": "<w:color w:val=\"C00000\"/>",
+          "direct": "<w:color w:val=\"auto\"/><w:shd w:val=\"clear\" w:fill=\"000000\"/>",
+          "text": "C004 run-auto-marker-red"
+        },
+        {
+          "name": "marker-auto-run-black",
+          "marker": "<w:color w:val=\"auto\"/>",
+          "direct": "<w:color w:val=\"000000\"/>",
+          "text": "C005 marker-auto-run-black"
+        }
+      ],
+      "pdf": [
+        {
+          "page": 0,
+          "text": "C000 marker-auto",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            83.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            72.01475524902344,
+            181.67201232910156,
+            85.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C001 marker-auto-over-red",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            103.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            92.01475524902344,
+            236.9920196533203,
+            105.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C004 run-auto-marker-red",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            163.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            152.01475524902344,
+            230.36802673339844,
+            165.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C005 marker-auto-run-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            183.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            172.01475524902344,
+            242.2720184326172,
+            185.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        }
+      ],
+      "secondPdf": [
+        {
+          "page": 0,
+          "text": "C000 marker-auto",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            83.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            72.01475524902344,
+            181.67201232910156,
+            85.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C001 marker-auto-over-red",
+          "color": 12582912,
+          "origin": [
+            72.0999984741211,
+            103.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            92.01475524902344,
+            236.9920196533203,
+            105.97075653076172
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C004 run-auto-marker-red",
+          "color": 16777215,
+          "origin": [
+            72.0999984741211,
+            163.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            152.01475524902344,
+            230.36802673339844,
+            165.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        },
+        {
+          "page": 0,
+          "text": "C005 marker-auto-run-black",
+          "color": 0,
+          "origin": [
+            72.0999984741211,
+            183.1507568359375
+          ],
+          "bbox": [
+            72.0999984741211,
+            172.01475524902344,
+            242.2720184326172,
+            185.97076416015625
+          ],
+          "size": 12.0,
+          "font": "DejaVuSans"
+        }
+      ],
+      "commands": [
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native/pdf",
+            "./original/markers.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/markers.docx as a Writer document -> ./native/pdf/markers.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native/docx",
+            "./original/markers.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/markers.docx as a Writer document -> ./native/docx/markers.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "odt",
+            "--outdir",
+            "./native/odt",
+            "./original/markers.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./original/markers.docx as a Writer document -> ./native/odt/markers.odt using filter : writer8\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "docx:Office Open XML Text",
+            "--outdir",
+            "./native/docx-second",
+            "./native/docx/markers.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./native/docx/markers.docx as a Writer document -> ./native/docx-second/markers.docx using filter : Office Open XML Text\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        },
+        {
+          "command": [
+            "soffice",
+            "--headless",
+            "-env:UserInstallation=file://./profile",
+            "--convert-to",
+            "pdf:writer_pdf_Export",
+            "--outdir",
+            "./native/pdf-second",
+            "./native/docx-second/markers.docx"
+          ],
+          "returncode": 0,
+          "stdout": "convert ./native/docx-second/markers.docx as a Writer document -> ./native/pdf-second/markers.pdf using filter : writer_pdf_Export\n",
+          "stderr": "Fontconfig error: No writable cache directories\nFontconfig error: No writable cache directories\n"
+        }
+      ]
+    }
+  ]
+}
