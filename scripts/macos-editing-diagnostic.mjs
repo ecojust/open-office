@@ -265,29 +265,72 @@ export function captureStream(child, path, limit) {
   });
   child.stderr.on('data', chunk => { stderr = appendLogTail(stderr, chunk); });
   child.on('error', error => { stderr = appendLogTail(stderr, Buffer.from(error.message)); });
-  return () => {
+  return (destination = path, { reset = false } = {}) => {
     const start = (offset - bytes + limit) % limit;
     const first = Math.min(bytes, limit - start);
-    writeFileSync(path, Buffer.concat([tail.subarray(start, start + first), tail.subarray(0, bytes - first)], bytes));
-    return { file: basename(path), mode: 'tail', limitBytes: limit, bytes, totalBytes,
+    writeFileSync(destination, Buffer.concat([tail.subarray(start, start + first), tail.subarray(0, bytes - first)], bytes));
+    const result = { file: basename(destination), mode: 'tail', limitBytes: limit, bytes, totalBytes,
       droppedBytes: totalBytes - bytes, truncated: totalBytes > bytes, startsMidLine, stderr: decodeLogTail(stderr) };
+    if (reset) {
+      // A phase boundary can split a record even when neither phase overflows.
+      startsMidLine = bytes > 0 ? tail[(offset - 1 + limit) % limit] !== 0x0a : startsMidLine;
+      offset = 0; bytes = 0; totalBytes = 0; stderr = Buffer.alloc(0);
+    }
+    return result;
   };
 }
-function collectCrashReports(started, directory) {
-  const evidence = { files: [], gaps: [] };
-  for (const root of [join(homedir(), 'Library', 'Logs', 'DiagnosticReports'), '/Library/Logs/DiagnosticReports']) {
-    try {
-      for (const file of readdirSync(root).sort()) {
-        if (!/^(open-office|Open Office|com\.apple\.WebKit|WebKit|WebContent|GPU|JetsamEvent).*\.(ips|crash)$/i.test(file)) continue;
-        const source = join(root, file), stat = lstatSync(source);
-        if (stat.mtimeMs < started - 1000 || !stat.isFile() || stat.isSymbolicLink()) continue;
-        if (stat.size > 8 * 1024 * 1024 || evidence.files.length >= 8) { evidence.gaps.push('matching-crash-report-limit'); continue; }
-        const bytes = readFileSync(source), destination = `crash-${evidence.files.length + 1}-${file}`;
+export async function collectCrashReports(started, directory, { terminated = false,
+  roots = [join(homedir(), 'Library', 'Logs', 'DiagnosticReports'), '/Library/Logs/DiagnosticReports'] } = {}) {
+  const collectingSince = Date.now(), maxWaitMs = terminated ? 10000 : 0;
+  const evidence = { files: [], gaps: [], directories: [], scanCount: 0, waitMs: 0, maxWaitMs };
+  const gap = value => { if (evidence.gaps.length < 32 && !evidence.gaps.includes(value)) evidence.gaps.push(value); };
+  let previous = new Map();
+  do {
+    const current = new Map(), candidates = [];
+    evidence.directories = [];
+    evidence.scanCount++;
+    for (const [index, root] of roots.entries()) {
+      const label = index === 0 ? 'user' : 'system';
+      const summary = { directory: label, readable: false, recentCount: 0, recent: [] };
+      evidence.directories.push(summary);
+      let files;
+      try { files = readdirSync(root).sort(); summary.readable = true; }
+      catch (error) { gap(`${label}-crash-directory-${error.code || 'unreadable'}`); continue; }
+      for (const file of files) {
+        if (!/\.(ips|crash)$/i.test(file)) continue;
+        const source = join(root, file);
+        try {
+          const stat = lstatSync(source);
+          if (stat.mtimeMs < started - 1000 || !stat.isFile() || stat.isSymbolicLink()) continue;
+          const matched = /^(open-office|Open Office|com\.apple\.WebKit|WebKit|WebContent|GPU|JetsamEvent)/i.test(file);
+          summary.recentCount++;
+          if (summary.recent.length < 16) summary.recent.push({ file: file.slice(0, 160), matched,
+            bytes: stat.size, modifiedAt: new Date(stat.mtimeMs).toISOString() });
+          if (!matched || stat.size === 0) continue;
+          if (stat.size > 8 * 1024 * 1024 || candidates.length >= 8) { gap('matching-crash-report-limit'); continue; }
+          const signature = `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}`;
+          current.set(source, signature);
+          candidates.push({ source, file, stat, label, stable: previous.get(source) === signature });
+        } catch (error) { gap(`${label}-crash-file-${error.code || 'unreadable'}`); }
+      }
+    }
+    for (const { source, file, stat, label, stable } of candidates) {
+      if (terminated && !stable) continue;
+      try {
+        const bytes = readFileSync(source), after = lstatSync(source);
+        if (bytes.length !== stat.size || after.size !== stat.size || after.mtimeMs !== stat.mtimeMs
+          || after.ino !== stat.ino || !after.isFile() || after.isSymbolicLink()) { gap('crash-report-changed-during-read'); continue; }
+        const destination = `crash-${evidence.files.length + 1}-${file}`;
         writeFileSync(join(directory, destination), bytes);
         evidence.files.push({ file: destination, bytes: bytes.length, sha256: hash(bytes), modifiedAt: new Date(stat.mtimeMs).toISOString() });
-      }
-    } catch (error) { evidence.gaps.push(`${root.startsWith(homedir()) ? 'user' : 'system'}-crash-directory-${error.code || 'unreadable'}`); }
-  }
+      } catch (error) { gap(`${label}-crash-file-${error.code || 'unreadable'}`); }
+    }
+    evidence.waitMs = Math.max(0, Date.now() - collectingSince);
+    if (evidence.files.length || evidence.waitMs >= maxWaitMs || evidence.scanCount >= 21) break;
+    previous = current;
+    await delay(Math.min(500, maxWaitMs - evidence.waitMs));
+  } while (true);
+  if (terminated && !evidence.files.length) gap('no-stable-crash-report-within-deadline');
   return evidence;
 }
 function killGroup(child, signal = 'SIGTERM') {
@@ -384,14 +427,21 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
   } catch (error) { report.error = String(error?.message || error).slice(0, 4000); }
   finally {
     if (app && !closed) { killGroup(app); await delay(300); if (!closed) killGroup(app, 'SIGKILL'); await delay(100); }
-    if (log) { log.kill('SIGTERM'); await delay(150); if (log.exitCode === null) log.kill('SIGKILL'); }
-    if (finishLog) report.systemLog = finishLog();
     if (app) {
       Object.assign(report.process, { exitCode, signal: exitSignal, stdoutTail: decodeLogTail(stdout), stderrTail: decodeLogTail(stderr) });
-      // ReportCrash can publish shortly after the WebContent callback. This wait
-      // is bounded and cannot hide a failed/restarted frontend.
-      if (!report.ok) await delay(1500);
-      report.crashReports = collectCrashReports(started, directory);
+      // ReportCrash publishes asynchronously. Only a recorded termination gets
+      // the longer stable-file polling window; keep system logs running through it.
+      const terminated = report.nativeDiagnostics?.terminations > 0;
+      // Preserve the crash-time tail before the waiting period can evict it.
+      // The reset ring records only the waiting phase, under the same 8 MiB cap.
+      if (terminated && finishLog) report.systemLog = finishLog(undefined, { reset: true });
+      if (!report.ok && !terminated) await delay(1500);
+      report.crashReports = await collectCrashReports(started, directory, { terminated });
+    }
+    if (log) { log.kill('SIGTERM'); await delay(150); if (log.exitCode === null) log.kill('SIGKILL'); }
+    if (finishLog) {
+      if (report.systemLog) report.reportCrashLog = finishLog(join(directory, 'system-reportcrash.ndjson'));
+      else report.systemLog = finishLog();
     }
     if (temporary) {
       for (const [source, target] of [['diagnostics.json', 'native-diagnostics.json'], ['frontend.json', 'frontend-report.json']]) {

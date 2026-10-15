@@ -1,11 +1,81 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readdirSync, utimesSync, truncateSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { checkInputPreflight, parseInputRequest, inputForWindow, checkLifecycle,
-  validateEditingReport, viewportMapping, geometryForRequest, captureStream, EDITING_ACTIONS, EDITING_CHECKS } from '../scripts/macos-editing-diagnostic.mjs';
+  validateEditingReport, viewportMapping, geometryForRequest, captureStream, collectCrashReports, EDITING_ACTIONS, EDITING_CHECKS } from '../scripts/macos-editing-diagnostic.mjs';
+
+function crashFixture(t) {
+  const directory = mkdtempSync(join(tmpdir(), 'macos-editing-crash-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const source = join(directory, 'user'), output = join(directory, 'output');
+  mkdirSync(source); mkdirSync(output);
+  return { source, output, roots: [source, join(directory, 'missing-system')], write(name, value, time = Date.now()) {
+    const path = join(source, name);
+    writeFileSync(path, value); utimesSync(path, time / 1000, time / 1000);
+    return path;
+  } };
+}
+
+test('a recorded termination waits for a delayed crash report to stop changing', async t => {
+  const fixture = crashFixture(t), started = Date.now();
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: started });
+  const pending = collectCrashReports(started, fixture.output, { roots: fixture.roots, terminated: true });
+  t.mock.timers.tick(500); await Promise.resolve();
+  fixture.write('com.apple.WebKit.WebContent.ips', '{"partial":');
+  t.mock.timers.tick(500); await Promise.resolve();
+  fixture.write('com.apple.WebKit.WebContent.ips', '{"partial":false,"frames":["crash-frame"]}');
+  t.mock.timers.tick(500); await Promise.resolve();
+  assert.deepEqual(readdirSync(fixture.output), [], 'A changed report must not be copied yet');
+  t.mock.timers.tick(500);
+  const evidence = await pending;
+  assert.equal(evidence.scanCount, 5);
+  assert.equal(evidence.waitMs, 2000);
+  assert.equal(evidence.maxWaitMs, 10000);
+  assert.equal(evidence.files.length, 1);
+  assert.deepEqual(JSON.parse(readFileSync(join(fixture.output, evidence.files[0].file))), { partial: false, frames: ['crash-frame'] });
+});
+
+test('missing crash reports cannot extend a termination collection past ten seconds', async t => {
+  const fixture = crashFixture(t), started = Date.now();
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: started });
+  fixture.write('WebKit-empty.ips', '');
+  const pending = collectCrashReports(started, fixture.output, { roots: fixture.roots, terminated: true });
+  for (let index = 0; index < 20; index++) { t.mock.timers.tick(500); await Promise.resolve(); }
+  const evidence = await pending;
+  assert.equal(evidence.waitMs, 10000);
+  assert.equal(evidence.scanCount, 21);
+  assert.deepEqual(evidence.files, []);
+  assert(evidence.gaps.includes('no-stable-crash-report-within-deadline'));
+  assert.equal(evidence.directories[0].recent[0].bytes, 0);
+});
+
+test('one-shot crash collection bounds metadata and continues after one file or directory fails', async t => {
+  const fixture = crashFixture(t), started = Date.now();
+  fixture.write('WebKit-a.ips', 'first');
+  fixture.write('WebKit-b.ips', 'complete crash stack');
+  fixture.write('WebKit-old.ips', 'old', started - 2000);
+  const oversized = fixture.write('WebKit-large.ips', '');
+  truncateSync(oversized, 8 * 1024 * 1024 + 1);
+  for (let index = 0; index < 20; index++) fixture.write(`unmatched-${index}.ips`, '{}');
+  // A per-file write failure must not hide a later readable report.
+  mkdirSync(join(fixture.output, 'crash-1-WebKit-a.ips'));
+  const evidence = await collectCrashReports(started, fixture.output, { roots: fixture.roots });
+  assert.equal(evidence.maxWaitMs, 0);
+  assert.equal(evidence.scanCount, 1);
+  assert.equal(evidence.files.length, 1);
+  assert.equal(readFileSync(join(fixture.output, evidence.files[0].file), 'utf8'), 'complete crash stack');
+  assert(evidence.gaps.some(value => value.startsWith('user-crash-file-')));
+  assert(evidence.gaps.includes('system-crash-directory-ENOENT'));
+  assert(evidence.gaps.includes('matching-crash-report-limit'));
+  assert.equal(evidence.directories[0].readable, true);
+  assert.equal(evidence.directories[0].recentCount, 23);
+  assert.equal(evidence.directories[0].recent.length, 16);
+  assert(evidence.directories[0].recent.some(value => !value.matched));
+  assert.equal(evidence.directories[1].readable, false);
+});
 
 function logCapture(t, limit) {
   const directory = mkdtempSync(join(tmpdir(), 'macos-editing-log-'));
@@ -60,6 +130,39 @@ test('log capture distinguishes a complete retained line from a truncated first 
   assert.equal(report.startsMidLine, false);
   assert.equal(report.droppedBytes, 4);
   assert.equal(report.totalBytes, 12);
+});
+
+test('a crash checkpoint stays intact when the separately bounded waiting log overflows', t => {
+  const capture = logCapture(t, 32);
+  capture.child.stdout.emit('data', Buffer.from('before crash\nWebContent Crash\n'));
+  const checkpoint = capture.finish(undefined, { reset: true });
+  const saved = readFileSync(capture.path);
+  const waiting = Buffer.from('ReportCrash wait\n'.repeat(20) + 'report published\n');
+  capture.child.stdout.emit('data', waiting);
+  const waitPath = join(capture.path, '..', 'system-reportcrash.ndjson');
+  const report = capture.finish(waitPath);
+  assert.deepEqual(readFileSync(capture.path), saved, 'Waiting output must not replace the crash-time log');
+  assert(saved.toString().includes('WebContent Crash'));
+  assert.deepEqual(readFileSync(waitPath), waiting.subarray(-32));
+  assert.equal(checkpoint.totalBytes, saved.length);
+  assert.equal(report.file, 'system-reportcrash.ndjson');
+  assert.equal(report.totalBytes, waiting.length, 'Waiting counters must exclude the checkpoint phase');
+  assert.equal(report.bytes, 32);
+  assert.equal(report.droppedBytes, waiting.length - 32);
+  assert.equal(report.truncated, true);
+});
+
+test('a phase checkpoint reports a split first line without retaining earlier bytes', t => {
+  const capture = logCapture(t, 32);
+  capture.child.stdout.emit('data', Buffer.from('partial'));
+  capture.finish(undefined, { reset: true });
+  capture.child.stdout.emit('data', Buffer.from(' record\nnext\n'));
+  const waitPath = join(capture.path, '..', 'system-reportcrash.ndjson');
+  const report = capture.finish(waitPath);
+  assert.equal(readFileSync(waitPath, 'utf8'), ' record\nnext\n');
+  assert.equal(report.startsMidLine, true);
+  assert.equal(report.truncated, false);
+  assert.equal(report.droppedBytes, 0);
 });
 
 test('log capture keeps stderr bounded and records stream failures without enlarging stdout', t => {
