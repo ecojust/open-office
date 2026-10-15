@@ -25,7 +25,11 @@ function fixture(t, options = {}) {
       api.python = readFileSync(path, 'utf8');
       const configLine = api.python.split('\n').find(line => line.startsWith('cfg = json.loads('));
       api.config = JSON.parse(JSON.parse(configLine.slice('cfg = json.loads('.length, -1)));
-      queueMicrotask(() => options.onSpawn?.(api));
+      if (!options.spawnError) child.pid = 23456;
+      queueMicrotask(() => {
+        if (!options.spawnError) child.emit('spawn');
+        options.onSpawn?.(api);
+      });
       return child;
     },
   };
@@ -180,7 +184,7 @@ test('post-ready stop timeout is bounded and cannot masquerade as confirmed deta
 });
 
 test('unavailable debugger is a no-attach blocked result', async t => {
-  const fake = fixture(t, { onSpawn: api => api.child.emit('error', Object.assign(new Error('not found'), { code: 'ENOENT' })) });
+  const fake = fixture(t, { spawnError: true, onSpawn: api => api.child.emit('error', Object.assign(new Error('not found'), { code: 'ENOENT', syscall: 'spawn /usr/bin/xcrun' })) });
   const session = await fake.start();
   assert.equal(session.report.status, 'blocked');
   assert.equal(session.report.reason, 'debugger-spawn-ENOENT');
@@ -188,6 +192,91 @@ test('unavailable debugger is a no-attach blocked result', async t => {
   assert.equal(session.report.cleanup, 'not-started');
   await session.finish();
   assert.deepEqual(fake.child.signals, []);
+});
+
+test('kill EPERM before LLDB initialization is never mistaken for a safe spawn failure', async t => {
+  const fake = fixture(t, { onKill: (_signal, api) => {
+    api.child.emit('error', Object.assign(new Error('kill EPERM'), { code: 'EPERM', syscall: 'kill' }));
+  } });
+  const session = await fake.start({ attachTimeoutMs: 100 });
+  assert.equal(session.report.status, 'failed');
+  assert.equal(session.report.safeToContinue, false);
+  assert.equal(session.report.cleanup, 'unconfirmed');
+  assert.deepEqual(fake.child.signals, ['SIGINT', 'SIGKILL']);
+  assert.equal(await session.stop(), session.report);
+});
+
+test('repeated kill errors after attach preserve the report and persistent error listener', async t => {
+  const fake = fixture(t, {
+    onSpawn: api => { api.emit('initialized'); api.emit('attached'); api.emit('ready'); },
+    onKill: (_signal, api) => api.child.emit('error', Object.assign(new Error('kill EPERM'), { code: 'EPERM', syscall: 'kill' })),
+  });
+  const session = await fake.start();
+  const report = await session.stop();
+  assert.equal(report.safeToContinue, false);
+  assert.equal(report.cleanup, 'unconfirmed');
+  assert.ok(fake.child.listenerCount('error') > 0, 'A later process error must never become unhandled');
+  assert.deepEqual(fake.child.signals, ['SIGINT', 'SIGKILL']);
+  const trace = readFileSync(join(fake.directory, report.trace.file), 'utf8');
+  const errors = trace.split('\n').filter(line => line.includes('"source":"controller"')).map(line => JSON.parse(line.slice(line.indexOf(':') + 1)));
+  assert.equal(errors.length, 2);
+  assert.ok(errors.every(error => error.code === 'EPERM' && error.event === 'controller-error'));
+  assert.equal(report.events.filter(event => event.source === 'controller').length, 2);
+});
+
+test('a process error with a PID cannot claim no process was spawned even before its spawn event', async t => {
+  const fake = fixture(t, { spawnError: true, onSpawn: api => {
+    api.child.pid = 23456;
+    api.child.emit('error', Object.assign(new Error('ambiguous spawn error'), { code: 'EIO', syscall: 'spawn /usr/bin/xcrun' }));
+  }, onStop: api => api.finish('not-attached') });
+  const session = await fake.start();
+  assert.equal(session.report.status, 'failed');
+  assert.equal(session.report.safeToContinue, false);
+  assert.notEqual(session.report.cleanup, 'not-started');
+});
+
+test('the spawn event alone excludes safe no-spawn fallback even when the PID is missing', async t => {
+  const fake = fixture(t, { spawnError: true, onSpawn: api => {
+    api.child.emit('spawn');
+    api.child.emit('error', Object.assign(new Error('late spawn error'), { code: 'EIO', syscall: 'spawn /usr/bin/xcrun' }));
+  }, onStop: api => api.finish('not-attached') });
+  const session = await fake.start();
+  assert.equal(session.report.safeToContinue, false);
+  assert.equal(session.report.status, 'failed');
+});
+
+test('a definite spawn rejection is persisted immediately, including an empty stdout', async t => {
+  let immediatelySaved = false;
+  const fake = fixture(t, { spawnError: true, onSpawn: api => {
+    api.child.emit('error', Object.assign(new Error('spawn blocked'), { code: 'EPERM', syscall: 'spawn /usr/bin/xcrun' }));
+    immediatelySaved = readFileSync(join(api.config.stopFile, '..', 'trace.txt'), 'utf8').includes('"code":"EPERM"');
+  } });
+  const session = await fake.start();
+  assert.equal(session.report.safeToContinue, true);
+  const trace = readFileSync(join(fake.directory, session.report.trace.file), 'utf8');
+  assert.match(trace, /"source":"controller"/);
+  assert.match(trace, /"code":"EPERM"/);
+  assert.match(trace, /"operation":"spawn"/);
+  assert.equal(immediatelySaved, true, 'Error evidence is flushed synchronously before any later cleanup can fail');
+});
+
+test('controller errors survive a full child output budget without exceeding the 1 MiB trace cap', async t => {
+  const fake = fixture(t, {
+    onSpawn: api => {
+      api.emit('initialized'); api.emit('attached'); api.emit('ready');
+      api.child.stdout.write(Buffer.alloc(2 * 1024 * 1024, 0x61));
+    },
+    onKill: () => { throw Object.assign(new Error('kill failed ' + 'x'.repeat(100000)), { code: 'EPERM', syscall: 'kill' }); },
+  });
+  const session = await fake.start();
+  const report = await session.stop();
+  assert.equal(report.safeToContinue, false);
+  const trace = readFileSync(join(fake.directory, report.trace.file));
+  assert.equal(trace.length, 1024 * 1024);
+  assert.equal(report.trace.bytes, trace.length);
+  assert.match(trace.toString(), /"source":"controller"/);
+  assert.match(trace.toString(), /"code":"EPERM"/);
+  assert.ok(!trace.toString().includes('x'.repeat(1000)));
 });
 
 test('non-macOS and invalid identifiers never start a debugger', async t => {

@@ -5,6 +5,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 
 const TRACE_LIMIT = 1024 * 1024;
+const CONTROLLER_LIMIT = 8192;
 const LINE_LIMIT = 8192;
 function waitWithin(promise, milliseconds) {
   return new Promise(resolve => {
@@ -182,20 +183,73 @@ export async function startWebContentDebugger({ pid, directory, attachTimeoutMs 
   writeFileSync(scriptPath, debuggerProgram({ pid, prefix, stopFile,
     attachSeconds: (attachTimeoutMs - reserveMs) / 1000, sessionSeconds: sessionTimeoutMs / 1000 }), { flag: 'wx', mode: 0o600 });
   report.trace.file = relative(directory, tracePath);
-  const chunks = [];
-  let child, closed = false, initialized = false, attached = false, readyResolve, closeResolve, stopping;
+  const chunks = [], controllerChunks = [];
+  let child, spawned = false, closed = false, initialized = false, attached = false, readyResolve, closeResolve, stopping;
+  let childBytes = 0, controllerBytes = 0, signalAttempt;
   let line = Buffer.alloc(0), discardLine = false, decisionResolved = false;
   const decision = new Promise(resolve => { readyResolve = resolve; });
   const completion = new Promise(resolve => { closeResolve = resolve; });
   const decide = () => { if (!decisionResolved) { decisionResolved = true; readyResolve(); } };
-  const save = () => writeFileSync(tracePath, Buffer.concat(chunks), { mode: 0o600 });
-  const fail = reason => { report.status = 'failed'; report.reason = reason; report.safeToContinue = false; };
+  const fail = reason => {
+    if (report.status !== 'failed') report.reason = reason;
+    report.status = 'failed'; report.safeToContinue = false;
+  };
+  const save = () => {
+    try {
+      // Keep controller failure evidence even if LLDB has exhausted its output
+      // budget. These tagged lines are written directly, never parsed as child
+      // readiness/cleanup markers.
+      const body = Buffer.concat(chunks).subarray(0, TRACE_LIMIT - controllerBytes);
+      const output = Buffer.concat([body, ...controllerChunks]);
+      report.trace.bytes = output.length;
+      writeFileSync(tracePath, output, { mode: 0o600 });
+    } catch (error) {
+      report.evidenceError = String(error.code || 'trace-write-error').slice(0, 80);
+      fail('debugger-evidence-write-failed');
+    }
+  };
   const capture = chunk => {
     const bytes = Buffer.from(chunk);
     report.trace.totalBytes += bytes.length;
-    const remaining = TRACE_LIMIT - report.trace.bytes;
-    if (remaining > 0) { chunks.push(Buffer.from(bytes.subarray(0, remaining))); report.trace.bytes += Math.min(bytes.length, remaining); }
+    const remaining = TRACE_LIMIT - childBytes;
+    if (remaining > 0) { chunks.push(Buffer.from(bytes.subarray(0, remaining))); childBytes += Math.min(bytes.length, remaining); }
+    report.trace.bytes = Math.min(TRACE_LIMIT, childBytes + controllerBytes);
     report.trace.truncated = report.trace.totalBytes > TRACE_LIMIT;
+  };
+  const controllerError = (operation, error) => {
+    // Cap record count and encoded bytes, including non-ASCII JSON escaping.
+    if (controllerChunks.length < 8) {
+      const event = { event: 'controller-error', source: 'controller', pid, operation,
+        code: String(error.code || 'error').slice(0, 40), syscall: String(error.syscall || '').slice(0, 80),
+        detail: String(error.message || error).slice(0, 500) };
+      const bytes = Buffer.from(`\n${prefix}${JSON.stringify(event)}\n`);
+      if (controllerBytes + bytes.length <= CONTROLLER_LIMIT) {
+        controllerChunks.push(bytes); controllerBytes += bytes.length;
+        report.trace.totalBytes += bytes.length;
+        report.trace.truncated = report.trace.totalBytes > TRACE_LIMIT;
+        if (report.events.length < 24) report.events.push(event);
+      }
+    }
+    save();
+  };
+  const processError = (error, operation = signalAttempt ? 'kill' : 'process') => {
+    // Node also emits child 'error' for kill(EPERM). Lack of an LLDB marker
+    // proves nothing about whether xcrun/LLDB already owns a target process.
+    const neverSpawned = operation === 'process' && !spawned && child?.pid === undefined
+      && !initialized && !attached && /^spawn(?:\s|$)/.test(String(error.syscall || ''));
+    if (neverSpawned) {
+      Object.assign(report, { status: 'blocked', reason: `debugger-spawn-${String(error.code || 'error').slice(0, 40)}`,
+        safeToContinue: true, cleanup: 'not-started' });
+      closed = true; closeResolve();
+    } else fail(`debugger-${operation}-${String(error.code || 'error').slice(0, 40)}`);
+    controllerError(neverSpawned ? 'spawn' : operation, error);
+    decide();
+  };
+  const signalDebugger = signal => {
+    signalAttempt = signal;
+    try { child.kill(signal); }
+    catch (error) { processError(error, 'kill'); }
+    finally { signalAttempt = undefined; }
   };
   const marker = value => {
     if (!value.startsWith(prefix)) return;
@@ -241,17 +295,18 @@ export async function startWebContentDebugger({ pid, directory, attachTimeoutMs 
   };
   const cleanup = async (timeoutMs = stopTimeoutMs) => {
     if (closed) { save(); return report; }
-    writeFileSync(stopFile, 'detach\n', { mode: 0o600 });
+    try { writeFileSync(stopFile, 'detach\n', { mode: 0o600 }); }
+    catch (error) { processError(error, 'stop-file'); }
     const gracefulMs = Math.max(0, timeoutMs - Math.min(250, timeoutMs / 2));
     await waitWithin(completion, gracefulMs);
     if (!closed) {
       // Only the debugger child is signalled. target.detach-on-error was set
       // before attach; forced cleanup still cannot count as confirmed detach.
-      child.kill('SIGINT');
+      signalDebugger('SIGINT');
       await waitWithin(completion, timeoutMs - gracefulMs);
     }
     if (!closed) {
-      child.kill('SIGKILL');
+      signalDebugger('SIGKILL');
       report.cleanup = 'unconfirmed'; fail('debugger-cleanup-timeout');
       child.stdout?.destroy?.(); child.stderr?.destroy?.(); child.unref?.();
     }
@@ -265,30 +320,30 @@ export async function startWebContentDebugger({ pid, directory, attachTimeoutMs 
       `script exec(compile(open(${JSON.stringify(scriptPath)}, 'r').read(), ${JSON.stringify(scriptPath)}, 'exec'))`],
     { shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
     report.attachAttempts = 1;
-    child.stdout.on('data', stdout);
-    child.stderr.on('data', capture);
-    child.once('error', error => {
-      if (initialized || attached) {
-        fail(`debugger-process-${String(error.code || 'error').slice(0, 40)}`);
-      } else {
-        Object.assign(report, { status: 'blocked', reason: `debugger-spawn-${String(error.code || 'error').slice(0, 40)}`,
-          safeToContinue: true, cleanup: 'not-started' });
-        closed = true; closeResolve(); decide();
-      }
-    });
+    child.once('spawn', () => { spawned = true; });
+    // Persistent: both SIGINT and a subsequent SIGKILL can emit EPERM.
+    child.on('error', error => processError(error));
     child.once('close', (code, signal) => {
       closed = true; report.exitCode = code; report.signal = signal;
       if (report.cleanup === 'pending') { report.cleanup = 'unconfirmed'; fail('debugger-exited-without-cleanup'); }
       closeResolve(); decide(); save();
     });
+    child.stdout.on('data', stdout);
+    child.stderr.on('data', capture);
   } catch (error) {
-    Object.assign(report, { status: 'blocked', reason: `debugger-spawn-${String(error.code || 'error').slice(0, 40)}`,
-      safeToContinue: true, cleanup: 'not-started' });
-    closed = true; save(); return inert();
+    if (child) processError(error, 'setup');
+    else {
+      Object.assign(report, { status: 'blocked', reason: `debugger-spawn-${String(error.code || 'error').slice(0, 40)}`,
+        safeToContinue: true, cleanup: 'not-started' });
+      closed = true; controllerError('spawn', error); return inert();
+    }
   }
   const decided = await waitWithin(decision, attachTimeoutMs - reserveMs);
   if (!decided) {
     fail('attach-timeout');
+    controllerError('attach-timeout', { code: 'ETIMEDOUT', message: 'Debugger did not confirm attach and running state before the deadline' });
+  }
+  if (!report.safeToContinue && !closed) {
     stopping = cleanup(reserveMs);
     await stopping;
   }
