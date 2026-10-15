@@ -190,7 +190,7 @@ impl GridcraftHost {
             .runner
             .start(
                 canvas,
-                eframe::WebOptions::default(),
+                eframe::WebOptions { webgl_context_option: eframe::WebGlContextOption::WebGl1, ..Default::default() },
                 Box::new(move |creation| {
                     if let Ok(mut state) = shared.try_borrow_mut() {
                         state.ctx = Some(creation.egui_ctx.clone());
