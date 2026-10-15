@@ -6,7 +6,9 @@
   const send = (path, body) => fetch(base + '__native-smoke/' + path, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).catch(() => {});
-  send('progress', { phase: 'document-start', detail: 'native initialization script' });
+  const boot = Object.freeze({ bootId: crypto.randomUUID(), timeOrigin: performance.timeOrigin });
+  Object.defineProperty(window, '__OPEN_OFFICE_DIAGNOSTIC_BOOT__', { value: boot, configurable: false });
+  send('progress', { phase: 'document-start', detail: JSON.stringify(boot) });
   let failed = false;
   const failure = value => {
     if (failed) return;

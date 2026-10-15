@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
+import { randomUUID } from 'node:crypto'
 
 // Execute the exact script embedded by Rust, with only its injected URL token
 // substituted. This checks the installed-page listeners, not a copied filter.
@@ -20,7 +21,7 @@ function initialize({ href = `${base}?nativeSmoke=1`, injectedBase = base, now =
   const context = vm.createContext({
     window, ErrorEvent, URL, location: { href }, navigator: { userAgent: 'native-smoke-init-test' },
     crossOriginIsolated: true, SharedArrayBuffer,
-    performance: { now: () => clock },
+    crypto: { randomUUID }, performance: { now: () => clock, timeOrigin: 1700000000000 },
     addEventListener(type, callback, capture) {
       const entries = listeners.get(type) || []
       entries.push({ callback, capture }); listeners.set(type, entries)
@@ -54,6 +55,17 @@ function assertOneFailure(h, expected) {
 function fillWindow(h, start, count = 30) {
   for (let index = 0; index < count; index++) h.notify(start + index * 30)
 }
+
+test('each document has an immutable new boot identifier also sent to the host', () => {
+  const first = initialize(), second = initialize()
+  const boot = first.window.__OPEN_OFFICE_DIAGNOSTIC_BOOT__
+  assert.match(boot.bootId, /^[a-f0-9-]{36}$/)
+  assert.equal(boot.timeOrigin, 1700000000000)
+  assert.equal(Object.isFrozen(boot), true)
+  assert.notEqual(boot.bootId, second.window.__OPEN_OFFICE_DIAGNOSTIC_BOOT__.bootId)
+  assert.deepEqual(JSON.parse(first.progress()[0].body.detail), { bootId: boot.bootId, timeOrigin: boot.timeOrigin })
+  assert.throws(() => { first.window.__OPEN_OFFICE_DIAGNOSTIC_BOOT__ = {} }, TypeError)
+})
 
 test('standard UA ResizeObserver notification records progress without masking the next real exception', () => {
   const h = initialize()

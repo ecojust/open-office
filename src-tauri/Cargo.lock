@@ -2109,6 +2109,8 @@ dependencies = [
  "getrandom 0.3.4",
  "hex",
  "libc",
+ "objc2",
+ "objc2-app-kit",
  "percent-encoding",
  "serde",
  "serde_json",

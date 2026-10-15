@@ -1,0 +1,164 @@
+name: Diagnose macOS editing with real OS input
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: open-office-macos-editing-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  editing:
+    name: macOS 26 Apple Silicon editing diagnostic
+    runs-on: macos-26
+    timeout-minutes: 75
+    env:
+      OPEN_OFFICE_PLATFORM_ID: macos-arm64
+      OPEN_OFFICE_TARGET: aarch64-apple-darwin
+      EXPECTED_NODE_ARCH: arm64
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          architecture: arm64
+          cache: npm
+      - name: Record and require the actual macOS 26 ARM host
+        run: |
+          mkdir -p artifacts/macos-editing
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { spawnSync } from 'node:child_process';
+          import { writeFileSync } from 'node:fs';
+          const command = (program, args) => {
+            const result = spawnSync(program, args, { encoding: 'utf8', timeout: 15000 });
+            return { status: result.status, stdout: result.stdout?.trim(), stderr: result.stderr?.trim(), error: result.error?.message };
+          };
+          const host = {
+            recordedAt: new Date().toISOString(), commit: process.env.GITHUB_SHA,
+            runId: process.env.GITHUB_RUN_ID, platform: process.platform, nodeArch: process.arch,
+            macOS: command('/usr/bin/sw_vers', ['-productVersion']),
+            macOSBuild: command('/usr/bin/sw_vers', ['-buildVersion']),
+            hardwareArch: command('/usr/bin/uname', ['-m']),
+            appleSilicon: command('/usr/sbin/sysctl', ['-n', 'hw.optional.arm64']),
+            swift: command('/usr/bin/xcrun', ['swiftc', '--version']),
+            limitation: 'The hosted macOS 26 image is recorded exactly; it may differ from the reported macOS 26.5 machine. This run cannot establish a fix.',
+          };
+          writeFileSync('artifacts/macos-editing/host.json', `${JSON.stringify(host, null, 2)}\n`);
+          assert.equal(host.platform, 'darwin');
+          assert.equal(host.nodeArch, 'arm64', 'Diagnostic orchestration must use native ARM Node');
+          assert.equal(host.hardwareArch.status, 0);
+          assert.equal(host.hardwareArch.stdout, 'arm64');
+          assert.equal(host.appleSilicon.status, 0);
+          assert.equal(host.appleSilicon.stdout, '1');
+          assert.equal(host.macOS.status, 0);
+          assert.match(host.macOS.stdout, /^26(?:\.|$)/, 'This diagnostic requires macOS 26');
+          assert.equal(host.swift.status, 0, 'The native Swift compiler is unavailable');
+          console.log(JSON.stringify(host, null, 2));
+          NODE
+      - name: Compile the real keyboard and mouse input helper before building the app
+        timeout-minutes: 3
+        run: |
+          xcrun swiftc scripts/macos-os-input.swift -o "$RUNNER_TEMP/open-office-os-input" 2>&1 | tee artifacts/macos-editing/swift-build.log
+      - name: Require OS event permissions and a supported keyboard input source
+        id: preflight
+        timeout-minutes: 2
+        run: node scripts/macos-editing-diagnostic.mjs --helper "$RUNNER_TEMP/open-office-os-input" --preflight
+      # A blocked preflight exits nonzero. Do not build or label a skipped input
+      # test successful, and do not grant TCC permissions automatically.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: arm64
+          cache: pip
+          cache-dependency-path: pdf-backend/requirements.txt
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri -> target
+            vendor/wordcraft -> target
+            vendor/gridcraft -> target
+            vendor/deckcraft -> target
+          key: aarch64-apple-darwin
+          cache-on-failure: true
+      - name: Require native build interpreters
+        run: |
+          test "$(rustc -vV | sed -n 's/^host: //p')" = "$OPEN_OFFICE_TARGET"
+          python - <<'PY'
+          import os, platform, sys
+          assert sys.platform == 'darwin'
+          assert platform.machine() == 'arm64'
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              output.write(f'OPEN_OFFICE_PYTHON={sys.executable}\n')
+          print(sys.version, platform.platform())
+          PY
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Install the pinned editor WASM bridge
+        run: cargo install --locked wasm-bindgen-cli --version 0.2.129
+      - name: Prepare the local PDF engine
+        run: node scripts/ensure-pdf-backend.mjs --dev
+      - name: Check frontend types, diagnostic contracts and PDF round trips
+        run: npm test 2>&1 | tee artifacts/macos-editing/tests.log
+      - name: Freeze and verify the native PDF runtime
+        run: node scripts/build-pdf-backend.mjs 2>&1 | tee artifacts/macos-editing/pdf-build.log
+      - name: Build the three Rust editors and complete frontend resources
+        run: npm run build 2>&1 | tee artifacts/macos-editing/frontend-build.log
+      - name: Verify the generated editor resources against their source
+        run: |
+          npm run word:check
+          npm run sheet:check
+          npm run deck:check
+          npm run engine:check:dist
+      - name: Compile and test the native lifecycle and file bridge
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml -- --include-ignored 2>&1 | tee artifacts/macos-editing/native-tests.log
+      - name: Build the native diagnostic application without a release installer
+        run: npm run desktop:build -- --bundles app 2>&1 | tee artifacts/macos-editing/app-build.log
+      - name: Exercise editing through native macOS keyboard and mouse events
+        id: diagnostic
+        timeout-minutes: 8
+        run: |
+          node scripts/macos-editing-diagnostic.mjs --helper "$RUNNER_TEMP/open-office-os-input" --app "$GITHUB_WORKSPACE/src-tauri/target/release/bundle/macos/Open Office.app"
+      - name: Explain the diagnostic result and its limits
+        if: always()
+        env:
+          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          DIAGNOSTIC_OUTCOME: ${{ steps.diagnostic.outcome }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+          const path = 'artifacts/macos-editing/report.json';
+          let status = 'No structured diagnostic report was produced.';
+          if (existsSync(path)) {
+            try { status = `Recorded report status: ${String(JSON.parse(readFileSync(path, 'utf8')).status ?? 'unknown')}`; }
+            catch { status = 'The diagnostic report could not be parsed; inspect the retained logs.'; }
+          }
+          const text = [
+            '## macOS editing diagnostic', '',
+            `OS input preflight: ${process.env.PREFLIGHT_OUTCOME || 'not reached'}.`,
+            `Application input test: ${process.env.DIAGNOSTIC_OUTCOME || 'not reached'}.`,
+            status, '',
+            'A blocked or skipped input test provides no editing result. A completed run without reproduction does not establish a fix for macOS 26.5. The exact host version, permissions, native lifecycle and input evidence are retained in the diagnostic artifact.',
+            'This workflow does not publish an application or release.', '',
+          ].join('\n');
+          console.log(text);
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, text);
+          NODE
+      - name: Always retain diagnostic evidence and build errors
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-editing-diagnostics
+          path: artifacts/macos-editing/
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0

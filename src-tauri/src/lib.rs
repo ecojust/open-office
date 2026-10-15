@@ -1,4 +1,6 @@
 mod files;
+#[cfg(target_os = "macos")]
+mod macos_diagnostics;
 mod pdf;
 mod server;
 mod smoke;
@@ -13,10 +15,17 @@ use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 struct Closing(AtomicBool);
 
 #[tauri::command]
-fn bootstrap(server: State<'_, server::AssetServer>) -> server::Bootstrap {
+fn bootstrap(
+    server: State<'_, server::AssetServer>,
+    window: tauri::WebviewWindow,
+) -> server::Bootstrap {
     if let Some(smoke) = &server.smoke {
         smoke.note("ipc-bootstrap", "native bootstrap command reached");
+        #[cfg(target_os = "macos")]
+        macos_diagnostics::record_geometry(&window, smoke);
     }
+    #[cfg(not(target_os = "macos"))]
+    let _ = window;
     server.info.clone()
 }
 
@@ -67,7 +76,10 @@ fn frontend_root(_app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 
 pub fn run() {
-    let application = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = macos_diagnostics::instrument(builder);
+    let application = builder
         .plugin(tauri_plugin_dialog::init())
         .manage(Closing::default())
         .manage(pdf::PdfRuntime::default())
@@ -160,6 +172,19 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            #[cfg(target_os = "macos")]
+            if matches!(
+                event,
+                tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_)
+            ) {
+                if let Some(server) = window.try_state::<server::AssetServer>() {
+                    if let Some(smoke) = &server.smoke {
+                        if let Some(webview) = window.get_webview_window("main") {
+                            macos_diagnostics::record_geometry(&webview, smoke);
+                        }
+                    }
+                }
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if !window.state::<Closing>().0.load(Ordering::Acquire) {
                     api.prevent_close();

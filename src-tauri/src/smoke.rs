@@ -4,19 +4,26 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
-    time::Instant,
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 // Reports carry independently inspected DOCX/XLSX/PPTX/PDF round-trip bytes.
 // Keep an explicit cap shared by IPC report storage and the failure-only HTTP route.
 pub const REPORT_LIMIT: usize = 12 * 1024 * 1024;
 
+#[derive(Default)]
+struct Lifecycle {
+    events: Vec<Value>,
+    generation: u64,
+    terminations: u64,
+}
+
 #[derive(Clone)]
 pub struct Smoke {
     output: PathBuf,
     scope: &'static str,
     started: Instant,
-    events: Arc<Mutex<Vec<Value>>>,
+    lifecycle: Arc<Mutex<Lifecycle>>,
     failure: Arc<dyn Fn() + Send + Sync>,
 }
 
@@ -45,7 +52,7 @@ impl Smoke {
             output,
             scope: "full",
             started: Instant::now(),
-            events: Arc::new(Mutex::new(vec![])),
+            lifecycle: Arc::new(Mutex::new(Lifecycle::default())),
             failure: Arc::new(failure),
         }
     }
@@ -62,15 +69,25 @@ impl Smoke {
             .take(400)
             .collect();
         eprintln!("OPEN_OFFICE_SMOKE {phase}: {detail}");
-        let mut events = self.events.lock().unwrap_or_else(|e| e.into_inner());
-        if events.len() >= 256 {
-            events.remove(0);
+        let mut state = self.lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+        if phase == "document-start" {
+            state.generation += 1;
         }
-        events.push(
-            json!({"phase":phase,"detail":detail,"elapsedMs":self.started.elapsed().as_millis()}),
+        if phase == "web-content-terminated" {
+            state.terminations += 1;
+        }
+        if state.events.len() >= 256 {
+            state.events.remove(0);
+        }
+        let generation = state.generation;
+        state.events.push(
+            json!({"phase":phase,"detail":detail,"elapsedMs":self.started.elapsed().as_millis(),
+                "unixMs":SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis(),
+                "generation":generation}),
         );
         if let Some(parent) = self.output.parent() {
-            let data = serde_json::to_vec_pretty(&json!({"schemaVersion":1,"events":*events}))
+            let data = serde_json::to_vec_pretty(&json!({"schemaVersion":1,"scope":self.scope,
+                "generation":state.generation,"terminations":state.terminations,"events":state.events}))
                 .unwrap_or_default();
             if let Err(error) = atomic_write(&parent.join("diagnostics.json"), &data) {
                 eprintln!("OPEN_OFFICE_SMOKE diagnostic-write-failed: {error}");
@@ -79,11 +96,26 @@ impl Smoke {
     }
 
     pub fn report(&self, report: &Value) -> Result<bool, String> {
-        let passed = report
+        let mut passed = report
             .get("ok")
             .and_then(Value::as_bool)
             .ok_or("Smoke report requires an explicit ok boolean.")?;
-        let bytes = serde_json::to_vec_pretty(report).map_err(|_| "Invalid smoke report.")?;
+        let mut report = report.clone();
+        if self.scope == "macos-editing" {
+            let state = self.lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+            report["nativeLifecycle"] =
+                json!({"generation":state.generation,"terminations":state.terminations});
+            // The browser's successful rerun cannot erase a previous process
+            // termination or navigation. This evidence lives in the host process.
+            if state.generation != 1 || state.terminations != 0 {
+                passed = false;
+                report["ok"] = json!(false);
+                report["error"] = json!(
+                    "Native editing diagnostic observed a page restart or WebContent termination."
+                );
+            }
+        }
+        let bytes = serde_json::to_vec_pretty(&report).map_err(|_| "Invalid smoke report.")?;
         if bytes.len() > REPORT_LIMIT {
             return Err("Smoke report exceeds 12 MiB.".into());
         }
@@ -110,6 +142,7 @@ impl Smoke {
 fn parse_scope(value: Option<&str>) -> Result<&'static str, String> {
     match value {
         None | Some("full") => Ok("full"),
+        Some("macos-editing") => Ok("macos-editing"),
         _ => Err("Unknown OPEN_OFFICE_SMOKE_SCOPE.".into()),
     }
 }
@@ -138,6 +171,7 @@ mod tests {
     fn smoke_scope_defaults_to_full_and_rejects_unknown_values() {
         assert_eq!(parse_scope(None).unwrap(), "full");
         assert_eq!(parse_scope(Some("full")).unwrap(), "full");
+        assert_eq!(parse_scope(Some("macos-editing")).unwrap(), "macos-editing");
         assert!(parse_scope(Some("rust-word-engine")).is_err());
         assert!(parse_scope(Some("word-package-ipc")).is_err());
         assert!(parse_scope(Some("")).is_err());
@@ -172,5 +206,24 @@ mod tests {
         let oversized = json!({"ok": true, "pdfBase64": "A".repeat(REPORT_LIMIT)});
         assert!(smoke.report(&oversized).is_err());
         assert_eq!(std::fs::read(output).unwrap(), saved);
+    }
+
+    #[test]
+    fn editing_diagnostic_cannot_pass_after_a_renderer_restart() {
+        let directory = tempfile::tempdir().unwrap();
+        let output = directory.path().join("report.json");
+        let mut smoke = Smoke::new(output.clone(), || {});
+        smoke.scope = "macos-editing";
+        smoke.note("document-start", "first");
+        assert!(smoke.report(&json!({"ok":true})).unwrap());
+        smoke.note("web-content-terminated", "main");
+        smoke.note("document-start", "reloaded");
+        assert!(!smoke.report(&json!({"ok":true})).unwrap());
+        let report: Value = serde_json::from_slice(&std::fs::read(output).unwrap()).unwrap();
+        assert_eq!(report["ok"], false);
+        assert_eq!(
+            report["nativeLifecycle"],
+            json!({"generation":2,"terminations":1})
+        );
     }
 }

@@ -40,7 +40,7 @@ export interface AppBootstrap {
   basePath: string
   platform: string
   smokeMode: boolean
-  smokeScope?: 'full'
+  smokeScope?: 'full' | 'macos-editing'
 }
 
 export interface NativeImage { name: string; base64: string; mimeType: 'image/png' | 'image/jpeg' }

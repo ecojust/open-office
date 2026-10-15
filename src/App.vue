@@ -17,6 +17,7 @@ import { inspectDeckcraftSession, prepareRustPresentationDocument, type Prepared
 import type { DeckcraftSmokeEditor } from './presentation/rust/deckcraft-native-smoke'
 import type { GridcraftSmokeEditor } from './sheet/rust/gridcraft-native-smoke'
 import type { WordcraftSmokeEditor } from './word/rust/wordcraft-native-smoke'
+import type { EditingSmokeAdapter } from './sheet/rust/macos-editing-smoke'
 import { bytesToBase64, base64ToBytes, extensionOf, kindOf, withExtension, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFormats, saveFileName, type SaveExtension, type Kind, type Extension, type EditorHandle } from './shared/document'
 
 interface Tab { key: string; document: NativeDocument; fileId?: string; requiresSaveAs?: boolean; importWarnings?:string[]; dirty: boolean; ready: boolean; loadError?: string }
@@ -484,6 +485,43 @@ function keydown(event:KeyboardEvent) {
   if(key==='p'&&currentDocument.value){event.preventDefault();globalFileAction('print')}
 }
 function beforeUnload(event:BeforeUnloadEvent){if(tabs.value.some(t=>t.dirty)){event.preventDefault();event.returnValue=''}}
+function editingSmokeAdapter(): EditingSmokeAdapter {
+  return {
+    open:async(kind,name)=>{
+      await editorTransaction('正在验证原生编辑输入',()=>addDocument({id:'',kind,extension:kind==='word'?'docx':'xlsx',name,base64:'',sha256:'',sizeBytes:0}))
+      await nextTick()
+      const tab=active.value
+      if(!tab||tab.document.kind!==kind)throw Error('Native editing diagnostic tab missing')
+      await awaitReady(tab)
+      const handle=(kind==='word'?rustWordHandles:rustSheetHandles).get(tab.key) as WordcraftSmokeEditor|GridcraftSmokeEditor|undefined
+      if(!handle?.inspect||!handle.command)throw Error('Native editing diagnostic handle unavailable')
+      const snapshot=await handle.inspect()
+      const element=[...document.querySelectorAll<HTMLElement>(`[data-testid="rust-${kind}-editor"]`)].find(node=>node.dataset.sessionId===snapshot.sessionId)
+      if(!element)throw Error('Native editing diagnostic canvas container missing')
+      return {key:tab.key,kind,element,editor:handle}
+    },
+    activeKey:()=>activeKey.value,
+    tabs:()=>tabs.value.map(tab=>({key:tab.key,kind:tab.document.kind,dirty:tab.dirty,ready:tab.ready})),
+    shell:()=>{
+      const workspace=document.querySelector<HTMLElement>('.editor-workspace')
+      return {home:home.value,tabCount:tabs.value.length,workspaceDisplay:workspace?getComputedStyle(workspace).display:'missing',visibleTabCount:[...document.querySelectorAll<HTMLElement>('.document-tab')].filter(node=>node.getBoundingClientRect().width>0&&node.getBoundingClientRect().height>0).length}
+    },
+    activate:async key=>{
+      const tab=tabs.value.find(candidate=>candidate.key===key)
+      if(!tab)throw Error('Native editing diagnostic activation tab missing')
+      await editorTransaction('正在验证保留文档',()=>activate(tab));await nextTick();await awaitReady(tab)
+    },
+    close:async key=>{
+      const tab=tabs.value.find(candidate=>candidate.key===key)
+      if(!tab)throw Error('Native editing diagnostic cleanup tab missing')
+      const inspect=tab.document.kind==='word'?inspectWordcraftSession:inspectGridcraftSession
+      const handle=(tab.document.kind==='word'?rustWordHandles:rustSheetHandles).get(key) as WordcraftSmokeEditor|GridcraftSmokeEditor|undefined
+      const sessionId=(await handle?.inspect())?.sessionId
+      await removeTab(tab,true);await nextTick()
+      if(sessionId){let closed=false;try{await inspect(sessionId)}catch{closed=true};if(!closed)throw Error('Native editing diagnostic session survived cleanup')}
+    },
+  }
+}
 onMounted(async()=>{
   window.addEventListener('keydown',keydown);window.addEventListener('beforeunload',beforeUnload);window.addEventListener('pointerdown',dismissNewMenu)
   smokeStage('app-mounted',JSON.stringify(smokeMode.value?smokeFeatures():{}))
@@ -496,6 +534,17 @@ onMounted(async()=>{
       if(smokeMode.value&&!config.smokeMode)throw Error('Native smoke URL was not enabled by the process')
       if(config.smokeMode) {
         smokeMode.value=true
+        if(config.smokeScope==='macos-editing') {
+          const report:Record<string,unknown>={...smokeFeatures(),scope:'macos-editing'}
+          try {
+            if(!crossOriginIsolated)throw Error('Native WebView is not cross-origin isolated')
+            const {runMacosEditingSmoke}=await import('./sheet/rust/macos-editing-smoke')
+            const editing=await runMacosEditingSmoke(editingSmokeAdapter())
+            report.editing=editing;report.ok=editing.ok
+          }catch(e){report.ok=false;report.error=message(e)}
+          await smokeAwait('ipc-smoke-report',()=>invoke('smoke_report',{report}))
+          return
+        }
         const report:Record<string,unknown>={...smokeFeatures()}
         try {
           if(!crossOriginIsolated)throw Error('Native WebView is not cross-origin isolated')
