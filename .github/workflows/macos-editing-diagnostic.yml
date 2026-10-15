@@ -122,8 +122,6 @@ jobs:
           PY
       - name: Install frontend dependencies
         run: npm ci
-      - name: Install the pinned editor WASM bridge
-        run: cargo install --locked wasm-bindgen-cli --version 0.2.129
       - name: Prepare the local PDF engine
         run: node scripts/ensure-pdf-backend.mjs --dev
       - name: Check frontend types, diagnostic contracts and PDF round trips
@@ -136,6 +134,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/reuse-release-editors.mjs
+      - name: Install the pinned WASM bridge only when an editor needs rebuilding
+        run: |
+          if node scripts/build-wordcraft.mjs --check && node scripts/build-gridcraft.mjs --check && node scripts/build-deckcraft.mjs --check; then
+            echo 'All editor sources and artifact hashes match; no WASM compilation is needed.'
+          else
+            cargo install --locked wasm-bindgen-cli --version 0.2.129
+          fi
       # Reuse never bypasses the normal build or its source and dist checks.
       - name: Build the three Rust editors and complete frontend resources
         run: npm run build 2>&1 | tee artifacts/macos-editing/frontend-build.log

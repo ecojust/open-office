@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readdirSync, utimesSync, truncateSync, existsSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readdirSync, utimesSync, truncateSync, existsSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
@@ -226,12 +226,76 @@ test('one-shot crash collection bounds metadata and continues after one file or 
   assert.equal(readFileSync(join(fixture.output, evidence.files[0].file), 'utf8'), 'complete crash stack');
   assert(evidence.gaps.some(value => value.startsWith('user-crash-file-')));
   assert(evidence.gaps.includes('system-crash-directory-ENOENT'));
+  assert(evidence.gaps.includes('user-retired-crash-directory-ENOENT'));
+  assert(evidence.gaps.includes('system-retired-crash-directory-ENOENT'));
   assert(evidence.gaps.includes('matching-crash-report-limit'));
   assert.equal(evidence.directories[0].readable, true);
   assert.equal(evidence.directories[0].recentCount, 23);
   assert.equal(evidence.directories[0].recent.length, 16);
   assert(evidence.directories[0].recent.some(value => !value.matched));
   assert.equal(evidence.directories[1].readable, false);
+  assert.deepEqual(evidence.directories.slice(2).map(summary => [summary.directory, summary.readable]),
+    [['user-retired', false], ['system-retired', false]]);
+});
+
+test('recent matching reports are collected from both fixed Retired directories', async t => {
+  const fixture = crashFixture(t), started = Date.now();
+  const userRetired = join(fixture.source, 'Retired'), systemRetired = join(fixture.roots[1], 'Retired');
+  mkdirSync(userRetired); mkdirSync(systemRetired, { recursive: true });
+  fixture.write('Retired/com.apple.WebKit.WebContent.ips', 'user crash stack');
+  writeFileSync(join(systemRetired, 'WebContent.crash'), 'system crash stack');
+  fixture.write('Retired/TextEdit.ips', 'unrelated crash stack');
+  fixture.write('Retired/WebContent-old.ips', 'old crash stack', started - 2000);
+  fixture.write('Retired/WebContent.txt', 'wrong extension');
+  for (const parent of [fixture.source, userRetired]) {
+    mkdirSync(join(parent, 'Other'));
+    writeFileSync(join(parent, 'Other', 'WebContent.ips'), 'nested crash stack');
+  }
+  const evidence = await collectCrashReports(started, fixture.output, { roots: fixture.roots });
+  assert.deepEqual(evidence.files.map(file => readFileSync(join(fixture.output, file.file), 'utf8')),
+    ['user crash stack', 'system crash stack']);
+  assert.deepEqual(evidence.directories.map(summary => [summary.directory, summary.readable, summary.recentCount]),
+    [['user', true, 0], ['system', true, 0], ['user-retired', true, 2], ['system-retired', true, 1]]);
+  assert.deepEqual(evidence.directories[2].recent.map(file => [file.file, file.matched]),
+    [['TextEdit.ips', false], ['com.apple.WebKit.WebContent.ips', true]]);
+  assert.deepEqual(evidence.gaps, []);
+});
+
+test('Retired reports share the eight-file limit and retain the 8 MiB per-file bound', async t => {
+  const fixture = crashFixture(t), started = Date.now(), limit = 8 * 1024 * 1024;
+  const userRetired = join(fixture.source, 'Retired'), systemRetired = join(fixture.roots[1], 'Retired');
+  mkdirSync(userRetired); mkdirSync(systemRetired, { recursive: true });
+  for (let index = 0; index < 4; index++) fixture.write(`WebContent-${index}.ips`, `user crash ${index}`);
+  for (let index = 0; index < 2; index++) {
+    writeFileSync(join(fixture.roots[1], `WebContent-${index}.ips`), `system crash ${index}`);
+    writeFileSync(join(systemRetired, `WebContent-${index}.ips`), `retired system crash ${index}`);
+  }
+  fixture.write('Retired/WebContent-limit.ips', Buffer.alloc(limit, 0x61));
+  truncateSync(fixture.write('Retired/WebContent-oversized.ips', ''), limit + 1);
+  const evidence = await collectCrashReports(started, fixture.output, { roots: fixture.roots });
+  assert.equal(evidence.files.length, 8);
+  assert.equal(readdirSync(fixture.output).length, 8);
+  assert.equal(evidence.files.find(file => file.file.endsWith('WebContent-limit.ips')).bytes, limit);
+  assert(evidence.files.every(file => file.bytes <= limit));
+  assert(!evidence.files.some(file => file.file.endsWith('WebContent-oversized.ips')));
+  assert.equal(readFileSync(join(fixture.output, evidence.files.at(-1).file), 'utf8'), 'retired system crash 0');
+  assert.deepEqual(evidence.gaps, ['matching-crash-report-limit']);
+});
+
+test('Retired collection does not follow report files or directories through symlinks', async t => {
+  const fixture = crashFixture(t), started = Date.now();
+  const userRetired = join(fixture.source, 'Retired');
+  mkdirSync(userRetired); mkdirSync(fixture.roots[1]);
+  const target = join(fixture.output, 'outside'); mkdirSync(target);
+  const report = join(target, 'WebContent.ips'); writeFileSync(report, 'outside crash stack');
+  symlinkSync(report, join(fixture.source, 'WebContent-link.ips'));
+  symlinkSync(report, join(userRetired, 'WebContent-link.ips'));
+  symlinkSync(target, join(fixture.roots[1], 'Retired'));
+  const evidence = await collectCrashReports(started, fixture.output, { roots: fixture.roots });
+  assert.deepEqual(evidence.files, []);
+  assert(evidence.directories.every(summary => summary.recentCount === 0));
+  assert.equal(evidence.directories[3].readable, false);
+  assert(evidence.gaps.includes('system-retired-crash-directory-not-directory'));
 });
 
 function logCapture(t, limit) {

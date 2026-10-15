@@ -336,17 +336,26 @@ export async function collectCrashReports(started, directory, { terminated = fal
   const collectingSince = Date.now(), maxWaitMs = terminated ? 10000 : 0;
   const evidence = { files: [], gaps: [], directories: [], scanCount: 0, waitMs: 0, maxWaitMs };
   const gap = value => { if (evidence.gaps.length < 32 && !evidence.gaps.includes(value)) evidence.gaps.push(value); };
+  const locations = roots.map((root, index) => ({ root, label: index === 0 ? 'user' : 'system' }));
+  // macOS may move a report here before collection. These fixed children share
+  // the same file/count limits; no other subdirectories are searched.
+  locations.push(...locations.map(({ root, label }) => ({ root: join(root, 'Retired'), parent: root, label: `${label}-retired` })));
   let previous = new Map();
   do {
     const current = new Map(), candidates = [];
     evidence.directories = [];
     evidence.scanCount++;
-    for (const [index, root] of roots.entries()) {
-      const label = index === 0 ? 'user' : 'system';
+    for (const { root, parent, label } of locations) {
       const summary = { directory: label, readable: false, recentCount: 0, recent: [] };
       evidence.directories.push(summary);
       let files;
-      try { files = readdirSync(root).sort(); summary.readable = true; }
+      try {
+        if ([parent, root].filter(Boolean).some(path => {
+          const stat = lstatSync(path);
+          return !stat.isDirectory() || stat.isSymbolicLink();
+        })) { gap(`${label}-crash-directory-not-directory`); continue; }
+        files = readdirSync(root).sort(); summary.readable = true;
+      }
       catch (error) { gap(`${label}-crash-directory-${error.code || 'unreadable'}`); continue; }
       for (const file of files) {
         if (!/\.(ips|crash)$/i.test(file)) continue;
@@ -552,7 +561,7 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
       wordcraft: inspectInstalledWordcraft(location.resourceRoot, { root }), gridcraft: inspectInstalledGridcraft(location.resourceRoot, { root }) };
     temporary = mkdtempSync(join(tmpdir(), 'open-office-macos-editing-'));
     rawPath = join(temporary, 'frontend.json');
-    const predicate = 'process == "open-office" OR process CONTAINS "WebContent" OR process CONTAINS "WebKit" OR process == "ReportCrash" OR subsystem BEGINSWITH "com.apple.WebKit" OR ((process == "runningboardd" OR process == "launchd" OR process == "kernel") AND (eventMessage CONTAINS[c] "WebContent" OR eventMessage CONTAINS[c] "WebKit" OR eventMessage CONTAINS[c] "open-office" OR eventMessage CONTAINS[c] "SIGKILL" OR eventMessage CONTAINS[c] "memorystatus" OR eventMessage CONTAINS[c] "jetsam" OR eventMessage CONTAINS[c] "EXC_RESOURCE" OR eventMessage CONTAINS[c] "invalid message" OR eventMessage CONTAINS[c] "exited"))';
+    const predicate = 'process == "open-office" OR process CONTAINS "WebContent" OR process CONTAINS "WebKit" OR process == "ReportCrash" OR process == "osanalyticshelper" OR subsystem BEGINSWITH "com.apple.WebKit" OR (process == "kernel" AND eventMessage CONTAINS[c] "corpse") OR ((process == "runningboardd" OR process == "launchd" OR process == "kernel") AND (eventMessage CONTAINS[c] "WebContent" OR eventMessage CONTAINS[c] "WebKit" OR eventMessage CONTAINS[c] "open-office" OR eventMessage CONTAINS[c] "SIGKILL" OR eventMessage CONTAINS[c] "memorystatus" OR eventMessage CONTAINS[c] "jetsam" OR eventMessage CONTAINS[c] "EXC_RESOURCE" OR eventMessage CONTAINS[c] "invalid message" OR eventMessage CONTAINS[c] "exited"))';
     log = spawn('/usr/bin/log', ['stream', '--style', 'ndjson', '--level', 'debug', '--predicate', predicate], { shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
     finishLog = captureStream(log, join(directory, 'system-webkit.ndjson'), 8 * 1024 * 1024);
     app = spawn(location.executable, [], { cwd: temporary, shell: false, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
