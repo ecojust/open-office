@@ -139,7 +139,7 @@ export class RustSheetSession {
       if (!textAgent && canvas.nextElementSibling instanceof HTMLInputElement) {
         textAgent = canvas.nextElementSibling
         textAgent.dataset.testid = 'gridcraft-input'
-        textAgent.spellcheck = false
+        textAgent.setAttribute('writingsuggestions', 'false')
         // eframe's 1px input needs a real content box. The shell's border-box
         // reset plus default input padding otherwise leaves zero content width;
         // Chromium then keeps committed text's DOM caret at the start.
