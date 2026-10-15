@@ -121,6 +121,11 @@ function validateRuntimeResources(resources) {
   }
 }
 
+/** Validate installed files without claiming that a runtime-resource probe ran. */
+export function validateInstalledGridcraftEvidence(evidence, { root = ROOT } = {}) {
+  return manifestEvidence(evidence, gridcraftSourceHash(root));
+}
+
 /** Publication can verify serialized installed evidence against its checkout. */
 export function validateNativeGridcraftEvidence(report, { root = ROOT } = {}) {
   const installed = report?.preflight?.gridcraft;

@@ -69,7 +69,8 @@ jobs:
           const selection = JSON.parse(readFileSync('selected-artifacts.json', 'utf8'));
           assert.equal(String(selection.sourceRunId), process.env.VERIFIED_BUILD_RUN_ID);
           assert.match(selection.sourceCommit, /^[0-9a-f]{40}$/);
-          assert.equal(selection.artifactIds.length, 3);
+          assert.equal(selection.artifactIds.length, 4);
+          assert.ok(selection.artifactIds.includes(selection.macosEditingProofArtifactId));
           assert.ok(selection.artifactIds.every(id => Number.isSafeInteger(id) && id > 0));
           appendFileSync(process.env.GITHUB_OUTPUT, `head_sha=${selection.sourceCommit}\nartifact_ids=${selection.artifactIds.join(',')}\n`);
           appendFileSync(process.env.GITHUB_ENV, `VERIFIED_SOURCE_SHA=${selection.sourceCommit}\n`);
@@ -81,7 +82,7 @@ jobs:
           ref: ${{ steps.selection.outputs.head_sha }}
           path: verified-source
           persist-credentials: false
-      - name: Download and verify all three exact artifact ZIPs
+      - name: Download and verify three installer artifacts and the independent editing proof
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -97,9 +98,9 @@ jobs:
           assert.match(selection.repository, /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/);
           assert.equal(selection.sourceRunId, process.env.VERIFIED_BUILD_RUN_ID);
           assert.equal(selection.sourceCommit, process.env.VERIFIED_SOURCE_SHA);
-          assert.equal(selection.artifacts.length, 3);
+          assert.equal(selection.artifacts.length, 4);
           assert.deepEqual(selection.artifacts.map(artifact => artifact.id), selection.artifactIds);
-          assert.equal(new Set(selection.artifactIds).size, 3);
+          assert.equal(new Set(selection.artifactIds).size, 4);
           assert.ok(process.env.GH_TOKEN, 'Artifact download token is missing');
           assert.equal(process.env.GITHUB_API_URL, 'https://api.github.com');
           mkdirSync('artifact-zips');
@@ -175,14 +176,18 @@ jobs:
           import { createHash } from 'node:crypto';
           import { execFileSync } from 'node:child_process';
           import { readFileSync, statSync, writeFileSync } from 'node:fs';
+          import { resolve } from 'node:path';
           import { validateFrontendReport } from './verified-source/scripts/native-smoke.mjs';
           import { validateNativeWordcraftEvidence } from './verified-source/scripts/wordcraft-native-smoke.mjs';
           import { validateNativeGridcraftEvidence } from './verified-source/scripts/gridcraft-native-smoke.mjs';
           import { validateNativeDeckcraftEvidence } from './verified-source/scripts/deckcraft-native-smoke.mjs';
           import { sha256File, verifyTransferProof } from './verified-source/scripts/macos-intel-transfer.mjs';
+          import { readMacosArmEditingProof, verifyMacosArmEditingProof } from './scripts/macos-arm-editing-gate.mjs';
           assert.equal(execFileSync('git', ['-C', 'verified-source', 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), process.env.VERIFIED_SOURCE_SHA);
           const version = JSON.parse(readFileSync('verified-source/package.json', 'utf8')).version;
           assert.match(version, /^\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?$/);
+          const editingProof = readMacosArmEditingProof('artifacts/macos26-editing-proof.json');
+          verifyMacosArmEditingProof(editingProof, { commit: process.env.VERIFIED_SOURCE_SHA, runId: process.env.VERIFIED_BUILD_RUN_ID, dmgPath: resolve(`artifacts/Open-Office-${version}-macos-arm64.dmg`), root: resolve('verified-source') });
           const required = [];
           for (const [id, target] of [['windows-x64', 'x86_64-pc-windows-msvc'], ['macos-arm64', 'aarch64-apple-darwin'], ['macos-x64', 'x86_64-apple-darwin']]) {
             const report = JSON.parse(readFileSync(`artifacts/${id}-native-smoke.json`, 'utf8'));
@@ -263,7 +268,7 @@ jobs:
           process.on('uncaughtExceptionMonitor', error => console.error('::error title=Verified desktop release::' + String(error.message).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')));
           import { appendFileSync, readFileSync } from 'node:fs';
           const selection = JSON.parse(readFileSync('selected-artifacts.json', 'utf8'));
-          const rows = [['Windows x64', selection.windowsArtifactId], ['macOS ARM64', selection.macosArmArtifactId], ['macOS Intel / Rosetta', selection.macosIntelArtifactId]];
+          const rows = [['Windows x64', selection.windowsArtifactId], ['macOS ARM64', selection.macosArmArtifactId], ['macOS Intel / Rosetta', selection.macosIntelArtifactId], ['macOS 26 ARM64 编辑验证', selection.macosEditingProofArtifactId]];
           appendFileSync('release-notes.md', '\n| 验证平台 | Actions 产物 ID |\n| --- | --- |\n' + rows.map(([platform, id]) => `| ${platform} | ${id} |`).join('\n') + '\n');
           NODE
           if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" > existing-tag.json 2> tag-error.txt; then

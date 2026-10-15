@@ -120,6 +120,11 @@ function validateRuntimeResources(resources) {
   }
 }
 
+/** Validate installed files without claiming that a runtime-resource probe ran. */
+export function validateInstalledWordcraftEvidence(evidence, { root = ROOT } = {}) {
+  return manifestEvidence(evidence, wordcraftSourceHash(root));
+}
+
 /** Publication can verify serialized installed evidence against its checkout. */
 export function validateNativeWordcraftEvidence(report, { root = ROOT } = {}) {
   const installed = report?.preflight?.wordcraft;

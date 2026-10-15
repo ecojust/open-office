@@ -6,10 +6,12 @@ import { pathToFileURL } from 'node:url';
 const REPOSITORY = 'ecojust/open-office';
 const WORKFLOW_PATH = '.github/workflows/desktop-release.yml';
 const PLATFORMS = ['windows-x64', 'macos-arm64', 'macos-x64'];
+const EDITING_PROOF_ARTIFACT = 'open-office-macos26-editing-proof';
 const REQUIRED_JOBS = [
   'Validate requested platforms',
   ...PLATFORMS.map(platform => `${platform} native build and verification`),
   'Unchanged Intel DMG / Rosetta real GUI round trip',
+  'Unchanged ARM DMG / macOS 26 real input editing',
 ];
 
 function positiveInteger(value, label) {
@@ -46,6 +48,8 @@ function completeList(envelope, key) {
  * Fetch jobs with filter=latest and supply complete, unmodified API envelopes.
  * Callers must download these exact IDs, then run the source commit's complete
  * native report, package, signature and digest validators before publishing.
+ * The current macOS editing validator must also verify the unchanged ARM DMG
+ * and the exact source checkout; historical builds cannot bypass this gate.
  * The explicit clock keeps selection deterministic and this function read-only.
  */
 export function selectDesktopReleaseArtifacts({ run, jobs, artifacts, now, expectedRunId }) {
@@ -83,8 +87,11 @@ export function selectDesktopReleaseArtifacts({ run, jobs, artifacts, now, expec
   });
 
   const allArtifacts = completeList(artifacts, 'artifacts');
-  const selected = PLATFORMS.map(platformId => {
-    const name = `open-office-native-${platformId}`;
+  const requiredArtifacts = [
+    ...PLATFORMS.map(platformId => ({ platformId, name: `open-office-native-${platformId}` })),
+    { platformId: 'macos26-editing-proof', name: EDITING_PROOF_ARTIFACT },
+  ];
+  const selected = requiredArtifacts.map(({ platformId, name }) => {
     const candidates = [];
     for (const artifact of allArtifacts.filter(item => item.name === name)) {
       assert.equal(typeof artifact.expired, 'boolean', `Artifact expiry flag is missing: ${name}`);
@@ -116,6 +123,7 @@ export function selectDesktopReleaseArtifacts({ run, jobs, artifacts, now, expec
     sourceRunUrl: `https://github.com/${REPOSITORY}/actions/runs/${runId}`,
     observedAt: now, artifactIds: selected.map(artifact => artifact.id), artifacts: selected,
     windowsArtifactId: selected[0].id, macosArmArtifactId: selected[1].id, macosIntelArtifactId: selected[2].id,
+    macosEditingProofArtifactId: selected[3].id,
     verifiedJobs };
 }
 
