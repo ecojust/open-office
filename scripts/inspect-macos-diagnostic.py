@@ -213,7 +213,7 @@ def native_event_summary(event):
 
 
 def native_timeline(events):
-    return [native_event_summary(event) for event in events if isinstance(event, dict) and (
+    return [native_event_summary(event) for event in events if isinstance(event, dict) and event.get("phase") != "editing-dom-event" and (
         str(event.get("phase", "")).startswith(("editing", "web-content", "fatal"))
         or event.get("phase") in ("document-start", "error", "unhandledrejection", "window-error", "renderer-uncaught", "renderer-resize-observer-notification")
     )][-30:]
@@ -221,6 +221,28 @@ def native_timeline(events):
 
 def compact_text(value, limit):
     return scrub(value, limit).encode("utf-8")[:limit].decode("utf-8", "ignore")
+
+
+def dom_event_summary(native):
+    events = []
+    for event in native.get("events") or []:
+        if not isinstance(event, dict) or event.get("phase") != "editing-dom-event":
+            continue
+        detail = event.get("detail")
+        if not isinstance(detail, str) or len(detail) > 400:
+            continue
+        try:
+            value = json.loads(detail)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(value, dict):
+            continue
+        events.append([event.get("elapsedMs"), value.get("seq"),
+            *[compact_text(str(value.get(key, "")), limit) for key, limit in
+              [("actionId", 30), ("type", 20), ("target", 24), ("activeElement", 24)]],
+            value.get("trusted") is True])
+    return {"count": len(events), "columns": ["nativeMs", "seq", "action", "event", "target", "active", "trusted"],
+        "events": events[-12:], "limitation": "Bounded frontend event observations; missing events do not establish the crash location."} if events else None
 
 
 def compact_timeline(native):
@@ -643,13 +665,16 @@ def summarize(read, files, run, artifact, expected_sha, context=None):
     log = read("system-webkit.ndjson", 8 * 1024 * 1024, False)
     crashes, crash_count = crash_summaries(read, files)
     debugger = debugger_summary(read, report, files)
-    summary = system_log_summary(log or b"", report, samples, max_lines=4 * (4 - len(crashes) - int(debugger is not None)), native=native)
+    dom_events = dom_event_summary(native)
+    summary = system_log_summary(log or b"", report, samples, max_lines=4 * (4 - len(crashes) - int(debugger is not None) - int(dom_events is not None)), native=native)
     notice("system-log", {"available": log is not None, **pick(report.get("systemLog"), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine", "stderr"]), **pick(summary, ["parsedLines", "skippedLines", "matchingLines", "firstParsedTimestamp", "lastParsedTimestamp", "timeFilterAvailable", "ownedWebContentPids", "limitation"])})
     notice("crash-evidence", {**crash_metadata(report, files), "ipsCount": crash_count, "ipsSummarized": len(crashes)})
     for crash in crashes:
         notice("crash-report", crash)
     if debugger is not None:
         notice("debugger", debugger)
+    if dom_events is not None:
+        notice("dom-events", dom_events)
     # Apply the smaller quota during severity ranking, preserving actual crash
     # messages over later routine GPU/focus chatter.
     lines = summary["lines"]

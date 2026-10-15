@@ -307,6 +307,23 @@ test('a stale preflight report does not hide a saved LLDB trace after cleanup fa
   assert.ok(!result.value.includes('private-person'));
 });
 
+test('bounded DOM event observations retain the action and native termination timeline', () => {
+  const events = [{ phase: 'editing-input-request', elapsedMs: 100, detail: JSON.stringify({ actionId: 'double-d6', kind: 'doubleClick' }) },
+    ...Array.from({ length: 40 }, (_, seq) => ({ phase: 'editing-dom-event', elapsedMs: 101 + seq,
+      detail: JSON.stringify({ seq, actionId: 'double-d6', type: 'focus', target: 'sheet-input', activeElement: 'sheet-input', trusted: true, value: 'private cell text' }) })),
+    { phase: 'web-content-terminated', elapsedMs: 150, detail: 'main' }];
+  const result = inspect({ mode: 'emit', time: '', pids: '', report: { nativeDiagnostics: { events } } });
+  assert.equal(result.ok, true, result.error);
+  const rows = annotations(result.value);
+  assert.ok(rows.length <= 10);
+  const dom = rows.find(row => row.section === 'dom-events');
+  assert.equal(dom.count, 40); assert.equal(dom.events.length, 12);
+  assert.deepEqual(dom.events[0], [129, 28, 'double-d6', 'focus', 'sheet-input', 'sheet-input', true]);
+  const timeline = rows.find(row => row.section === 'native').timeline.flat().join('\n');
+  assert.match(timeline, /double-d6/); assert.match(timeline, /TERMINATED/);
+  assert.ok(!result.value.includes('private cell text'));
+});
+
 test('Rust regression output includes compilation failure context and tail without emitting the full log', () => {
   const log = Array.from({ length: 70 }, (_, i) => `compile progress ${i}`);
   log[5] = 'error[E0433]: cannot find type CellEditor';
