@@ -164,6 +164,9 @@ jobs:
           esac
           if [[ "$DIAGNOSTIC_DEBUG_WEBCONTENT" == "true" ]]; then args+=(--lldb); fi
           node scripts/macos-editing-diagnostic.mjs --helper "$RUNNER_TEMP/open-office-os-input" --app "$GITHUB_WORKSPACE/src-tauri/target/release/bundle/macos/Open Office.app" "${args[@]}"
+      - name: Verify all editor round trips after successful native editing
+        timeout-minutes: 8
+        run: node scripts/native-smoke.mjs --app "$GITHUB_WORKSPACE/src-tauri/target/release/bundle/macos/Open Office.app"
       - name: Explain the diagnostic result and its limits
         if: always()
         env:
@@ -201,3 +204,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
           compression-level: 0
+      - name: Retain all-editor verification evidence when reached
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-editing-all-editors
+          path: artifacts/macos-arm64-*.json
+          if-no-files-found: ignore
+          retention-days: 7

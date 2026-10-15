@@ -118,6 +118,12 @@ Linux WPE 的 Playwright WebKit 2336（报告版本 26.5）另做了只读对照
 
 [报告服务上下文读取 38796719449](https://github.com/ecojust/open-office/actions/runs/38796719449) 仅检查已有原始双击诊断记录，准确 SIGTRAP 时间前两秒至后十秒内没有 ReportCrash 或 osanalyticshelper 消息。未取得异常栈，不能据此判断服务配置或底层原因。
 
+## WebKit 公开兼容模式对照
+
+下一候选使用 macOS 26.4 起公开的 [`WKWebpagePreferences.securityRestrictionMode`](https://developer.apple.com/documentation/webkit/wkwebpagepreferences/securityrestrictionmode)。在首次创建网页前，仅将 None 改为 MaximizeCompatibility；已有 Lockdown、未知模式和不支持该 API 的系统保留原设置。诊断回读新建 WKWebView 的实际配置，不能仅凭已调用 setter 判断生效。
+
+该模式保持网页功能兼容，但关闭整个网页进程的 JIT，并增强内存保护、选择独立进程。它不是仅禁用某一 Wasm 优化层的开关；即使验证通过，也不能单独确定 SIGTRAP 来自 JIT。它可能降低三个编辑器的运行速度，因此候选先验证默认真实输入，再用同一应用验证 Word、表格、演示文稿和 PDF 的往返操作，尚未作为修复发布。
+
 ## 原生检查的判定要求
 
 使用 macOS 系统级键鼠事件，校验浏览器收到的事件确为可信输入，并检查实际文档内容、全部标签和会话身份。记录测试机实际 macOS 小版本，不能将其他 26.x 小版本称为 26.5。
