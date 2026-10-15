@@ -15,3 +15,27 @@
 .pe-highlight-control { display:flex; align-items:center; gap:6px; min-width:0 }
 .pe-highlight-control input[type="color"] { flex:1 1 0; width:0; min-width:32px }
 .pe-highlight-control button { flex:0 0 auto; white-space:nowrap; min-width:48px; min-height:32px }
+
+/* Theme the workspace controls, never the slide artwork or document colors. */
+[data-theme="dark"] .pe-editor {
+  --pe-accent: var(--ui-warning);
+  --pe-accent-soft: var(--ui-warning-soft);
+  --pe-line: var(--ui-line);
+  --pe-muted: var(--ui-muted);
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+[data-theme="dark"] .pe-editor :is(.pe-toolbar,.pe-toolbar-end,.pe-notes,.pe-properties,.pe-properties>.pe-panel-heading,.pe-data-dialog) { background: var(--ui-surface); border-color: var(--ui-line); }
+[data-theme="dark"] .pe-editor :is(.pe-filmstrip,.pe-status) { background: var(--ui-surface-muted); color: var(--ui-muted); }
+[data-theme="dark"] .pe-viewport { background: var(--ui-bg); }
+[data-theme="dark"] .pe-editor :is(.pe-slide-name,.pe-slide-number,.pe-panel-heading button,.pe-notes label,.pe-property-section h3 small,.pe-properties label,.pe-dialog-fields label,.pe-paragraph-dialog label,.pe-data-dialog p,.pe-data-dialog header button,.pe-loading,.pe-load-error,.pe-data-cells small) { color: var(--ui-muted); }
+[data-theme="dark"] .pe-editor :is(.pe-properties .pe-checkbox,.pe-load-error strong) { color: var(--ui-text); }
+[data-theme="dark"] .pe-editor :is(.pe-property-section,.pe-layout-details,.pe-paragraph-picker,.pe-data-preview td) { border-color: var(--ui-line); }
+[data-theme="dark"] .pe-editor :is(.pe-properties input,.pe-properties select,.pe-button-row button,.pe-wide-button,.pe-load-error button,.pe-data-dialog input,.pe-data-dialog select,.pe-data-dialog textarea,.pe-data-dialog footer button,.pe-paragraph-picker-actions button) { background: var(--ui-surface); color: var(--ui-text); border-color: var(--ui-line-strong); }
+[data-theme="dark"] .pe-editor :is(.pe-toolbar button,.pe-tool-select,.pe-slide-actions button,.pe-status button,.pe-button-row button,.pe-wide-button):hover { background: var(--ui-surface-muted); }
+[data-theme="dark"] .pe-editor button[aria-pressed=true] { background: var(--pe-accent-soft); color: var(--pe-accent); }
+[data-theme="dark"] .pe-editor :is(.pe-toolbar .pe-present,.pe-data-dialog footer .pe-primary) { background: var(--pe-accent); border-color: var(--pe-accent); color: var(--ui-bg); }
+[data-theme="dark"] .pe-editor :is(.pe-data-preview tr:first-child td,.pe-data-cells textarea[readonly]) { background: var(--ui-surface-muted); color: var(--ui-muted); }
+[data-theme="dark"] .pe-error { background: var(--ui-danger-soft); color: var(--ui-danger); border-color: var(--ui-line); }
+[data-theme="dark"] .pe-warning { background: var(--ui-warning-soft); color: var(--ui-warning); border-color: var(--ui-line); }
+[data-theme="dark"] :is(.pe-stage,.pe-thumbnail) { color: #272d37; color-scheme: light; }

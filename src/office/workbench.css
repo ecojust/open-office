@@ -16,7 +16,7 @@
 
 .ow-sheet {
   --ow-accent: var(--ui-success, #25835d);
-  --ow-pale: #edf7f1;
+  --ow-pale: var(--ui-success-soft, #edf7f1);
 }
 
 .ow-ribbon {
@@ -381,8 +381,8 @@
   flex-wrap: wrap;
   gap: 6px 12px;
   padding: 8px 16px;
-  border-bottom: 1px solid #ebdfc4;
-  background: #fff9ec;
+  border-bottom: 1px solid var(--ui-line, #ebdfc4);
+  background: var(--ui-warning-soft, #fff9ec);
   color: var(--ui-warning, #906313);
   font-size: 12px;
   line-height: 1.6;
@@ -409,8 +409,8 @@
 }
 
 .ow-error {
-  border-color: #ebd2d2;
-  background: #fdf3f3;
+  border-color: var(--ui-line, #ebd2d2);
+  background: var(--ui-danger-soft, #fdf3f3);
   color: var(--ui-danger, #b54746);
 }
 
@@ -421,7 +421,7 @@
 .ow-panel .ow-error {
   margin: 12px 0;
   padding: 10px;
-  border: 1px solid #ebd2d2;
+  border: 1px solid var(--ui-line, #ebd2d2);
   border-radius: var(--ui-radius, 6px);
 }
 

@@ -12,8 +12,12 @@ const sha = value => createHash('sha256').update(value).digest('hex');
 function installation() {
   const directory = mkdtempSync(join(tmpdir(), 'wordcraft-native-contract-'));
   const root = join(directory, 'checkout'), resourceRoot = join(directory, 'installed');
-  for (const path of ['scripts', 'vendor/wordcraft/src', 'crates/word-engine/fonts']) mkdirSync(join(root, path), { recursive: true });
+  for (const path of ['scripts', 'vendor/wordcraft/src', 'crates/word-engine/fonts', 'src/icons/svg/word']) mkdirSync(join(root, path), { recursive: true });
   writeFileSync(join(root, 'scripts/build-wordcraft.mjs'), '// independently controlled fixture');
+  writeFileSync(join(root, 'scripts/build-office-icons.mjs'), '// offline geometry compiler fixture');
+  writeFileSync(join(root, 'src/icons/shared.json'), '{}');
+  writeFileSync(join(root, 'src/icons/svg/word/names.json'), '["test"]');
+  writeFileSync(join(root, 'src/icons/svg/word/test.svg'), '<svg/>');
   writeFileSync(join(root, 'vendor/wordcraft/src/lib.rs'), '// source fixture');
   writeFileSync(join(root, 'crates/word-engine/fonts/license.txt'), 'font fixture');
   const assets = join(resourceRoot, 'frontend/wordcraft'); mkdirSync(assets, { recursive: true });
@@ -92,6 +96,12 @@ test('installed assets bind exact manifest bytes, WASM/JS sizes and hashes to th
     ]) {
       const mutated = structuredClone(report); mutate(mutated);
       assert.throws(() => validateNativeWordcraftEvidence(mutated, { root: fixture.root }), /WordCraft/);
+    }
+    for (const path of ['scripts/build-office-icons.mjs', 'src/icons/shared.json', 'src/icons/svg/word/test.svg', 'src/icons/svg/word/names.json']) {
+      const source = readFileSync(join(fixture.root, path));
+      writeFileSync(join(fixture.root, path), Buffer.concat([source, Buffer.from(' ')]));
+      assert.throws(() => validateNativeWordcraftEvidence(report, { root: fixture.root }), /current checkout source/);
+      writeFileSync(join(fixture.root, path), source);
     }
     writeFileSync(join(fixture.root, 'vendor/wordcraft/src/lib.rs'), '// modified after build');
     assert.throws(() => validateNativeWordcraftEvidence(report, { root: fixture.root }), /current checkout source/);

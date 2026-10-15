@@ -1,5 +1,5 @@
 export type Kind = 'word'|'sheet'|'presentation'|'pdf'
-export type Extension = 'docx'|'odt'|'doc'|'rtf'|'xlsx'|'ods'|'xls'|'pptx'|'odp'|'ppt'|'pdf'
+export type Extension = 'docx'|'odt'|'doc'|'rtf'|'xlsx'|'ods'|'xls'|'csv'|'tsv'|'pptx'|'odp'|'ppt'|'pdf'
 export type SaveExtension = Exclude<Extension,'doc'|'rtf'|'xls'|'ppt'>
 export type SaveFormatOption = { extension: SaveExtension; title: string; description: string }
 /** Formats actually implemented by each active editor, not all import formats. */
@@ -33,14 +33,14 @@ export type EditorHandle = {
 }
 export function extensionOf(name:string):Extension {
  const extension=name.split('.').at(-1)?.toLowerCase()
- if(!['docx','odt','doc','rtf','xlsx','ods','xls','pptx','odp','ppt','pdf'].includes(extension || ''))throw new Error('请选择 DOCX、ODT、DOC、RTF、XLSX、ODS、XLS、PPTX、ODP、PPT 或 PDF 文件。宏、加密文件及其他格式暂不支持。')
+ if(!['docx','odt','doc','rtf','xlsx','ods','xls','csv','tsv','pptx','odp','ppt','pdf'].includes(extension || ''))throw new Error('请选择 DOCX、ODT、DOC、RTF、XLSX、ODS、XLS、CSV、TSV、PPTX、ODP、PPT 或 PDF 文件。宏、加密文件及其他格式暂不支持。')
  return extension as Extension
 }
-export function kindOf(extension:Extension):Kind{return extension==='pdf'?'pdf':['pptx','odp','ppt'].includes(extension)?'presentation':['xlsx','ods','xls'].includes(extension)?'sheet':'word'}
+export function kindOf(extension:Extension):Kind{return extension==='pdf'?'pdf':['pptx','odp','ppt'].includes(extension)?'presentation':['xlsx','ods','xls','csv','tsv'].includes(extension)?'sheet':'word'}
 export function isImportOnly(extension:Extension):boolean{return ['doc','rtf','xls','ppt'].includes(extension)}
 export function defaultSaveExtension(extension:Extension):SaveExtension {
  if(extension==='doc'||extension==='rtf')return 'docx'
- if(extension==='xls')return 'xlsx'
+ if(extension==='xls'||extension==='csv'||extension==='tsv')return 'xlsx'
  if(extension==='ppt')return 'pptx'
  return extension
 }
@@ -53,6 +53,8 @@ export function validateDocumentSignature(bytes:Uint8Array,extension:Extension):
  if(extension==='pdf') {
   // ISO 32000 permits readers to locate the header within the first 1024 bytes.
   valid=Array.from(bytes.subarray(0,1024),value=>String.fromCharCode(value)).join('').includes('%PDF-')
+ } else if(extension==='csv'||extension==='tsv') {
+  try { const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);valid=!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(text) } catch { valid=false }
  } else if(extension==='rtf') {
   const prefix=Array.from(bytes.subarray(0,32),value=>String.fromCharCode(value)).join('')
   valid=/^\{\\rtf[1-9]\d*(?=[\\\s])/.test(prefix)

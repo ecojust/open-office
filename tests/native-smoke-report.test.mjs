@@ -4,6 +4,7 @@ import { strToU8, zipSync } from 'fflate';
 import { REQUIRED_RUST_WORD_CHECKS, validateFrontendReport, validateRustWordEngineReport } from '../scripts/native-smoke.mjs';
 import { REQUIRED_CHECKS } from '../scripts/word-package-native-smoke.mjs';
 import { wordcraftReport } from './helpers/wordcraft-smoke-report.mjs';
+import { gridcraftReport } from './helpers/gridcraft-smoke-report.mjs';
 
 // These fixtures test the release report contract, not Office functionality.
 // The native CI separately runs the actual packaged GUI and real file round trips.
@@ -65,6 +66,7 @@ function completeReport() {
     independentWordPackage: wordPackageReport(),
     rustWordEngine: rustWordReport(),
     wordcraft: wordcraftReport(),
+    gridcraft: gridcraftReport(),
     office: {
       ok: true, engine: 'ZetaOffice / LibreOffice 24.2.8.0',
       writer: {
@@ -114,6 +116,7 @@ test('a complete four-workspace report preserves old checks and requires Impress
     'independentWordPackageIpc',
     'rustWordEngineIpc', 'rustWordEngineDocxReadback', 'rustWordEngineSessionCleanup',
     'wordcraftDefaultCanvas', 'wordcraftDomInput', 'wordcraftDocxReadback', 'wordcraftFailureAtomicity', 'wordcraftSessionCleanup',
+    'gridcraftDefaultCanvas', 'gridcraftDomInput', 'gridcraftXlsxReadback', 'gridcraftFormulaRoundTrip', 'gridcraftFailureAtomicity', 'gridcraftSessionCleanup',
     'writerOriginalTextRoundTrip', 'writerPdfExport', 'calcFormulaRoundTrip', 'calcPdfExport',
     'pdfOriginalTextReplacementRoundTrip', 'impressOriginalTextRoundTrip', 'impressOdpRoundTrip',
     'impressPdfExport', 'impressPdfPageCount',
@@ -131,6 +134,13 @@ test('full release smoke requires the new real Rust Word engine IPC report', () 
   for (const value of [undefined, null, [], {}, { ok: true }, { ...rustWordReport(), ok: false }]) {
     const report = completeReport(); report.rustWordEngine = value;
     assert.throws(() => validateFrontendReport(report), /Rust Word engine/);
+  }
+});
+
+test('legacy Calc checks cannot replace the default GridCraft canvas and XLSX evidence', () => {
+  for (const value of [undefined, null, [], {}, { ok: true }, { ...gridcraftReport(), transport: 'local-wasm-in-browser' }]) {
+    const report = completeReport(); report.gridcraft = value;
+    assert.throws(() => validateFrontendReport(report), /GridCraft/);
   }
 });
 

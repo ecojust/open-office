@@ -1,4 +1,5 @@
 import type { NativeDocument } from '../../types'
+import type { Appearance } from '../../shared/appearance'
 import { base64ToBytes } from '../../shared/document'
 import type { WordcraftEvent, WordcraftFileAction, WordcraftSnapshot } from './wordcraft-types'
 
@@ -14,6 +15,7 @@ interface WordcraftHost {
   discardChanges(id: string, documentId: number, revision: number): boolean
   close(id: string, documentId: number, revision: number, force: boolean): boolean
   setActive(active: boolean): void
+  setTheme(theme: Appearance): void
   destroy(): void
 }
 type Bindings = { default(options: { module_or_path: URL }): Promise<unknown>; createHost(callback: (event: string) => void): WordcraftHost }
@@ -23,6 +25,7 @@ let activeId: string | undefined, activation = 0, interactive = false, compositi
 let activationSessionId: string | undefined
 let textAgent: HTMLInputElement | undefined, disableTimer: ReturnType<typeof setTimeout> | undefined
 let queue: Promise<void> = Promise.resolve()
+let interfaceTheme: Appearance = 'system'
 const sessions = new Map<string, RustWordSession>()
 const fileActions = new Set<WordcraftFileAction>(['new', 'open', 'save', 'saveAs', 'exportPdf', 'print', 'close'])
 
@@ -55,9 +58,16 @@ async function loadHost(): Promise<WordcraftHost> {
   const bindings = await import(/* @vite-ignore */ url.href) as Bindings
   await bindings.default({ module_or_path: new URL('wordcraft/wordcraft_bg.wasm', document.baseURI) })
   host = bindings.createHost(receive)
+  host.setTheme(interfaceTheme)
   return host
 }
 function getHost() { return runtime ??= loadHost().catch(cause => { runtime = undefined; throw cause }) }
+
+/** Appearance changes never flush an editor draft or mutate a document. */
+export function setRustWordTheme(theme: Appearance): Promise<void> {
+  interfaceTheme = theme
+  return serialize(() => { host?.setTheme(interfaceTheme) })
+}
 function parkingElement() {
   if (!parking) {
     parking = document.createElement('div')

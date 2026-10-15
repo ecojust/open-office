@@ -115,7 +115,7 @@ async function openFile(file, shortcut = false) {
           await diagnostic('before-Control+o');
           await page.keyboard.press('Control+o');
           await diagnostic('after-Control+o');
-        } else await page.locator('.command-bar').getByRole('button', { name: '打开', exact: true }).click();
+        } else await page.getByTestId('shell-open').click();
       })(),
     ]);
     await diagnostic('chooser-opened');
@@ -128,7 +128,7 @@ async function openFile(file, shortcut = false) {
 async function saveFile(filename, trigger) {
   const pending = page.waitForEvent('download');
   if (trigger) await trigger();
-  else await page.locator('.command-bar').getByRole('button', { name: '保存', exact: true }).click();
+  else await page.getByTestId('shell-save').click();
   const download = await pending, destination = path.join(output, filename);
   assert.match(download.suggestedFilename(), /\.docx$/i);
   await download.saveAs(destination); await idle();
@@ -225,7 +225,7 @@ async function clickRibbon(id) {
 }
 async function exportPdf(filename) {
   const pending = page.waitForEvent('download');
-  await page.locator('.command-bar').getByRole('button', { name: '导出 PDF', exact: true }).click();
+  await page.getByTestId('shell-export-pdf').click();
   const chooser = page.getByTestId('save-format-confirm');
   if (await chooser.isVisible()) await chooser.click();
   const download = await pending, destination = path.join(output, filename);
@@ -565,7 +565,7 @@ async function embeddedUiTests() {
   const frame = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const shellText = async () => {
     assert.doesNotMatch(await page.locator('body').innerText(), /wordcraft/i, 'Visible application chrome contains no upstream brand');
-    for (const id of ['shell-new-word', 'shell-open', 'shell-save', 'shell-save-as', 'shell-export-pdf', 'shell-print']) {
+    for (const id of ['shell-new', 'shell-open', 'shell-save', 'shell-save-as', 'shell-export-pdf', 'shell-print']) {
       assert.equal(await page.getByTestId(id).count(), 1, 'Exactly one shell file control: ' + id);
       assert.equal(await page.getByTestId(id).isVisible(), true, 'Shell file control remains accessible: ' + id);
     }
@@ -704,6 +704,7 @@ async function embeddedUiTests() {
     await assert.rejects(() => inspectSession(id), 'The shell close destroys only its target session');
   };
   await discardBlank();
+  await page.getByTestId('shell-new').click();
   await page.getByTestId('shell-new-word').click();
   await page.waitForFunction(expected => document.querySelectorAll('.document-tab').length === expected, tabsBefore + 1);
   await idle(); assert.equal((await inspectSession()).text, ''); await discardBlank();

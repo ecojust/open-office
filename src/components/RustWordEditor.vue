@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import type { NativeDocument } from '../types'
+import type { Appearance } from '../shared/appearance'
 import { bytesToBase64, type EditorExport, type Extension } from '../shared/document'
-import { prepareRustWordDocument, type PreparedRustWordDocument, type RustWordSession } from '../word/rust/client'
+import { prepareRustWordDocument, setRustWordTheme, type PreparedRustWordDocument, type RustWordSession } from '../word/rust/client'
 import type { WordcraftEvent, WordcraftFileAction, WordcraftSnapshot } from '../word/rust/wordcraft-types'
 
-const props = withDefaults(defineProps<{ document: NativeDocument; prepared?: PreparedRustWordDocument; active?: boolean; disabled?: boolean }>(), { active: true, disabled: false })
+const props = withDefaults(defineProps<{ document: NativeDocument; prepared?: PreparedRustWordDocument; active?: boolean; disabled?: boolean; theme?: Appearance }>(), { active: true, disabled: false, theme: 'system' })
 const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: WordcraftFileAction] }>()
 const viewport = ref<HTMLElement>(), snapshot = shallowRef<WordcraftSnapshot>()
 const pictureInput = ref<HTMLInputElement>()
@@ -143,6 +144,7 @@ async function load() {
     loading.value = false; emit('ready'); emit('status', '文字文稿已就绪')
   } catch (cause) { prepared?.discard(); if (token === generation) { loading.value = false; report(cause) } }
 }
+watch(() => props.theme, value => { void setRustWordTheme(value).catch(report) }, { immediate: true })
 watch(() => props.document.id, () => { opening = load() }, { immediate: true })
 watch(() => props.active, value => {
   if (value) void attach().catch(report)
@@ -168,5 +170,5 @@ defineExpose({ exportFile, markSaved, discardChanges, undo, redo, search, print,
 </template>
 
 <style scoped>
-.rust-word-editor{display:flex;flex:1;position:relative;min-width:0;min-height:0;overflow:hidden;background:#edf0f4}.wordcraft-viewport{position:absolute;inset:0;min-width:0;min-height:0}.wordcraft-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;background:#f7f9fc;color:#5d6c82;font-size:13px}.wordcraft-spinner{width:17px;height:17px;border:2px solid #d7e0ed;border-top-color:#426ba5;border-radius:50%;animation:wordcraft-spin .8s linear infinite}.wordcraft-error{position:absolute;z-index:2;left:18px;right:18px;bottom:12px;padding:12px 15px;border:1px solid #f0cbbd;background:#fff4ed;color:#943f28;border-radius:7px;font-size:13px;line-height:1.6}@keyframes wordcraft-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.wordcraft-spinner{animation:none}}
+.rust-word-editor{display:flex;flex:1;position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--ui-bg)}.wordcraft-viewport{position:absolute;inset:0;min-width:0;min-height:0}.wordcraft-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--ui-surface-muted);color:var(--ui-muted);font-size:13px}.wordcraft-spinner{width:17px;height:17px;border:2px solid var(--ui-line);border-top-color:var(--ui-accent);border-radius:50%;animation:wordcraft-spin .8s linear infinite}.wordcraft-error{position:absolute;z-index:2;left:18px;right:18px;bottom:12px;padding:12px 15px;border:1px solid var(--ui-danger);background:var(--ui-danger-soft);color:var(--ui-danger);border-radius:7px;font-size:13px;line-height:1.6}@keyframes wordcraft-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.wordcraft-spinner{animation:none}}
 </style>

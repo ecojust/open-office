@@ -9,6 +9,7 @@
 | 组件 | 实际版本或构建 | 使用的许可与说明 |
 | --- | --- | --- |
 | WordCraft 文档引擎及 egui 界面 | 固定提交 `3292ba05d3c15c003823be6849e87a1c6e205242`，本地集成见下文 | MIT OR Apache-2.0；Copyright (c) 2026 ArtCraft Team and the WordCraft contributors。保留 `wordcraft/` 中的双许可、NOTICE 和 ATTRIBUTION；这是上游 Rust 内核与界面的集成，不是本项目原创内核。 |
+| GridCraft 电子表格引擎及 egui 界面 | 固定提交 `e6b6b349708ab4978cb3f061f6bd6ecbc25667cb`，上游工作区版本 `0.7.0` | MIT OR Apache-2.0；Copyright (c) 2026 ArtCraft Team and the GridCraft contributors。双许可、NOTICE、资产归属及本地改动说明保留在 `gridcraft/`；这是对上游 Rust 引擎与界面的集成。 |
 | ZetaOffice / LibreOffice WASM | 24.2.8.0；核心构建 `efaf0670b4d055f838a2849becb10f08aa06a257` | LibreOffice 的 MPL-2.0、LGPL-3.0 及各文件许可；完整上游法律文档保留在 `LIBREOFFICE-THIRD-PARTY-LICENSES.html`。WASM 与 Qt 静态组合还包含下述 GPL 代码。 |
 | Qt 5 / QtBase WASM 分支 | `5.15.2+wasm` | **WASM 平台插件采用 GPL 第 3 版**，并保留 Qt 原文规定的后续版本选项；不能仅以 Qt 其他部分的 LGPL 掩盖该要求。插件原文见 `QT-WASM-LICENSE-HEADER.txt`，全文见 `GPL-3.0.txt`。其余组件仍按各文件许可。 |
 | zeta.js | v1.2.0，提交 `57360bcb0e7726ffa0e66567c8041261b959f8dd` | MIT，Copyright © 2024 allotropia software GmbH and contributors。本地修复 `getSingleton` 返回值转换，并补充 UNO `TYPEDEF` 别名递归解析（含异常路径的类型描述句柄释放）；完整差异保存在 `zetajs-local-change.patch`，上游版权与许可保持不变。 |
@@ -73,6 +74,14 @@ egui 依赖 `epaint_default_fonts` 的内嵌字体另外保留 Noto Emoji 的 OF
 WordCraft WASM 宿主的 normal／build 依赖闭包单独记录在 [`public/legal/wordcraft-dependencies.json`](public/legal/wordcraft-dependencies.json)，按 `wasm32-unknown-unknown` 目标与锁文件生成，未将整个上游桌面／测试依赖都计为实际链接库。旧 `rust-dependencies.json` 继续描述此前三个锁文件的范围。部分发布 crate 未随包携带代码 LICENSE，已根据各自 `.cargo_vcs_info.json` 的提交从 AccessKit/accesskit、emilk/egui、aclysma/profiling、nicoburns/wuff 获取原始许可；精确 URL、字节数和 SHA-256 位于各包的 `upstreamLicenseEvidence`。
 
 WordCraft 及其通用库并不免除本发行包中其他 AGPL/GPL 等组件的义务。它也不代表所有上游功能都已在 Open Office 中通过验收。
+
+## GridCraft 来源与本地改动
+
+电子表格源码固定在 `vendor/gridcraft/`。`apps/open-office-host` 将上游 Rust 工作簿模型、公式计算、编辑命令和 egui 界面接入 Open Office 的本地 WebAssembly 工作区，文件选择、写入和标签生命周期由外壳协调。原始上游归档的 URL、字节数、SHA-256，以及原样保留的许可文件摘要见 [`public/legal/gridcraft/source-manifest.json`](public/legal/gridcraft/source-manifest.json)。本地适配源码随 Open Office 的确切发行提交提供；上游提交本身不代表修改后的完整构建输入。
+
+GridCraft 使用的 `craft-ui` 与文字工作区固定到相同的 `craft-libs` 提交，复用 `public/legal/wordcraft/craft-libs/` 中的原始许可、NOTICE 和资产归属。上游 `docs/brand/` 的 ArtCraft 标志图片依其品牌条款从派生源码中移除，条款原文保留；NOTICE 和 ATTRIBUTION 对这些图片的原始引用不代表本应用仍分发它们，也不代表本应用获得 ArtCraft 背书。
+
+WASM 宿主的 normal／build 依赖闭包单独记录在 [`public/legal/gridcraft-dependencies.json`](public/legal/gridcraft-dependencies.json)，许可说明见 [`gridcraft/OPEN-OFFICE-INTEGRATION.md`](public/legal/gridcraft/OPEN-OFFICE-INTEGRATION.md)。可选 `storytold/craft-fonts` 未包含在本集成中。GridCraft 的双许可不改变已有 LibreOffice／Qt、PDF 及其他组件的许可和对应源码义务，也不代表上游全部功能均已在 Open Office 验收。
 
 ## 0.7.0 第一阶段 Rust 文字内核的字体与基础库
 

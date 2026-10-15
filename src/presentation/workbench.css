@@ -789,10 +789,10 @@
   align-items: center;
   justify-content: space-between;
   padding: 9px 14px;
-  background: #fff7e8;
+  background: var(--ui-warning-soft, #fff7e8);
   color: var(--ui-warning, #906313);
   line-height: 1.6;
-  border-bottom: 1px solid #eddccc;
+  border-bottom: 1px solid var(--ui-line, #eddccc);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
@@ -811,9 +811,9 @@
   align-items: center;
   gap: 8px;
   padding: 10px 13px;
-  background: #fcf0ef;
+  background: var(--ui-danger-soft, #fcf0ef);
   color: var(--ui-danger, #b54746);
-  border-bottom: 1px solid #eddccb;
+  border-bottom: 1px solid var(--ui-line, #eddccb);
   font-size: 12px;
 }
 .pw-confirm-delete>span {
@@ -1162,7 +1162,7 @@
   margin: 0;
   padding: 10px 25px;
   color: var(--ui-danger, #b54746);
-  background: #fcf0ef;
+  background: var(--ui-danger-soft, #fcf0ef);
   line-height: 1.7;
   font-size: 12px;
   overflow-wrap: anywhere;
@@ -1201,3 +1201,7 @@
 .pw-multi-arrange {
   margin-top: 8px;
 }
+
+[data-theme="dark"] .pw-active { --pw-accent: var(--ui-warning); --pw-accent-soft: var(--ui-warning-soft); }
+[data-theme="dark"] .pw-command-primary:hover:not(:disabled) { background: var(--pw-accent-soft); border-color: var(--pw-accent); }
+[data-theme="dark"] .pw-confirm-delete button { border-color: var(--ui-line-strong); }

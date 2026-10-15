@@ -31,6 +31,8 @@ pub(crate) fn command_visible(id: &str) -> bool {
         && !matches!(
             id,
             "ui.backstage"
+                | "ui.theme"
+                | "ui.dark"
                 | "ui.print"
                 | "ui.printSubmit"
                 | "ui.openFileDialog"
@@ -84,6 +86,7 @@ mod tests {
             );
             // A previous preference or direct state restore cannot reveal Backstage in the host.
             app.ui.backstage = embedded;
+            app.ui.tab = "View".into();
             let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1600.0, 900.0)).build_ui_state(
                 |ui, app: &mut WordApp| {
                     app.logic(ui.ctx());
@@ -95,7 +98,7 @@ mod tests {
             let ctx = h.state().ctx.as_ref().unwrap();
             let controls = drawn(ctx);
             let has = |id: &str| controls.iter().any(|control| control["id"] == id);
-            for id in ["titleBar", "share", "quickAccess:file.save", "tab:File", "tab:Help"] {
+            for id in ["titleBar", "share", "quickAccess:file.save", "tab:File", "tab:Help", "interfaceTheme"] {
                 assert_eq!(has(id), !embedded, "{id}, embedded={embedded}");
             }
             for id in ["quickAccess:edit.undo", "quickAccess:edit.redo", "tab:Home", "tab:Insert", "tab:Layout"] {
@@ -113,6 +116,54 @@ mod tests {
                 crate::keytips::activate(app);
                 crate::keytips::handle_key(app, egui::Key::Num1);
                 assert!(!app.ui.backstage);
+            }
+        }
+    }
+
+    #[test]
+    fn embedded_host_theme_changes_only_interface_and_keeps_system_automatic() {
+        use crate::theme::Appearance;
+        for edited in [false, true] {
+            let mut app = WordApp::new(
+                wordcraft_engine::Session::new(wordcraft_doc::Document::from_text("Draft")),
+                Services { embedded_editor: true, ..Default::default() },
+            );
+            if edited {
+                app.run("text.insert", json!({"text": "Unsaved "})).unwrap();
+                app.run("format.bold", json!({"value": true})).unwrap();
+                app.run("edit.undo", json!({})).unwrap();
+            }
+            app.session.view.dark_mode = true;
+            let ctx = egui::Context::default();
+            ctx.run_ui(egui::RawInput::default(), |ui| app.logic(ui.ctx())).drop_without_applying_deltas();
+            let document = app.session.doc.clone();
+            let selection = app.session.sel.clone();
+            let revision = app.session.rev();
+            let dirty = app.session.dirty;
+            let undo = app.session.undo_depth();
+            let redo = app.session.can_redo();
+            for appearance in [Appearance::Dark, Appearance::Light, Appearance::System] {
+                app.set_host_theme(appearance);
+                for os in [egui::Theme::Dark, egui::Theme::Light] {
+                    ctx.run_ui(egui::RawInput { system_theme: Some(os), ..Default::default() }, |ui| app.logic(ui.ctx()))
+                        .drop_without_applying_deltas();
+                    let observed = crate::control::inspect(&mut app, &ctx);
+                    assert_eq!(observed["theme"]["preference"], appearance.code());
+                    assert_eq!(observed["theme"]["resolved"], if appearance.is_dark(Some(os)) { "dark" } else { "light" });
+                    assert_eq!(ctx.options(|options| options.theme_preference), appearance.preference());
+                    assert_eq!(app.session.doc, document);
+                    assert_eq!(app.session.sel, selection);
+                    assert_eq!(app.session.rev(), revision);
+                    assert_eq!(app.session.dirty, dirty);
+                    assert_eq!(app.session.undo_depth(), undo);
+                    assert_eq!(app.session.can_redo(), redo);
+                    assert!(app.session.view.dark_mode);
+                }
+                for id in ["ui.theme", "ui.dark"] {
+                    assert!(app.run(id, json!({"value": "light"})).is_err());
+                    assert!(app.execute(id, json!({"value": "light"})).is_err());
+                    assert_eq!(app.ui.theme, appearance);
+                }
             }
         }
     }

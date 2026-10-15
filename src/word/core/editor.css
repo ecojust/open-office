@@ -64,3 +64,28 @@
 @media(max-width:420px){.word-page-settings-heading{padding:12px}.word-page-settings-scroll{padding:12px}.word-page-settings-actions{padding:10px 12px}.word-page-settings-options{gap:2px}.word-page-settings-options span{padding:0 3px;font-size:11px}.word-page-settings-fields{gap:12px}}
 
 .word-page-settings-buttons{display:flex;justify-content:flex-end;gap:8px}.word-page-settings-actions .word-page-settings-error{margin:0;max-height:90px;overflow:auto}
+
+/* Keep the paper, text formatting and color swatches independent of the UI theme. */
+[data-theme="dark"] .standalone-word-editor { background: var(--ui-bg); color: var(--ui-text); }
+[data-theme="dark"] :is(.word-toolbar,.word-status,.word-underline-menu,.word-strike-menu,.word-highlight-menu,.word-background-menu,.word-case-menu,.word-letter-spacing-menu,.word-position-menu,.word-paragraph-spacing-overlay,.word-page-settings-panel,.word-position-actions,.word-underline-color-actions,.word-page-settings-actions) { background: var(--ui-surface); border-color: var(--ui-line); }
+[data-theme="dark"] :is(.word-indent-panel,.word-paragraph-spacing-panel,.word-kerning-options,.word-paragraph-spacing-options,.word-page-settings-options) { background: var(--ui-surface-muted); border-color: var(--ui-line); }
+[data-theme="dark"] :is(.word-toolbar-group,.word-underline-color-fieldset,.word-page-settings-heading) { border-color: var(--ui-line); }
+[data-theme="dark"] :is(.word-toolbar,.word-indent-panel,.word-paragraph-spacing-panel,.word-page-settings-panel) :is(button,input,select,legend,label,output) { color: var(--ui-text); border-color: var(--ui-line-strong); }
+[data-theme="dark"] :is(.word-toolbar,.word-indent-panel,.word-paragraph-spacing-panel,.word-page-settings-panel) :is(input,select) { background: var(--ui-surface); }
+[data-theme="dark"] :is(.word-indent-actions,.word-paragraph-spacing-actions,.word-page-settings-actions) button { background: var(--ui-surface); }
+[data-theme="dark"] .word-toolbar button:hover,
+[data-theme="dark"] :is(.word-indent-actions,.word-paragraph-spacing-actions,.word-page-settings-actions) button:hover { background: var(--ui-surface-muted); }
+[data-theme="dark"] .word-toolbar :is(button[aria-pressed=true],button[aria-expanded=true],button[aria-checked=true]),
+[data-theme="dark"] :is(.word-kerning-options,.word-paragraph-spacing-options,.word-page-settings-options) input:checked+span { background: var(--ui-accent-soft); border-color: var(--ui-accent); color: var(--ui-accent); }
+[data-theme="dark"] .word-toolbar button[aria-pressed=mixed] { background: var(--ui-surface-muted); border-color: var(--ui-line-strong); color: var(--ui-muted); }
+[data-theme="dark"] :is(.word-underline-control,.word-strike-control):has([aria-expanded=true]) { background: var(--ui-accent-soft); }
+[data-theme="dark"] .standalone-word-editor :is(.word-toolbar,.word-indent-panel,.word-paragraph-spacing-panel,.word-page-settings-panel) button[class$="-apply"] { background: var(--ui-accent); border-color: var(--ui-accent); color: var(--ui-bg); }
+[data-theme="dark"] :is(.word-toolbar,.word-indent-panel,.word-paragraph-spacing-panel,.word-page-settings-panel) small,
+[data-theme="dark"] :is(.word-toolbar,.word-indent-panel,.word-paragraph-spacing-panel,.word-page-settings-panel) input::placeholder { color: var(--ui-muted); }
+[data-theme="dark"] :is(.word-select-label,.word-color-label,.word-highlight-arrow,.word-underline-preview,.word-strike-preview,.word-case-preview,.word-underline-color-help,.word-position-caption,.word-position-help,.word-highlight-caption,.word-background-caption,.word-background-help,.word-case-help,.word-letter-spacing-caption,.word-letter-spacing-help,.word-kerning-help,.word-indent-help,.word-paragraph-spacing-help,.word-paragraph-spacing-line-help,.word-page-settings-help,.word-view-heading,.word-loading,.word-status) { color: var(--ui-muted); }
+[data-theme="dark"] :is(.word-kerning-fieldset legend span,.word-paragraph-spacing-line legend>span,.word-page-settings-heading>span,.word-underline-color-fieldset legend span,.word-kerning-options span,.word-paragraph-spacing-options span,.word-page-settings-options span) { color: var(--ui-muted); }
+[data-theme="dark"] :is(.word-view-heading strong,.word-paragraph-spacing-title,.word-page-settings-heading h3) { color: var(--ui-text); }
+[data-theme="dark"] .word-message { background: var(--ui-accent-soft); border-color: var(--ui-line); color: var(--ui-accent); }
+[data-theme="dark"] .word-problem { background: var(--ui-danger-soft); border-color: var(--ui-line); color: var(--ui-danger); }
+[data-theme="dark"] :is(.word-position-error,.word-letter-spacing-error,.word-indent-error,.word-paragraph-spacing-error,.word-page-settings-error) { color: var(--ui-danger); }
+[data-theme="dark"] .word-page { color-scheme: light; }

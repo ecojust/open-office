@@ -1,6 +1,6 @@
 {
   "name": "open-office",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -9,8 +9,10 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5198 --strictPort",
     "typecheck": "vue-tsc --noEmit",
+    "icons:build": "node scripts/build-office-icons.mjs",
+    "icons:check": "node scripts/build-office-icons.mjs --check",
     "runtime:fetch": "node scripts/fetch-office-runtime.mjs",
-    "build": "npm run assets && npm run runtime:fetch && npm run word:build && npm run typecheck && vite build",
+    "build": "npm run assets && npm run runtime:fetch && npm run word:build && npm run sheet:build && npm run typecheck && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4198 --strictPort",
     "test": "npm run typecheck && node --test --experimental-test-isolation=none tests/*.test.mjs && npm run pdf:test",
     "pdf:build": "node scripts/build-pdf-backend.mjs",
@@ -68,13 +70,17 @@
     "test:browser:office-drafts": "node tests/browser/workbench-drafts.cjs",
     "test:compatibility": "node tests/compatibility/run.cjs",
     "test:compatibility:onlyoffice": "node tests/compatibility/onlyoffice-desktop.mjs",
-    "predev": "npm run word:build",
+    "predev": "npm run word:build && npm run sheet:build",
     "word:build": "node scripts/build-wordcraft.mjs",
     "word:check": "node scripts/build-wordcraft.mjs --check",
     "test:browser:word-engine": "node tests/browser/wordcraft-engine.cjs",
     "test:browser:word-embedded": "node tests/browser/wordcraft-embedded-ui.cjs",
     "test:browser:wordcraft": "node tests/browser/wordcraft-engine.cjs",
-    "test:native:word-engine": "node scripts/rust-word-native-smoke.mjs"
+    "test:native:word-engine": "node scripts/rust-word-native-smoke.mjs",
+    "sheet:build": "node scripts/build-gridcraft.mjs",
+    "sheet:check": "node scripts/build-gridcraft.mjs --check",
+    "test:browser:sheet-engine": "node tests/browser/gridcraft-engine.cjs",
+    "test:browser:sheet-native-helper": "node tests/browser/gridcraft-native-helper.cjs"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "1.1.1",

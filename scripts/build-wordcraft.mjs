@@ -3,12 +3,14 @@ import { readFile, readdir, mkdir, writeFile, rm } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { buildOfficeIcons } from './build-office-icons.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const source = join(root, 'vendor/wordcraft')
 const output = join(root, 'public/wordcraft')
 const digest = value => createHash('sha256').update(value).digest('hex')
-const sources = ['scripts/build-wordcraft.mjs']
+await buildOfficeIcons({ root, families: ['word'], check: process.argv.includes('--check') })
+const sources = ['scripts/build-wordcraft.mjs', 'scripts/build-office-icons.mjs']
 async function collect(relative) {
   for (const entry of (await readdir(join(root, relative), { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
     if (['target', '.git'].includes(entry.name)) continue
@@ -18,6 +20,7 @@ async function collect(relative) {
   }
 }
 await collect('vendor/wordcraft')
+await collect('src/icons')
 // The host embeds these locally bundled, licensed fonts for Chinese UI and documents.
 await collect('crates/word-engine/fonts')
 const hash = createHash('sha256')

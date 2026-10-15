@@ -6,7 +6,7 @@
   --pdf-line-strong: var(--ui-line-strong, #cbd2dc);
   --pdf-accent: var(--ui-danger, #b54746);
   --pdf-accent-hover: #983a3a;
-  --pdf-soft: #faf0ef;
+  --pdf-soft: var(--ui-danger-soft, #faf0ef);
   --pdf-surface: var(--ui-surface, #fff);
   --pdf-surface-muted: var(--ui-surface-muted, #f7f8fa);
   display: flex;
@@ -127,9 +127,9 @@
 
 .pdf-message > span { min-width: 0; }
 .pdf-message button { flex: none; min-height: 28px; padding: 3px 9px; border: 1px solid currentColor; border-radius: 4px; color: inherit; background: transparent; }
-.pdf-message-error { background: #fbefee; color: var(--ui-danger, #b54746); border-bottom: 1px solid #ecd2d0; }
-.pdf-message-warning { background: #fbf5e8; color: var(--ui-warning, #906313); border-bottom: 1px solid #e9ddc1; }
-.pdf-message-info { background: var(--ui-accent-soft, #edf2fd); color: #39577c; border-bottom: 1px solid #d5dff0; }
+.pdf-message-error { background: var(--ui-danger-soft, #fbefee); color: var(--ui-danger, #b54746); border-bottom: 1px solid var(--pdf-line); }
+.pdf-message-warning { background: var(--ui-warning-soft, #fbf5e8); color: var(--ui-warning, #906313); border-bottom: 1px solid var(--pdf-line); }
+.pdf-message-info { background: var(--ui-accent-soft, #edf2fd); color: var(--ui-accent, #39577c); border-bottom: 1px solid var(--pdf-line); }
 
 .pdf-search-bar { flex: none; padding: 10px 16px; border-bottom: 1px solid var(--pdf-line); background: var(--pdf-surface); }
 .pdf-search-bar form { display: flex; align-items: center; gap: 8px; max-width: 500px; }
@@ -188,7 +188,7 @@
 .pdf-form-checkbox input { width: 17px; height: 17px; accent-color: var(--pdf-accent); }
 
 /* The paper and annotation colors belong to the document, not the UI theme. */
-.pdf-stage { position: relative; display: block; flex: 1; min-width: 0; min-height: 0; padding: 24px; overflow: auto; overscroll-behavior: contain; background: #eef0f3; scrollbar-width: thin; }
+.pdf-stage { position: relative; display: block; flex: 1; min-width: 0; min-height: 0; padding: 24px; overflow: auto; overscroll-behavior: contain; background: var(--ui-bg, #eef0f3); scrollbar-width: thin; }
 .pdf-page-surface { position: relative; flex: none; margin: 0 auto 24px; outline: 1px solid var(--pdf-line-strong); background: white; }
 .pdf-main-canvas { display: block; width: 100%; height: 100%; }
 .pdf-text-overlay { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
@@ -231,7 +231,7 @@
 .pdf-editor select { appearance: none; padding-right: 28px; }
 
 /* Loading, locked files and dialogs */
-.pdf-busy-overlay { position: absolute; z-index: 4; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; background: #eef0f3f2; color: var(--pdf-ink); text-align: center; }
+.pdf-busy-overlay { position: absolute; z-index: 4; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; background: var(--ui-bg, #eef0f3); color: var(--pdf-ink); text-align: center; }
 .pdf-busy-overlay > span:last-child { color: var(--pdf-muted); font-size: 12px; }
 .pdf-spinner { width: 24px; height: 24px; border: 2px solid #e7c6c5; border-top-color: var(--pdf-accent); border-radius: 50%; animation: pdf-spin .8s linear infinite; }
 @keyframes pdf-spin { to { transform: rotate(360deg); } }
@@ -269,7 +269,7 @@
 .pdf-local-badge { display: flex; flex: none; align-items: center; gap: 5px; color: var(--ui-success, #25835d); }
 .pdf-local-badge::before { width: 5px; height: 5px; border-radius: 50%; background: currentColor; content: ''; }
 .pdf-context-hint { flex: none; margin: 0; padding: 5px 16px; border-top: 1px solid var(--pdf-line); background: var(--pdf-surface-muted); color: var(--pdf-muted); font-size: 11px; }
-.pdf-scanned-hint { background: #fbf5e8; color: var(--ui-warning, #906313); }
+.pdf-scanned-hint { background: var(--ui-warning-soft, #fbf5e8); color: var(--ui-warning, #906313); }
 .pdf-sr-only { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; white-space: nowrap; }
 
 @media (max-width: 1000px) {
@@ -320,3 +320,7 @@
   .pdf-editor button { transition: none; }
   .pdf-spinner { animation-duration: 2s; }
 }
+
+[data-theme="dark"] .pdf-editor :is(.pdf-tool-button.active,.pdf-thumbnail-item.selected) { border-color: var(--pdf-accent); }
+[data-theme="dark"] .pdf-editor .pdf-primary-button { color: var(--ui-bg); }
+[data-theme="dark"] .pdf-editor .pdf-primary-button:hover:not(:disabled) { background: var(--pdf-accent); }

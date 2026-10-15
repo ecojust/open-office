@@ -10,6 +10,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validateWordPackageReport } from './word-package-native-smoke.mjs';
 import { inspectInstalledWordcraft, validateNativeWordcraftEvidence, validateWordcraftNativeReport } from './wordcraft-native-smoke.mjs';
+import { inspectInstalledGridcraft, validateNativeGridcraftEvidence, validateGridcraftNativeReport } from './gridcraft-native-smoke.mjs';
 
 // This launches the final packaged GUI, not a source executable or an isolated
 // engine substitute. A native desktop session is required on the CI runner.
@@ -252,11 +253,14 @@ export function validateFrontendReport(report) {
   const officeWorkbenchChecks = validateOfficeWorkbenches(report);
   validateRustWordEngineReport(report.rustWordEngine);
   validateWordcraftNativeReport(report.wordcraft);
+  validateGridcraftNativeReport(report.gridcraft);
 
   return {
     ...officeWorkbenchChecks,
     wordcraftDefaultCanvas: true, wordcraftDomInput: true, wordcraftDocxReadback: true,
     wordcraftFailureAtomicity: true, wordcraftSessionCleanup: true,
+    gridcraftDefaultCanvas: true, gridcraftDomInput: true, gridcraftXlsxReadback: true,
+    gridcraftFormulaRoundTrip: true, gridcraftFailureAtomicity: true, gridcraftSessionCleanup: true,
     rustWordEngineIpc: true, rustWordEngineDocxReadback: true, rustWordEngineSessionCleanup: true,
     independentWordPackageIpc: true,
     presentationWorkbenchRoundTrip: true, presentationMediaMetadata: true, presentationCanvasNavigation: true,
@@ -558,6 +562,7 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     report.preflight.finalExecutableSha256 = hashFile(location.executable);
     report.preflight.pdfExecutableSha256 = hashFile(location.pdfExecutable);
     report.preflight.wordcraft = inspectInstalledWordcraft(location.resourceRoot, { root });
+    report.preflight.gridcraft = inspectInstalledGridcraft(location.resourceRoot, { root });
     if (configuration.os === 'darwin') {
       report.preflight.macos = macPreflight(location.app, location.executable, location.pdfExecutable, configuration.nativeArch);
       if (execution.executionMode === 'rosetta2') {
@@ -578,6 +583,7 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     report.frontend = readFrontendReport(rawReport);
     report.checks = validateFrontendReport(report.frontend);
     Object.assign(report.checks, validateNativeWordcraftEvidence(report, { root }));
+    Object.assign(report.checks, validateNativeGridcraftEvidence(report, { root }));
     requireCheck(report.process.cleanExit === true && report.process.exitCode === 0 && !report.process.signal && !report.process.timedOut, 'Native GUI did not exit cleanly after its checks');
     report.ok = true;
   } catch (error) {

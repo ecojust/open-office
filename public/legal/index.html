@@ -5,11 +5,12 @@
 <title>Open Office — 开源许可与对应源码</title>
 <style>body{max-width:880px;margin:40px auto;padding:0 20px;font:16px/1.8 system-ui,sans-serif;color:#23314b}a{color:#2455aa}li{margin:.4em 0}code{font-size:.92em}footer{margin-top:3em;color:#637087}</style>
 <h1>开源许可与对应源码</h1>
-<p>Open Office 使用 WordCraft、ZetaOffice / LibreOffice、Qt WASM、PyMuPDF / MuPDF、Vue、PDF.js、Tauri 等开源组件。各组件保留原作者的版权、许可和免责条款，本应用不是这些项目的官方发行版。</p>
+<p>Open Office 使用 WordCraft、GridCraft、ZetaOffice / LibreOffice、Qt WASM、PyMuPDF / MuPDF、Vue、PDF.js、Tauri 等开源组件。各组件保留原作者的版权、许可和免责条款，本应用不是这些项目的官方发行版。</p>
 <p>发行物含 AGPL 和 GPL 组件；本项目未使用或购买其商业授权。Qt WASM 平台插件为 GPL 第 3 版，不能以 Qt 其他部分的 LGPL 代替。</p>
 <h2>主要许可原文</h2>
 <ul>
 <li>WordCraft：<a href="wordcraft/LICENSE-MIT">MIT</a> · <a href="wordcraft/LICENSE-APACHE">Apache-2.0</a> · <a href="wordcraft/NOTICE">NOTICE</a> · <a href="wordcraft/ATTRIBUTION.md">资产归属</a> · <a href="wordcraft/OPEN-OFFICE-INTEGRATION.md">本地集成与字体说明</a> · <a href="wordcraft/source-manifest.json">固定来源及 SHA-256</a></li>
+<li>GridCraft：<a href="gridcraft/LICENSE-MIT">MIT</a> · <a href="gridcraft/LICENSE-APACHE">Apache-2.0</a> · <a href="gridcraft/NOTICE">NOTICE</a> · <a href="gridcraft/ATTRIBUTION.md">资产归属</a> · <a href="gridcraft/OPEN-OFFICE-INTEGRATION.md">本地集成说明</a> · <a href="gridcraft/source-manifest.json">固定来源及 SHA-256</a></li>
 <li>craft-ui / craft-libs：<a href="wordcraft/craft-libs/LICENSE-MIT">MIT</a> · <a href="wordcraft/craft-libs/LICENSE-APACHE">Apache-2.0</a> · <a href="wordcraft/craft-libs/NOTICE">NOTICE 与代码来源</a></li>
 <li>WordCraft 字体：<a href="wordcraft/fonts/OFL-Inter.txt">Inter</a> · <a href="wordcraft/fonts/OFL-JetBrainsMono.txt">JetBrains Mono</a> · <a href="wordcraft/fonts/OFL-SourceSans3.txt">Source Sans 3</a> · <a href="wordcraft/fonts/OFL-SourceSerif4.txt">Source Serif 4</a> · <a href="wordcraft/fonts/open-office/LICENSE-Noto-CJK.txt">Noto CJK</a></li>
 <li>egui 内嵌字体：<a href="rust/epaint_default_fonts@0.36.2/fonts/OFL.txt">Noto Emoji OFL</a> · <a href="rust/epaint_default_fonts@0.36.2/fonts/UFL.txt">Ubuntu 字体许可</a> · <a href="rust/epaint_default_fonts@0.36.2/fonts/Hack-Regular.txt">Hack / Bitstream Vera / DejaVu</a> · <a href="rust/epaint_default_fonts@0.36.2/fonts/emoji-icon-font-mit-license.txt">emoji-icon-font MIT</a></li>
@@ -29,6 +30,7 @@
 <li><a href="THIRD_PARTY_NOTICES.md">本应用第三方声明</a></li>
 <li><a href="npm-dependencies.json">npm 依赖及许可索引</a> · <a href="rust-dependencies.json">Rust 依赖及许可索引</a></li>
 <li><a href="wordcraft-dependencies.json">WordCraft WASM 实际依赖及许可索引</a>（normal / build 依赖，与旧 Rust 清单分开记录）</li>
+<li><a href="gridcraft-dependencies.json">GridCraft WASM 实际依赖及许可索引</a>（normal / build 依赖，与旧 Rust 清单分开记录）</li>
 <li><a href="CORRESPONDING-SOURCE.md">对应源码组装与发行说明</a></li>
 <li><a href="corresponding-sources-manifest.json">固定源码提交、下载地址和 SHA-256</a></li>
 <li><a href="zetajs-local-change.patch">zeta.js 本地修改</a> · <a href="LIBREOFFICE-WASM-BUILD.md">上游 WASM 构建文档</a></li>

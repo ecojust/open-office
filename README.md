@@ -4,7 +4,9 @@
 
 [下载安装包](https://github.com/ecojust/open-office/releases) · [构建记录](https://github.com/ecojust/open-office/actions/workflows/desktop-release.yml) · [开发与构建](docs/development.md)
 
-**0.8.1 · 文字编辑体验更新（Alpha）**：文字工作区仅保留文档编辑工具，新建、打开、保存、另存为、导出与打印统一由 Open Office 提供。修复搜索框输入、另存为快捷键及关闭标签后恢复原文稿的问题。本地生产构建与三套浏览器验收已通过；三平台安装包通过本轮 Actions 检查后以公开测试版提供。见 [0.8.1 更新说明](docs/releases/0.8.1.md)与[验证边界](docs/wordcraft-integration.md)。此前的 [0.8.0 已公开发布](https://github.com/ecojust/open-office/releases/tag/desktop-v0.8.0-38691848013)。
+**0.9.0 · 电子表格与统一工作台（Alpha）**：XLSX、CSV、TSV 使用本地 Rust 编辑器；新建、打开、保存、导出与打印集中到顶部工具栏，作用于当前文档。全局浅色／深色／跟随系统主题与原创 SVG 图标同步文字和表格工作区。见 [0.9.0 更新说明](docs/releases/0.9.0.md)及[电子表格集成说明](docs/gridcraft-integration.md)。
+
+Windows x64、Mac M 系列与 Mac Intel 安装包通过各自自检后在[发布页](https://github.com/ecojust/open-office/releases)公开。
 
 ![Open Office 工作台](docs/screenshots/home.png)
 
@@ -14,15 +16,22 @@
 | --- | --- | --- |
 | 文字文档（Alpha） | DOCX；导出 PDF | 文字与段落格式、列表、表格、图片、页面与审阅等编辑工具；文件操作由 Open Office 统一提供，验证范围见下文 |
 | 文字兼容编辑器 | DOCX、ODT | 文字与段落排版、普通列表与编号、上下标与高亮、超链接、标题大纲、表格、页眉页脚、查找替换、批注与修订、导出 PDF |
-| 电子表格 | XLSX、ODS | 单元格与公式、混合格式提示与富文本格式设置、向下/向右填充、选区汇总、工作表管理、排序筛选、冻结、条件格式、数据验证、基础图表与透视汇总 |
+| 电子表格（Alpha） | XLSX、CSV、TSV；导出 PDF | Rust 工作簿模型与公式计算、功能区、公式栏、格式与工作表编辑；文件操作由 Open Office 统一提供，功能保真与验证边界见集成说明 |
+| 表格兼容编辑器 | XLSX、ODS、XLS 导入 | 保留原表格引擎，供 ODS、旧 XLS 及需要核对兼容性的复杂工作簿使用 |
 | 演示文稿 | PPTX | 独立画布、局部文字与段落排版、文本框布局、图片、可编辑表格和图表、备注、页面切换、本地音视频与放映 |
 | PDF 工作室 | PDF | 原文替换、新增文字与图片、高亮与便签、批注备注管理、简单表单填写、手绘签名、搜索、合并与页面整理、页码和水印 |
 
 支持最近文件、撤销重做、保存与另存为；另存为可以选择当前工作区支持的格式，跨格式转换生成副本，保留原文稿继续编辑。未保存退出确认、未应用草稿检查和外部文件修改检测，帮助保留编辑结果。旧版 DOC、RTF、XLS 可导入并另存现代格式副本。演示文稿目前支持标准 PPTX，旧 PPT 与 ODP 需要先转换。
 
+新建、打开、保存、另存为、导出与打印集中到最顶部全局工具栏。右上角的太阳、月亮、显示器按钮分别选择浅色、深色和跟随系统；选择会记忆，并同步文字与表格编辑区。
+
+顶部工具栏、文字与表格功能区采用自行绘制的 SVG 图标，统一线条、留白和主题色。可编辑的图标源文件与生成方式见 [图标说明](src/icons/README.md)。
+
 演示工作区现已采用独立文档模型、SVG 画布和 PPTX 读写模块，不加载原办公引擎。文件操作与幻灯片工具各一行，属性收在侧栏；支持拖动、缩放、组合、表格与图表数据编辑，以及可检索中文的 PDF 导出。[功能与验证范围](docs/standalone-presentation.md)
 
-默认文字工作区基于 [WordCraft](https://github.com/storytold/wordcraft) 的 Rust 内核与 egui `WordApp` 界面，编译为随应用分发的 WASM，在本地画布中运行。Vue/Tauri 负责工作台、多标签、文件对话框和保存保护。这是对开源编辑器源码的集成；电子表格和显式文字兼容入口继续使用原办公引擎，演示与 PDF 保留各自实现。
+默认文字工作区基于 [WordCraft](https://github.com/storytold/wordcraft) 的 Rust 内核与 egui `WordApp` 界面；默认表格工作区采用 [GridCraft](https://github.com/storytold/gridcraft) 的 Rust 工作簿、公式引擎与 egui 界面。两者编译为随应用分发的 WASM，在本地画布中运行。Vue/Tauri 负责工作台、多标签、文件对话框和保存保护。显式文字与表格兼容入口继续使用原办公引擎，演示与 PDF 保留各自实现。
+
+新的表格集成复用开源引擎，不加载远程 Office 网页。导入工作簿首次保存生成副本；CSV／TSV 只导出活动表的显示值，不包含格式和公式。复杂 XLSX 的未建模对象及扩展仍可能丢失，不能假定任意文件无损往返，也不把上游功能数量当作本应用已验收数量。[表格架构、格式与验证边界](docs/gridcraft-integration.md)
 
 当前外壳开放 DOCX 导入、编辑与保存，以及 PDF 副本导出。WordCraft 上游仍为 Alpha，完整功能区中的命令数量不等于已经验证所有功能；复杂对象、字体替换、分页和文件往返保真仍需核对。导入的 DOCX 首次保存生成副本，失败打开不会自动切换引擎。其他文字格式从“兼容编辑器”入口打开。尚未测得本集成相对旧引擎的性能提升，也未宣称替代完整 Microsoft Office。[架构、功能与验收边界](docs/wordcraft-integration.md)
 
@@ -40,19 +49,21 @@
 
 ## 界面预览
 
-以下为实际运行的浏览器预览截图，内容为测试文档；桌面版另提供原生文件保存与本地后台处理。演示工作区采用独立扁平界面，截图中的文字兼容编辑器和表格工作区仍保留内置高级菜单的原有外观，尚未展示当前默认文字工作区。
+以下为实际运行的浏览器预览截图，内容为测试文档；桌面版另提供原生文件保存与本地后台处理。文字与表格截图展示 0.9.0 的全局工具栏、主题切换和原创图标。
 
 <details>
-<summary>文字文档</summary>
+<summary>文字文档（深色主题）</summary>
 
-![文字文档编辑](docs/screenshots/document.png)
+![文字工作区与全局工具栏](docs/screenshots/document.png)
 
 </details>
 
 <details>
-<summary>电子表格</summary>
+<summary>电子表格（跟随系统浅色主题）</summary>
 
-![电子表格编辑](docs/screenshots/spreadsheet.png)
+![Rust 电子表格工作区](docs/screenshots/spreadsheet.png)
+
+[窄窗截图](docs/screenshots/spreadsheet-narrow.png) · [已验证功能与边界](docs/gridcraft-integration.md)
 
 </details>
 
@@ -76,7 +87,7 @@
 
 当前安装包未配置商业代码签名；macOS 包使用本地签名，尚未进行开发者公证。首次打开请按系统安全提示处理，校验文件见发布附件 `SHA256SUMS`。
 
-0.8.1 的改动与验证范围见 [更新说明](docs/releases/0.8.1.md)。本轮 Windows x64、macOS ARM64 与 macOS Intel 安装包须通过构建及必要自检，全部通过后公开测试版；下载与校验文件以[发布页](https://github.com/ecojust/open-office/releases)为准，逐平台结果见[构建记录](https://github.com/ecojust/open-office/actions/workflows/desktop-release.yml)。也可查看已发布的 [0.8.0 安装包](https://github.com/ecojust/open-office/releases/tag/desktop-v0.8.0-38691848013)。
+0.9.0 的改动与验证范围见 [更新说明](docs/releases/0.9.0.md)，各平台安装包、源码与校验文件见[发布页](https://github.com/ecojust/open-office/releases)，逐平台验证结果见[构建记录](https://github.com/ecojust/open-office/actions/workflows/desktop-release.yml)。
 
 开发需要 Node.js 24、Python 3.12、Rust stable（至少 1.95）、`wasm32-unknown-unknown`、固定 `wasm-bindgen-cli 0.2.129` 和对应系统的原生构建工具，步骤见[开发与构建](docs/development.md)。
 

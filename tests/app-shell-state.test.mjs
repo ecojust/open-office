@@ -15,10 +15,11 @@ import * as textColor from '../src/word/core/text-color.ts'
 const app = (await readFile(new URL('../src/App.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
 const utilities = await readFile(new URL('../src/shared/document.ts', import.meta.url), 'utf8')
 const dialogFocus = await readFile(new URL('../src/shared/dialog-focus.ts', import.meta.url), 'utf8')
+const appearanceSource = await readFile(new URL('../src/shared/appearance.ts', import.meta.url), 'utf8')
 const preparedSource = await readFile(new URL('../src/word/core/prepared.ts', import.meta.url), 'utf8')
 const paperSource = await readFile(new URL('../src/word/core/paper.ts', import.meta.url), 'utf8')
 const independentEditor = (await readFile(new URL('../src/components/StandaloneWordEditor.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
-const names = 'tabs,activeKey,active,home,tabBar,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,officeDocument,pdfDocument,presentationDocument,independentWordDocument,independentWordPrepared,rustWordDocument,rustWordPrepared,rustWordEntries,rustWordHandles,setRustWordHandle,officeEditor,pdfEditor,presentationEditor,independentWordEditor,rustWordEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,openLegacyWord,browserFile,browserLegacyWord,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest'
+const names = 'tabs,activeKey,active,home,tabBar,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,officeDocument,pdfDocument,presentationDocument,independentWordDocument,independentWordPrepared,rustWordDocument,rustWordPrepared,rustWordEntries,rustWordHandles,setRustWordHandle,rustSheetEntries,rustSheetHandles,setRustSheetHandle,officeEditor,pdfEditor,presentationEditor,independentWordEditor,rustWordEditor,wordWorkbench,sheetWorkbench,writerState,calcState,presentationState,slidePreview,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,openLegacyWord,openLegacySheet,browserFile,browserLegacyWord,browserLegacySheet,saveActive,closeTab,closeWindow,resolveClose,task,editorTransaction,nativeTransactionalEditor,readFreshWriterState,runWriterCommand,officeRequest,appearance,currentDocument,globalActionsBlocked,documentActionsDisabled,globalFileAction,globalNewDocument,keydown'
 
 function compile(source, require, extra = {}) {
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
@@ -31,8 +32,8 @@ function compile(source, require, extra = {}) {
 const { prepareWordDocument } = compile(preparedSource, () => { throw Error('Unexpected prepared import') })
 const paper = compile(paperSource, () => { throw Error('Unexpected paper import') })
 
-function shell({nativeEnabled = true, smoke = false, independentImportError, independentImport, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, rustSmokeError, rustSmokeReport, rustSmokeRun, wordcraftSmokeError, wordcraftSmokeReport, wordcraftSmokeRun} = {}) {
-  const independentModels = [], preparations = [], rustPreparations = []
+function shell({nativeEnabled = true, smoke = false, independentImportError, independentImport, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, rustSmokeError, rustSmokeReport, rustSmokeRun, wordcraftSmokeError, wordcraftSmokeReport, wordcraftSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], gridcraftSmokeError, gridcraftSmokeReport, gridcraftSmokeRun, storedAppearance, systemDark = false, storageUnavailable = false} = {}) {
+  const independentModels = [], preparations = [], rustPreparations = [], sheetPreparations = []
   const calls = [], mounted = [], beforeUnmount = [], observers = [], reviews = [], native = {
     isTauri: () => nativeEnabled,
     onCloseRequested: async () => () => {},
@@ -47,13 +48,26 @@ function shell({nativeEnabled = true, smoke = false, independentImportError, ind
     },
   }
   const lifecycle = { ...vue, onMounted(callback) { mounted.push(callback) }, onBeforeUnmount(callback) { beforeUnmount.push(callback) } }
+  const storage = new Map(storedAppearance === undefined ? [] : [['open-office.appearance', storedAppearance]])
+  const windowListeners = new Map(), mediaListeners = new Set()
+  const media = { matches: systemDark, addEventListener(_type, callback) { mediaListeners.add(callback) }, removeEventListener(_type, callback) { mediaListeners.delete(callback) } }
+  class Element {}
   // Share DOM identities with the real dialog helper across both VM contexts.
   // Layout notifications remain controlled because this harness has no renderer.
   const browser = {
     crossOriginIsolated: true,
-    window: { addEventListener() {}, removeEventListener() {} },
-    document: { baseURI: 'http://127.0.0.1/', activeElement: null },
-    HTMLElement: class {},
+    window: {
+      addEventListener(type, callback) { if (!windowListeners.has(type)) windowListeners.set(type, new Set()); windowListeners.get(type).add(callback) },
+      removeEventListener(type, callback) { windowListeners.get(type)?.delete(callback) },
+      matchMedia: () => media,
+      localStorage: {
+        getItem(key) { if (storageUnavailable) throw Error('Storage unavailable'); return storage.get(key) ?? null },
+        setItem(key, value) { if (storageUnavailable) throw Error('Storage unavailable'); storage.set(key, value) },
+      },
+    },
+    document: { baseURI: 'http://127.0.0.1/', activeElement: null, documentElement: { dataset: {} } },
+    Element,
+    HTMLElement: class extends Element {},
     ResizeObserver: class {
       targets = new Set()
       disconnected = false
@@ -68,6 +82,10 @@ function shell({nativeEnabled = true, smoke = false, independentImportError, ind
     if (name === 'vue') return lifecycle
     throw Error(`Unexpected dialog helper import ${name}`)
   }, browser)
+  const appearance = compile(appearanceSource, name => {
+    if (name === 'vue') return lifecycle
+    throw Error(`Unexpected appearance helper import ${name}`)
+  }, browser)
   const helpers = compile(utilities, () => { throw Error('Unexpected helper import') })
   const state = scope.run(() => compile(`${app}\nexport const state={${names}}`, name => {
     if (name === 'vue') return lifecycle
@@ -75,6 +93,7 @@ function shell({nativeEnabled = true, smoke = false, independentImportError, ind
     if (name === './smoke') return {smokeRequested:()=>smoke,smokeStage(){},smokeFeatures:()=>({}),smokeFailure:async(error,phase)=>{calls.push(['smoke-failure',phase,String(error)])},smokeAwait:async(_phase,action)=>action()}
     if (name === './shared/document') return helpers
     if (name === './shared/dialog-focus') return focus
+    if (name === './shared/appearance') return appearance
     if (name === './office/import-review') return {reviewOfficeImport(document){reviews.push(document);return reviewOfficeImport(document)}}
     if (name === './word/core/prepared') return { prepareWordDocument(source, model) {
       const handoff=prepareWordDocument(source,model);preparations.push({source:{...source},model,handoff});return handoff
@@ -95,12 +114,27 @@ function shell({nativeEnabled = true, smoke = false, independentImportError, ind
       rustPreparations.push(Object.assign(record,{handoff}));calls.push(['rust-prepared',captured.id])
       return handoff
     } }
+    if (name === './sheet/rust/client') return { async prepareRustSheetDocument(source) {
+      const captured={...source}
+      calls.push(['sheet-preflight',captured])
+      if(sheetPrepareError)throw Error(sheetPrepareError)
+      const session=sheetPrepare?await sheetPrepare(captured):{testSheetSession:sheetPreparations.length}
+      let pending=session
+      const record={source:captured,session,discarded:0,takes:[]}
+      const handoff={warnings:[...sheetWarnings],
+        take(target){record.takes.push({...target});const value=pending;pending=undefined;return captured.id===target.id&&captured.base64===target.base64?value:undefined},
+        discard(){record.discarded++;pending=undefined},
+      }
+      sheetPreparations.push(Object.assign(record,{handoff}));calls.push(['sheet-prepared',captured.id])
+      return handoff
+    } }
     // These tests verify the shell's preflight ordering and rejection handling;
     // the real DOCX parser has separate codec and browser round-trip coverage.
     if (name === './word/core/runtime') return {async importWordDocument(bytes){calls.push(['independent-preflight',bytes.length]);if(independentImportError)throw Error(independentImportError);const model=independentImport?await independentImport(bytes):{paragraphs:[],testImport:independentModels.length};independentModels.push(model);return model}}
     if (name === './word/core/native-package-smoke') return {async runNativeWordPackageSmoke(){calls.push(['word-native-smoke']);if(wordSmokeError)throw Error(wordSmokeError);if(wordSmokeRun)return wordSmokeRun();return wordSmokeReport??{ok:true,kind:'word-package-ipc'}}}
     if (name === './word/rust/native-smoke') return {async runNativeRustWordSmoke(){calls.push(['rust-native-smoke']);if(rustSmokeError)throw Error(rustSmokeError);if(rustSmokeRun)return rustSmokeRun();return rustSmokeReport??{schemaVersion:1,ok:true,transport:'tauri-word-engine-request'}}}
     if (name === './word/rust/wordcraft-native-smoke') return {async runWordcraftNativeSmoke(adapter){calls.push(['wordcraft-native-smoke']);if(wordcraftSmokeError)throw Error(wordcraftSmokeError);if(wordcraftSmokeRun)return wordcraftSmokeRun(adapter);return wordcraftSmokeReport??{schemaVersion:1,ok:true,engine:'wordcraft-wasm'}}}
+    if (name === './sheet/rust/gridcraft-native-smoke') return {async runGridcraftNativeSmoke(adapter){calls.push(['gridcraft-native-smoke']);if(gridcraftSmokeError)throw Error(gridcraftSmokeError);if(gridcraftSmokeRun)return gridcraftSmokeRun(adapter);return gridcraftSmokeReport??{schemaVersion:1,ok:true,engine:'gridcraft-wasm'}}}
     if (name === '@tauri-apps/api/core') return { invoke: async (command,args) => { calls.push(['invoke',command,args]) } }
     if (name.endsWith('.vue')) return {}
     throw Error(`Unexpected setup import ${name}`)
@@ -121,16 +155,20 @@ function shell({nativeEnabled = true, smoke = false, independentImportError, ind
     getPresentationState: async () => ({ documentId: state.activeKey.value, revision: 1 }),
   })
   state.presentationEditor.value = presentationHandle
-  function tab(id, { ready = true, dirty = false, fileId = id, kind = 'word', wordEngine } = {}) {
+  function tab(id, { ready = true, dirty = false, fileId = id, kind = 'word', wordEngine, sheetEngine } = {}) {
     assert.ok(kind!=='word'||['legacy','independent','rust'].includes(wordEngine),'Word fixtures must select their engine explicitly')
+    assert.ok(kind!=='sheet'||['legacy','rust'].includes(sheetEngine),'Sheet fixtures must select their engine explicitly')
     const extension = {word:'docx',sheet:'xlsx',presentation:'pptx',pdf:'pdf'}[kind]
-    state.tabs.value.push({ key: id, ready, dirty, fileId, wordEngine:kind==='word'?wordEngine:undefined, document: { id, kind, extension,
+    state.tabs.value.push({ key: id, ready, dirty, fileId, wordEngine:kind==='word'?wordEngine:undefined, sheetEngine:kind==='sheet'?sheetEngine:undefined, document: { id, kind, extension,
       name: `${id}.${extension}`, base64: 'T0xE', sha256: 'old-hash', sizeBytes: 3 } })
     return state.tabs.value.at(-1)
   }
   function active(tab) {
     state.activeKey.value = tab.key
-    if (tab.wordEngine === 'rust') state.rustWordDocument.value = tab.document
+    if (tab.sheetEngine === 'rust') {
+      if(!state.rustSheetEntries.value.some(entry=>entry.document.id===tab.key))state.rustSheetEntries.value=[...state.rustSheetEntries.value,{document:tab.document}]
+    }
+    else if (tab.wordEngine === 'rust') state.rustWordDocument.value = tab.document
     else if (tab.wordEngine === 'independent') state.independentWordDocument.value = tab.document
     else if (tab.document.kind === 'pdf') state.pdfDocument.value = tab.document
     else if (tab.document.kind === 'presentation') state.presentationDocument.value = tab.document
@@ -140,7 +178,9 @@ function shell({nativeEnabled = true, smoke = false, independentImportError, ind
     for (let n = 0; n < 50 && state.busy.value; n++) { await Promise.resolve(); await vue.nextTick() }
     assert.equal(state.busy.value, '', 'The shell task should finish')
   }
-  return { state, native, calls, reviews, independentModels, preparations, rustPreparations, handle, presentationHandle, independentWordHandle, rustWordHandle, tab, active, idle, browser, observers,
+  return { state, native, calls, reviews, independentModels, preparations, rustPreparations, sheetPreparations, handle, presentationHandle, independentWordHandle, rustWordHandle, tab, active, idle, browser, observers, storage, windowListeners, mediaListeners,
+    setSystemDark(value) { media.matches = value; for (const listener of mediaListeners) listener({ matches: value }) },
+    dispatchWindow(type, event) { for (const listener of windowListeners.get(type) ?? []) listener(event) },
     async mount() { for (const callback of mounted) await callback() },
     unmount() { for (const callback of beforeUnmount) callback(); scope.stop() },
   }
@@ -221,7 +261,7 @@ test('save-as preserves its form and dirty state after a native conflict or expo
 
 test('save-as format choices match the active engine and preserve legacy source-copy behavior',async()=>{
   for(const [kind,expected]of [['sheet',['xlsx','ods','pdf']],['presentation',['pptx','pdf']],['pdf',['pdf']]]){
-    const h=shell(),a=h.tab(kind,{wordEngine:'legacy',kind});h.active(a);h.state.openSaveAs()
+    const h=shell(),a=h.tab(kind,{wordEngine:'legacy',sheetEngine:'legacy',kind});h.active(a);h.state.openSaveAs()
     assert.deepEqual(Array.from(h.state.saveAsOptions.value,o=>o.extension),expected)
     h.state.cancelSaveAs();assert.equal(h.state.saveAsDraft.value,null)
   }
@@ -400,8 +440,10 @@ test('full native smoke awaits independent Word evidence before creating the Off
   assert.equal(report.independentWordPackage,independent)
   assert.equal(report.rustWordEngine.transport,'tauri-word-engine-request')
   assert.equal(report.wordcraft.engine,'wordcraft-wasm')
+  assert.equal(report.gridcraft.engine,'gridcraft-wasm')
   assert.ok(h.calls.findIndex(call=>call[0]==='word-native-smoke') < h.calls.findIndex(call=>call[0]==='wordcraft-native-smoke'))
-  assert.ok(h.calls.findIndex(call=>call[0]==='wordcraft-native-smoke') < h.calls.findIndex(call=>call[0]==='office-document-created'))
+  assert.ok(h.calls.findIndex(call=>call[0]==='wordcraft-native-smoke') < h.calls.findIndex(call=>call[0]==='gridcraft-native-smoke'))
+  assert.ok(h.calls.findIndex(call=>call[0]==='gridcraft-native-smoke') < h.calls.findIndex(call=>call[0]==='office-document-created'))
   assert.equal(report.ok,false);assert.match(report.error,/controlled Office failure after Word gate/)
   stop();h.unmount()
 })
@@ -588,7 +630,7 @@ test('cancelled save and external conflict preserve dirty state and original ide
 
 test('legacy imports save only as modern copies without an original-file overwrite token', async () => {
   for(const [extension,modern,kind] of [['doc','docx','word'],['rtf','docx','word'],['xls','xlsx','sheet']]) {
-    const h=shell(),a=h.tab('original',{wordEngine:'legacy',dirty:true,kind});h.active(a)
+    const h=shell(),a=h.tab('original',{wordEngine:'legacy',sheetEngine:'legacy',dirty:true,kind});h.active(a)
     a.document.extension=extension;a.document.name=`Original.${extension}`
     let requested
     h.handle.exportFile=async options=>{requested=options;return{base64:'TkVX',extension:modern,name:`Original.${extension}`}}
@@ -654,13 +696,13 @@ test('browser compatibility import checks document bytes before creating a tab',
   assert.equal(h.state.tabs.value[0].requiresSaveAs,true)
 })
 
-test('risky XLSX is inspected once and requires Save As after switching or cancelling',async()=>{
+test('compatibility risky XLSX is inspected once and requires Save As after switching or cancelling',async()=>{
   const h=shell(),bytes=riskyWorkbook()
   const original={id:'source',kind:'sheet',extension:'xlsx',name:'Source.v2.xlsx',base64:Buffer.from(bytes).toString('base64'),sha256:'source-hash',sizeBytes:bytes.length}
-  await h.state.addDocument(original,'source')
+  await h.state.addDocument(original,'source',undefined,'legacy')
   const a=h.state.tabs.value[0];a.ready=true;a.dirty=true
   assert.equal(h.reviews.length,1);assert.equal(a.requiresSaveAs,true);assert.equal(a.importWarnings.length,2)
-  await h.state.addDocument(original,'source')
+  await h.state.addDocument(original,'source',undefined,'legacy')
   assert.equal(h.reviews.length,1,'Reactivating an already-open source does not rebind its original review')
   h.handle.exportFile=async()=>({base64:'TkVX',extension:'xlsx',dirty:true})
   const b=h.tab('B',{wordEngine:'legacy'});await h.state.activate(b);b.ready=true;await h.state.activate(a);a.ready=true
@@ -682,9 +724,9 @@ test('risky XLSX is inspected once and requires Save As after switching or cance
   assert.equal(a.document.extension,'xlsx')
 })
 
-test('the browser import path applies the same XLSX warning and source-copy safeguard',async()=>{
+test('the explicit browser compatibility path applies the same XLSX warning and source-copy safeguard',async()=>{
   const h=shell({nativeEnabled:false}),bytes=riskyWorkbook()
-  await h.state.browserFile({target:{value:'Source.xlsx',files:[{name:'Source.xlsx',size:bytes.length,arrayBuffer:async()=>bytes.buffer}]}})
+  await h.state.browserLegacySheet({target:{value:'Source.xlsx',files:[{name:'Source.xlsx',size:bytes.length,arrayBuffer:async()=>bytes.buffer}]}})
   const a=h.state.tabs.value[0]
   assert.equal(h.reviews.length,1);assert.equal(a.requiresSaveAs,true)
   assert.match(a.importWarnings[0],/ISFORMULA/);assert.match(a.importWarnings[1],/veryHidden/)
@@ -921,7 +963,7 @@ test('presentation and Office/PDF switches preserve separate model identities an
 
 test('closing the final presentation releases its model while retaining the active Office/PDF editor', async () => {
   for (const kind of ['word','pdf']) {
-    const h=shell(),deck=h.tab('deck',{kind:'presentation'}),other=h.tab('other',{wordEngine:'legacy',kind});h.active(deck)
+    const h=shell(),deck=h.tab('deck',{kind:'presentation'}),other=h.tab('other',{wordEngine:'legacy',sheetEngine:'legacy',kind});h.active(deck)
     await h.state.activate(other);h.state.readyFor(other.key)
     const field=kind==='pdf'?'pdfDocument':'officeDocument', retained=h.state[field].value
     const discards=h.calls.filter(call=>call[0]==='discard').length
@@ -1026,7 +1068,7 @@ test('native duplicate-slide request uses the metadata-aware editor and respects
 
 for (const [kind,panel] of [['word','wordWorkbench'],['sheet','sheetWorkbench']]) {
   test(`${kind} pending inputs prevent export and tab switching until applied or explicitly discarded`, async () => {
-    const h=shell(), a=h.tab('A',{wordEngine:'legacy',kind,dirty:true}), b=h.tab('B',{wordEngine:'legacy'});h.active(a)
+    const h=shell(), a=h.tab('A',{wordEngine:'legacy',sheetEngine:'legacy',kind,dirty:true}), b=h.tab('B',{wordEngine:'legacy'});h.active(a)
     let exports=0,discarded=0
     h.handle.exportFile=async()=>{exports++;return {base64:'NEW',extension:kind==='word'?'docx':'xlsx'}}
     h.state[panel].value={assertNoPendingEdits(){throw Error('Unapplied workspace input')},discardDrafts(){discarded++}}
@@ -1042,7 +1084,7 @@ for (const [kind,panel] of [['word','wordWorkbench'],['sheet','sheetWorkbench']]
 
 for(const [kind,getter,field] of [['word','getWriterState','writerState'],['sheet','getCalcState','calcState'],['presentation','getPresentationState','presentationState']]) {
  test(`${kind} toolbar refreshes when returning from PDF to its retained editor`,async()=>{
-   const h=shell(),office=h.tab('office',{wordEngine:'legacy',kind}),pdf=h.tab('pdf',{kind:'pdf'});h.active(pdf)
+   const h=shell(),office=h.tab('office',{wordEngine:'legacy',sheetEngine:'legacy',kind}),pdf=h.tab('pdf',{kind:'pdf'});h.active(pdf)
    const documentField=kind==='presentation'?'presentationDocument':'officeDocument'
    h.state[documentField].value=office.document
    const reopened=[]
@@ -1542,4 +1584,296 @@ test('a failed Rust saved-revision acknowledgement cannot mark the shell tab cle
   assert.equal(tab.dirty,true,'Unacknowledged in-memory content must still prompt before closing')
   assert.equal(tab.wordEngine,'rust');assert.equal(h.state.activeKey.value,tab.key)
   h.unmount()
+})
+
+// The following are shell contracts with controlled editor doubles, not proof
+// of real spreadsheet parsing, calculation, rendering or native WebView input.
+function sheetSource(id='source',extension='xlsx') {
+  return {id,kind:'sheet',extension,name:`${id}.${extension}`,base64:'T0xE',sha256:'source-hash',sizeBytes:3}
+}
+function mountSheetHandle(h,tab,overrides={}) {
+  const handle={exportFile:async({format})=>({base64:'U0hFRVQ=',extension:format,dirty:true}),
+    discardChanges:async options=>{h.calls.push(['sheet-discard',tab.key,options])},
+    markSaved:async bytes=>{h.calls.push(['sheet-marked',tab.key,bytes])},...overrides}
+  h.state.setRustSheetHandle(tab.key,handle);h.state.readyFor(tab.key)
+  return handle
+}
+
+test('global file controls ignore a hidden home document and retain generic Open and New', async () => {
+  const h=shell(), word=h.tab('hidden-word',{wordEngine:'rust',dirty:true})
+  h.active(word)
+  h.rustWordHandle.exportFile=async()=>assert.fail('Home must not save its retained hidden document')
+  h.rustWordHandle.undo=async()=>assert.fail('Home must not edit its retained hidden document')
+  assert.equal(h.state.active.value.key,word.key)
+  assert.equal(h.state.currentDocument.value,undefined)
+  assert.equal(h.state.documentActionsDisabled.value,true)
+  for(const action of ['save','saveAs','exportPdf','print','undo','redo'])h.state.globalFileAction(action)
+  h.state.keydown({key:'s',ctrlKey:true,preventDefault(){}})
+  await h.idle()
+  assert.equal(h.state.saveAsDraft.value,null)
+  assert.equal(word.dirty,true)
+  assert.equal(h.calls.filter(call=>call[0]==='save').length,0)
+  const openArguments=[]
+  h.native.openDocument=async(...args)=>{openArguments.push(args);return null}
+  h.state.globalFileAction('open');await h.idle()
+  assert.deepEqual(openArguments,[[]],'Global Open is not restricted by the retained Word tab')
+  // Creating another tab legitimately snapshots the retained editor, but must
+  // not acknowledge that snapshot as an on-disk save.
+  h.rustWordHandle.exportFile=async()=>({base64:'T0xE',extension:'docx',dirty:true})
+  h.state.globalNewDocument('sheet');await h.idle()
+  assert.equal(h.state.home.value,false)
+  assert.equal(h.state.currentDocument.value.document.kind,'sheet')
+  assert.equal(h.state.currentDocument.value.sheetEngine,'rust')
+  assert.equal(h.state.documentActionsDisabled.value,true,'New editor must be ready before document actions enable')
+  h.unmount()
+})
+
+test('global save and undo use only the visible active editor and respect the transaction barrier', async () => {
+  const h=shell(), word=h.tab('word',{wordEngine:'rust',dirty:true}), sheet=h.tab('sheet',{kind:'sheet',sheetEngine:'rust',dirty:true})
+  const operations=[]
+  h.rustWordHandle.exportFile=async()=>{operations.push('word-save');return{base64:'V09SRA==',extension:'docx',dirty:true}}
+  h.rustWordHandle.undo=async()=>{operations.push('word-undo')}
+  mountSheetHandle(h,sheet,{exportFile:async()=>{operations.push('sheet-save');return{base64:'U0hFRVQ=',extension:'xlsx',dirty:true}},undo:async()=>{operations.push('sheet-undo')}})
+  h.active(sheet);h.state.home.value=false
+  assert.equal(h.state.documentActionsDisabled.value,false)
+  h.state.globalFileAction('save');await h.idle()
+  assert.deepEqual(operations,['sheet-save']);assert.equal(sheet.dirty,false);assert.equal(word.dirty,true)
+  h.state.globalFileAction('undo');await h.idle()
+  h.active(word)
+  h.state.globalFileAction('save');await h.idle()
+  assert.deepEqual(operations,['sheet-save','sheet-undo','word-save'])
+  assert.equal(h.calls.filter(call=>call[0]==='save').at(-1)[1].documentId,'word')
+  h.state.openSaveAs()
+  assert.equal(h.state.globalActionsBlocked.value,true)
+  h.state.globalFileAction('undo');h.state.globalFileAction('open');h.state.globalNewDocument('sheet')
+  assert.deepEqual(operations,['sheet-save','sheet-undo','word-save'])
+  assert.equal(h.state.tabs.value.length,2)
+  h.state.cancelSaveAs()
+  h.state.busy.value='Controlled pending transaction'
+  h.state.globalFileAction('save')
+  assert.deepEqual(operations,['sheet-save','sheet-undo','word-save'])
+  h.state.busy.value=''
+  h.unmount()
+})
+
+test('Rust canvas shortcuts stay engine-owned while header shortcuts dispatch one active-document action', async () => {
+  const h=shell(), sheet=h.tab('sheet-shortcut',{kind:'sheet',sheetEngine:'rust',dirty:true})
+  mountSheetHandle(h,sheet);h.active(sheet);h.state.home.value=false
+  const editorTarget=Object.assign(new h.browser.Element(),{closest:()=>({})})
+  let prevented=0
+  h.state.keydown({key:'s',ctrlKey:true,target:editorTarget,preventDefault(){prevented++}})
+  await h.idle()
+  assert.equal(prevented,0);assert.equal(h.calls.filter(call=>call[0]==='save').length,0)
+  const headerTarget=Object.assign(new h.browser.Element(),{closest:()=>null})
+  h.state.keydown({key:'s',ctrlKey:true,target:headerTarget,preventDefault(){prevented++}})
+  await h.idle()
+  assert.equal(prevented,1);assert.equal(h.calls.filter(call=>call[0]==='save').length,1)
+  const requests=[];h.native.openDocument=async(...args)=>{requests.push(args);return null}
+  h.state.keydown({key:'o',ctrlKey:true,target:headerTarget,preventDefault(){}});await h.idle()
+  assert.deepEqual(requests,[[]],'Header Ctrl+O uses the generic picker even for an active Rust spreadsheet')
+  h.unmount()
+})
+
+test('real appearance hook persists explicit themes, follows system only in auto mode and does not edit documents', () => {
+  const h=shell({storedAppearance:'dark',systemDark:false}), word=h.tab('theme-word',{wordEngine:'rust',dirty:true})
+  h.active(word);h.state.home.value=false
+  const initialCalls=h.calls.length
+  assert.equal(h.state.appearance.value,'dark')
+  assert.deepEqual(h.browser.document.documentElement.dataset,{theme:'dark',themePreference:'dark'})
+  h.setSystemDark(true);h.state.appearance.value='light'
+  assert.equal(h.browser.document.documentElement.dataset.theme,'light')
+  assert.equal(h.storage.get('open-office.appearance'),'light')
+  h.state.appearance.value='system'
+  assert.equal(h.browser.document.documentElement.dataset.theme,'dark')
+  h.setSystemDark(false)
+  assert.equal(h.browser.document.documentElement.dataset.theme,'light')
+  h.dispatchWindow('storage',{key:'open-office.appearance',newValue:'dark'})
+  assert.equal(h.state.appearance.value,'dark')
+  assert.equal(h.browser.document.documentElement.dataset.theme,'dark')
+  h.dispatchWindow('storage',{key:'open-office.appearance',newValue:'invalid'})
+  assert.equal(h.state.appearance.value,'system')
+  assert.equal(word.dirty,true);assert.equal(word.document.base64,'T0xE');assert.equal(h.calls.length,initialCalls)
+  assert.equal(h.mediaListeners.size,1)
+  h.unmount()
+  assert.equal(h.mediaListeners.size,0)
+  assert.equal(h.windowListeners.get('storage').size,0)
+})
+
+test('appearance remains usable when storage is unavailable and invalid stored values follow the system', () => {
+  const invalid=shell({storedAppearance:'unexpected',systemDark:true})
+  assert.equal(invalid.state.appearance.value,'system')
+  assert.equal(invalid.browser.document.documentElement.dataset.theme,'dark')
+  invalid.unmount()
+  const h=shell({storageUnavailable:true})
+  assert.doesNotThrow(()=>{h.state.appearance.value='dark'})
+  assert.equal(h.browser.document.documentElement.dataset.theme,'dark')
+  h.unmount()
+})
+
+test('default spreadsheet new/save uses its own prepared Rust session and editor handle',async()=>{
+  const h=shell()
+  h.handle.exportFile=async()=>assert.fail('Default sheets must not export through the compatible Office editor')
+  h.rustWordHandle.exportFile=async()=>assert.fail('Default sheets must not export through the Word editor')
+  h.state.newDocument('sheet');await h.idle()
+  const tab=h.state.active.value,entry=h.state.rustSheetEntries.value[0],prepared=h.sheetPreparations[0]
+  assert.equal(tab.sheetEngine,'rust');assert.equal(tab.document.extension,'xlsx')
+  assert.equal(h.state.officeDocument.value,undefined);assert.equal(h.state.rustWordEntries.value.length,0)
+  assert.equal(h.sheetPreparations.length,1);assert.equal(prepared.source.base64,'');assert.equal(prepared.source.id,tab.key)
+  assert.equal(entry.prepared.take(tab.document),prepared.session);assert.equal(entry.prepared.take(tab.document),undefined)
+  mountSheetHandle(h,tab)
+  h.state.openSaveAs();assert.deepEqual(Array.from(h.state.saveAsOptions.value,o=>o.extension),['xlsx','csv','tsv','pdf']);h.state.cancelSaveAs()
+  assert.equal(await h.state.saveActive(),true)
+  assert.equal(tab.dirty,false);assert.equal(tab.document.base64,'U0hFRVQ=');assert.equal(tab.sheetEngine,'rust')
+  assert.deepEqual(h.calls.filter(c=>c[0]==='sheet-marked'),[['sheet-marked',tab.key,'U0hFRVQ=']])
+  h.unmount()
+})
+
+for(const route of ['native','recent','browser'])test(`generic ${route} XLSX opening uses Rust warnings and requires a protected first save`,async()=>{
+  const warning='Controlled parser warning: unsupported chart detail'
+  const h=shell({nativeEnabled:route!=='browser',sheetWarnings:[warning]}),source=sheetSource(route)
+  if(route==='native'){h.native.openDocument=async()=>source;h.state.openFile();await h.idle()}
+  else if(route==='recent'){h.native.openRecent=async id=>{assert.equal(id,'recent');return source};h.state.openRecent({id:'recent'});await h.idle()}
+  else {
+    const bytes=riskyWorkbook(),input={value:'Source.xlsx',files:[{name:'Source.xlsx',size:bytes.length,arrayBuffer:async()=>bytes.buffer}]}
+    await h.state.browserFile({target:input});assert.equal(input.value,'')
+  }
+  const tab=h.state.active.value
+  assert.equal(tab.sheetEngine,'rust');assert.equal(tab.requiresSaveAs,true)
+  assert.equal(h.sheetPreparations.length,1);assert.equal(h.sheetPreparations[0].source.id,tab.key)
+  assert.equal(h.sheetPreparations[0].source.base64,tab.document.base64)
+  assert.equal(tab.importWarnings.at(-1),warning)
+  assert.equal(h.reviews.length,0,'Legacy Calc conversion warnings must not be substituted for the Rust parser report')
+  assert.equal(h.state.officeDocument.value,undefined);assert.equal(h.rustPreparations.length,0)
+  h.unmount()
+})
+
+test('ODS and explicit compatible XLSX keep the legacy editor and skip Rust preparation',async()=>{
+  for(const extension of ['ods','xls']) {
+    const h=shell();await h.state.addDocument(sheetSource('legacy',extension),'legacy')
+    assert.equal(h.state.active.value.sheetEngine,'legacy');assert.equal(h.sheetPreparations.length,0)
+    assert.equal(h.state.officeDocument.value.id,h.state.activeKey.value);assert.equal(h.state.rustSheetEntries.value.length,0)
+    h.unmount()
+  }
+  const h=shell();h.native.openDocument=async()=>sheetSource('compatible')
+  h.state.openLegacySheet();await h.idle()
+  assert.equal(h.state.active.value.sheetEngine,'legacy');assert.equal(h.sheetPreparations.length,0)
+  h.unmount()
+})
+
+test('failed spreadsheet preparation leaves the active dirty document and engine untouched',async()=>{
+  const h=shell({sheetPrepareError:'Malformed workbook package'}),tab=h.tab('live',{wordEngine:'legacy',dirty:true});h.active(tab)
+  const before=JSON.stringify(tab),live=h.state.officeDocument.value
+  h.handle.exportFile=async()=>assert.fail('Rejected spreadsheet must not snapshot the current document')
+  await assert.rejects(h.state.addDocument(sheetSource('bad'),'bad'),/Malformed workbook package/)
+  assert.equal(h.state.tabs.value.length,1);assert.equal(h.state.activeKey.value,tab.key)
+  assert.equal(JSON.stringify(tab),before);assert.equal(h.state.officeDocument.value,live)
+  assert.equal(h.state.rustSheetEntries.value.length,0);assert.equal(h.reviews.length,0)
+  h.unmount()
+})
+
+test('unpublished spreadsheet candidates are discarded after blocked switching and app disposal',async()=>{
+  const h=shell(),tab=h.tab('typing',{wordEngine:'legacy',dirty:true});h.active(tab)
+  h.handle.exportFile=async()=>{throw Error('Composition pending')}
+  await assert.rejects(h.state.addDocument(sheetSource('new'),'new'),/Composition pending/)
+  assert.equal(h.state.tabs.value.length,1);assert.equal(h.state.activeKey.value,tab.key)
+  assert.equal(h.sheetPreparations[0].discarded,1);assert.equal(h.state.rustSheetEntries.value.length,0)
+  h.unmount()
+  let finish
+  const disposed=shell({sheetPrepare:()=>new Promise(resolve=>{finish=resolve})})
+  const opening=disposed.state.addDocument(sheetSource('late'),'late');await Promise.resolve()
+  disposed.unmount();finish({testSheetSession:'late'});await opening
+  assert.equal(disposed.state.tabs.value.length,0);assert.equal(disposed.state.rustSheetEntries.value.length,0)
+  assert.equal(disposed.sheetPreparations[0].discarded,1)
+})
+
+test('spreadsheet imports protect their original identity until XLSX save succeeds',async()=>{
+  const h=shell();await h.state.addDocument(sheetSource('original'),'original')
+  const tab=h.state.active.value;mountSheetHandle(h,tab);tab.dirty=true
+  const save=h.native.saveDocument
+  h.native.saveDocument=async request=>{h.calls.push(['cancelled-sheet-save',request]);return{status:'cancelled'}}
+  assert.equal(await h.state.saveActive(),false)
+  assert.equal(tab.dirty,true);assert.equal(tab.requiresSaveAs,true);assert.equal(tab.fileId,'original')
+  assert.ok(!h.calls.some(c=>c[0]==='sheet-marked'))
+  h.native.saveDocument=save;assert.equal(await h.state.saveActive(),true)
+  for(const [,request] of h.calls.filter(c=>['save','cancelled-sheet-save'].includes(c[0]))) {
+    assert.equal(request.saveAs,true);assert.equal(request.documentId,undefined);assert.equal(request.expectedSha256,undefined)
+    assert.equal(request.name,'original - 副本.xlsx')
+  }
+  assert.notEqual(tab.fileId,'original');assert.equal(tab.requiresSaveAs,false);assert.equal(tab.dirty,false)
+  assert.equal(h.calls.filter(c=>c[0]==='sheet-marked').length,1)
+  h.unmount()
+})
+
+for(const format of ['csv','tsv','pdf'])test(`${format} spreadsheet exports preserve editable workbook identity, warnings and unsaved changes`,async()=>{
+  const h=shell();await h.state.addDocument(sheetSource('original'),'original')
+  const tab=h.state.active.value;tab.dirty=true
+  mountSheetHandle(h,tab,{markSaved:async()=>assert.fail('A data/PDF export must not mark the workbook saved')})
+  const before=JSON.stringify(tab),entry=h.state.rustSheetEntries.value[0]
+  assert.equal(await h.state.saveActive(true,format),true)
+  assert.equal(JSON.stringify(tab),before);assert.equal(h.state.rustSheetEntries.value[0],entry)
+  const request=h.calls.find(c=>c[0]==='save')[1]
+  assert.equal(request.extension,format);assert.equal(request.documentId,undefined);assert.equal(request.expectedSha256,undefined);assert.equal(request.saveAs,true)
+  h.unmount()
+})
+
+test('retained spreadsheet tabs use their own handles and only a closed tab releases its preparation',async()=>{
+  const h=shell(),exports=[]
+  await h.state.addDocument(sheetSource('first'),'first');const first=h.state.active.value
+  mountSheetHandle(h,first,{exportFile:async()=>{exports.push(first.key);return{base64:'RklSU1Q=',extension:'xlsx',dirty:true}}})
+  const firstEntry=h.state.rustSheetEntries.value[0]
+  await h.state.addDocument(sheetSource('second'),'second');const second=h.state.active.value
+  mountSheetHandle(h,second,{exportFile:async()=>{exports.push(second.key);return{base64:'U0VDT05E',extension:'xlsx',dirty:true}}})
+  const secondEntry=h.state.rustSheetEntries.value[1]
+  await h.state.activate(first);await h.state.activate(second)
+  assert.deepEqual(exports,[first.key,second.key,first.key])
+  assert.equal(h.state.rustSheetEntries.value[0],firstEntry);assert.equal(h.state.rustSheetEntries.value[1],secondEntry)
+  assert.equal(firstEntry.document.base64,'T0xE');assert.equal(secondEntry.document.base64,'T0xE')
+  assert.equal(first.ready,true);assert.equal(second.ready,true);assert.equal(h.sheetPreparations.length,2)
+  h.native.saveDocument=async()=>({status:'cancelled'})
+  h.state.closeTarget.value=second;await h.state.resolveClose('save')
+  assert.equal(h.state.rustSheetEntries.value.length,2);assert.equal(h.sheetPreparations[1].discarded,0)
+  assert.equal(h.state.closeTarget.value,second,'Cancelling the save leaves the unsaved close decision pending')
+  h.state.closeTarget.value=second;await h.state.resolveClose('discard')
+  assert.equal(h.state.rustSheetEntries.value.length,1);assert.equal(h.state.rustSheetEntries.value[0],firstEntry)
+  assert.equal(h.sheetPreparations[1].discarded,1);assert.equal(h.sheetPreparations[0].discarded,0)
+  h.unmount();assert.equal(h.sheetPreparations[0].discarded,1)
+})
+
+test('a rejected spreadsheet saved-revision acknowledgement leaves the tab dirty',async()=>{
+  const h=shell(),tab=h.tab('editing',{kind:'sheet',sheetEngine:'rust',dirty:true});h.active(tab)
+  mountSheetHandle(h,tab,{markSaved:async()=>{throw Error('Spreadsheet saved revision is stale')}})
+  await assert.rejects(h.state.saveActive(),/saved revision is stale/)
+  assert.equal(h.calls.filter(c=>c[0]==='save').length,1);assert.equal(tab.dirty,true)
+  assert.equal(tab.sheetEngine,'rust');assert.equal(h.state.activeKey.value,tab.key)
+  h.unmount()
+})
+
+test('full native smoke awaits the default spreadsheet gate before compatible Office',async()=>{
+  let release,started
+  const gate=new Promise(resolve=>{release=resolve}),entered=new Promise(resolve=>{started=resolve})
+  const h=shell({smoke:true,gridcraftSmokeRun:async()=>{started();return gate}})
+  h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'})
+  const mounting=h.mount();await entered
+  assert.ok(h.calls.some(c=>c[0]==='wordcraft-native-smoke'));assert.equal(h.state.officeDocument.value,undefined)
+  assert.ok(!h.calls.some(c=>c[0]==='invoke'&&c[1]==='smoke_report'))
+  const gridcraft={schemaVersion:1,ok:false,engine:'gridcraft-wasm',error:'controlled GridCraft failure'}
+  release(gridcraft);await mounting
+  const report=h.calls.find(c=>c[0]==='invoke'&&c[1]==='smoke_report')[2].report
+  assert.equal(report.gridcraft,gridcraft);assert.equal(report.ok,false);assert.match(report.error,/controlled GridCraft/)
+  assert.equal(h.state.tabs.value.length,0);assert.equal(h.state.officeDocument.value,undefined)
+  h.unmount()
+})
+
+test('full native smoke propagates spreadsheet cleanup and thrown failures without starting Office',async()=>{
+  for(const mode of ['cleanup','thrown']) {
+    const gridcraft={schemaVersion:1,ok:false,engine:'gridcraft-wasm',closeError:'controlled GridCraft cleanup failure'}
+    const h=shell({smoke:true,...(mode==='thrown'?{gridcraftSmokeError:'controlled GridCraft thrown failure'}:{gridcraftSmokeReport:gridcraft})})
+    h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'});await h.mount()
+    const report=h.calls.find(c=>c[0]==='invoke'&&c[1]==='smoke_report')[2].report
+    assert.equal(report.ok,false);assert.match(report.error,/controlled GridCraft/)
+    assert.equal(h.state.tabs.value.length,0);assert.equal(h.state.officeDocument.value,undefined)
+    if(mode==='cleanup')assert.equal(report.gridcraft,gridcraft)
+    else assert.equal(report.gridcraft,undefined)
+    h.unmount()
+  }
 })

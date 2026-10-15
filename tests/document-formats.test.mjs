@@ -42,6 +42,20 @@ test('OLE screening rejects truncated, byte-swapped and mislabeled legacy contai
   }
 })
 
+test('text spreadsheets default to a workbook copy and reject invalid UTF-8 or binary controls',()=>{
+  for(const extension of ['csv','tsv']) {
+    assert.equal(extensionOf(`季度数据.${extension.toUpperCase()}`),extension)
+    assert.equal(kindOf(extension),'sheet')
+    assert.equal(defaultSaveExtension(extension),'xlsx')
+    assert.equal(saveFileName('当前工作表',extension),`当前工作表.${extension}`)
+    for(const text of ['名称,数量\r\n中文,12\r\n','\ufeff名称\t数量\n中文\t12\n'])assert.doesNotThrow(()=>validateDocumentSignature(encode(text),extension))
+    for(const text of ['A\u0000B','A\u000bB','A\u007fB','A\u0085B'])assert.throws(()=>validateDocumentSignature(encode(text),extension))
+    assert.throws(()=>validateDocumentSignature(new Uint8Array([0xc3,0x28]),extension))
+    assert.throws(()=>validateDocumentSignature(new Uint8Array([0xff,0xfe,0x41,0]),extension))
+    assert.throws(()=>validateDocumentSignature(new Uint8Array(),extension),/文档为空/)
+  }
+})
+
 test('modern ZIP and RTF signatures fail closed before the engine parses content',()=>{
   for(const extension of ['docx','odt','xlsx','ods','pptx','odp']){
     assert.doesNotThrow(()=>validateDocumentSignature(zip(),extension))

@@ -58,6 +58,8 @@ pub mod frame;
 pub mod guides;
 pub mod i18n;
 pub mod icons;
+mod office_icons;
+mod office_svg;
 pub mod ink;
 pub mod keys;
 pub mod keytips;
@@ -1289,6 +1291,16 @@ impl WordApp {
     /// Whether the interface theme setting currently resolves to dark (`System` asks the OS).
     pub fn ui_is_dark(&self) -> bool {
         self.ui.theme.is_dark(self.ctx.as_ref().and_then(|ctx| system_theme(ctx, self.desktop_dark)))
+    }
+
+    /// Set the embedding shell's interface preference without editing the document or its
+    /// separate dark-page view. Invalidate the cached palette, including for inactive tabs.
+    pub fn set_host_theme(&mut self, appearance: theme::Appearance) {
+        self.ui.theme = appearance;
+        self.applied_theme = None;
+        if let Some(ctx) = &self.ctx {
+            ctx.request_repaint();
+        }
     }
 
     /// Whether animation effects are on: the Animation effects setting, where `System` follows

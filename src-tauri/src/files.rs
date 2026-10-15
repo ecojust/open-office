@@ -28,7 +28,7 @@ const ENCODED_LIMIT: usize = ((DOCUMENT_LIMIT as usize + 2) / 3) * 4;
 const HISTORY_LIMIT: u64 = 2 * 1024 * 1024;
 const MAX_RECENT: usize = 100;
 const EXTENSIONS: &[&str] = &[
-    "docx", "odt", "doc", "rtf", "xlsx", "ods", "xls", "pptx", "odp", "ppt", "pdf",
+    "docx", "odt", "doc", "rtf", "xlsx", "csv", "tsv", "ods", "xls", "pptx", "odp", "ppt", "pdf",
 ];
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -39,6 +39,8 @@ pub enum DocExt {
     Doc,
     Rtf,
     Xlsx,
+    Csv,
+    Tsv,
     Ods,
     Xls,
     Pptx,
@@ -55,6 +57,8 @@ impl DocExt {
             Self::Doc => "doc",
             Self::Rtf => "rtf",
             Self::Xlsx => "xlsx",
+            Self::Csv => "csv",
+            Self::Tsv => "tsv",
             Self::Ods => "ods",
             Self::Xls => "xls",
             Self::Pptx => "pptx",
@@ -75,20 +79,22 @@ impl DocExt {
             "doc" => Ok(Self::Doc),
             "rtf" => Ok(Self::Rtf),
             "xlsx" => Ok(Self::Xlsx),
+            "csv" => Ok(Self::Csv),
+            "tsv" => Ok(Self::Tsv),
             "ods" => Ok(Self::Ods),
             "xls" => Ok(Self::Xls),
             "pptx" => Ok(Self::Pptx),
             "odp" => Ok(Self::Odp),
             "ppt" => Ok(Self::Ppt),
             "pdf" => Ok(Self::Pdf),
-            _ => Err("请选择 DOCX、ODT、DOC、RTF、XLSX、ODS、XLS、PPTX、ODP、PPT 或 PDF 文件；宏、加密文件及其他格式暂不支持。".into()),
+            _ => Err("请选择 DOCX、ODT、DOC、RTF、XLSX、CSV、TSV、ODS、XLS、PPTX、ODP、PPT 或 PDF 文件；宏、加密文件及其他格式暂不支持。".into()),
         }
     }
 
     fn kind(self) -> DocumentKind {
         match self {
             Self::Docx | Self::Odt | Self::Doc | Self::Rtf => DocumentKind::Word,
-            Self::Xlsx | Self::Ods | Self::Xls => DocumentKind::Sheet,
+            Self::Xlsx | Self::Csv | Self::Tsv | Self::Ods | Self::Xls => DocumentKind::Sheet,
             Self::Pptx | Self::Odp | Self::Ppt => DocumentKind::Presentation,
             Self::Pdf => DocumentKind::Pdf,
         }
@@ -487,6 +493,14 @@ fn validate_document_signature(bytes: &[u8], extension: DocExt) -> Result<(), St
         return Err("文档为空，无法打开。".into());
     }
     let valid = match extension {
+        // Text tables have no container magic. Accept UTF-8 (including an
+        // optional BOM), tabs and line breaks; reject binary/control bytes
+        // before passing the content to the spreadsheet parser.
+        DocExt::Csv | DocExt::Tsv => std::str::from_utf8(bytes).is_ok_and(|text| {
+            !text
+                .chars()
+                .any(|character| character.is_control() && !matches!(character, '\t' | '\r' | '\n'))
+        }),
         DocExt::Pdf => bytes[..bytes.len().min(1024)]
             .windows(5)
             .any(|window| window == b"%PDF-"),
@@ -957,6 +971,53 @@ mod tests {
                 original,
                 "A converted copy must preserve the original bytes"
             );
+        }
+    }
+
+    #[test]
+    fn text_table_formats_validate_utf8_and_keep_native_file_capabilities() {
+        for (extension, name, contents) in [
+            (DocExt::Csv, "csv", "\u{feff}名称,数量\r\n苹果,12\r\n"),
+            (DocExt::Tsv, "tsv", "名称\t数量\n苹果\t12\n"),
+        ] {
+            assert!(EXTENSIONS.contains(&name));
+            assert_eq!(extension.kind(), DocumentKind::Sheet);
+            assert_eq!(serde_json::to_value(extension).unwrap(), name);
+            assert_eq!(
+                DocExt::from_path(Path::new(&format!("Table.{}", name.to_uppercase()))).unwrap(),
+                extension
+            );
+            assert!(extension.ensure_exportable().is_ok());
+            assert!(validate_document_signature(contents.as_bytes(), extension).is_ok());
+            for bytes in [
+                b"\xff\xfeA".as_slice(),
+                b"a\0b",
+                b"a\x1bb",
+                b"a\x7fb",
+                b"a\xc2\x85b",
+            ] {
+                assert!(validate_document_signature(bytes, extension).is_err());
+            }
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join(format!("source.{name}"));
+            fs::write(&path, contents).unwrap();
+            let store = DocumentStore::new(directory.path().join("data")).unwrap();
+            let opened = store.register_open(path.clone()).unwrap();
+            assert_eq!(opened.extension, extension);
+            assert_eq!(opened.kind, DocumentKind::Sheet);
+            assert_eq!(STANDARD.decode(opened.base64).unwrap(), contents.as_bytes());
+            // A separate export preserves the original import and receives its
+            // own file capability, just as the shell's copy-only export does.
+            let target = directory.path().join(format!("copy.{name}"));
+            store
+                .save_to_target(
+                    TargetSnapshot::capture(target.clone()).unwrap(),
+                    extension,
+                    contents.as_bytes().to_vec(),
+                )
+                .unwrap();
+            assert_eq!(fs::read(&path).unwrap(), contents.as_bytes());
+            assert_eq!(fs::read(target).unwrap(), contents.as_bytes());
         }
     }
 

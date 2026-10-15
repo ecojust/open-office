@@ -302,6 +302,9 @@ pub fn menu_button(
         icons::paint(ui.painter(), Rect::from_center_size(pos2(r.max.x - 6.0, r.center().y), vec2(DROPDOWN, DROPDOWN)), "dropdown", c, c);
         resp
     };
+    if icon == "interfaceTheme" {
+        crate::embedding::record(ui.ctx(), "interfaceTheme", tip, "", resp.rect);
+    }
     let resp = resp.on_hover_text(tip);
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, on, tip));
     if !on {

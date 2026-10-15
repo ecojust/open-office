@@ -23,3 +23,5 @@ artifacts/
 test-results/
 playwright-report/
 public/pdfjs/
+public/gridcraft/
+vendor/gridcraft/target/

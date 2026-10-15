@@ -50,6 +50,10 @@ pub fn inspect(app: &mut WordApp, ctx: &egui::Context) -> Value {
     json!({
         "ui": app.prefs(),
         "embeddedEditor": app.services.embedded_editor,
+        "theme": {
+            "preference": app.ui.theme.code(),
+            "resolved": if ctx.global_style().visuals.dark_mode { "dark" } else { "light" },
+        },
         "drawnChrome": crate::embedding::drawn(ctx),
         "ribbonTabs": crate::embedding::drawn(ctx).into_iter().filter_map(|mut item| {
             let id = item.get("id")?.as_str()?.strip_prefix("tab:")?.to_owned();

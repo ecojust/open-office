@@ -4,6 +4,22 @@
 
 默认文字工作区接入固定版本的 [WordCraft Rust 引擎与画布界面](wordcraft-integration.md)，已随 [0.8.0](https://github.com/ecojust/open-office/releases/tag/desktop-v0.8.0-38691848013) 公开发布。[0.8.1](releases/0.8.1.md) 将内层界面限定为编辑工具，文件操作统一由 Open Office 外壳处理。旧基础 Rust 内核与测试属于历史路径，不能代替当前默认编辑器的验收。
 
+0.9.0 的默认 XLSX／CSV／TSV 工作区接入 [GridCraft Rust 引擎与界面](gridcraft-integration.md)。ODS、旧 XLS 和显式兼容表格入口保留原办公引擎；旧 Calc 工作台测试只证明这条兼容路径。
+
+## 全局工具栏与主题
+
+开发版的文件操作集中在最顶部，作用于当前文档；主页保留新建与打开。太阳、月亮、显示器按钮分别选择浅色、深色和跟随系统，记忆选择并同步现有及新建的文字／表格会话。编辑区原有局部主题入口已隐藏。
+
+2026-10-15 本轮生产构建、两引擎源码／产物摘要检查和 123 项外壳测试通过；`node tests/browser/global-shell-theme.cjs` 的 5 组 Chromium 定向验收通过。覆盖全局文件按钮及快捷键、主题记忆、两引擎跟随系统变化、待提交中文草稿保留，以及主题切换不改变内容与撤销历史；3 次实际下载经独立 DOCX／XLSX 解析核对。报告 `test-results/global-shell-theme/report.json` 记录运行前后一致的产品摘要，README 截图来自本轮。
+
+本轮是工具栏与主题专项，没有重跑历史完整格式或原生安装包验收；历史引擎报告和哈希仍只对应各自快照。该轮验证时版本号为 0.8.1；0.9.0 发布验证另见[更新说明](releases/0.9.0.md)。
+
+## 0.9.0 发布验证
+
+发布候选版本包含上述工具栏、主题、表格引擎和原创 SVG 图标。安装包由 `.github/workflows/desktop-release.yml` 构建，只有 Windows x64、macOS ARM64 及 Intel 包的 Rosetta 验证全部通过才公开。确切源码与运行记录随发布说明提供。
+
+0.9.0 本地生产构建、995 项 Node 回归及 83 项 PDF 后端测试通过。表格源码的格式、资产归属、依赖分层、功能清单与快捷键生成检查通过；完整 `cargo xtask ci` 在 Linux 桌面 Clippy 依赖编译期间因临时盘仅余 240 MiB 而停止，未完成的 Clippy 与工作区测试不计为通过。Windows／macOS 发布所需的 Rust 专项测试与安装包原生验证在发布工作流中分别执行。
+
 ## 本地开发
 
 
@@ -61,6 +77,21 @@ node tests/browser/wordcraft-native-helper.cjs
 ```
 
 构建脚本 `scripts/build-wordcraft.mjs` 使用锁定的 Cargo 依赖和 `wasm-bindgen 0.2.129`，生成 `public/wordcraft/` 下的 JS、WASM 与摘要清单；该目录不提交 Git。`word:check` 校验源码／字体及产物哈希，构建成功本身不等于功能验收。首次构建需下载 Rust 依赖，正常编辑不依赖远程 Office 服务。可通过 `WASM_BINDGEN`、`WORDCRAFT_TARGET_DIR` 指定工具和构建缓存路径。
+
+默认表格使用同一版本的 `wasm-bindgen`，单独构建并验证：
+
+```bash
+npm run sheet:build
+npm run sheet:check
+npm run test:browser:sheet-engine
+npm run test:browser:sheet-native-helper
+```
+
+`scripts/build-gridcraft.mjs` 编译 `vendor/gridcraft/apps/open-office-host`，输出 `public/gridcraft/` 和 `manifest.json`；可通过 `GRIDCRAFT_TARGET_DIR` 指定缓存。该目录不提交 Git，`npm run dev` 和生产构建都会确保其与源码／字体指纹匹配。不要把上游功能清单、旧 Calc 测试或成功编译当作新工作区的实际 UI、保存往返或安装包验收；范围见[表格集成说明](gridcraft-integration.md)。
+
+`test:browser:sheet-engine` 检查默认 Rust 表格工作区，`test:browser:sheet-native-helper` 在浏览器中复用安装包自检逻辑，不等同于原生 WebView 验收。原 `test:browser:sheet` 仍检查兼容表格引擎。
+
+2026-10-15 表格引擎替换轮次已通过生产构建、表格产物摘要检查、Chromium 主浏览器验收 9 组及自检流程 6 项，报告分别位于 `test-results/gridcraft-engine/report.json` 和 `test-results/gridcraft-native-helper/report.json`。这些是全局工具栏与主题调整前的快照结果；具体范围和历史指纹见[表格集成说明](gridcraft-integration.md)。该轮验证时版本号为 0.8.1；0.9.0 发布验证另见[更新说明](releases/0.9.0.md)。
 
 WordCraft 浏览器验收自行启动临时 Vite 与 Chromium，无需另开开发服务器；运行前须安装 Playwright Chromium，并确保 `python3` 可以导入 PyMuPDF（`fitz`），以独立读取导出的 PDF。核心检查器直接调用 `python3`，仅设置 `PYTHON` 不能替代这一要求；使用虚拟环境时先激活环境。可用 `WORDCRAFT_OUTPUT` 指定独立报告目录，保留每轮的源码摘要、导出工件和失败证据。
 

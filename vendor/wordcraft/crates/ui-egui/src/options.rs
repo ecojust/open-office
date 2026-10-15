@@ -179,7 +179,9 @@ fn flag(app: &mut WordApp, ui: &mut Ui, label: &str, key: &str, value: bool) {
 
 fn general(app: &mut WordApp, ui: &mut Ui) {
     section(ui, "Interface");
-    theme_picker(app, ui);
+    if !app.services.embedded_editor {
+        theme_picker(app, ui);
+    }
     interface_size_picker(app, ui);
     ui.checkbox(&mut app.ui.mini_toolbar, tl!("Show the mini toolbar when text is selected"));
     let mut dark_page = app.session.view.dark_mode;

@@ -35,7 +35,7 @@ function positive(value, label, maximum = Number.MAX_SAFE_INTEGER) {
 
 /** Match the build script's path+NUL+bytes+NUL fingerprint without executing a build. */
 export function wordcraftSourceHash(root = ROOT) {
-  const files = ['scripts/build-wordcraft.mjs'];
+  const files = ['scripts/build-wordcraft.mjs', 'scripts/build-office-icons.mjs'];
   function collect(directory) {
     for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
       if (['target', '.git'].includes(entry.name)) continue;
@@ -44,7 +44,7 @@ export function wordcraftSourceHash(root = ROOT) {
       else if (entry.isFile()) files.push(path);
     }
   }
-  collect('vendor/wordcraft'); collect('crates/word-engine/fonts');
+  collect('vendor/wordcraft'); collect('crates/word-engine/fonts'); collect('src/icons');
   check(files.some(name => name.startsWith('vendor/wordcraft/'))
     && files.some(name => name.startsWith('crates/word-engine/fonts/')), 'source and licensed fonts are required');
   const hash = createHash('sha256');

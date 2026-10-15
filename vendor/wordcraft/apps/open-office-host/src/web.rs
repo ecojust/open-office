@@ -7,7 +7,10 @@ use serde_json::{Value, json};
 use wasm_bindgen::prelude::*;
 use wordcraft_doc::{Document, StoryRef};
 use wordcraft_engine::Session;
-use wordcraft_ui_egui::{Services, WordApp};
+use wordcraft_ui_egui::{
+    Services, WordApp,
+    theme::{self, Appearance},
+};
 
 const MAX_SESSIONS: usize = 8;
 const MAX_INPUT_BYTES: usize = 64 * 1024 * 1024;
@@ -89,6 +92,7 @@ struct FlushWaiter {
 
 struct State {
     entries: BTreeMap<String, Entry>,
+    theme: Appearance,
     active: Option<String>,
     enabled: bool,
     drain_input: bool,
@@ -251,6 +255,7 @@ pub fn create_host(callback: Function) -> WordcraftHost {
     WordcraftHost {
         state: Rc::new(RefCell::new(State {
             entries: BTreeMap::new(),
+            theme: Appearance::System,
             active: None,
             enabled: true,
             drain_input: false,
@@ -311,6 +316,7 @@ impl WordcraftHost {
         }
         app.autosave = false;
         app.ui.language = "zh-hans".into();
+        app.set_host_theme(state.theme);
         let mut entry = Entry {
             app,
             name: name.to_owned(),
@@ -343,6 +349,7 @@ impl WordcraftHost {
                 Box::new(move |creation| {
                     if let Ok(mut state) = shared.try_borrow_mut() {
                         state.ctx = Some(creation.egui_ctx.clone());
+                        theme::apply(&creation.egui_ctx, state.theme);
                     }
                     Ok(Box::new(HostApp { state: shared }))
                 }),
@@ -381,6 +388,9 @@ impl WordcraftHost {
                 }
                 let memory = state.entry_mut(id)?.memory.clone().unwrap_or_default();
                 ctx.memory_mut(|current| *current = memory);
+                // Session memory can contain the palette preference from an older frame.
+                // The shell preference is shared by every tab, including restored tabs.
+                theme::apply(&ctx, state.theme);
             }
             state.active = Some(id.to_owned());
         }
@@ -546,6 +556,26 @@ impl WordcraftHost {
         }
         state.repaint();
         Ok(true)
+    }
+
+    /// The shell owns interface appearance; this never changes document/page styling.
+    #[wasm_bindgen(js_name = setTheme)]
+    pub fn set_theme(&self, preference: &str) -> Result<(), JsValue> {
+        let appearance = Appearance::from_code(preference)
+            .ok_or_else(|| js_error("theme must be light, dark or system"))?;
+        let mut state = self.state.try_borrow_mut().map_err(js_error)?;
+        if state.destroyed {
+            return Err(js_error("editor host is destroyed"));
+        }
+        state.theme = appearance;
+        for entry in state.entries.values_mut() {
+            entry.app.set_host_theme(appearance);
+        }
+        if let Some(ctx) = &state.ctx {
+            theme::apply(ctx, appearance);
+        }
+        state.repaint();
+        Ok(())
     }
 
     #[wasm_bindgen(js_name = setActive)]
