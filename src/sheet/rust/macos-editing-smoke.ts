@@ -80,7 +80,20 @@ async function until<T>(read: () => Promise<T>, valid: (value: T) => boolean, la
 const frame = () => bounded(new Promise<void>(resolve => requestAnimationFrame(() => resolve())), 'rendered frame')
 function readBoot(): Boot {
   const value = (window as Window & { __OPEN_OFFICE_DIAGNOSTIC_BOOT__?: Boot }).__OPEN_OFFICE_DIAGNOSTIC_BOOT__
-  assert(value && typeof value.bootId === 'string' && value.bootId.length >= 16 && value.timeOrigin === performance.timeOrigin, 'native initialization boot marker is missing or invalid')
+  // WebKit converts its monotonic origin to wall time on each getter call:
+  // https://github.com/WebKit/WebKit/blob/f38c61096af22dabaf3a5e97242e513c71f29c1e/Source/WebCore/page/Performance.cpp
+  // GenericTimeMixin::approximate() samples both clocks again, so a repeated
+  // performance.timeOrigin read need not equal the immutable captured value.
+  // Identity remains exact against the initial marker and native startup event.
+  const valid = value && typeof value.bootId === 'string'
+    && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value.bootId)
+    && Number.isFinite(value.timeOrigin) && value.timeOrigin > 0
+  if (!valid) {
+    const detail = { markerType: typeof value, bootIdType: typeof value?.bootId,
+      bootId: typeof value?.bootId === 'string' ? value.bootId.slice(0, 64).replace(/[^a-zA-Z0-9-]/g, '?') : null,
+      storedTimeOrigin: typeof value?.timeOrigin === 'number' ? String(value.timeOrigin) : `<${typeof value?.timeOrigin}>` }
+    assert(false, `native initialization boot marker is missing or invalid: ${JSON.stringify(detail)}`)
+  }
   return value
 }
 function identity(mount: EditingSmokeMount, state: Snapshot): Identity { return { key: mount.key, kind: mount.kind, sessionId: state.sessionId, documentId: state.documentId } }

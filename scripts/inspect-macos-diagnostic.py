@@ -274,7 +274,7 @@ def system_log_summary(data, report, samples):
     app_pid = (report.get("process") or {}).get("pid")
     sampled = {row["pid"] for sample in samples for row in sample["rows"]}
     keywords = re.compile(r"\b(crash(?:ed|ing)?|terminat\w*|kill(?:ed|ing)?|memory|memorystatus|jetsam|GPU|assert\w*|exception|fatal|abort(?:ed)?|error|fault)\b", re.I)
-    invalid_message = re.compile(r"\b(?:received\s+invalid\s+(?:IPC\s+)?message|didReceiveInvalidMessage|invalid\s+IPC\s+message)\b", re.I)
+    invalid_message = re.compile(r"\b(?:received\s+(?:an?\s+)?invalid\s+(?:IPC\s+)?message|didReceiveInvalidMessage|invalid\s+IPC\s+message)\b", re.I)
     severe = re.compile(r"\b(crash\w*|terminat\w*|kill\w*|jetsam|exception|fatal|abort\w*)\b|\bassert(?:ion)?\s+(?:failed|failure)\b|\bfailed\s+assertion\b", re.I)
     selected, parsed_count, skipped = [], 0, 0
     first_parsed_timestamp, last_parsed_timestamp = None, None

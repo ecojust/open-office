@@ -22,6 +22,9 @@ let server, browser, page;
     await context.addInitScript(() => {
       window.__OPEN_OFFICE_DIAGNOSTIC_BOOT__ = Object.freeze({ bootId: crypto.randomUUID(), timeOrigin: performance.timeOrigin });
       window.editingBoot(window.__OPEN_OFFICE_DIAGNOSTIC_BOOT__);
+      // WebKit converts the origin between clocks on every read. Simulate a
+      // later conversion differing while the native startup marker stays fixed.
+      Object.defineProperty(performance, 'timeOrigin', { get: () => window.__OPEN_OFFICE_DIAGNOSTIC_BOOT__.timeOrigin + 1 });
     });
     page = await context.newPage();
     page.on('pageerror', error => report.errors.push(error.message));
@@ -57,6 +60,10 @@ let server, browser, page;
     assert.equal(new Set(report.helper.sessions.map(session => session.sessionId)).size, 3);
     assert.deepEqual(report.helper.cleanup, { attempted: 3, closed: 3, ok: true });
     assert.equal(report.boots.length, 1);
+    assert.equal(report.helper.bootId, report.boots[0].bootId);
+    assert.equal(report.helper.timeOrigin, report.boots[0].timeOrigin);
+    report.liveTimeOrigin = await page.evaluate(() => performance.timeOrigin);
+    assert.equal(report.liveTimeOrigin, report.helper.timeOrigin + 1, 'Live getter drift must not replace the captured startup identity');
     assert.deepEqual(report.errors, []);
     report.ok = true;
   } catch (error) {

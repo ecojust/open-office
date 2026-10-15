@@ -42,7 +42,11 @@
 
 [完整受限摘要](https://github.com/ecojust/open-office/actions/runs/38772145687) 显示系统日志只保留了最早 8 MiB，最后时间为 16:38:02.843，早于退出 5.452 秒。日志中的启动期 RBS、Jetsam Boost 和网络沙箱消息不能据此归因本次退出。退出前最后一次采样的 WebContent 为约 634 MiB RSS；退出后出现新 PID，同样不能据此认定内存杀死。采集器已改为保留最后 8 MiB，并记录截断和丢弃字节数。
 
-候选提交 `011bcab00626225224cf4dbbfca27339ced16c5c` 只阻止表格 canvas 的左键 `mousedown` 浏览器默认行为，保留 pointer 事件、传播、焦点桥接和隐藏输入样式。Chromium 的八项真实编辑检查与 TypeScript 检查通过；[原生候选验证](https://github.com/ecojust/open-office/actions/runs/38772234421) 用于判断该改动是否影响复现，尚不能称为已确认修复。
+候选提交 `011bcab00626225224cf4dbbfca27339ced16c5c` 只阻止表格 canvas 的左键 `mousedown` 浏览器默认行为，保留 pointer 事件、传播、焦点桥接和隐藏输入样式。Chromium 的八项真实编辑检查、全局按钮到表格的真实键盘焦点回归与 TypeScript 检查通过。
+
+[原生候选验证 38772234421](https://github.com/ecojust/open-office/actions/runs/38772234421) 在编辑开始前被诊断脚本的 boot marker 检查拦截：已记录一次 `document-start`，但未发出 CGEvent，终止次数为 0。该运行不能评价候选改动。原检查要求初始化时捕获的时间与再次读取 `performance.timeOrigin` 严格相等；WebKit 上游 `Performance::timeOrigin()` 使用 `approximate<WallTime>()`，会根据当前单调时钟与墙上时钟换算，不能假定多次浮点读取完全相同。该运行未记录两个值，不能据此确认具体失败子条件。诊断应以初始化生成的不可变 UUID、捕获时间和原生启动计数共同识别页面，并保留失败详情。
+
+采集器本轮已正确保留末尾 8 MiB 日志（总量约 9.6 MiB），没有编辑阶段的进程退出可供分析。候选改动尚不能称为已确认修复。
 
 ## 原生检查的判定要求
 
