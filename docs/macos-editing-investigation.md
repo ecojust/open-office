@@ -26,6 +26,8 @@
 
 这些检查没有使用 Apple WKWebView，不能作为 macOS 26.5 已通过的证据。本地详细报告位于 `test-results/grid-edit-actions-focused/report.json` 等诊断输出中，未作为安装包内容发布。
 
+提交 `ff6fb94` 的本地完整检查通过：TypeScript、344 项应用测试、83 项 PDF 测试；浏览器诊断通过 11 次可信输入和 8 项模型检查，保留一次启动及全部会话。测试将实时 `timeOrigin` getter 偏移 1 ms，确认报告继续使用原始捕获的页面身份。
+
 ## 首次 macOS 原生诊断
 
 [诊断运行 38763519681](https://github.com/ecojust/open-office/actions/runs/38763519681) 使用提交 `cf808783494902a0db6ea93fc49d8b6ad90dc6f1`。实际系统为 macOS **26.6.2（25G83）**、Apple Silicon，并非用户的 26.5。系统输入权限与应用构建通过，两张空白表格均就绪，但首次点击前的坐标校验失败：原生采样为 1024 × 674 点，页面视口为 1024 × 642。
@@ -47,6 +49,10 @@
 [原生候选验证 38772234421](https://github.com/ecojust/open-office/actions/runs/38772234421) 在编辑开始前被诊断脚本的 boot marker 检查拦截：已记录一次 `document-start`，但未发出 CGEvent，终止次数为 0。该运行不能评价候选改动。原检查要求初始化时捕获的时间与再次读取 `performance.timeOrigin` 严格相等；WebKit 上游 `Performance::timeOrigin()` 使用 `approximate<WallTime>()`，会根据当前单调时钟与墙上时钟换算，不能假定多次浮点读取完全相同。该运行未记录两个值，不能据此确认具体失败子条件。诊断应以初始化生成的不可变 UUID、捕获时间和原生启动计数共同识别页面，并保留失败详情。
 
 采集器本轮已正确保留末尾 8 MiB 日志（总量约 9.6 MiB），没有编辑阶段的进程退出可供分析。候选改动尚不能称为已确认修复。
+
+提交 `ff6fb94eb113c7bf9432338953cd2fa9c999bb73` 保留同一候选产品改动，修正诊断身份读取后进行[下一轮原生验证 38774688910](https://github.com/ecojust/open-office/actions/runs/38774688910)。本轮实际发出四项系统输入：A1 单击、键入 `42`、Enter 均完成；D6 双击请求在 10181 ms，进程终止在 10425 ms，随后重载。WebKit 日志给出 `reason=Crash`，原生计数为两次启动、一次终止。因此该鼠标默认行为候选无效，已从产品代码撤回。
+
+本轮末尾日志覆盖崩溃，未提供异常栈或具体信号，也未发现 `.ips` 文件。WebContent 退出前最近采样约 769 MiB RSS，仍不足以认定内存杀死。后续检查聚焦双击事件回调中同步进入编辑的路径，并继续读取崩溃时刻上下文。
 
 ## 原生检查的判定要求
 

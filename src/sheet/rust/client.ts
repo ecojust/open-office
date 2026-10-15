@@ -99,10 +99,6 @@ function newCanvas() {
   element.dataset.testid = 'gridcraft-canvas'
   element.setAttribute('aria-label', '工作簿与功能区')
   element.tabIndex = 0
-  // Keep native text-selection defaults out of the pointer-driven canvas.
-  element.addEventListener('mousedown', event => {
-    if (event.button === 0) event.preventDefault()
-  })
   Object.assign(element.style, { display: 'block', width: '100%', height: '100%', outline: 'none' })
   return element
 }
