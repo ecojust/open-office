@@ -172,4 +172,5 @@ def inspect_pdf(path):
         return {'pages': len(document), 'text': '\n'.join(p.get_text() for p in document), 'spans': [{'text': s['text'], 'size': s['size'], 'color': s['color'], 'font': s['font']} for p in document for b in p.get_text('dict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans']]}
 
 if __name__ == '__main__':
-    print(json.dumps(inspect_pdf(sys.argv[2]) if sys.argv[1] == '--pdf' else inspect(sys.argv[1]), ensure_ascii=False))
+    # JSON escapes preserve Unicode when Windows pipes use a legacy encoding.
+    print(json.dumps(inspect_pdf(sys.argv[2]) if sys.argv[1] == '--pdf' else inspect(sys.argv[1])))
