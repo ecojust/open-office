@@ -54,6 +54,7 @@ export interface MacosEditingReport {
   finalTabIds: string[]
   actions: Action[]
   observations: Record<string, unknown>
+  preselectionHold?: { startedAtMs: number; finishedAtMs?: number; durationMs?: number }
   lastState?: unknown
   cleanup: { attempted: number; closed: number; ok: boolean }
   error?: string
@@ -306,6 +307,15 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
       const started = performance.now()
       await bounded(sheet.editor.command('selection.set', { cell: 'D6' }), 'preselect D6 model command')
       await preselectionProbe(sheet, 'after-command', started)
+      // The preceding document.inspect query schedules a repaint. Observe its
+      // aftermath before hit testing, further inspection, or native geometry.
+      const hold = report.preselectionHold = { startedAtMs: performance.now() } as NonNullable<MacosEditingReport['preselectionHold']>
+      smokeStage('editing-preselect-hold', JSON.stringify({ phase: 'begin', performanceMs: hold.startedAtMs }))
+      while (performance.now() - hold.startedAtMs < 3000) {
+        await new Promise(resolve => setTimeout(resolve, Math.ceil(3000 - (performance.now() - hold.startedAtMs))))
+      }
+      hold.finishedAtMs = performance.now(); hold.durationMs = hold.finishedAtMs - hold.startedAtMs
+      smokeStage('editing-preselect-hold', JSON.stringify({ phase: 'end', performanceMs: hold.finishedAtMs, durationMs: hold.durationMs }))
     }
     if (control) {
       if (preselect) smokeStage('editing-preselect-click', 'single click already-selected D6')

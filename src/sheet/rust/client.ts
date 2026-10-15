@@ -99,12 +99,6 @@ function newCanvas() {
   element.dataset.testid = 'gridcraft-canvas'
   element.setAttribute('aria-label', '工作簿与功能区')
   element.tabIndex = 0
-  const nativeFocus = element.focus.bind(element)
-  element.focus = (options?: FocusOptions) => {
-    // Isolate redundant eframe focus calls while preserving real focus handoffs.
-    if (document.activeElement === element && options?.preventScroll === true) return
-    nativeFocus(options)
-  }
   Object.assign(element.style, { display: 'block', width: '100%', height: '100%', outline: 'none' })
   return element
 }

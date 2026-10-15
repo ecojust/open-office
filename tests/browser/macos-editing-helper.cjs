@@ -51,8 +51,24 @@ let server, browser, page;
       try { await runMacosEditingSmoke(app.editingSmokeAdapter(), options); }
       catch (error) { nativeGuardRejected = String(error).includes('opted-in native WebView'); }
       if (!nativeGuardRejected) throw Error('Native diagnostic accepted browser evidence');
-      const value = await verifyMacosEditing(app.editingSmokeAdapter(), request => window.editingInput(request), options);
-      return { ...value, nativeGuardRejected, requiredChecks: editEntry === 'preselect' ? MACOS_EDITING_PRESELECT_CHECKS : editEntry === 'f2' ? MACOS_EDITING_F2_CHECKS : MACOS_EDITING_CHECKS };
+      const adapter = app.editingSmokeAdapter(), inspectionTimes = [], inputTimes = [];
+      if (editEntry === 'preselect') {
+        const open = adapter.open;
+        adapter.open = async (...args) => {
+          const mount = await open(...args), editor = mount.editor;
+          return { ...mount, editor: {
+            inspect: () => { inspectionTimes.push(performance.now()); return editor.inspect(); },
+            command: (...params) => editor.command(...params),
+            ...(editor.query ? { query: (...params) => { inspectionTimes.push(performance.now()); return editor.query(...params); } } : {}),
+          } };
+        };
+      }
+      const value = await verifyMacosEditing(adapter, request => {
+        inputTimes.push({ actionId: request.actionId, atMs: performance.now() });
+        return window.editingInput(request);
+      }, options);
+      return { ...value, nativeGuardRejected, inspectionTimes, inputTimes,
+        requiredChecks: editEntry === 'preselect' ? MACOS_EDITING_PRESELECT_CHECKS : editEntry === 'f2' ? MACOS_EDITING_F2_CHECKS : MACOS_EDITING_CHECKS };
     }, editEntry);
     assert.equal(report.helper.ok, true, report.helper.error || report.helper.closeError);
     assert.equal(report.helper.transport, 'local-wasm-in-browser');
@@ -74,7 +90,17 @@ let server, browser, page;
         if (index) { assert.ok(probe.elapsedMs >= 2500); assert.equal(probe.activeCell, 'D6'); }
         assert.equal(probe.mode, 'Ready'); assert.equal(probe.editor, null); assert.equal(probe.focus, 'canvas');
       }
-    } else assert.equal(report.helper.observations.preselection, undefined);
+      const hold = report.helper.preselectionHold;
+      assert.ok(Number.isFinite(hold.startedAtMs) && Number.isFinite(hold.finishedAtMs));
+      assert.ok(hold.durationMs >= 3000);
+      assert.equal(hold.durationMs, hold.finishedAtMs - hold.startedAtMs);
+      assert.ok(report.helper.inspectionTimes.every(time => time < hold.startedAtMs || time >= hold.finishedAtMs), 'The hold must not inspect or query the Rust model');
+      assert.ok(report.helper.inputTimes.every(input => input.atMs < hold.startedAtMs || input.atMs >= hold.finishedAtMs), 'The hold must not dispatch OS input');
+      assert.ok(report.helper.inputTimes.find(input => input.actionId === 'single-d6').atMs >= hold.finishedAtMs);
+    } else {
+      assert.equal(report.helper.observations.preselection, undefined);
+      assert.equal(report.helper.preselectionHold, undefined);
+    }
     if (control) {
       assert.ok(!report.helper.checks.includes('sheet-double-click-native-typing'));
       assert.ok(!report.requests.some(request => request.kind === 'doubleClick'));
