@@ -92,6 +92,22 @@ function inspectReporter(patch = {}) {
   return inspect({ mode: 'emit', time: '', pids: '', report: sigtrapReport(), crashReporterContext: true, ...patch });
 }
 
+test('public WebKit policy readback survives a full input timeline without exposing arbitrary fields', () => {
+  const policy = (stage, actual) => ({ phase: 'editing-webkit-policy', detail: JSON.stringify({
+    stage, actual, supported: true, privateText: 'DO_NOT_EMIT', requested: 1,
+  }) });
+  const result = inspect({ mode: 'emit', time: '', pids: '', report: { nativeDiagnostics: {
+    generation: 1, terminations: 0, events: [policy('before-set', 0), policy('after-set', 1), policy('created', 1),
+      ...Array.from({ length: 40 }, (_, i) => ({ phase: 'editing-input-complete', detail: `input-${i}`, elapsedMs: i, generation: 1 }))],
+  } } });
+  assert.equal(result.ok, true, result.error);
+  const native = annotations(result.value).find(item => item.section === 'native');
+  assert.deepEqual(native.webKitPolicy, { columns: ['stage', 'supported', 'actualMode'], rows: [
+    ['before-set', true, 0], ['after-set', true, 1], ['created', true, 1],
+  ] });
+  assert.equal(result.value.includes('DO_NOT_EMIT'), false);
+});
+
 test('context input requires exact UTC time and one or two distinct valid PIDs', () => {
   assert.equal(inspect({ mode: 'parse', time: '', pids: '' }).value, null);
   assert.deepEqual(inspect({ mode: 'parse' }).value.pids, [15706, 15734]);

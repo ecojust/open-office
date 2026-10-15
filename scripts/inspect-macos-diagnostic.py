@@ -277,6 +277,26 @@ def compact_timeline(native):
     return [result[:15], result[15:]]
 
 
+def webkit_policy_summary(native):
+    rows = []
+    for event in (native.get("events") or [])[:256]:
+        if not isinstance(event, dict) or event.get("phase") != "editing-webkit-policy":
+            continue
+        detail = event.get("detail")
+        if not isinstance(detail, str) or len(detail) > 400:
+            continue
+        try:
+            value = json.loads(detail)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(value, dict) or value.get("stage") not in ("before-create", "before-set", "after-set", "created"):
+            continue
+        actual = value.get("actual")
+        rows.append([value["stage"], value.get("supported") is True,
+            actual if type(actual) is int and -128 <= actual <= 128 else None])
+    return {"columns": ["stage", "supported", "actualMode"], "rows": rows[-4:]}
+
+
 def process_rows(samples):
     result = []
     for sample in samples:
@@ -800,7 +820,9 @@ def summarize(read, files, run, artifact, expected_sha, context=None, crash_repo
     notice("overview", {"system": pick(report.get("system"), ["swVers", "machine", "node"]), "host": {key: pick(host.get(key), ["status", "stdout"]) for key in ["macOS", "macOSBuild", "hardwareArch"]},
         "sentCount": len(actions), "actions": [{"id": (action.get("request") or {}).get("actionId"), "kind": (action.get("request") or {}).get("kind"), **pick(action.get("result"), ["ok", "eventCount", "error"])} for action in actions[:16]],
         "preflight": {**pick(preflight, ["kind", "ok", "error"]), "permissions": pick(preflight.get("permissions"), ["postEventAccess", "accessibilityTrusted", "screenCaptureAccess", "inputSourceId", "osVersion"])}})
-    notice("native", {**pick(native, ["generation", "terminations", "scope"]), "timeline": compact_timeline(native)})
+    policy = webkit_policy_summary(native)
+    notice("native", {**pick(native, ["generation", "terminations", "scope"]),
+        **({"webKitPolicy": policy} if policy["rows"] else {}), "timeline": compact_timeline(native)})
     process = report.get("process") or {}
     exit_observer = exit_observer_summary(read, report, native)
     samples = process_rows((report.get("processSamples") or [])[-200:])
