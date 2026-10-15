@@ -4,6 +4,7 @@ Never runs an app or interprets an artifact as code. ZIP members are read in
 place after path/type/size validation; nothing from the archive is extracted.
 """
 import argparse
+from datetime import datetime
 import json
 import os
 import re
@@ -156,7 +157,7 @@ def archive_members(archive):
     return files
 
 
-def read_evidence(archive, files, filename, limit):
+def read_evidence(archive, files, filename, limit, as_json=True):
     # upload-artifact normally strips the common directory; accept its exact
     # original prefix as well, but never search arbitrary nested locations.
     matches = [files[name] for name in (filename, f"artifacts/macos-editing/{filename}", f"macos-editing/{filename}") if name in files]
@@ -167,6 +168,8 @@ def read_evidence(archive, files, filename, limit):
     with archive.open(matches[0]) as stream:
         data = stream.read(limit + 1)
     require(len(data) <= limit, f"{filename} exceeds read bound")
+    if not as_json:
+        return data
     value = json.loads(data)
     require(isinstance(value, dict), f"{filename} must contain a JSON object")
     return value
@@ -178,7 +181,7 @@ def pick(value, keys):
 
 
 def native_event_summary(event):
-    summary = pick(event, ["phase", "detail", "elapsedMs", "generation"])
+    summary = pick(event, ["phase", "detail", "elapsedMs", "unixMs", "generation"])
     detail = summary.get("detail")
     if summary.get("phase") == "editing-window-geometry" and isinstance(detail, str) and len(detail) <= 4096:
         try:
@@ -192,13 +195,119 @@ def native_event_summary(event):
     return summary
 
 
+def native_timeline(events):
+    return [native_event_summary(event) for event in events if isinstance(event, dict) and (
+        str(event.get("phase", "")).startswith(("editing", "web-content", "fatal"))
+        or event.get("phase") in ("document-start", "error", "unhandledrejection", "window-error", "renderer-uncaught", "renderer-resize-observer-notification")
+    )][-30:]
+
+
+def timeline_notices(native):
+    base = pick(native, ["generation", "terminations", "scope"])
+    chunks, current = [], []
+    for event in native_timeline(native.get("events") or []):
+        candidate = current + [event]
+        if current and (len(candidate) > 10 or len(json.dumps(bounded({**base, "recentEvents": candidate}), ensure_ascii=False)) > 12000):
+            chunks.append(current)
+            current = []
+        current.append(event)
+    chunks.append(current)
+    for index, events in enumerate(chunks):
+        notice("native", {**base, "part": index + 1, "parts": len(chunks), "recentEvents": events})
+
+
+def process_rows(samples):
+    result = []
+    for sample in samples:
+        rows = []
+        for row in (sample.get("rows") or [])[:40]:
+            match = re.fullmatch(r"\s*(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+(.+)", str(row))
+            if not match:
+                continue
+            pid, parent, rss, cpu, command = match.groups()
+            if not re.search(r"open-office|Open Office|WebContent|WebKit|GPU", command, re.I):
+                continue
+            rows.append({"pid": int(pid), "ppid": int(parent), "rssKiB": int(rss), "cpuPercent": float(cpu), "process": PurePosixPath(command).name})
+        result.append({"unixMs": sample.get("unixMs"), "rows": rows})
+    return result
+
+
+def system_time(value):
+    try:
+        if isinstance(value, str):
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return parsed.timestamp() if parsed.tzinfo else None
+        return None
+    except (ValueError, OverflowError):
+        return None
+
+
+def system_log_summary(data, report, samples):
+    start, end = system_time(report.get("startedAt")), system_time(report.get("finishedAt"))
+    app_pid = (report.get("process") or {}).get("pid")
+    sampled = {row["pid"] for sample in samples for row in sample["rows"]}
+    keywords = re.compile(r"\b(crash(?:ed|ing)?|terminat\w*|kill(?:ed|ing)?|memory|memorystatus|jetsam|GPU|assert\w*|exception|fatal|abort(?:ed)?|error|fault)\b", re.I)
+    severe = re.compile(r"\b(crash\w*|terminat\w*|kill\w*|jetsam|assert\w*|exception|fatal|abort\w*)\b", re.I)
+    selected, parsed_count, skipped = [], 0, 0
+    first_parsed_timestamp, last_parsed_timestamp = None, None
+    for line in data.splitlines():
+        if len(line) > 65536:
+            skipped += 1
+            continue
+        try:
+            event = json.loads(line)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            skipped += 1
+            continue
+        if not isinstance(event, dict):
+            continue
+        parsed_count += 1
+        message = event.get("eventMessage")
+        timestamp = system_time(event.get("timestamp"))
+        if timestamp is not None:
+            last_parsed_timestamp = scrub(event["timestamp"], 80)
+            if first_parsed_timestamp is None:
+                first_parsed_timestamp = last_parsed_timestamp
+        if not isinstance(message, str) or not keywords.search(message):
+            continue
+        if start is None or end is None or timestamp is None or not start - 2 <= timestamp <= end + 2:
+            continue
+        pid = event.get("processID")
+        if isinstance(pid, str) and pid.isdigit():
+            pid = int(pid)
+        if not isinstance(pid, int):
+            pid = None
+        if isinstance(app_pid, int) and pid == app_pid:
+            correlation = "launched-app-pid"
+        elif pid in sampled:
+            correlation = "sampled-WebKit-pid; app ownership unproven"
+        elif re.search(r"com\.ecojust\.openoffice|\bopen-office\b", message, re.I) or (isinstance(app_pid, int) and re.search(rf"\bpid\s*[:=]?\s*{app_pid}\b", message, re.I)):
+            correlation = "message references app or launched pid"
+        else:
+            continue
+        item = {"time": scrub(event.get("timestamp"), 80), "pid": pid, "process": scrub(PurePosixPath(str(event.get("processImagePath") or "unknown")).name, 100), "correlation": correlation, "message": scrub(message, 1000)}
+        # Leave room for JSON grouping and notice metadata within the overall
+        # 20 KB output budget, even when messages contain multibyte characters.
+        while len(json.dumps(item, ensure_ascii=False).encode("utf-8")) > 900:
+            item["message"] = item["message"][:-20]
+        selected.append((bool(severe.search(message)), timestamp, item))
+    # Preserve the most relevant failure messages if verbose GPU diagnostics
+    # fill the bounded log; retain chronology among the selected messages.
+    selected = sorted(sorted(selected, key=lambda row: (row[0], row[1]), reverse=True)[:20], key=lambda row: row[1])
+    return {"parsedLines": parsed_count, "skippedLines": skipped, "matchingLines": len(selected),
+            "firstParsedTimestamp": first_parsed_timestamp, "lastParsedTimestamp": last_parsed_timestamp,
+            "timeFilterAvailable": start is not None and end is not None,
+            "limitation": "Related log messages only, not proof of cause. Sampled WebKit PIDs may belong to another application.",
+            "lines": [row[2] for row in selected]}
+
+
 def local_evidence(directory):
     require(directory.is_dir() and not directory.is_symlink(), "Local evidence directory is missing or is a symlink")
     root = directory.resolve()
     files = [item.name for item in root.iterdir()]
     require(len(files) <= 128, "Local evidence inventory exceeds bound")
 
-    def read(filename, limit):
+    def read(filename, limit, as_json=True):
         path = root / filename
         if not path.exists() and not path.is_symlink():
             return None
@@ -207,6 +316,8 @@ def local_evidence(directory):
         with path.open("rb") as stream:
             data = stream.read(limit + 1)
         require(len(data) <= limit, f"{filename} exceeds read bound")
+        if not as_json:
+            return data
         value = json.loads(data)
         require(isinstance(value, dict), f"{filename} must contain a JSON object")
         return value
@@ -229,12 +340,23 @@ def summarize(read, files, run, artifact, expected_sha):
     notice("system", {"system": pick(report.get("system"), ["swVers", "machine", "node"]), "host": {key: pick(host.get(key), ["status", "stdout", "stderr"]) for key in ["macOS", "macOSBuild", "hardwareArch", "appleSilicon", "swift"]}})
     actions = report.get("actions") or []
     notice("actions", {"sentCount": len(actions), "actions": [{"request": pick(action.get("request"), ["actionId", "kind"]), "result": pick(action.get("result"), ["ok", "kind", "eventCount", "error"])} for action in actions[:16]]})
-    notice("native", {**pick(native, ["generation", "terminations", "scope"]), "recentEvents": [native_event_summary(event) for event in (native.get("events") or [])[-10:]]})
+    timeline_notices(native)
     state = editing.get("lastState") or {}
     notice("frontend", {**pick(frontend, ["ok", "error", "nativeLifecycle"]), "editing": {**pick(editing, ["ok", "error", "closeError", "checks", "initialTabIds", "finalTabIds", "cleanup"]), "lastState": {**pick(state, ["activeKey", "shell"]), "tabs": [pick(tab, ["key", "kind", "dirty", "ready"]) for tab in (state.get("tabs") or [])[:8]], "sessions": [pick(session, ["key", "kind", "sessionId", "documentId", "revision", "dirty"]) for session in (state.get("sessions") or [])[:8]]}}})
     notice("preflight", {**pick(preflight, ["schemaVersion", "kind", "ok", "error"]), "permissions": pick(preflight.get("permissions"), ["postEventAccess", "accessibilityTrusted", "screenCaptureAccess", "inputSourceId", "osVersion"])})
     process = report.get("process") or {}
     notice("process", {**pick(process, ["exitCode", "signal", "spawnError"]), "stderrTail": scrub(str(process.get("stderrTail") or "")[-1500:], 1500), "crashFilenames": [PurePosixPath(name).name for name in files if PurePosixPath(name).name.startswith("crash-") and name.endswith((".ips", ".crash"))][:8], "crashGaps": pick(report.get("crashReports"), ["gaps"])})
+    samples = process_rows((report.get("processSamples") or [])[-200:])
+    recent = []
+    for sample in samples[-6:]:
+        rows = [row for row in sample["rows"] if re.search(r"open-office|Open Office|WebContent", row["process"], re.I)]
+        recent.append({"unixMs": sample["unixMs"], "relatedCount": len(rows), "totalRssKiB": sum(row["rssKiB"] for row in rows), "highestRssRows": sorted(rows, key=lambda row: row["rssKiB"], reverse=True)[:8]})
+    notice("process-samples", {"samples": recent, "limit": "Last six samples; up to 40 source rows per sample, top eight App/WebContent rows by RSS. RSS is a snapshot, not proof of a memory kill."})
+    log = read("system-webkit.ndjson", 8 * 1024 * 1024, False)
+    summary = system_log_summary(log or b"", report, samples)
+    notice("system-log", {"available": log is not None, **pick(report.get("systemLog"), ["bytes", "truncated", "stderr"]), **pick(summary, ["parsedLines", "skippedLines", "matchingLines", "firstParsedTimestamp", "lastParsedTimestamp", "timeFilterAvailable", "limitation"])})
+    for offset in range(0, len(summary["lines"]), 5):
+        notice("related-system-log", {"part": offset // 5 + 1, "lines": summary["lines"][offset:offset + 5], "causalityEstablished": False})
 
 
 def main():
@@ -263,7 +385,7 @@ def main():
             download_zip(url, destination)
             with zipfile.ZipFile(destination) as archive:
                 files = archive_members(archive)
-                summarize(lambda filename, limit: read_evidence(archive, files, filename, limit), files, run, artifact, args.expected_sha)
+                summarize(lambda filename, limit, as_json=True: read_evidence(archive, files, filename, limit, as_json), files, run, artifact, args.expected_sha)
         return 0
     except Exception as error:
         # Only locally generated validation messages are exposed. URL-bearing
