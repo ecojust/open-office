@@ -21,7 +21,8 @@ import type { OfficeDocument } from './office/types'
 import { reviewOfficeImport } from './office/import-review'
 import { useDialogFocus } from './shared/dialog-focus'
 import { prepareWordDocument, type PreparedWordDocument } from './word/core/prepared'
-import { prepareRustWordDocument, type PreparedRustWordDocument } from './word/rust/client'
+import { inspectWordcraftSession, prepareRustWordDocument, type PreparedRustWordDocument } from './word/rust/client'
+import type { WordcraftSmokeEditor } from './word/rust/wordcraft-native-smoke'
 import { bytesToBase64, base64ToBytes, extensionOf, kindOf, withExtension, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFormats, saveFileName, type SaveExtension, type Kind, type Extension, type EditorHandle } from './shared/document'
 
 type WordEngine = 'rust' | 'independent' | 'legacy'
@@ -658,6 +659,42 @@ onMounted(async()=>{
           report.independentWordPackage=independentWordPackage
           if(!independentWordPackage.ok)throw Error(independentWordPackage.error||'Independent Word native package verification failed')
           smokeStage('word-package-ipc','complete')
+          smokeStage('wordcraft-native','starting the default WordCraft canvas and input round trip')
+          const {runWordcraftNativeSmoke}=await import('./word/rust/wordcraft-native-smoke')
+          const wordcraft=await runWordcraftNativeSmoke({
+            open:async(base64,name)=>{
+              await editorTransaction('正在验证默认文字编辑器',()=>addDocument({id:'',kind:'word',extension:'docx',name,base64,sha256:'',sizeBytes:Math.floor(base64.length*.75)}))
+              await nextTick()
+              const tab=active.value
+              if(!tab||tab.wordEngine!=='rust')throw Error('Default WordCraft smoke tab missing')
+              await awaitReady(tab)
+              const handle=rustWordHandles.get(tab.key) as WordcraftSmokeEditor|undefined
+              if(!handle?.inspect||!handle.command)throw Error('Default WordCraft smoke editor unavailable')
+              const snapshot=await handle.inspect()
+              const element=[...document.querySelectorAll<HTMLElement>('[data-testid="rust-word-editor"]')].find(node=>node.dataset.sessionId===snapshot.sessionId)
+              if(!element)throw Error('Default WordCraft smoke canvas container missing')
+              return {key:tab.key,element,editor:nativeTransactionalEditor(handle)}
+            },
+            activeKey:()=>activeKey.value,
+            close:async key=>{
+              const tab=tabs.value.find(candidate=>candidate.key===key)
+              if(!tab)throw Error('WordCraft smoke cleanup tab missing')
+              const handle=rustWordHandles.get(key) as WordcraftSmokeEditor|undefined
+              const sessionId=(await handle?.inspect())?.sessionId
+              await removeTab(tab,true)
+              await nextTick()
+              // The real component unmount queues session.close. Inspect uses
+              // that same queue, so rejection confirms cleanup has completed.
+              if(sessionId) {
+                let closed=false
+                try {await inspectWordcraftSession(sessionId)} catch {closed=true}
+                if(!closed)throw Error('WordCraft smoke session survived unmount')
+              }
+            },
+          })
+          report.wordcraft=wordcraft
+          if(!wordcraft.ok)throw Error(wordcraft.error||wordcraft.closeError||'Default WordCraft native verification failed')
+          smokeStage('wordcraft-native','complete')
           smokeStage('office-start','creating Writer document')
           await editorTransaction('正在准备本机文档验证',()=>addDocument({id:'',kind:'word',extension:'docx',name:'Smoke.docx',base64:'',sha256:'',sizeBytes:0},undefined,'legacy'))
           await nextTick()

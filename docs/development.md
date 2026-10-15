@@ -140,13 +140,17 @@ node scripts/benchmark-word-package.cjs
 
 脚本自行启动临时服务，使用原始 LibreOffice 小文件及 100／1,000／4,000 段合成正文；运行时应暂停其他浏览器测试和编译。此项不测真实 Tauri IPC 或整份文稿的打开、保存时间。参见[测量范围和结果](word-package-performance.md)。
 
-桌面发布工作流仅由 `workflow_dispatch` 触发。选择 `platform=all` 与 `publish=true`，三种安装包通过本次构建及应用内自检后，才发布测试版；源码推送本身不会自动发布。现有自检仍验证旧文字 IPC 与兼容编辑器，尚缺新默认 WordCraft 的真实 WebView 验收；补齐前不能用当前工作流通过结果宣称此次集成可发布。历史版本通过记录不能替代 WordCraft 本轮验收。
+桌面发布工作流仅由 `workflow_dispatch` 触发。选择 `platform=all` 与 `publish=true`，三种安装包通过本次构建及应用内自检后，才发布测试版；源码推送本身不会自动发布。0.8.0 本轮使用 `platform=all`、`publish=false`，构建并验证安装包，不公开发布。默认 WordCraft 的真实 WebView 自动检查已接入必要门槛，实际三平台结果仍待本轮 Actions；历史版本通过记录不能替代它。
 
 发布检查包括实际启动、文档编辑、保存重开与 PDF 独立回读。Windows x64 与 macOS ARM64 使用对应平台的真实应用；Intel 安装包原生编译后，将原封 DMG 转移到 ARM Mac，通过 Rosetta 验证 x64 应用和 PDF 进程。搬运前后校验安装包、应用文件、链接与签名，不重新构建或签名。该检查不等同于真实 Intel 显卡测试。
 
 从 0.6.0 起，完整安装包自检在加载 Office 引擎前，先执行独立 Word 的真实 Rust IPC 两轮读写、格式保留及无效输入拒绝检查，并将结果保存到 `frontend.independentWordPackage`。报告缺失、失败或内容不完整均阻止发布；随后继续执行原有工作区检查。该模块验证不包含轻量编辑器的原生文件对话框或全部 UI 操作。独立 `word-package` crate 的单元测试也在各构建平台单独运行。
 
-历史 0.7.0 发布还要求 `word-engine` 内核的完整安装包 IPC 验收：真实应用调用 `word_engine_request`，完成新建、编辑、排版、DOCX 导出重开及无效请求保护，再继续原有工作区检查。各平台须运行 `word-engine` 的 Rust 测试，并校验必要的原生报告；失败或缺失时不得发布。该结果与旧 `word-package` ZIP IPC 分开记录。新的 WordCraft 默认入口须另做真实应用加载与保存验收，不得仅靠这些历史模块检查提供新发布结论。
+历史 0.7.0 发布还要求 `word-engine` 内核的完整安装包 IPC 验收：真实应用调用 `word_engine_request`，完成新建、编辑、排版、DOCX 导出重开及无效请求保护，再继续原有工作区检查。各平台须运行 `word-engine` 的 Rust 测试，并校验必要的原生报告；失败或缺失时不得发布。该结果与旧 `word-package` ZIP IPC 分开记录，也不代替新默认 WordCraft 的报告。
+
+0.8.0 的完整自检新增必需的 `frontend.wordcraft`：实际挂载默认 Vue／WordCraft 编辑器，观察 WebGL 绘制，向真实 eframe 输入节点派发合成中文／emoji 输入，执行 Rust 格式命令，并验证 DOCX 导出与保存回执、过期保存拒绝、无效打开保护、默认入口重开及会话／画布／输入节点清理。`scripts/wordcraft-smoke-docx.py` 独立核对两份导出 DOCX 的正文与格式。`scripts/wordcraft-native-smoke.mjs` 只从安装目录读取四份生成产物，核对源码输入和清单摘要，再将其与 WebView 实际获取的清单、JS／WASM 摘要绑定；没有源码目录回退。
+
+该报告必须来自原生 WebView；复用检查逻辑的 Chromium 报告会标记为浏览器，不能通过原生门槛。检查不模拟物理系统输入法，不测试系统剪贴板、原生文件对话框或磁盘保存；保存断言只涵盖导出内容与编辑器版本回执。三平台实际结果及这些未测范围应分别记录，详见[WordCraft 集成说明](wordcraft-integration.md)。
 
 构建版本采用北京时间 `YYYY.MMDD.HHmm`，可通过 `OFFICE_BUILD_VERSION` 固定。每份安装包以对应 Actions 记录和提交为准。
 

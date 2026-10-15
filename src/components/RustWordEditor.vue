@@ -64,6 +64,7 @@ async function undo() { await flush(); await session!.command('edit.undo') }
 async function redo() { await flush(); await session!.command('edit.redo') }
 async function search(value: string) { await flush(); await session!.command('edit.find', { text: value }) }
 async function inspect() { await flush(); return session!.inspect() }
+async function command(id: string, params: Record<string, unknown> = {}) { await flush(); return session!.command(id, params) }
 function focus() { session?.focus() }
 function pickFile(event: Extract<WordcraftEvent, { type: 'pick-file' }>) {
   if (!session || !props.active || props.disabled) return
@@ -154,7 +155,7 @@ onBeforeUnmount(() => {
   void session?.close(true).catch(cause => console.error('WordCraft session cleanup failed', cause))
   printFrame?.remove(); if (printUrl) URL.revokeObjectURL(printUrl)
 })
-defineExpose({ exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect })
+defineExpose({ exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, command })
 </script>
 
 <template>

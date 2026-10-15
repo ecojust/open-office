@@ -4,7 +4,7 @@
 
 [下载安装包](https://github.com/ecojust/open-office/releases) · [构建记录](https://github.com/ecojust/open-office/actions/workflows/desktop-release.yml) · [开发与构建](docs/development.md)
 
-**WordCraft 文字编辑器集成预览（Alpha）**：本分支将默认文字工作区接入 WordCraft 的 Rust 文档引擎和完整功能区界面。上游版本固定，文件在本机处理；实际功能与验证边界见[集成说明](docs/wordcraft-integration.md)。已发布的 [0.7.0](docs/releases/0.7.0.md) 使用此前的基础 Rust 内核，不包含此次集成。
+**0.8.0 · WordCraft 文字编辑器集成预览（Alpha）**：默认文字工作区接入 WordCraft 的 Rust 文档引擎和完整功能区界面。浏览器验收已通过，本轮准备构建三平台安装包，尚未公开发布；见 [0.8.0 更新说明](docs/releases/0.8.0.md)与[验证边界](docs/wordcraft-integration.md)。已发布的 [0.7.0](docs/releases/0.7.0.md) 使用此前的基础 Rust 内核，不包含此次集成。
 
 ![Open Office 工作台](docs/screenshots/home.png)
 
@@ -76,7 +76,7 @@
 
 当前安装包未配置商业代码签名；macOS 包使用本地签名，尚未进行开发者公证。首次打开请按系统安全提示处理，校验文件见发布附件 `SHA256SUMS`。
 
-历史版本、安装包和已通过的检查见 [0.7.0 更新说明](docs/releases/0.7.0.md)。本分支的 WordCraft 集成验证单独记录，不能沿用历史测试数量作为完成证明。
+0.8.0 的改动、开发验证及待完成的安装包检查见 [0.8.0 更新说明](docs/releases/0.8.0.md)；本轮仅构建安装包，不自动公开发布。现有公开安装包仍以[发布页](https://github.com/ecojust/open-office/releases)为准。历史 [0.7.0](docs/releases/0.7.0.md) 的测试数量不能作为 WordCraft 集成的完成证明。
 
 开发需要 Node.js 24、Python 3.12、Rust stable（至少 1.95）、`wasm32-unknown-unknown`、固定 `wasm-bindgen-cli 0.2.129` 和对应系统的原生构建工具，步骤见[开发与构建](docs/development.md)。
 

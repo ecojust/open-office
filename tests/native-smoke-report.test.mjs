@@ -3,6 +3,7 @@ import test from 'node:test';
 import { strToU8, zipSync } from 'fflate';
 import { REQUIRED_RUST_WORD_CHECKS, validateFrontendReport, validateRustWordEngineReport } from '../scripts/native-smoke.mjs';
 import { REQUIRED_CHECKS } from '../scripts/word-package-native-smoke.mjs';
+import { wordcraftReport } from './helpers/wordcraft-smoke-report.mjs';
 
 // These fixtures test the release report contract, not Office functionality.
 // The native CI separately runs the actual packaged GUI and real file round trips.
@@ -63,6 +64,7 @@ function completeReport() {
     userAgent: 'Native WebView contract test',
     independentWordPackage: wordPackageReport(),
     rustWordEngine: rustWordReport(),
+    wordcraft: wordcraftReport(),
     office: {
       ok: true, engine: 'ZetaOffice / LibreOffice 24.2.8.0',
       writer: {
@@ -111,10 +113,18 @@ test('a complete four-workspace report preserves old checks and requires Impress
   for (const required of [
     'independentWordPackageIpc',
     'rustWordEngineIpc', 'rustWordEngineDocxReadback', 'rustWordEngineSessionCleanup',
+    'wordcraftDefaultCanvas', 'wordcraftDomInput', 'wordcraftDocxReadback', 'wordcraftFailureAtomicity', 'wordcraftSessionCleanup',
     'writerOriginalTextRoundTrip', 'writerPdfExport', 'calcFormulaRoundTrip', 'calcPdfExport',
     'pdfOriginalTextReplacementRoundTrip', 'impressOriginalTextRoundTrip', 'impressOdpRoundTrip',
     'impressPdfExport', 'impressPdfPageCount',
   ]) assert.equal(checks[required], true);
+});
+
+test('full release smoke requires the actual WordCraft default-canvas report independently of legacy IPC', () => {
+  for (const value of [undefined, null, [], {}, { ok: true }, { ...wordcraftReport(), ok: false }]) {
+    const report = completeReport(); report.wordcraft = value;
+    assert.throws(() => validateFrontendReport(report), /WordCraft/);
+  }
 });
 
 test('full release smoke requires the new real Rust Word engine IPC report', () => {

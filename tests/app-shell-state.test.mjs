@@ -31,7 +31,7 @@ function compile(source, require, extra = {}) {
 const { prepareWordDocument } = compile(preparedSource, () => { throw Error('Unexpected prepared import') })
 const paper = compile(paperSource, () => { throw Error('Unexpected paper import') })
 
-function shell({nativeEnabled = true, smoke = false, independentImportError, independentImport, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, rustSmokeError, rustSmokeReport, rustSmokeRun} = {}) {
+function shell({nativeEnabled = true, smoke = false, independentImportError, independentImport, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, rustSmokeError, rustSmokeReport, rustSmokeRun, wordcraftSmokeError, wordcraftSmokeReport, wordcraftSmokeRun} = {}) {
   const independentModels = [], preparations = [], rustPreparations = []
   const calls = [], mounted = [], beforeUnmount = [], observers = [], reviews = [], native = {
     isTauri: () => nativeEnabled,
@@ -100,6 +100,7 @@ function shell({nativeEnabled = true, smoke = false, independentImportError, ind
     if (name === './word/core/runtime') return {async importWordDocument(bytes){calls.push(['independent-preflight',bytes.length]);if(independentImportError)throw Error(independentImportError);const model=independentImport?await independentImport(bytes):{paragraphs:[],testImport:independentModels.length};independentModels.push(model);return model}}
     if (name === './word/core/native-package-smoke') return {async runNativeWordPackageSmoke(){calls.push(['word-native-smoke']);if(wordSmokeError)throw Error(wordSmokeError);if(wordSmokeRun)return wordSmokeRun();return wordSmokeReport??{ok:true,kind:'word-package-ipc'}}}
     if (name === './word/rust/native-smoke') return {async runNativeRustWordSmoke(){calls.push(['rust-native-smoke']);if(rustSmokeError)throw Error(rustSmokeError);if(rustSmokeRun)return rustSmokeRun();return rustSmokeReport??{schemaVersion:1,ok:true,transport:'tauri-word-engine-request'}}}
+    if (name === './word/rust/wordcraft-native-smoke') return {async runWordcraftNativeSmoke(adapter){calls.push(['wordcraft-native-smoke']);if(wordcraftSmokeError)throw Error(wordcraftSmokeError);if(wordcraftSmokeRun)return wordcraftSmokeRun(adapter);return wordcraftSmokeReport??{schemaVersion:1,ok:true,engine:'wordcraft-wasm'}}}
     if (name === '@tauri-apps/api/core') return { invoke: async (command,args) => { calls.push(['invoke',command,args]) } }
     if (name.endsWith('.vue')) return {}
     throw Error(`Unexpected setup import ${name}`)
@@ -398,8 +399,46 @@ test('full native smoke awaits independent Word evidence before creating the Off
   const report = h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')?.[2].report
   assert.equal(report.independentWordPackage,independent)
   assert.equal(report.rustWordEngine.transport,'tauri-word-engine-request')
+  assert.equal(report.wordcraft.engine,'wordcraft-wasm')
+  assert.ok(h.calls.findIndex(call=>call[0]==='word-native-smoke') < h.calls.findIndex(call=>call[0]==='wordcraft-native-smoke'))
+  assert.ok(h.calls.findIndex(call=>call[0]==='wordcraft-native-smoke') < h.calls.findIndex(call=>call[0]==='office-document-created'))
   assert.equal(report.ok,false);assert.match(report.error,/controlled Office failure after Word gate/)
   stop();h.unmount()
+})
+
+test('full native smoke awaits the default WordCraft gate before starting compatible Office', async () => {
+  let release, started
+  const gate=new Promise(resolve=>{release=resolve}),entered=new Promise(resolve=>{started=resolve})
+  const h=shell({smoke:true,wordcraftSmokeRun:async()=>{started();return gate}})
+  h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'})
+  const mounting=h.mount()
+  await entered
+  assert.ok(h.calls.some(call=>call[0]==='word-native-smoke'))
+  assert.equal(h.state.officeDocument.value,undefined)
+  assert.ok(!h.calls.some(call=>call[0]==='invoke'&&call[1]==='smoke_report'))
+  const wordcraft={schemaVersion:1,ok:false,engine:'wordcraft-wasm',error:'controlled default WordCraft failure'}
+  release(wordcraft)
+  await mounting
+  const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')?.[2].report
+  assert.equal(report.wordcraft,wordcraft);assert.equal(report.ok,false)
+  assert.match(report.error,/controlled default WordCraft failure/)
+  assert.equal(h.state.tabs.value.length,0);assert.equal(h.state.officeDocument.value,undefined)
+  h.unmount()
+})
+
+test('full native smoke reports WordCraft cleanup and thrown failures without starting Office', async () => {
+  for(const mode of ['cleanup','thrown']) {
+    const wordcraft={schemaVersion:1,ok:false,engine:'wordcraft-wasm',closeError:'controlled WordCraft cleanup failure'}
+    const h=shell({smoke:true,...(mode==='thrown'?{wordcraftSmokeError:'controlled WordCraft thrown failure'}:{wordcraftSmokeReport:wordcraft})})
+    h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'})
+    await h.mount()
+    const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')?.[2].report
+    assert.equal(report.ok,false);assert.match(report.error,/controlled WordCraft/)
+    assert.equal(h.state.tabs.value.length,0);assert.equal(h.state.officeDocument.value,undefined)
+    if(mode==='cleanup')assert.equal(report.wordcraft,wordcraft)
+    else assert.equal(report.wordcraft,undefined)
+    h.unmount()
+  }
 })
 
 test('full native smoke awaits Rust Word evidence before starting the old package or Office gates', async () => {

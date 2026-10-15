@@ -53,7 +53,7 @@ WordCraft 上游仍标记为 **Alpha**。复杂 DOCX、图表／SmartArt、域�
 
 需要 Rust 1.95 或更新版本（固定的 craft-ui 依赖要求）、`wasm32-unknown-unknown` 和固定 `wasm-bindgen-cli 0.2.129`。运行 `npm run word:build` 后，`public/wordcraft/manifest.json` 记录上游提交、实际源文件和字体输入摘要，以及生成 JS／WASM 的摘要；`npm run word:check` 检查产物是否匹配。完整步骤见[开发与构建](development.md)。
 
-2026-10-15 的最终冻结版本已通过生产构建和完整 WordCraft 浏览器验收。下表仅记录本轮明确执行的范围，不使用旧基础 Rust 内核、CLI、兼容编辑器或历史安装包报告提供新引擎结论；原生安装包验收仍未完成。
+2026-10-15 的集成冻结快照已通过生产构建和完整 WordCraft 浏览器验收。下表的通过数字对应这份快照；0.8.0 新增的安装包检查已接入，实际结果仍待本轮 Actions。这里不使用旧基础 Rust 内核、CLI、兼容编辑器或历史安装包报告提供新引擎结论。
 
 | 范围 | 当前证据与状态 |
 | --- | --- |
@@ -62,12 +62,12 @@ WordCraft 上游仍标记为 **Alpha**。复杂 DOCX、图表／SmartArt、域�
 | 默认画布与功能区 | 最终浏览器报告 9 组全部通过，记录 11 份 UI 文件。实际中文、emoji、组合字符与连续输入、输入法保存、撤销／重做、粗体／斜体／下划线按钮操作，以及下载 OOXML 的独立读取均通过。 |
 | 剪贴板与多标签生命周期 | 实际复制／剪切／粘贴只插入一次；同一会话的普通粘贴保留内部格式，`Ctrl+Shift+V` 使用目标纯文本格式，每次粘贴可一步撤销。即时切换标签的待处理输入归属、历史、关闭取消与弃稿释放，以及坏包打开原子性通过。跨标签／跨应用富文本限制仍如上所述。 |
 | 富文档与 PDF | 真实 UI 导入、保存重开和 PDF 导出保留已检查的正文、表格、图片字节、页眉页脚与 PAGE 域；独立 PDF 检查覆盖中文／emoji、图片、表格和页眉页脚文本及位置。 |
-| 原生安装包 | 新默认 WordCraft 的 WebView2／WebKit、系统输入法及原生文件流程尚未验收。 |
+| 原生安装包 | 默认 WordCraft 的实际 WebView 画布、输入、导出重开及资源摘要检查已接入必检流程，三平台结果待本轮 Actions。物理系统输入法、系统剪贴板和原生文件对话框／磁盘保存不在这项自动检查范围内。 |
 | Rust 原生单元测试 | 本轮未执行新增 Rust 代码的原生 `cargo test`；WASM 构建与实际浏览器执行不替代该项。 |
 
-最终本地报告为 `test-results/wordcraft-engine-final-2/report.json`，SHA-256 为 `870956d74036be6babe0fd493825be92c1a657850a079e4366665f26eb6d14e7`。产品源码、测试与独立来源的前后摘要一致；页面错误、控制台错误、外网请求、旧 Office runtime 和旧文字核心请求均为零。报告目录同时保留导出文件和三张实际界面截图；早期失败探针保留，不计入最终通过数量。
+该集成快照的本地报告为 `test-results/wordcraft-engine-final-2/report.json`，SHA-256 为 `870956d74036be6babe0fd493825be92c1a657850a079e4366665f26eb6d14e7`。产品源码、测试与独立来源的前后摘要一致；页面错误、控制台错误、外网请求、旧 Office runtime 和旧文字核心请求均为零。报告目录同时保留导出文件和三张实际界面截图；早期失败探针保留，不计入最终通过数量。
 
-最终 WASM 为 80,125,402 字节，SHA-256 为 `5c3b3ab9b6d51868fe48fe7a88696916f5841afa759965f8a02c1d2d7fde4bfb`；构建输入 `sourceHash` 为 `9916b531a710b38819a2088cf8c349672b1dcedf80acd6c3948303b46d41c2ad`。摘要记录在生成的 `public/wordcraft/manifest.json` 中。
+该快照的 WASM 为 80,125,402 字节，SHA-256 为 `5c3b3ab9b6d51868fe48fe7a88696916f5841afa759965f8a02c1d2d7fde4bfb`；构建输入 `sourceHash` 为 `9916b531a710b38819a2088cf8c349672b1dcedf80acd6c3948303b46d41c2ad`。后续安装包须以各自构建生成的 `public/wordcraft/manifest.json` 及实际安装资源摘要为准。
 
 浏览器通过仅覆盖上述样例与操作。正式发布前还需按冻结版本核对：
 
@@ -78,7 +78,11 @@ WordCraft 上游仍标记为 **Alpha**。复杂 DOCX、图表／SmartArt、域�
 
 输入法检查需区分证据来源：目前通过 Chromium CDP 发起真实浏览器组合输入并点击保存，已观察到只提交一次；这仍不是物理系统输入法验收。人工向已失焦输入框延迟派发组合结束事件属于另一条边界探针，不能与上述浏览器行为合并为输入法全面通过结论。
 
-现有 `desktop-release.yml` 调用的 `scripts/native-smoke.mjs` 仍检查旧 `word_engine_request` IPC，并通过显式兼容入口验证 Writer；它尚未启动默认 WordCraft 画布。其 `rustWordEngine` 报告即使通过，也不能作为本次 WordCraft 桌面验收。发布新安装包前，必须补充各目标平台实际打包 WebView 中默认 WordCraft 的加载、编辑、保存与重开检查，并校验安装资源中的 WordCraft JS／WASM 摘要。本轮浏览器验收不代替这个发布门槛。
+0.8.0 已在 `desktop-release.yml` 使用的 `scripts/native-smoke.mjs` 中加入必需的 `frontend.wordcraft` 报告。检查在实际安装包中挂载默认 Vue 编辑器，观察本地 WASM 请求和真实 WebGL 绘制，通过 eframe 输入节点派发中文／emoji 输入，再执行 Rust 格式命令。它验证 DOCX 导出、保存回执、过期回执拒绝、坏包打开后保留当前文稿、默认编辑器重开，以及两个会话和画布／输入节点的释放；导出与重开后的 DOCX 都交给独立 Python ZIP/XML 检查器核对正文和格式。
+
+安装包预检直接读取安装目录 `frontend/wordcraft` 的四份生成产物，核对清单、文件摘要和当前源码输入；运行时实际获取的清单、JS／WASM 摘要须与安装目录证据一致。Windows、macOS ARM64 和 Intel 包的 Rosetta 检查都必须提供这份新报告，缺失或失败不能通过。实际安装包结果仍待本轮 Actions，旧 `rustWordEngine` IPC 或兼容 Writer 报告不能替代它。
+
+这项原生自动检查使用明确标记为合成的指针／普通输入事件，格式通过真实 Rust 命令执行，不包含物理键盘、组合输入或系统剪贴板验收。保存范围是导出 DOCX 字节和编辑器保存回执，不经过原生文件对话框或磁盘交付。前述 Chromium 输入法、剪贴板和功能区测试也不能扩大为这些原生路径已通过。
 
 ## 来源与许可
 
