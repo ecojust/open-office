@@ -105,6 +105,22 @@ test('Linux publisher verifies a complete original-DMG native-editing proof with
   assert.equal(value.proof.diagnostic.frontend.editing.checks.length, 8);
 });
 
+test('debugger and F2 controls cannot be promoted to release proof even with passing default evidence', async t => {
+  const { proof, options } = installation(t);
+  const cases = [
+    ['debugger requested without attachment', p => { p.diagnostic.debugger = { requested: true, attached: false }; }, /Debugger experiments/],
+    ['F2 control', p => { p.diagnostic.editEntry = 'f2'; }, /F2 control experiments/],
+  ];
+  for (const [name, mutate, message] of cases) await t.test(name, () => {
+    const changed = structuredClone(proof); mutate(changed);
+    assert.throws(() => verifyMacosArmEditingProof(changed, options), message);
+  });
+  const normal = structuredClone(proof);
+  normal.diagnostic.debugger = { requested: false };
+  normal.diagnostic.editEntry = 'doubleclick';
+  assert.equal(verifyMacosArmEditingProof(normal, options), true);
+});
+
 test('release success flags cannot replace OS actions, actual models, original sessions or a surviving page', async t => {
   const { proof, options } = installation(t);
   const cases = [

@@ -41,6 +41,7 @@ export interface AppBootstrap {
   platform: string
   smokeMode: boolean
   smokeScope?: 'full' | 'macos-editing'
+  macosEditingEntry?: 'doubleclick' | 'f2'
 }
 
 export interface NativeImage { name: string; base64: string; mimeType: 'image/png' | 'image/jpeg' }

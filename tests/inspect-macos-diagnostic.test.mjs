@@ -235,6 +235,62 @@ test('older artifacts explicitly distinguish missing crash collection and servic
   assert.equal(metadata.ipsCount, 0);
 });
 
+test('system exit messages retain exact native WebContent PID references without inferring ownership from samples', () => {
+  const report = {
+    startedAt: '2026-10-15T17:16:10.000Z', finishedAt: '2026-10-15T17:16:30.000Z',
+    process: { pid: 15706 }, processSamples: [], editEntry: 'f2',
+    nativeDiagnostics: { events: [{ phase: 'editing-window-geometry', detail: JSON.stringify({
+      webContent: { supported: true, pid: 15734, source: 'WKWebView._webProcessIdentifier' },
+    }) }] },
+  };
+  const log = [event(1, 240, 'pid 15734 exited due to SIGSEGV', { processImagePath: '/sbin/launchd' }),
+    event(1, 241, 'pid 157340 exited due to SIGKILL'),
+    event(15734, 242, 'crash reason'),
+    ...Array.from({ length: 25 }, (_, i) => event(15706, 250 + i, 'process terminated cleanup'))].join('\n');
+  const result = inspect({ mode: 'emit', time: '', pids: '', report, log });
+  assert.equal(result.ok, true, result.error);
+  const rows = annotations(result.value);
+  assert.deepEqual(rows.find(row => row.section === 'system-log').ownedWebContentPids, [15734]);
+  assert.equal(rows.find(row => row.section === 'status').report.editEntry, 'f2');
+  const messages = rows.filter(row => row.section === 'related-system-log').flatMap(row => row.lines);
+  assert.equal(messages[0].message, 'pid 15734 exited due to SIGSEGV');
+  assert.equal(messages[0].correlation, 'message references WKWebView WebContent pid');
+  assert.ok(!messages.some(row => row.message.includes('157340')));
+  assert.equal(rows.length, 10);
+  report.nativeDiagnostics.events[0].detail = JSON.stringify({ webContent: { supported: true, pid: 15734, source: 'ps' } });
+  const unowned = annotations(inspect({ mode: 'emit', time: '', pids: '', report, log }).value);
+  assert.deepEqual(unowned.find(row => row.section === 'system-log').ownedWebContentPids, []);
+  assert.ok(!unowned.filter(row => row.section === 'related-system-log').flatMap(row => row.lines).some(row => row.pid === 1));
+});
+
+test('debugger evidence exposes denied attach or a bounded captured stack and stays within notice quota', () => {
+  const report = {
+    startedAt: '2026-10-15T17:16:10.000Z', finishedAt: '2026-10-15T17:16:30.000Z',
+    process: { pid: 15706 }, debugger: { requested: true, status: 'blocked', reason: 'attach-denied-or-unavailable',
+      events: [{ event: 'blocked', detail: 'Not allowed to attach to process' }] },
+  };
+  let rows = annotations(inspect({ mode: 'emit', time: '', pids: '', report }).value);
+  assert.equal(rows.find(row => row.section === 'debugger').reason, 'attach-denied-or-unavailable');
+  Object.assign(report.debugger, { captured: true, status: 'attached', trace: { file: 'webcontent-lldb-Abc123/trace.txt' } });
+  const evidence = { 'webcontent-lldb-Abc123/trace.txt': ['--- thread backtrace all -c 32 ---',
+    '  thread #1 unrelated', '* thread #2 stop reason = EXC_BAD_ACCESS',
+    ...Array.from({ length: 35 }, (_, i) => `    frame #${i}: WebCore::focus /Users/private-person/focus.mm`),
+    '--- register read --all ---', 'should not expose registers'].join('\n') };
+  const result = inspect({ mode: 'emit', time: '', pids: '', report, evidence,
+    log: Array.from({ length: 20 }, (_, i) => event(15706, i, 'process terminated reason=Crash')).join('\n') });
+  assert.equal(result.ok, true, result.error);
+  rows = annotations(result.value);
+  assert.equal(rows.length, 10);
+  const debuggerRow = rows.find(row => row.section === 'debugger');
+  assert.equal(debuggerRow.backtraceExcerpt.length, 10);
+  assert.match(debuggerRow.backtraceExcerpt[0], /EXC_BAD_ACCESS/);
+  assert.ok(!result.value.includes('private-person'));
+  assert.ok(!result.value.includes('should not expose registers'));
+  report.debugger.trace.file = '../trace.txt';
+  rows = annotations(inspect({ mode: 'emit', time: '', pids: '', report, evidence }).value);
+  assert.equal(rows.find(row => row.section === 'debugger').backtraceExcerpt, undefined);
+});
+
 test('Rust regression output includes compilation failure context and tail without emitting the full log', () => {
   const log = Array.from({ length: 70 }, (_, i) => `compile progress ${i}`);
   log[5] = 'error[E0433]: cannot find type CellEditor';

@@ -1,6 +1,6 @@
 //! Opt-in observations only. Production keeps Tauri's normal termination handler.
 use crate::{server::AssetServer, smoke::Smoke};
-use objc2::MainThreadMarker;
+use objc2::{msg_send, sel, MainThreadMarker};
 use objc2_app_kit::{NSScreen, NSView, NSWindow};
 use serde_json::{json, Value};
 use tauri::Manager;
@@ -53,6 +53,20 @@ fn sample_geometry(window: &tauri::WebviewWindow, smoke: &Smoke, request: Option
         // pointers for this main-thread callback. WKWebView inherits NSView.
         let view: &NSView = unsafe { &*platform.inner().cast() };
         let window: &NSWindow = unsafe { &*platform.ns_window().cast() };
+        // This optional private read-only selector identifies this WKWebView's
+        // process. Never infer ownership from a WebContent name or parent PID.
+        // Only the explicitly opted-in diagnostic reaches this callback.
+        // WebKit WKWebViewPrivate.h declares this property as pid_t (i32):
+        // https://github.com/WebKit/WebKit/blob/f38c61096af22dabaf3a5e97242e513c71f29c1e/Source/WebKit/UIProcess/API/Cocoa/WKWebViewPrivate.h#L226
+        let supports_process_id: bool = unsafe {
+            msg_send![view, respondsToSelector: sel!(_webProcessIdentifier)]
+        };
+        let web_content_pid: Option<i32> = if supports_process_id {
+            let pid: i32 = unsafe { msg_send![view, _webProcessIdentifier] };
+            (pid > 0 && pid as u32 != std::process::id()).then_some(pid)
+        } else {
+            None
+        };
         let screens = NSScreen::screens(mtm);
         let Some(primary) = screens.firstObject() else {
             diagnostic.note("editing-window-error", "no-screen");
@@ -84,6 +98,8 @@ fn sample_geometry(window: &tauri::WebviewWindow, smoke: &Smoke, request: Option
         let geometry = json!({"actionId":request.as_ref().and_then(|value|value.get("actionId")),
             "viewport":request.as_ref().map(|value|json!({"width":value["viewportWidth"],"height":value["viewportHeight"]})),
             "pid":std::process::id(),"windowId":window.windowNumber(),
+            "webContent":{"pid":web_content_pid,"supported":supports_process_id,
+                "source":"WKWebView._webProcessIdentifier"},
             "x":rect.origin.x,"y":primary.origin.y + primary.size.height - rect.origin.y - rect.size.height,
             "width":rect.size.width,"height":rect.size.height,"scaleFactor":window.backingScaleFactor(),
             "bounds":[bounds.origin.x,bounds.origin.y,bounds.size.width,bounds.size.height],

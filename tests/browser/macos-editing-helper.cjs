@@ -6,8 +6,13 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
-const output = path.join(root, 'test-results/macos-editing-helper-browser');
-const report = { ok: false, runtime: 'Chromium trusted input; not native macOS acceptance', requests: [], errors: [], boots: [], limitations: ['CGEvent, macOS WebContent termination, native IME and macOS 26.5 are not covered.'] };
+const editEntry = process.env.MACOS_EDITING_BROWSER_ENTRY || 'doubleclick';
+assert.ok(['doubleclick', 'f2'].includes(editEntry), 'Unsupported browser diagnostic edit entry');
+const f2Control = editEntry === 'f2';
+const output = path.join(root, `test-results/macos-editing-helper-browser${f2Control ? '-f2' : ''}`);
+const report = { ok: false, runtime: 'Chromium trusted input; not native macOS acceptance', editEntry, diagnosticOnly: f2Control,
+  requests: [], errors: [], boots: [], limitations: ['CGEvent, macOS WebContent termination, native IME and macOS 26.5 are not covered.',
+    ...(f2Control ? ['F2 is a diagnostic control; it does not validate double-click editing and cannot satisfy the ARM DMG release gate.'] : [])] };
 fs.mkdirSync(output, { recursive: true });
 let server, browser, page;
 (async () => {
@@ -38,21 +43,34 @@ let server, browser, page;
     });
     await page.goto('http://127.0.0.1:5304');
     await page.locator('.create-card.sheet').waitFor();
-    report.helper = await page.evaluate(async () => {
+    report.helper = await page.evaluate(async editEntry => {
       const app = document.querySelector('#app').__vue_app__._instance.setupState;
-      const { runMacosEditingSmoke, verifyMacosEditing, MACOS_EDITING_CHECKS } = await import('/src/sheet/rust/macos-editing-smoke.ts');
+      const { runMacosEditingSmoke, verifyMacosEditing, MACOS_EDITING_CHECKS, MACOS_EDITING_F2_CHECKS } = await import('/src/sheet/rust/macos-editing-smoke.ts');
+      const options = editEntry === 'f2' ? { editEntry } : undefined;
       let nativeGuardRejected = false;
-      try { await runMacosEditingSmoke(app.editingSmokeAdapter()); }
+      try { await runMacosEditingSmoke(app.editingSmokeAdapter(), options); }
       catch (error) { nativeGuardRejected = String(error).includes('opted-in native WebView'); }
       if (!nativeGuardRejected) throw Error('Native diagnostic accepted browser evidence');
-      const value = await verifyMacosEditing(app.editingSmokeAdapter(), request => window.editingInput(request));
-      return { ...value, nativeGuardRejected, requiredChecks: MACOS_EDITING_CHECKS };
-    });
+      const value = await verifyMacosEditing(app.editingSmokeAdapter(), request => window.editingInput(request), options);
+      return { ...value, nativeGuardRejected, requiredChecks: editEntry === 'f2' ? MACOS_EDITING_F2_CHECKS : MACOS_EDITING_CHECKS };
+    }, editEntry);
     assert.equal(report.helper.ok, true, report.helper.error || report.helper.closeError);
     assert.equal(report.helper.transport, 'local-wasm-in-browser');
+    assert.equal(report.helper.editEntry, editEntry);
+    assert.equal(report.helper.diagnosticOnly, f2Control);
     assert.equal(report.helper.nativeGuardRejected, true);
     assert.deepEqual(report.helper.checks, report.helper.requiredChecks);
-    assert.deepEqual(report.helper.actions.map(action => action.actionId), ['single-a1', 'type-a1', 'enter-a1', 'double-d6', 'type-d6', 'enter-d6', 'select-a1', 'ribbon-bold', 'global-undo', 'word-click', 'word-type']);
+    assert.deepEqual(report.helper.actions.map(action => action.actionId), ['single-a1', 'type-a1', 'enter-a1',
+      ...(f2Control ? ['single-d6', 'f2-d6'] : ['double-d6']), 'type-d6', 'enter-d6', 'select-a1', 'ribbon-bold', 'global-undo', 'word-click', 'word-type']);
+    assert.equal(report.helper.observations[f2Control ? 'f2Value' : 'doubleClickValue'], 'sheetnative');
+    assert.equal(report.helper.observations[f2Control ? 'doubleClickValue' : 'f2Value'], undefined);
+    if (f2Control) {
+      assert.ok(!report.helper.checks.includes('sheet-double-click-native-typing'));
+      assert.ok(!report.requests.some(request => request.kind === 'doubleClick'));
+      assert.ok(report.requests.some(request => request.actionId === 'f2-d6' && request.kind === 'key' && request.key === 'F2'));
+      assert.ok(report.helper.actions.find(action => action.actionId === 'f2-d6').events.some(event =>
+        event.type === 'keyup' && event.key === 'F2' && event.isTrusted));
+    }
     assert.ok(report.helper.actions.every(action => action.completed && action.events.some(event => event.isTrusted)));
     assert.equal(report.helper.initialTabIds.length, 2);
     assert.equal(report.helper.finalTabIds.length, 3);

@@ -232,7 +232,7 @@ def compact_timeline(native):
         phase, detail = event.get("phase"), event.get("detail")
         if phase == "editing-window-geometry" and isinstance(detail, dict):
             viewport = detail.get("viewport") or {}
-            detail = f'{detail.get("actionId")} bounds={detail.get("width")}x{detail.get("height")} css={viewport.get("width")}x{viewport.get("height")}'
+            detail = f'{detail.get("actionId")} pid={(detail.get("webContent") or {}).get("pid")} bounds={detail.get("width")}x{detail.get("height")} css={viewport.get("width")}x{viewport.get("height")}'
         elif phase in ("editing-input-request", "document-start") and isinstance(detail, str):
             try:
                 parsed = json.loads(detail)
@@ -351,13 +351,30 @@ def context_log_summary(data, report, samples, context):
         "lines": [row[3] for row in sorted(selected, key=lambda row: (row[1], row[2]))]}
 
 
-def system_log_summary(data, report, samples, max_lines=20):
+def owned_webcontent_pids(native):
+    result = set()
+    for event in (native.get("events") or [])[:256]:
+        if not isinstance(event, dict) or event.get("phase") != "editing-window-geometry":
+            continue
+        detail = native_event_summary(event).get("detail")
+        process = detail.get("webContent") if isinstance(detail, dict) else None
+        if not isinstance(process, dict):
+            continue
+        pid = process.get("pid")
+        if process.get("supported") is True and process.get("source") == "WKWebView._webProcessIdentifier" and type(pid) is int and 1 < pid <= 2147483647:
+            result.add(pid)
+    return result
+
+
+def system_log_summary(data, report, samples, max_lines=20, native=None):
     start, end = system_time(report.get("startedAt")), system_time(report.get("finishedAt"))
     app_pid = (report.get("process") or {}).get("pid")
     sampled = {row["pid"] for sample in samples for row in sample["rows"]}
-    keywords = re.compile(r"\b(crash(?:ed|ing)?|terminat\w*|kill(?:ed|ing)?|memory|memorystatus|jetsam|GPU|assert\w*|exception|fatal|abort(?:ed)?|error|fault)\b", re.I)
+    owned = owned_webcontent_pids(native or report.get("nativeDiagnostics") or {})
+    keywords = re.compile(r"\b(crash(?:ed|ing)?|terminat\w*|kill(?:ed|ing)?|exit(?:ed)?|signal|SIG[A-Z]+|memory|memorystatus|jetsam|GPU|assert\w*|exception|fatal|abort(?:ed)?|error|fault)\b", re.I)
     invalid_message = re.compile(r"\b(?:received\s+(?:an?\s+)?invalid\s+(?:IPC\s+)?message|didReceiveInvalidMessage|invalid\s+IPC\s+message)\b", re.I)
     severe = re.compile(r"\b(crash\w*|terminat\w*|kill\w*|jetsam|exception|fatal|abort\w*)\b|\bassert(?:ion)?\s+(?:failed|failure)\b|\bfailed\s+assertion\b", re.I)
+    exit_reason = re.compile(r"\b(?:exit(?:ed)?|SIG[A-Z]+|signal|jetsam|memorystatus|crash\w*)\b", re.I)
     selected, parsed_count, skipped = [], 0, 0
     first_parsed_timestamp, last_parsed_timestamp = None, None
     for line in data.splitlines():
@@ -389,6 +406,10 @@ def system_log_summary(data, report, samples, max_lines=20):
             pid = None
         if isinstance(app_pid, int) and pid == app_pid:
             correlation = "launched-app-pid"
+        elif pid in owned:
+            correlation = "WKWebView WebContent pid"
+        elif owned and any(re.search(rf"(?<![A-Za-z0-9]){target}(?![A-Za-z0-9])", message) for target in owned):
+            correlation = "message references WKWebView WebContent pid"
         elif pid in sampled:
             correlation = "sampled-WebKit-pid; app ownership unproven"
         elif re.search(r"com\.ecojust\.openoffice|\bopen-office\b", message, re.I) or (isinstance(app_pid, int) and re.search(rf"\bpid\s*[:=]?\s*{app_pid}\b", message, re.I)):
@@ -400,14 +421,16 @@ def system_log_summary(data, report, samples, max_lines=20):
         # 20 KB output budget, even when messages contain multibyte characters.
         while len(json.dumps(item, ensure_ascii=False).encode("utf-8")) > 630:
             item["message"] = item["message"][:-20]
-        selected.append((bool(severe.search(message) or invalid_message.search(message)), timestamp, item))
+        priority = 2 if correlation == "message references WKWebView WebContent pid" and exit_reason.search(message) else int(bool(severe.search(message) or invalid_message.search(message)))
+        selected.append((priority, timestamp, item))
     # Actual failures and invalid IPC messages outrank normal assertion lifecycle
     # or verbose GPU logs; retain chronology among the selected messages.
     selected = sorted(sorted(selected, key=lambda row: (row[0], row[1]), reverse=True)[:max_lines], key=lambda row: row[1])
     return {"parsedLines": parsed_count, "skippedLines": skipped, "matchingLines": len(selected),
             "firstParsedTimestamp": first_parsed_timestamp, "lastParsedTimestamp": last_parsed_timestamp,
             "timeFilterAvailable": start is not None and end is not None,
-            "limitation": "Related log messages only, not proof of cause. Sampled WebKit PIDs may belong to another application.",
+            "ownedWebContentPids": sorted(owned),
+            "limitation": "Related log messages only, not proof of cause. PID mentions are textual correlation; sampled WebKit PIDs may belong to another application.",
             "lines": [row[2] for row in selected]}
 
 
@@ -519,6 +542,34 @@ def crash_summaries(read, files):
     return summaries, len(names)
 
 
+def debugger_summary(read, report):
+    debugger = report.get("debugger") or {}
+    if debugger.get("requested") is not True:
+        return None
+    summary = {**pick(debugger, ["requested", "status", "reason", "pid", "ready", "safeToContinue", "cleanup", "captured", "continuedWithoutDebugger"]),
+        "diagnosticOnly": True, "events": [pick(event, ["event", "reason", "detail", "reasons"]) for event in (debugger.get("events") or [])[-8:]],
+        "trace": pick(debugger.get("trace"), ["bytes", "totalBytes", "truncated"])}
+    filename = (debugger.get("trace") or {}).get("file")
+    if debugger.get("captured") is True and isinstance(filename, str) and re.fullmatch(r"webcontent-lldb-[A-Za-z0-9_-]{1,80}/trace\.txt", filename):
+        try:
+            data = read(filename, 1024 * 1024, False)
+            lines = (data or b"").decode("utf-8", "replace").splitlines()
+            start = next((index for index, line in enumerate(lines) if line.startswith("* thread #")), None)
+            if start is None:
+                start = next((index + 1 for index, line in enumerate(lines) if "--- thread backtrace all" in line), None)
+            if start is not None:
+                excerpt = []
+                for line in lines[start:]:
+                    if len(excerpt) == 10 or line.startswith(("--- register", "--- image", "OO_LLDB_")):
+                        break
+                    if line.strip():
+                        excerpt.append(crash_text(line, 170))
+                summary["backtraceExcerpt"] = excerpt
+        except Exception as error:
+            summary["traceReadError"] = type(error).__name__
+    return summary
+
+
 def summarize(read, files, run, artifact, expected_sha, context=None):
     report = read("report.json", 12 * 1024 * 1024) or {}
     host = read("host.json", 64 * 1024) or {}
@@ -546,8 +597,8 @@ def summarize(read, files, run, artifact, expected_sha, context=None):
     # most two for IPS excerpts, and spend the remaining slots on system logs.
     state = editing.get("lastState") or {}
     notice("status", {"runId": run["id"], "headSha": expected_sha, "conclusion": run.get("conclusion"), "artifactId": artifact["id"], "bytes": artifact["size_in_bytes"], "establishesFix": False,
-        "report": {**pick(report, ["status", "ok", "blockedReason", "durationMs"]), "error": compact_text(report.get("error") or "", 500)},
-        "frontend": {"ok": frontend.get("ok"), "error": compact_text(frontend.get("error") or "", 250), "editingError": compact_text(editing.get("error") or "", 250),
+        "report": {**pick(report, ["status", "ok", "blockedReason", "durationMs", "editEntry"]), "error": compact_text(report.get("error") or "", 500)},
+        "frontend": {"ok": frontend.get("ok"), **pick(editing, ["editEntry", "diagnosticOnly"]), "error": compact_text(frontend.get("error") or "", 250), "editingError": compact_text(editing.get("error") or "", 250),
             "lastState": {**pick(state, ["activeKey", "shell"]), "tabs": [pick(tab, ["key", "kind", "dirty", "ready"]) for tab in (state.get("tabs") or [])[:4]], "sessions": [pick(session, ["documentId", "revision", "dirty"]) for session in (state.get("sessions") or [])[:4]]}}})
     actions = report.get("actions") or []
     notice("overview", {"system": pick(report.get("system"), ["swVers", "machine", "node"]), "host": {key: pick(host.get(key), ["status", "stdout"]) for key in ["macOS", "macOSBuild", "hardwareArch"]},
@@ -565,11 +616,14 @@ def summarize(read, files, run, artifact, expected_sha, context=None):
         "crashes": [compact_text(PurePosixPath(name).name, 100) for name in files if PurePosixPath(name).name.startswith("crash-") and name.endswith((".ips", ".crash"))][:4]})
     log = read("system-webkit.ndjson", 8 * 1024 * 1024, False)
     crashes, crash_count = crash_summaries(read, files)
-    summary = system_log_summary(log or b"", report, samples, max_lines=4 * (4 - len(crashes)))
-    notice("system-log", {"available": log is not None, **pick(report.get("systemLog"), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine", "stderr"]), **pick(summary, ["parsedLines", "skippedLines", "matchingLines", "firstParsedTimestamp", "lastParsedTimestamp", "timeFilterAvailable", "limitation"])})
+    debugger = debugger_summary(read, report)
+    summary = system_log_summary(log or b"", report, samples, max_lines=4 * (4 - len(crashes) - int(debugger is not None)), native=native)
+    notice("system-log", {"available": log is not None, **pick(report.get("systemLog"), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine", "stderr"]), **pick(summary, ["parsedLines", "skippedLines", "matchingLines", "firstParsedTimestamp", "lastParsedTimestamp", "timeFilterAvailable", "ownedWebContentPids", "limitation"])})
     notice("crash-evidence", {**crash_metadata(report, files), "ipsCount": crash_count, "ipsSummarized": len(crashes)})
     for crash in crashes:
         notice("crash-report", crash)
+    if debugger is not None:
+        notice("debugger", debugger)
     # Apply the smaller quota during severity ranking, preserving actual crash
     # messages over later routine GPU/focus chatter.
     lines = summary["lines"]

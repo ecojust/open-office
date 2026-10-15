@@ -27,6 +27,11 @@ export const EDITING_ACTIONS = [
   ['global-undo', 'click', 'shell:undo'], ['word-click', 'click', 'word:page'],
   ['word-type', 'type', 'word:page', 'wordnative'],
 ];
+export const EDITING_F2_CHECKS = EDITING_CHECKS.map(check => check === 'sheet-double-click-native-typing' ? 'sheet-f2-native-typing' : check);
+export const EDITING_F2_ACTIONS = [
+  ...EDITING_ACTIONS.slice(0, 3), ['single-d6', 'click', 'sheet:D6'], ['f2-d6', 'key', 'sheet:D6', 'F2'],
+  ...EDITING_ACTIONS.slice(4),
+];
 
 function writeJson(path, value) {
   mkdirSync(resolve(path, '..'), { recursive: true });
@@ -160,7 +165,10 @@ export function checkLifecycle(diagnostics, final = false) {
 }
 
 /** A posted CGEvent alone is never an editing success. */
-export function validateEditingReport(frontend, diagnostics, sent) {
+export function validateEditingReport(frontend, diagnostics, sent, { editEntry = 'doubleclick' } = {}) {
+  assert.ok(['doubleclick', 'f2'].includes(editEntry), 'Unsupported editing validation entry');
+  const f2Control = editEntry === 'f2';
+  const expectedActions = f2Control ? EDITING_F2_ACTIONS : EDITING_ACTIONS;
   checkLifecycle(diagnostics, true);
   assert.equal(frontend?.ok, true, frontend?.error || 'Frontend editing failed');
   assert.deepEqual(frontend.nativeLifecycle, { generation: 1, terminations: 0 });
@@ -168,12 +176,16 @@ export function validateEditingReport(frontend, diagnostics, sent) {
   assert.equal(editing?.schemaVersion, 1);
   assert.equal(editing.kind, 'macos-editing');
   assert.equal(editing.transport, 'local-wasm-in-native-webview');
+  // Legacy double-click reports omit these markers. F2 always requires an
+  // explicit diagnostic-only marker and a separately selected validator.
+  assert.equal(editing.editEntry ?? 'doubleclick', editEntry, 'Editing entry differs from the requested scenario');
+  assert.equal(editing.diagnosticOnly ?? false, f2Control, 'Control experiments cannot supply double-click acceptance');
   assert.equal(editing.ok, true, editing.error || 'Editing scenarios failed');
   assert.match(editing.bootId, /^[a-f0-9-]{36}$/);
   assert.ok(Number.isFinite(editing.timeOrigin) && editing.timeOrigin > 0);
   const boots = diagnostics.events.filter(event => event.phase === 'document-start').map(event => JSON.parse(event.detail));
   assert.equal(boots.length, 1); assert.equal(boots[0].bootId, editing.bootId); assert.equal(boots[0].timeOrigin, editing.timeOrigin);
-  assert.deepEqual(editing.checks, EDITING_CHECKS, 'Editing checks are missing or out of order');
+  assert.deepEqual(editing.checks, f2Control ? EDITING_F2_CHECKS : EDITING_CHECKS, 'Editing checks are missing or out of order');
   assert.equal(editing.initialTabIds?.length, 2, 'Expected two cold workbooks before any edit');
   assert.equal(editing.finalTabIds?.length, 3);
   assert.equal(new Set(editing.finalTabIds).size, 3);
@@ -187,14 +199,14 @@ export function validateEditingReport(frontend, diagnostics, sent) {
     assert.ok(typeof session.sessionId === 'string' && session.sessionId.length > 0);
     assert.ok(Number.isSafeInteger(session.documentId) && session.documentId > 0);
   }
-  assert.equal(editing.actions?.length, EDITING_ACTIONS.length);
-  assert.equal(sent.length, EDITING_ACTIONS.length);
+  assert.equal(editing.actions?.length, expectedActions.length);
+  assert.equal(sent.length, expectedActions.length);
   const progressRequests = diagnostics.events.filter(event => event.phase === 'editing-input-request').map(event => parseInputRequest(event.detail));
   assert.deepEqual(progressRequests, sent.map(action => action.request), 'Native progress and actual OS input inventories differ');
   const identity = ({ key, kind, sessionId, documentId }) => ({ key, kind, sessionId, documentId });
   let previous = null;
-  for (let index = 0; index < EDITING_ACTIONS.length; index++) {
-    const [actionId, kind, target, value] = EDITING_ACTIONS[index];
+  for (let index = 0; index < expectedActions.length; index++) {
+    const [actionId, kind, target, value] = expectedActions[index];
     const evidence = editing.actions[index], action = sent[index];
     const request = parseInputRequest(JSON.stringify(action.request));
     assert.deepEqual([evidence.actionId, evidence.kind, evidence.target], [actionId, kind, target]);
@@ -227,7 +239,7 @@ export function validateEditingReport(frontend, diagnostics, sent) {
       const ups = evidence.events.filter(event => event.type === 'keyup' && keyTargets.includes(event.target));
       assert.deepEqual(ups.map(event => event.key), kind === 'type' ? [...value] : [value], `${actionId} did not receive the requested native keys`);
     }
-    const count = index < 9 ? 2 : 3;
+    const count = target.startsWith('word:') ? 3 : 2;
     for (const snapshot of [evidence.before, evidence.after]) {
       assert.deepEqual(snapshot?.tabs?.map(tab => tab.key), editing.finalTabIds.slice(0, count), `${actionId} lost original tabs`);
       assert.deepEqual(snapshot.tabs.map(tab => tab.kind), ['sheet', 'sheet', 'word'].slice(0, count));
@@ -244,7 +256,7 @@ export function validateEditingReport(frontend, diagnostics, sent) {
       previous = snapshot.sessions;
     }
   }
-  assert.deepEqual(editing.observations, { singleClickValue: 42, doubleClickValue: 'sheetnative', ribbonBold: true,
+  assert.deepEqual(editing.observations, { singleClickValue: 42, [f2Control ? 'f2Value' : 'doubleClickValue']: 'sheetnative', ribbonBold: true,
     commandValue: 'API_SENTINEL', undoneValue: null, wordText: 'wordnative',
     retained: { a1: 42, bold: true, d6: 'sheetnative', pristineA1: null } }, 'Actual Rust model edits or retained values differ');
   assert.equal(editing.lastState?.activeKey, editing.initialTabIds[1]);
@@ -358,16 +370,32 @@ export async function collectCrashReports(started, directory, { terminated = fal
 function killGroup(child, signal = 'SIGTERM') {
   if (child?.pid) { try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; } }
 }
-function parseArgs(args) {
+export function parseArgs(args) {
   const values = {};
   for (let index = 0; index < args.length; index++) {
     const key = args[index];
     if (key === '--preflight') { assert.equal(values.preflight, undefined); values.preflight = true; }
+    else if (key === '--lldb') { assert.equal(values.lldb, undefined); values.lldb = true; }
+    else if (key === '--edit-entry') {
+      assert.equal(values.editEntry, undefined, 'Editing entry was specified twice');
+      values.editEntry = args[++index];
+      assert.ok(['doubleclick', 'f2'].includes(values.editEntry), '--edit-entry must be doubleclick or f2');
+    }
     else { assert.ok(['--app', '--helper'].includes(key) && values[key] === undefined); values[key] = args[++index]; assert.ok(isAbsolute(values[key] || '')); }
   }
   assert.ok(values['--helper'], '--helper must name the compiled Swift tool');
   assert.ok(values.preflight || values['--app'], '--app is required');
-  return values;
+  return { editEntry: 'doubleclick', lldb: false, ...values };
+}
+
+/** Require a PID sampled from this WKWebView for this exact pending gesture.
+ * Neither a process name nor a parent PID establishes WebContent ownership. */
+export function debuggerTargetPid(geometry, appPid) {
+  assert.equal(geometry?.pid, appPid, 'Debugger geometry belongs to another application');
+  const process = geometry.webContent;
+  if (process?.supported !== true || process.source !== 'WKWebView._webProcessIdentifier') return null;
+  if (!Number.isSafeInteger(process.pid) || process.pid <= 1 || process.pid > 0x7fffffff || process.pid === appPid) return null;
+  return process.pid;
 }
 
 export async function runMacosEditingDiagnostic(args = process.argv.slice(2), env = process.env, root = ROOT) {
@@ -377,10 +405,14 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
     commit: env.GITHUB_SHA || null, runId: env.GITHUB_RUN_ID || null, startedAt: new Date(started).toISOString(),
     userReportedSystem: { app: '0.9.0', macOS: '26.5', processor: 'Apple Silicon' }, actions: [], gaps: [],
     limitations: ['OS CGEvent input is not physical hardware or an IME composition acceptance test.', 'Runner OS/build is reported exactly; macos-26 does not imply macOS 26.5.', 'No crash report does not prove that WebContent survived.'] };
-  let app, log, temporary, rawPath, finishLog, closed = false, exitCode = null, exitSignal = null;
+  let app, log, temporary, rawPath, finishLog, debuggerControl, closed = false, exitCode = null, exitSignal = null;
   let stdout = Buffer.alloc(0), stderr = Buffer.alloc(0);
   try {
     const options = parseArgs(args);
+    report.editEntry = options.editEntry;
+    report.debugger = { requested: options.lldb, status: options.lldb ? 'pending' : 'not-requested', ready: false };
+    if (options.editEntry === 'f2') report.limitations.push('F2 is a separate control experiment; passing it is not evidence that double-click editing is fixed.');
+    if (options.lldb) report.limitations.push('Debugger attachment can change timing; this run cannot supply release acceptance.');
     assert.equal(process.platform, 'darwin', 'This diagnostic requires native macOS');
     assert.equal(process.arch, 'arm64', 'This diagnostic requires native Apple Silicon Node');
     report.system = { swVers: command('/usr/bin/sw_vers', []), machine: command('/usr/bin/uname', ['-m']), node: process.version };
@@ -398,11 +430,12 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
       wordcraft: inspectInstalledWordcraft(location.resourceRoot, { root }), gridcraft: inspectInstalledGridcraft(location.resourceRoot, { root }) };
     temporary = mkdtempSync(join(tmpdir(), 'open-office-macos-editing-'));
     rawPath = join(temporary, 'frontend.json');
-    const predicate = 'process == "open-office" OR process CONTAINS "WebContent" OR process CONTAINS "WebKit" OR process == "ReportCrash" OR subsystem BEGINSWITH "com.apple.WebKit"';
+    const predicate = 'process == "open-office" OR process CONTAINS "WebContent" OR process CONTAINS "WebKit" OR process == "ReportCrash" OR subsystem BEGINSWITH "com.apple.WebKit" OR ((process == "runningboardd" OR process == "launchd" OR process == "kernel") AND (eventMessage CONTAINS[c] "WebContent" OR eventMessage CONTAINS[c] "WebKit" OR eventMessage CONTAINS[c] "open-office" OR eventMessage CONTAINS[c] "SIGKILL" OR eventMessage CONTAINS[c] "memorystatus" OR eventMessage CONTAINS[c] "jetsam" OR eventMessage CONTAINS[c] "EXC_RESOURCE" OR eventMessage CONTAINS[c] "invalid message" OR eventMessage CONTAINS[c] "exited"))';
     log = spawn('/usr/bin/log', ['stream', '--style', 'ndjson', '--level', 'debug', '--predicate', predicate], { shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
     finishLog = captureStream(log, join(directory, 'system-webkit.ndjson'), 8 * 1024 * 1024);
     app = spawn(location.executable, [], { cwd: temporary, shell: false, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...env, OPEN_OFFICE_SMOKE: '1', OPEN_OFFICE_SMOKE_SCOPE: 'macos-editing', OPEN_OFFICE_SMOKE_OUTPUT: rawPath } });
+      env: { ...env, OPEN_OFFICE_SMOKE: '1', OPEN_OFFICE_SMOKE_SCOPE: 'macos-editing', OPEN_OFFICE_SMOKE_OUTPUT: rawPath,
+        OPEN_OFFICE_SMOKE_EDIT_ENTRY: options.editEntry } });
     report.process = { pid: app.pid };
     app.stdout.on('data', chunk => { stdout = appendLogTail(stdout, chunk); });
     app.stderr.on('data', chunk => { stderr = appendLogTail(stderr, chunk); });
@@ -421,6 +454,25 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
           if (sent.has(request.actionId)) continue;
           const geometry = geometryForRequest(request, diagnostics.events);
           if (!geometry) continue;
+          if (options.lldb && report.debugger.status === 'pending') {
+            const pid = debuggerTargetPid(geometry, app.pid);
+            if (pid === null) {
+              report.debugger = { requested: true, status: 'blocked', reason: 'exact-webcontent-pid-unavailable',
+                ready: false, safeToContinue: true, continuedWithoutDebugger: true };
+            } else {
+              const { startWebContentDebugger } = await import('./macos-webcontent-lldb.mjs');
+              debuggerControl = await startWebContentDebugger({ pid, directory, attachTimeoutMs: 8000 });
+              report.debugger = debuggerControl.report;
+              report.debugger.requested = true;
+              assert.equal(report.debugger.safeToContinue, true, 'Debugger could not confirm WebContent is running or detached; no OS input was sent');
+              report.debugger.continuedWithoutDebugger = report.debugger.ready !== true;
+            }
+            // An attachment attempt may take several seconds. Re-read native
+            // lifecycle counters before sending the pending gesture; a failed
+            // attach must not turn a replacement WebContent into the control.
+            report.nativeDiagnostics = readJson(path);
+            checkLifecycle(report.nativeDiagnostics);
+          }
           assert.ok(sent.size < 32, 'Too many OS input requests');
           const input = inputForWindow(request, geometry, app.pid);
           sent.add(request.actionId);
@@ -444,11 +496,22 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
     assert.ok(closed, 'Native editing diagnostic timed out');
     report.frontend = readJson(rawPath, 12 * 1024 * 1024);
     report.nativeDiagnostics = readJson(join(temporary, 'diagnostics.json'));
-    validateEditingReport(report.frontend, report.nativeDiagnostics, report.actions);
+    validateEditingReport(report.frontend, report.nativeDiagnostics, report.actions, { editEntry: options.editEntry });
     assert.equal(exitCode, 0, 'Native application did not exit cleanly'); assert.equal(exitSignal, null);
     report.status = 'passed'; report.ok = true;
   } catch (error) { report.error = String(error?.message || error).slice(0, 4000); }
   finally {
+    if (report.nativeDiagnostics?.terminations > 0 && finishLog) report.systemLog = finishLog(undefined, { reset: true });
+    // Detach before the harness terminates its fixture application so cleanup
+    // signals cannot be mistaken for the editing failure under investigation.
+    if (debuggerControl) {
+      try {
+        await debuggerControl.stop();
+        assert.ok(['not-started', 'not-attached', 'detached', 'target-exited'].includes(report.debugger.cleanup),
+          'WebContent debugger detach was not confirmed');
+      }
+      catch (error) { report.gaps.push(`debugger-cleanup: ${String(error?.message || error).slice(0, 500)}`); report.ok = false; report.status = 'failed'; }
+    }
     if (app && !closed) { killGroup(app); await delay(300); if (!closed) killGroup(app, 'SIGKILL'); await delay(100); }
     if (app) {
       Object.assign(report.process, { exitCode, signal: exitSignal, stdoutTail: decodeLogTail(stdout), stderrTail: decodeLogTail(stderr) });
@@ -457,7 +520,7 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
       const terminated = report.nativeDiagnostics?.terminations > 0;
       // Preserve the crash-time tail before the waiting period can evict it.
       // The reset ring records only the waiting phase, under the same 8 MiB cap.
-      if (terminated && finishLog) report.systemLog = finishLog(undefined, { reset: true });
+      if (terminated && finishLog && !report.systemLog) report.systemLog = finishLog(undefined, { reset: true });
       if (!report.ok && !terminated) await delay(1500);
       report.crashReports = await collectCrashReports(started, directory, { terminated });
     }

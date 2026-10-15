@@ -539,7 +539,7 @@ onMounted(async()=>{
           try {
             if(!crossOriginIsolated)throw Error('Native WebView is not cross-origin isolated')
             const {runMacosEditingSmoke}=await import('./sheet/rust/macos-editing-smoke')
-            const editing=await runMacosEditingSmoke(editingSmokeAdapter())
+            const editing=await runMacosEditingSmoke(editingSmokeAdapter(),{editEntry:config.macosEditingEntry})
             report.editing=editing;report.ok=editing.ok
           }catch(e){report.ok=false;report.error=message(e)}
           await smokeAwait('ipc-smoke-report',()=>invoke('smoke_report',{report}))

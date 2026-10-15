@@ -29,6 +29,22 @@ pub struct Bootstrap {
     pub smoke_mode: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub smoke_scope: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub macos_editing_entry: Option<&'static str>,
+}
+
+fn diagnostic_editing_entry(
+    scope: Option<&str>,
+    requested: Option<&str>,
+) -> Result<Option<&'static str>, String> {
+    if scope != Some("macos-editing") {
+        return Ok(None);
+    }
+    match requested {
+        None | Some("doubleclick") => Ok(Some("doubleclick")),
+        Some("f2") => Ok(Some("f2")),
+        _ => Err("Invalid diagnostic editing entry.".into()),
+    }
 }
 
 pub struct AssetServer {
@@ -75,6 +91,10 @@ impl AssetServer {
             platform: std::env::consts::OS.into(),
             smoke_mode: smoke.is_some(),
             smoke_scope: smoke.as_ref().map(Smoke::scope),
+            macos_editing_entry: diagnostic_editing_entry(
+                smoke.as_ref().map(Smoke::scope),
+                std::env::var("OPEN_OFFICE_SMOKE_EDIT_ENTRY").ok().as_deref(),
+            )?,
         };
         let assets = Assets {
             root,
@@ -861,6 +881,27 @@ mod tests {
     }
 
     #[test]
+    fn editing_control_is_only_enabled_for_the_opted_in_macos_diagnostic() {
+        for scope in [None, Some("full")] {
+            assert_eq!(diagnostic_editing_entry(scope, Some("f2")), Ok(None));
+            assert_eq!(diagnostic_editing_entry(scope, Some("invalid")), Ok(None));
+        }
+        assert_eq!(
+            diagnostic_editing_entry(Some("macos-editing"), None),
+            Ok(Some("doubleclick"))
+        );
+        assert_eq!(
+            diagnostic_editing_entry(Some("macos-editing"), Some("doubleclick")),
+            Ok(Some("doubleclick"))
+        );
+        assert_eq!(
+            diagnostic_editing_entry(Some("macos-editing"), Some("f2")),
+            Ok(Some("f2"))
+        );
+        assert!(diagnostic_editing_entry(Some("macos-editing"), Some("invalid")).is_err());
+    }
+
+    #[test]
     fn navigation_stays_in_the_same_secret_namespace() {
         let info = Bootstrap {
             origin: "http://127.0.0.1:12345".into(),
@@ -868,6 +909,7 @@ mod tests {
             platform: "test".into(),
             smoke_mode: false,
             smoke_scope: None,
+            macos_editing_entry: None,
         };
         assert!(AssetServer::allows_navigation(
             &info,

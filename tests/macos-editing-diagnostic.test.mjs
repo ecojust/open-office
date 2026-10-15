@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { checkInputPreflight, parseInputRequest, inputForWindow, checkLifecycle,
-  validateEditingReport, viewportMapping, geometryForRequest, captureStream, collectCrashReports, EDITING_ACTIONS, EDITING_CHECKS } from '../scripts/macos-editing-diagnostic.mjs';
+  validateEditingReport, viewportMapping, geometryForRequest, captureStream, collectCrashReports,
+  parseArgs, debuggerTargetPid, EDITING_ACTIONS, EDITING_CHECKS, EDITING_F2_ACTIONS, EDITING_F2_CHECKS } from '../scripts/macos-editing-diagnostic.mjs';
 
 function crashFixture(t) {
   const directory = mkdtempSync(join(tmpdir(), 'macos-editing-crash-'));
@@ -186,16 +187,17 @@ const geometry = { actionId: 'single-a1', viewport: { width: 1200, height: 800 }
 const request = { actionId: 'single-a1', kind: 'click', clientX: 300, clientY: 200, viewportWidth: 1200, viewportHeight: 800 };
 const permissions = { postEventAccess: true, accessibilityTrusted: true, screenCaptureAccess: false, inputSourceId: 'com.apple.keylayout.ABC' };
 
-function fixture() {
+function fixture(editEntry = 'doubleclick') {
+  const f2 = editEntry === 'f2', expectedActions = f2 ? EDITING_F2_ACTIONS : EDITING_ACTIONS;
   const sessions = ['sheet', 'sheet', 'word'].map((kind, index) => ({ key: `tab-${index}`, kind, sessionId: `${kind}-${index}`, documentId: index + 1 }));
   const snapshot = (index, after = false) => {
-    const count = index < 9 ? 2 : 3;
+    const count = expectedActions[index][2].startsWith('word:') ? 3 : 2;
     return { activeKey: sessions[count === 2 ? 1 : 2].key,
       tabs: sessions.slice(0, count).map(({ key, kind }) => ({ key, kind, dirty: true, ready: true })),
       sessions: sessions.slice(0, count).map((value, item) => ({ ...value, revision: item === 0 ? 2 : index * 2 + (after ? 2 : 1), dirty: item !== 0 && index > 0 })),
       shell: { home: false, tabCount: count, workspaceDisplay: 'flex', visibleTabCount: count } };
   };
-  const sent = EDITING_ACTIONS.map(([actionId, kind, , value]) => {
+  const sent = expectedActions.map(([actionId, kind, , value]) => {
     const input = { actionId, kind, viewportWidth: 1200, viewportHeight: 800,
       ...(['click', 'doubleClick'].includes(kind) ? { clientX: 300, clientY: 200 } : kind === 'type' ? { text: value } : { key: value }) };
     const current = { ...structuredClone(geometry), actionId };
@@ -204,17 +206,17 @@ function fixture() {
         pid: geometry.pid, windowId: geometry.windowId, eventCount: kind === 'doubleClick' ? 5 : kind === 'click' ? 3 : kind === 'key' ? 2 : value.length * 2,
         startedAt: 1700000000000, finishedAt: 1700000001000, permissions: structuredClone(permissions) } };
   });
-  const actions = EDITING_ACTIONS.map(([actionId, kind, target, value], index) => ({ actionId, kind, target, completed: true,
+  const actions = expectedActions.map(([actionId, kind, target, value], index) => ({ actionId, kind, target, completed: true,
     before: snapshot(index), after: snapshot(index, true), events: ['click', 'doubleClick'].includes(kind)
       ? [{ type: kind === 'doubleClick' ? 'dblclick' : 'click', target: target === 'shell:undo' ? 'button:撤销' : target.startsWith('word:') ? 'wordcraft-canvas' : 'gridcraft-canvas',
         isTrusted: true, clientX: 300, clientY: 200, detail: kind === 'doubleClick' ? 2 : 1 }]
       : (kind === 'key' ? [value] : [...value]).map(key => ({ type: 'keyup', key, isTrusted: true, target: target.startsWith('word:') ? 'wordcraft-input' : 'gridcraft-input' })) }));
-  const editing = { schemaVersion: 1, kind: 'macos-editing', transport: 'local-wasm-in-native-webview', ok: true,
-    bootId: 'd3b1ead1-d8e1-418f-b964-cd13826da6ac', timeOrigin: 1700000000000, checks: [...EDITING_CHECKS],
+  const editing = { schemaVersion: 1, kind: 'macos-editing', transport: 'local-wasm-in-native-webview', editEntry, diagnosticOnly: f2, ok: true,
+    bootId: 'd3b1ead1-d8e1-418f-b964-cd13826da6ac', timeOrigin: 1700000000000, checks: [...(f2 ? EDITING_F2_CHECKS : EDITING_CHECKS)],
     initialTabIds: sessions.slice(0, 2).map(item => item.key), finalTabIds: sessions.map(item => item.key), sessions, actions,
-    observations: { singleClickValue: 42, doubleClickValue: 'sheetnative', ribbonBold: true, commandValue: 'API_SENTINEL',
+    observations: { singleClickValue: 42, [f2 ? 'f2Value' : 'doubleClickValue']: 'sheetnative', ribbonBold: true, commandValue: 'API_SENTINEL',
       undoneValue: null, wordText: 'wordnative', retained: { a1: 42, bold: true, d6: 'sheetnative', pristineA1: null } },
-    lastState: { ...snapshot(10, true), activeKey: sessions[1].key }, cleanup: { attempted: 3, closed: 3, ok: true } };
+    lastState: { ...snapshot(expectedActions.length - 1, true), activeKey: sessions[1].key }, cleanup: { attempted: 3, closed: 3, ok: true } };
   const diagnostics = { schemaVersion: 1, scope: 'macos-editing', generation: 1, terminations: 0, events: [
     { phase: 'document-start', detail: JSON.stringify({ bootId: editing.bootId, timeOrigin: editing.timeOrigin }) },
     ...sent.flatMap(item => [{ phase: 'editing-input-request', detail: JSON.stringify(item.request) }, { phase: 'editing-window-geometry', detail: JSON.stringify(item.geometry) }]),
@@ -222,6 +224,47 @@ function fixture() {
   return { frontend: { ok: true, nativeLifecycle: { generation: 1, terminations: 0 }, editing }, diagnostics, sent };
 }
 const validate = value => validateEditingReport(value.frontend, value.diagnostics, value.sent);
+
+test('diagnostic entry defaults to double-click and only explicit F2 or LLDB flags opt in', () => {
+  const basic = ['--app', '/tmp/Open Office.app', '--helper', '/tmp/os-input'];
+  assert.deepEqual(parseArgs(basic), { '--app': '/tmp/Open Office.app', '--helper': '/tmp/os-input', editEntry: 'doubleclick', lldb: false });
+  assert.deepEqual(parseArgs([...basic, '--edit-entry', 'f2', '--lldb']), { ...parseArgs(basic), editEntry: 'f2', lldb: true });
+  assert.equal(parseArgs(['--helper', '/tmp/os-input', '--preflight']).preflight, true);
+  for (const extra of [['--edit-entry'], ['--edit-entry', 'F2'], ['--edit-entry', 'f2', '--edit-entry', 'doubleclick'], ['--lldb', '--lldb'], ['--unknown']]) {
+    assert.throws(() => parseArgs([...basic, ...extra]));
+  }
+});
+
+test('LLDB accepts only the sampled private WebView PID with no process-name or parent fallback', () => {
+  const current = { ...geometry, webContent: { supported: true, source: 'WKWebView._webProcessIdentifier', pid: 2345 } };
+  assert.equal(debuggerTargetPid(current, geometry.pid), 2345);
+  assert.throws(() => debuggerTargetPid(current, 9999), /another application/);
+  for (const webContent of [undefined, { ...current.webContent, supported: false },
+    { ...current.webContent, source: 'ps-name-match' }, ...[null, 0, -1, 1, 2.5, 0x80000000, geometry.pid].map(pid => ({ ...current.webContent, pid }))]) {
+    assert.equal(debuggerTargetPid({ ...geometry, webContent }, geometry.pid), null);
+  }
+});
+
+test('F2 has a separate 12-action control validator and cannot stand in for a double-click pass', () => {
+  const value = fixture('f2');
+  const f2Validate = value => validateEditingReport(value.frontend, value.diagnostics, value.sent, { editEntry: 'f2' });
+  assert.equal(value.sent.length, 12); assert.equal(value.frontend.editing.checks.length, 8);
+  assert.equal(f2Validate(value), true);
+  assert.throws(() => validate(value), /entry differs/);
+  assert.throws(() => f2Validate(fixture()), /entry differs/);
+  for (const mutate of [
+    v => { delete v.frontend.editing.editEntry; },
+    v => { delete v.frontend.editing.diagnosticOnly; },
+    v => { v.frontend.editing.observations.doubleClickValue = v.frontend.editing.observations.f2Value; delete v.frontend.editing.observations.f2Value; },
+    v => { v.frontend.editing.checks[2] = 'sheet-double-click-native-typing'; },
+    v => { v.frontend.editing.actions[4].events[0].key = 'Enter'; },
+    v => { v.sent[4].request.key = 'Enter'; },
+    v => { v.frontend.editing.actions[7].after.tabs.pop(); },
+    v => { v.diagnostics.terminations = 1; },
+  ]) { const changed = structuredClone(value); mutate(changed); assert.throws(() => f2Validate(changed)); }
+  const mislabeled = fixture(); mislabeled.frontend.editing.diagnosticOnly = true;
+  assert.throws(() => validate(mislabeled), /Control experiments/);
+});
 
 test('posting permission and keyboard layout preflight cannot be replaced by synthetic input', () => {
   const preflight = { schemaVersion: 1, kind: 'macos-os-input-preflight', permissions: { ...permissions } };

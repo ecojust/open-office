@@ -37,10 +37,13 @@ interface Boot { bootId: string; timeOrigin: number }
 interface RecordedEvent { type: string; isTrusted: boolean; target: string; key?: string; detail?: number; clientX?: number; clientY?: number }
 interface Identity { key: string; kind: Kind; sessionId: string; documentId: number }
 interface Action { actionId: string; kind: string; target: string; events: RecordedEvent[]; before: unknown; after?: unknown; completed: boolean }
+export interface EditingSmokeOptions { editEntry?: 'doubleclick' | 'f2' }
 export interface MacosEditingReport {
   schemaVersion: 1
   kind: 'macos-editing'
   transport: 'local-wasm-in-native-webview' | 'local-wasm-in-browser'
+  editEntry: 'doubleclick' | 'f2'
+  diagnosticOnly: boolean
   ok: boolean
   bootId: string
   timeOrigin: number
@@ -65,6 +68,9 @@ export const MACOS_EDITING_CHECKS = [
   'word-trusted-native-edit',
   'original-tabs-and-session-identities-preserved',
 ] as const
+// The F2 control experiment cannot supply the double-click release check.
+export const MACOS_EDITING_F2_CHECKS = MACOS_EDITING_CHECKS.map(check =>
+  check === 'sheet-double-click-native-typing' ? 'sheet-f2-native-typing' : check)
 
 function assert(value: unknown, message: string): asserts value { if (!value) throw Error(`macOS editing: ${message}`) }
 async function bounded<T>(work: Promise<T>, label: string, milliseconds = 20000): Promise<T> {
@@ -121,16 +127,19 @@ async function sheetPoint(mount: EditingSmokeMount, name: string, chrome = false
 
 /** OS input is posted by the external diagnostic runner. No DOM focus, value
  * assignment, synthetic event, or replacement native IPC is used here. */
-export async function runMacosEditingSmoke(adapter: EditingSmokeAdapter): Promise<MacosEditingReport> {
+export async function runMacosEditingSmoke(adapter: EditingSmokeAdapter, options: EditingSmokeOptions = {}): Promise<MacosEditingReport> {
   assert(isTauri() && smokeRequested(), 'an opted-in native WebView is required')
-  return verifyMacosEditing(adapter, request => { smokeStage('editing-input-request', JSON.stringify(request)) })
+  return verifyMacosEditing(adapter, request => { smokeStage('editing-input-request', JSON.stringify(request)) }, options)
 }
 
 /** A browser harness may drive the same scenario with trusted Playwright input;
  * its distinct transport must never satisfy the macOS native acceptance gate. */
-export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestInput: (request: EditingInputRequest) => void | Promise<void>): Promise<MacosEditingReport> {
+export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestInput: (request: EditingInputRequest) => void | Promise<void>, options: EditingSmokeOptions = {}): Promise<MacosEditingReport> {
+  const editEntry = options.editEntry ?? 'doubleclick'
+  assert(editEntry === 'doubleclick' || editEntry === 'f2', 'unsupported diagnostic edit entry')
+  const f2Control = editEntry === 'f2'
   const boot = readBoot()
-  const report: MacosEditingReport = { schemaVersion: 1, kind: 'macos-editing', transport: isTauri() ? 'local-wasm-in-native-webview' : 'local-wasm-in-browser', ok: false, ...boot, checks: [], sessions: [], initialTabIds: [], finalTabIds: [], actions: [], observations: {}, cleanup: { attempted: 0, closed: 0, ok: true } }
+  const report: MacosEditingReport = { schemaVersion: 1, kind: 'macos-editing', transport: isTauri() ? 'local-wasm-in-native-webview' : 'local-wasm-in-browser', editEntry, diagnosticOnly: f2Control, ok: false, ...boot, checks: [], sessions: [], initialTabIds: [], finalTabIds: [], actions: [], observations: {}, cleanup: { attempted: 0, closed: 0, ok: true } }
   const opened: EditingSmokeMount[] = []
   let currentEvents: RecordedEvent[] | undefined
   const eventNames = ['pointerdown', 'pointerup', 'click', 'dblclick', 'keydown', 'keyup', 'input']
@@ -203,12 +212,17 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
     report.observations.singleClickValue = (await until(() => cell(sheet, 'A1'), value => value.value === 42, 'single-click edit committed')).value
     assert((await cell(first, 'A1')).value === null, 'editing second workbook changed first workbook')
     report.checks.push(MACOS_EDITING_CHECKS[1])
-    await input('double-d6', 'sheet:D6', { kind: 'doubleClick', ...await sheetPoint(sheet, 'D6') })
-    await until(() => sheet.editor.inspect(), value => (value.ui as SheetUi)?.editor?.cell === 'D6' && document.activeElement === sheet.element.querySelector('[data-testid="gridcraft-input"]'), 'double-click editor and natural input focus')
+    if (f2Control) {
+      await input('single-d6', 'sheet:D6', { kind: 'click', ...await sheetPoint(sheet, 'D6') })
+      await input('f2-d6', 'sheet:D6', { kind: 'key', key: 'F2' })
+    } else {
+      await input('double-d6', 'sheet:D6', { kind: 'doubleClick', ...await sheetPoint(sheet, 'D6') })
+    }
+    await until(() => sheet.editor.inspect(), value => (value.ui as SheetUi)?.editor?.cell === 'D6' && document.activeElement === sheet.element.querySelector('[data-testid="gridcraft-input"]'), `${editEntry} editor and natural input focus`)
     await input('type-d6', 'sheet:D6', { kind: 'type', text: 'sheetnative' })
     await input('enter-d6', 'sheet:D6', { kind: 'key', key: 'Enter' })
-    report.observations.doubleClickValue = (await until(() => cell(sheet, 'D6'), value => value.value === 'sheetnative', 'double-click edit committed')).value
-    report.checks.push(MACOS_EDITING_CHECKS[2])
+    report.observations[f2Control ? 'f2Value' : 'doubleClickValue'] = (await until(() => cell(sheet, 'D6'), value => value.value === 'sheetnative', `${editEntry} edit committed`)).value
+    report.checks.push(f2Control ? 'sheet-f2-native-typing' : MACOS_EDITING_CHECKS[2])
     await input('select-a1', 'sheet:A1', { kind: 'click', ...await sheetPoint(sheet, 'A1') })
     await input('ribbon-bold', 'sheet:home.bold', { kind: 'click', ...await sheetPoint(sheet, 'home.bold', true) })
     report.observations.ribbonBold = (await until(() => cell(sheet, 'A1'), value => value.style.font.bold === true, 'ribbon bold style committed')).style.font.bold

@@ -2,6 +2,16 @@ name: Diagnose macOS editing with real OS input
 
 on:
   workflow_dispatch:
+    inputs:
+      edit_entry:
+        description: Diagnostic edit entry; F2 is a control and cannot satisfy double-click release acceptance
+        type: choice
+        default: doubleClick
+        options: [doubleClick, f2]
+      debug_webcontent:
+        description: Attempt a bounded LLDB attachment to the exact WebContent process without changing system protections
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -126,8 +136,14 @@ jobs:
       - name: Exercise editing through native macOS keyboard and mouse events
         id: diagnostic
         timeout-minutes: 8
+        env:
+          DIAGNOSTIC_EDIT_ENTRY: ${{ inputs.edit_entry }}
+          DIAGNOSTIC_DEBUG_WEBCONTENT: ${{ inputs.debug_webcontent }}
         run: |
-          node scripts/macos-editing-diagnostic.mjs --helper "$RUNNER_TEMP/open-office-os-input" --app "$GITHUB_WORKSPACE/src-tauri/target/release/bundle/macos/Open Office.app"
+          args=()
+          if [[ "$DIAGNOSTIC_EDIT_ENTRY" == "f2" ]]; then args+=(--edit-entry f2); fi
+          if [[ "$DIAGNOSTIC_DEBUG_WEBCONTENT" == "true" ]]; then args+=(--lldb); fi
+          node scripts/macos-editing-diagnostic.mjs --helper "$RUNNER_TEMP/open-office-os-input" --app "$GITHUB_WORKSPACE/src-tauri/target/release/bundle/macos/Open Office.app" "${args[@]}"
       - name: Explain the diagnostic result and its limits
         if: always()
         env:
