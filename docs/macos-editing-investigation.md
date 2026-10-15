@@ -82,6 +82,8 @@ F2 对照通过工作流 `edit_entry=f2` 或采集器 `--edit-entry f2` 启用�
 
 [首次 F2/LLDB 运行 38784012150](https://github.com/ecojust/open-office/actions/runs/38784012150) 完成构建，但采集器收尾的 `kill EPERM` 中断最终报告保存，留下的是旧 `preflight-passed` 报告。[只读检查 38788191716](https://github.com/ecojust/open-office/actions/runs/38788191716) 确认调试 trace 为零字节，未留下输入、生命周期或调用栈证据。因此不能把该轮解释为 F2 成功、失败或未发送输入。采集器已改为先保存 native/frontend 证据，各收尾错误独立记录并保留原始错误，最后覆盖预检报告；下一轮先运行无调试器 F2 对照。
 
+Linux WPE 的 Playwright WebKit 2336（报告版本 26.5）另做了只读对照。F2 的 12 项动作、8 项模型检查通过；DPR1、双击零派发延迟的 11 项动作、8 项检查也通过，包括 D6 实际写入、粗体、撤销、Word 输入及三个标签身份保留，未观察到页面崩溃。DPR2、80 ms 派发延迟的双击未进入编辑：两次 pointerup 的观测间隔约 827 ms，超过 egui 的 300 ms 双击阈值，Rust 编辑器为 null，标签仍在。三轮外围脚本均因一条 ResizeObserver 告警而标为失败，不能将核心编辑断言通过描述为整套测试通过，也不能将 Linux WPE 的结果替代 macOS WKWebView 验证。
+
 ## 原生检查的判定要求
 
 使用 macOS 系统级键鼠事件，校验浏览器收到的事件确为可信输入，并检查实际文档内容、全部标签和会话身份。记录测试机实际 macOS 小版本，不能将其他 26.x 小版本称为 26.5。

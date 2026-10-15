@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { EDITOR_RELEASE, publishedEditorChecksum, reuseInstalledEditors, runEditorReleaseReuse, validateEditorRelease, verifyEditorReleaseAsset } from '../scripts/reuse-release-editors.mjs';
@@ -20,7 +20,9 @@ const metadata = () => ({ id: EDITOR_RELEASE.id, tag_name: EDITOR_RELEASE.tag, t
   assets: [EDITOR_RELEASE.dmg, EDITOR_RELEASE.checksums].map(asset => ({ ...asset, digest: `sha256:${asset.sha256}`,
     browser_download_url: `https://github.com/${EDITOR_RELEASE.repository}/releases/download/${EDITOR_RELEASE.tag}/${asset.name}` })) });
 function fixture(t) {
-  const root = mkdtempSync(join(tmpdir(), 'editor-release-reuse-'));
+  // macOS exposes /var through /private/var. Match the canonical destination
+  // used by resource promotion so injected rename failures really execute.
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'editor-release-reuse-')));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const write = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, value); };
   const engines = [
