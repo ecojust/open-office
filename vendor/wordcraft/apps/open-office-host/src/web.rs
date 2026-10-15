@@ -204,6 +204,7 @@ fn services(session_id: &str, actions: Rc<RefCell<Vec<Value>>>) -> Services {
     let save_id = session_id.to_owned();
     let save_actions = actions.clone();
     Services {
+        embedded_editor: true,
         browser_clipboard: true,
         host_command: Some(Box::new(move |id, params| {
             if let Some(action) = host_action(id) {
@@ -432,7 +433,7 @@ impl WordcraftHost {
             {
                 entry.app.execute(command_id, params)
             } else {
-                Err("unknown WordCraft command".into())
+                Err("unknown editor command".into())
             };
             let snapshot = state.snapshot(id)?;
             state.repaint();

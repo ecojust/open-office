@@ -20,6 +20,7 @@ fs.mkdirSync(output, { recursive: true });
 const persist = () => fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
 (async () => {
   try {
+    report.artifactCheck = execFileSync(process.execPath, [path.join(root, 'scripts/build-wordcraft.mjs'), '--check'], { cwd: root, encoding: 'utf8' }).trim();
     const { createServer } = await import('vite');
     server = await createServer({ root, clearScreen: false, cacheDir: path.join(output, 'vite-cache'), server: { host: '127.0.0.1', port: 0, hmr: false, watch: { ignored: ['**/vendor/**', '**/src-tauri/target/**', '**/test-results/**'] } } });
     await server.listen();
@@ -35,6 +36,7 @@ const persist = () => fs.writeFileSync(path.join(output, 'report.json'), JSON.st
     page.on('pageerror', error => report.errors.push(error.message));
     await page.goto(origin);
     await page.locator('.create-card.word').waitFor();
+    assert.doesNotMatch(await page.locator('.create-card.word').innerText(), /wordcraft/i, 'The visible workbench has no upstream editor branding');
     report.helper = await page.evaluate(async () => {
       const app = document.querySelector('#app').__vue_app__._instance.setupState;
       const vueUrl = performance.getEntriesByType('resource').map(entry => entry.name).find(name => /\/deps\/vue\.js(?:\?|$)/.test(name));
@@ -42,6 +44,7 @@ const persist = () => fs.writeFileSync(path.join(output, 'report.json'), JSON.st
       const { nextTick } = await import(vueUrl);
       const { inspectWordcraftSession } = await import('/src/word/rust/client.ts');
       const { runWordcraftNativeSmoke, verifyMountedWordcraftEditor } = await import('/src/word/rust/wordcraft-native-smoke.ts');
+      const embeddedChrome = [];
       const adapter = {
         async open(base64, name) {
           await app.editorTransaction('Browser smoke document', () => app.addDocument({ id: '', kind: 'word', extension: 'docx', name, base64, sha256: '', sizeBytes: Math.floor(base64.length * .75) }));
@@ -51,6 +54,19 @@ const persist = () => fs.writeFileSync(path.join(output, 'report.json'), JSON.st
           const handle = app.rustWordHandles.get(tab.key), state = await handle.inspect();
           const element = [...document.querySelectorAll('[data-testid="rust-word-editor"]')].find(node => node.dataset.sessionId === state.sessionId);
           if (!element) throw Error('Actual WordCraft component missing');
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          const drawn = await handle.inspect();
+          if (!drawn.ui?.ribbonTabs?.length || !drawn.ui?.drawnChrome?.length) throw Error('Actual embedded chrome geometry missing');
+          for (const tab of drawn.ui.ribbonTabs) {
+            if (/^(File|Help)$/i.test(tab.id)) throw Error('Embedded file/help tab remains visible');
+          }
+          for (const widget of drawn.ui.drawnChrome) {
+            if (!widget.id.startsWith('tab:') && !['quickAccess:edit.undo', 'quickAccess:edit.redo'].includes(widget.id)) throw Error('Non-editing embedded chrome remains visible: ' + widget.id);
+          }
+          for (const selector of ['.command-bar', '.editor-status', '[data-testid="import-review-notice"]']) {
+            if (/wordcraft/i.test(document.querySelector(selector)?.innerText || '')) throw Error('Upstream brand appears in visible application chrome: ' + selector);
+          }
+          embeddedChrome.push({ documentId: drawn.documentId, tabs: drawn.ui.ribbonTabs, chrome: drawn.ui.drawnChrome });
           return { key: tab.key, element, editor: app.nativeTransactionalEditor(handle) };
         },
         activeKey: () => app.activeKey,
@@ -68,12 +84,13 @@ const persist = () => fs.writeFileSync(path.join(output, 'report.json'), JSON.st
       try { await runWordcraftNativeSmoke(adapter); } catch (error) { nativeGuardRejected = String(error).includes('real native WebView is required'); }
       if (!nativeGuardRejected) throw Error('Native smoke accepted a browser');
       const result = await verifyMountedWordcraftEditor(adapter);
-      return { ...result, nativeGuardRejected };
+      return { ...result, nativeGuardRejected, embeddedChrome };
     });
     persist();
     assert.equal(report.helper.ok, true, report.helper.error || report.helper.closeError);
     assert.equal(report.helper.transport, 'local-wasm-in-browser');
     assert.equal(report.helper.nativeGuardRejected, true);
+    assert.equal(report.helper.embeddedChrome.length, 2, 'Both mounted real editors use editing-only chrome while retaining the deliberately branded document content');
     assert.equal(report.helper.cleanup.closed, 2); assert.equal(report.helper.cleanup.remainingCanvas, 0); assert.equal(report.helper.cleanup.remainingInput, 0);
     report.docx = [];
     for (const key of ['docxBase64', 'reopenedDocxBase64']) {

@@ -119,6 +119,12 @@ fn ui_shortcut(key: Key, m: Modifiers) -> Option<(&'static str, Value)> {
 
 /// Find and run the command bound to this key. Returns true if handled.
 fn dispatch(app: &mut WordApp, key: Key, m: Modifiers) -> bool {
+    // The embedding shell owns this shortcut on every platform. The standalone Windows
+    // keymap uses it for Apply Styles; do not let canvas focus change the shell's Save As action.
+    if app.services.embedded_editor && key == Key::S && (m.command || m.ctrl) && m.shift && !m.alt {
+        let _ = app.run("file.saveAs", json!({}));
+        return true;
+    }
     // eframe's browser backend forwards the keydown and later the DOM clipboard event.
     // Running a command here first would paste the old internal copy, then paste the real
     // clipboard again (or cut twice). The semantic event is authoritative even if delayed
@@ -224,7 +230,7 @@ fn is_paste_special_release(key: Key, modifiers: egui::Modifiers) -> bool {
 /// Events for the focused canvas: text, editing keys, clipboard, IME. While keytips are showing
 /// every key belongs to them (letters pick badges, Escape cancels), so nothing here runs.
 pub fn canvas_events(app: &mut WordApp, ctx: &egui::Context) {
-    if app.ui.keytips != crate::keytips::Phase::Off {
+    if canvas_input_blocked(app) {
         return;
     }
     let events = ctx.input(|i| i.events.clone());
@@ -257,6 +263,11 @@ pub fn canvas_events(app: &mut WordApp, ctx: &egui::Context) {
     let alt_codes = alt_codes_supported(ctx);
     let mut events = events.into_iter().peekable();
     while let Some(e) = events.next() {
+        // A shortcut may have opened a dialog earlier in this same batch. Leave subsequent
+        // events in egui's input for its text field; they no longer belong to the document.
+        if canvas_input_blocked(app) {
+            return;
+        }
         // An Alt shortcut (Alt+Shift+D, Alt+F7…) may also send its key's text; it isn't typed.
         match &e {
             egui::Event::Key { pressed: true, .. } => {
@@ -459,6 +470,16 @@ pub fn canvas_events(app: &mut WordApp, ctx: &egui::Context) {
     }
 }
 
+/// The canvas is drawn before dialogs, so its cached focus can still be true after a dialog's
+/// text field took focus. Explicit input ownership must win over that previous-frame cache.
+fn canvas_input_blocked(app: &WordApp) -> bool {
+    app.ui.keytips != crate::keytips::Phase::Off
+        || app.ui.backstage
+        || app.dialog.is_some()
+        || app.colors.is_some()
+        || app.file_dialog_open()
+}
+
 /// Escape leaves full screen (#980) once nothing nearer took it: a pen, a text box, a header, a
 /// dialog, a menu or a popup, a drag on the page, and in the document (`canvas`) a selection,
 /// which Escape collapses first (`select.collapse`), as in a normal window.
@@ -637,6 +658,98 @@ pub fn global_shortcuts(app: &mut WordApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn embedded_save_as_shortcut_delegates_once_and_preserves_the_draft() {
+        for modifiers in [Modifiers { command: true, shift: true, ..Default::default() }, Modifiers { ctrl: true, shift: true, ..Default::default() }] {
+            let calls = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+            let sink = calls.clone();
+            let mut app = WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), crate::Services {
+                embedded_editor: true,
+                host_command: Some(Box::new(move |id, _| (id == "file.saveAs").then(|| {
+                    sink.borrow_mut().push(id.to_string());
+                    Ok(json!({"pending": "host"}))
+                }))),
+                ..Default::default()
+            });
+            app.run("text.insert", json!({"text": "Unsaved 中文 draft"})).unwrap();
+            let document = app.session.doc.clone();
+            let selection = app.session.sel.clone();
+            let undo = app.session.undo_depth();
+            let ctx = egui::Context::default();
+            let key = |pressed| egui::Event::Key { key: Key::S, physical_key: Some(Key::S), pressed, repeat: false, modifiers };
+            alt_frame(&ctx, &mut app, vec![key(true), key(false)]);
+            assert_eq!(*calls.borrow(), ["file.saveAs"]);
+            assert_eq!(app.session.doc, document);
+            assert_eq!(app.session.sel, selection);
+            assert_eq!(app.session.undo_depth(), undo);
+            assert!(app.session.dirty);
+            assert!(!app.session.view.styles_pane && !app.ui.backstage && app.dialog.is_none());
+            assert_eq!(crate::widgets::shortcut_text(&app, "file.saveAs"), crate::widgets::key_text("Mod+Shift+S"));
+            assert!(!crate::widgets::shortcut_text(&app, "styles.apply").contains("Shift+S"));
+        }
+        let (_, mut standalone) = alt_frame_app();
+        if !cfg!(target_os = "macos") {
+            assert!(dispatch(&mut standalone, Key::S, Modifiers { command: true, shift: true, ..Default::default() }));
+            assert!(standalone.session.view.styles_pane, "standalone Windows/Linux keeps Apply Styles");
+        } else {
+            let key = standalone.session.keymap.resolve(&standalone.session.registry, "Mod+Shift+S").unwrap();
+            assert_eq!(key.id, "file.saveAs", "standalone macOS retains its original binding");
+        }
+        let (_, mut embedded) = alt_frame_app();
+        embedded.services.embedded_editor = true;
+        assert!(dispatch(&mut embedded, Key::S, Modifiers { command: true, shift: true, alt: true, ..Default::default() }));
+        assert!(embedded.session.view.styles_pane, "the distinct Styles Pane shortcut remains available");
+    }
+
+    #[test]
+    fn command_search_owns_typing_and_escape_then_returns_input_to_the_document() {
+        let mut app = WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::from_text("Draft")), Default::default());
+        app.run("caret.docEnd", json!({})).unwrap();
+        let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1440.0, 900.0)).build_ui_state(
+            |ui, app: &mut WordApp| { app.logic(ui.ctx()); app.ui(ui); }, app,
+        );
+        h.run_steps(4);
+        let document = h.state().session.doc.clone();
+        let selection = h.state().session.sel.clone();
+        let undo = h.state().session.undo_depth();
+        let dirty = h.state().session.dirty;
+        for query in ["file", "print", "bold"] {
+            h.state_mut().run("ui.dialog", json!({"name": "commands"})).unwrap();
+            h.run_steps(3);
+            // The canvas caches focus before the dialog draws; reproduce that stale flag even
+            // though the real TextEdit already owns egui focus and must receive these events.
+            h.state_mut().canvas.focused = true;
+            h.event(egui::Event::Key { key: Key::B, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE });
+            h.event(egui::Event::Text(query.into()));
+            h.run_steps(2);
+            assert!(matches!(&h.state().dialog, Some(crate::dialogs::Dialog::Commands { query: actual, .. }) if actual == query));
+            h.key_press(Key::Escape);
+            h.run_steps(3);
+            assert!(h.state().dialog.is_none());
+            assert_eq!(h.state().session.doc, document);
+            assert_eq!(h.state().session.sel, selection);
+            assert_eq!(h.state().session.undo_depth(), undo);
+            assert_eq!(h.state().session.dirty, dirty);
+        }
+        assert!(h.state().canvas.focused);
+        h.event(egui::Event::Text("正文😀".into()));
+        h.run_steps(2);
+        assert_eq!(h.state().session.doc.plain_text(wordcraft_doc::StoryRef::Body), "Draft正文😀");
+        assert_eq!(h.state().session.undo_depth(), undo + 1);
+    }
+
+    #[test]
+    fn opening_command_search_stops_document_input_in_the_same_event_batch() {
+        if cfg!(target_os = "macos") { return; } // Option+Q is text on macOS, not command search.
+        let (ctx, mut app) = alt_frame_app();
+        let before = app.session.doc.clone();
+        let depth = app.session.undo_depth();
+        alt_frame(&ctx, &mut app, vec![alt_key(Key::Q, true, false), egui::Event::Text("q".into()), egui::Event::Text("bold".into())]);
+        assert!(matches!(app.dialog, Some(crate::dialogs::Dialog::Commands { .. })));
+        assert_eq!(app.session.doc, before);
+        assert_eq!(app.session.undo_depth(), depth);
+    }
 
     #[test]
     fn input_method_surrounding_replacement_is_one_unicode_transaction() {

@@ -49,6 +49,13 @@ pub fn inspect(app: &mut WordApp, ctx: &egui::Context) -> Value {
     let caret = crate::canvas::caret_screen(app).map(|(p, h)| json!({"x": p.x, "y": p.y, "h": h}));
     json!({
         "ui": app.prefs(),
+        "embeddedEditor": app.services.embedded_editor,
+        "drawnChrome": crate::embedding::drawn(ctx),
+        "ribbonTabs": crate::embedding::drawn(ctx).into_iter().filter_map(|mut item| {
+            let id = item.get("id")?.as_str()?.strip_prefix("tab:")?.to_owned();
+            item["id"] = json!(id);
+            Some(item)
+        }).collect::<Vec<_>>(),
         "view": app.session.view,
         "dialog": app.dialog.as_ref().map(|d| serde_json::to_value(d).unwrap_or_default()),
         "window": [r.width(), r.height()],

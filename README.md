@@ -4,7 +4,7 @@
 
 [下载安装包](https://github.com/ecojust/open-office/releases) · [构建记录](https://github.com/ecojust/open-office/actions/workflows/desktop-release.yml) · [开发与构建](docs/development.md)
 
-**0.8.0 · WordCraft 文字编辑器集成预览（Alpha）**：默认文字工作区接入 WordCraft 的 Rust 文档引擎和完整功能区界面。浏览器验收已通过，本轮准备构建三平台安装包，尚未公开发布；见 [0.8.0 更新说明](docs/releases/0.8.0.md)与[验证边界](docs/wordcraft-integration.md)。已发布的 [0.7.0](docs/releases/0.7.0.md) 使用此前的基础 Rust 内核，不包含此次集成。
+**0.8.1 · 文字编辑体验更新（Alpha）**：文字工作区仅保留文档编辑工具，新建、打开、保存、另存为、导出与打印统一由 Open Office 提供。修复搜索框输入、另存为快捷键及关闭标签后恢复原文稿的问题。本地生产构建与三套浏览器验收已通过；三平台安装包通过本轮 Actions 检查后以公开测试版提供。见 [0.8.1 更新说明](docs/releases/0.8.1.md)与[验证边界](docs/wordcraft-integration.md)。此前的 [0.8.0 已公开发布](https://github.com/ecojust/open-office/releases/tag/desktop-v0.8.0-38691848013)。
 
 ![Open Office 工作台](docs/screenshots/home.png)
 
@@ -12,7 +12,7 @@
 
 | 工作区 | 常用格式 | 主要功能 |
 | --- | --- | --- |
-| 文字文档（WordCraft Alpha） | DOCX；导出 PDF | 复用 WordCraft 的 Rust 文档模型、排版和功能区，提供文字与段落格式、列表、表格、图片、页面与审阅等工具；本项目接入及验证范围见下文 |
+| 文字文档（Alpha） | DOCX；导出 PDF | 文字与段落格式、列表、表格、图片、页面与审阅等编辑工具；文件操作由 Open Office 统一提供，验证范围见下文 |
 | 文字兼容编辑器 | DOCX、ODT | 文字与段落排版、普通列表与编号、上下标与高亮、超链接、标题大纲、表格、页眉页脚、查找替换、批注与修订、导出 PDF |
 | 电子表格 | XLSX、ODS | 单元格与公式、混合格式提示与富文本格式设置、向下/向右填充、选区汇总、工作表管理、排序筛选、冻结、条件格式、数据验证、基础图表与透视汇总 |
 | 演示文稿 | PPTX | 独立画布、局部文字与段落排版、文本框布局、图片、可编辑表格和图表、备注、页面切换、本地音视频与放映 |
@@ -34,13 +34,13 @@
 - 演示专项覆盖 12 份复杂原件，分别检查原始内容保留、可编辑功能与画面差异；对尚未支持的动画、图示和排版明确提示。[复杂演示文稿测试](docs/presentation-complex-compatibility.md)
 - 持续修复四个工作区的编辑与保存问题。每轮记录源码指纹、实际操作、失败原因和已知限制；测试结果不会替代未完成的功能。[当前实现与验证进展](docs/rea-compatibility-progress.md)
 - 界面检查覆盖桌面和窄窗；具体工具的 390、320 像素操作、键盘交互与实际截图见各专项记录。
-- 历史发布记录包含 Windows x64、macOS ARM64 和 macOS Intel 安装包检查；Intel 使用 Rosetta，尚未在真实 Intel 显卡上完整实测。0.7.0 的 Rust IPC 和旧浏览器结果不证明此次 WordCraft WASM／画布集成通过，后者需要独立验收。
+- 安装包检查覆盖 Windows x64、macOS ARM64 和 macOS Intel，各版本结果以对应 Actions 记录为准；Intel 使用 Rosetta，尚未在真实 Intel 显卡上完整实测。旧 Rust IPC 或浏览器结果不能代替默认文字工作区的原生 WebView 验收。
 
 测试只证明报告中的样例与检查项。复杂版式、特殊字体、部分公式和嵌入附件仍可能存在差异；完整对象动画、扫描件 OCR 和证书数字签名编辑尚未支持。发现已知导入风险时会提示另存副本，重要文档请保留原件并核对导出结果。[PDF 功能边界](docs/pdf-capabilities.md) · [内存测试记录](docs/memory-optimization.md)
 
 ## 界面预览
 
-以下为实际运行的浏览器预览截图，内容为测试文档；桌面版另提供原生文件保存与本地后台处理。演示工作区采用独立扁平界面，截图中的文字兼容编辑器和表格工作区仍保留内置高级菜单的原有外观，尚未展示此次 WordCraft 界面。
+以下为实际运行的浏览器预览截图，内容为测试文档；桌面版另提供原生文件保存与本地后台处理。演示工作区采用独立扁平界面，截图中的文字兼容编辑器和表格工作区仍保留内置高级菜单的原有外观，尚未展示当前默认文字工作区。
 
 <details>
 <summary>文字文档</summary>
@@ -76,7 +76,7 @@
 
 当前安装包未配置商业代码签名；macOS 包使用本地签名，尚未进行开发者公证。首次打开请按系统安全提示处理，校验文件见发布附件 `SHA256SUMS`。
 
-0.8.0 的改动、开发验证及待完成的安装包检查见 [0.8.0 更新说明](docs/releases/0.8.0.md)；本轮仅构建安装包，不自动公开发布。现有公开安装包仍以[发布页](https://github.com/ecojust/open-office/releases)为准。历史 [0.7.0](docs/releases/0.7.0.md) 的测试数量不能作为 WordCraft 集成的完成证明。
+0.8.1 的改动与验证范围见 [更新说明](docs/releases/0.8.1.md)。本轮 Windows x64、macOS ARM64 与 macOS Intel 安装包须通过构建及必要自检，全部通过后公开测试版；下载与校验文件以[发布页](https://github.com/ecojust/open-office/releases)为准，逐平台结果见[构建记录](https://github.com/ecojust/open-office/actions/workflows/desktop-release.yml)。也可查看已发布的 [0.8.0 安装包](https://github.com/ecojust/open-office/releases/tag/desktop-v0.8.0-38691848013)。
 
 开发需要 Node.js 24、Python 3.12、Rust stable（至少 1.95）、`wasm32-unknown-unknown`、固定 `wasm-bindgen-cli 0.2.129` 和对应系统的原生构建工具，步骤见[开发与构建](docs/development.md)。
 

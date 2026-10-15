@@ -2,7 +2,7 @@
 
 [返回项目首页](../README.md)
 
-本分支接入固定版本的 [WordCraft Rust 引擎与完整画布界面](wordcraft-integration.md)。已发布 [0.7.0](releases/0.7.0.md) 的基础 Rust 内核与测试属于历史阶段，不能作为此次集成的验收结果。
+默认文字工作区接入固定版本的 [WordCraft Rust 引擎与画布界面](wordcraft-integration.md)，已随 [0.8.0](https://github.com/ecojust/open-office/releases/tag/desktop-v0.8.0-38691848013) 公开发布。[0.8.1](releases/0.8.1.md) 将内层界面限定为编辑工具，文件操作统一由 Open Office 外壳处理。旧基础 Rust 内核与测试属于历史路径，不能代替当前默认编辑器的验收。
 
 ## 本地开发
 
@@ -56,11 +56,15 @@ npm run test:browser:ppt-independent
 npm run word:build
 npm run word:check
 npm run test:browser:wordcraft
+node tests/browser/wordcraft-embedded-ui.cjs
+node tests/browser/wordcraft-native-helper.cjs
 ```
 
 构建脚本 `scripts/build-wordcraft.mjs` 使用锁定的 Cargo 依赖和 `wasm-bindgen 0.2.129`，生成 `public/wordcraft/` 下的 JS、WASM 与摘要清单；该目录不提交 Git。`word:check` 校验源码／字体及产物哈希，构建成功本身不等于功能验收。首次构建需下载 Rust 依赖，正常编辑不依赖远程 Office 服务。可通过 `WASM_BINDGEN`、`WORDCRAFT_TARGET_DIR` 指定工具和构建缓存路径。
 
 WordCraft 浏览器验收自行启动临时 Vite 与 Chromium，无需另开开发服务器；运行前须安装 Playwright Chromium，并确保 `python3` 可以导入 PyMuPDF（`fitz`），以独立读取导出的 PDF。核心检查器直接调用 `python3`，仅设置 `PYTHON` 不能替代这一要求；使用虚拟环境时先激活环境。可用 `WORDCRAFT_OUTPUT` 指定独立报告目录，保留每轮的源码摘要、导出工件和失败证据。
+
+0.8.1 的本地生产构建及三套浏览器验收通过：编辑区与外壳专项 4 组、完整文字回归 9 组、安装包自检逻辑的浏览器复用检查 6 项。第三套报告明确标记为浏览器传输，不计作原生 WebView 通过；三平台安装包仍须执行发布工作流中的独立检查。
 
 上游字体、断词数据、WordCraft 与 craft-ui 许可原文在 `public/legal/wordcraft/`，来源固定到具体提交。本地桥接、字体适配和上游修改随本仓库源码分发。详见[第三方声明](../THIRD_PARTY_NOTICES.md)。
 
@@ -140,7 +144,7 @@ node scripts/benchmark-word-package.cjs
 
 脚本自行启动临时服务，使用原始 LibreOffice 小文件及 100／1,000／4,000 段合成正文；运行时应暂停其他浏览器测试和编译。此项不测真实 Tauri IPC 或整份文稿的打开、保存时间。参见[测量范围和结果](word-package-performance.md)。
 
-桌面发布工作流仅由 `workflow_dispatch` 触发。选择 `platform=all` 与 `publish=true`，三种安装包通过本次构建及应用内自检后，才发布测试版；源码推送本身不会自动发布。0.8.0 本轮使用 `platform=all`、`publish=false`，构建并验证安装包，不公开发布。默认 WordCraft 的真实 WebView 自动检查已接入必要门槛，实际三平台结果仍待本轮 Actions；历史版本通过记录不能替代它。
+桌面发布工作流由 `workflow_dispatch` 触发。选择 `platform=all` 与 `publish=true`，Windows x64、macOS ARM64 与 macOS Intel 安装包通过本次构建及必要自检后，才公开测试版。[0.8.0 已公开发布](https://github.com/ecojust/open-office/releases/tag/desktop-v0.8.0-38691848013)；0.8.1 的逐平台结果以本轮 Actions 为准。默认文字工作区的真实 WebView 自动检查属于必要门槛，历史版本与本地浏览器通过记录不能代替它。
 
 发布检查包括实际启动、文档编辑、保存重开与 PDF 独立回读。Windows x64 与 macOS ARM64 使用对应平台的真实应用；Intel 安装包原生编译后，将原封 DMG 转移到 ARM Mac，通过 Rosetta 验证 x64 应用和 PDF 进程。搬运前后校验安装包、应用文件、链接与签名，不重新构建或签名。该检查不等同于真实 Intel 显卡测试。
 

@@ -23,8 +23,12 @@ const _: () = assert!(BIG_ICON_Y + 16.0 <= BIG_LABEL_Y);
 /// Shortcut text for a command (`⌘B` on macOS, `Ctrl+B` elsewhere): its first key in effect,
 /// custom keys included (Customize Keyboard).
 pub fn shortcut_text(app: &WordApp, id: &str) -> String {
+    if app.services.embedded_editor && id == "file.saveAs" {
+        return key_text("Mod+Shift+S");
+    }
     let keys = app.session.keymap.keys_for(&app.session.registry, id);
-    keys.first().map(|k| key_text(k)).unwrap_or_default()
+    keys.iter().find(|k| !app.services.embedded_editor || !matches!(k.as_str(), "Mod+Shift+S" | "Ctrl+Shift+S"))
+        .map(|k| key_text(k)).unwrap_or_default()
 }
 
 /// A key as the platform writes it (`⌘⇧K` on macOS, `Ctrl+Shift+K` elsewhere).
@@ -394,6 +398,7 @@ pub fn command_icon(id: &str) -> &str {
 /// Right-click on a command's button: put it on (or take it off) the Quick Access Toolbar, or
 /// open Customize Ribbon (#379).
 pub fn command_menu(resp: &Response, app: &mut WordApp, id: &str) {
+    if app.services.embedded_editor { return; }
     resp.context_menu(|ui| {
         let known = app.session.registry.get(id).is_some();
         let on_qat = app.session.ribbon.qat().contains(&id);
@@ -414,6 +419,7 @@ pub fn command_menu(resp: &Response, app: &mut WordApp, id: &str) {
 
 /// "Customize the Ribbon…" and "Customize Quick Access Toolbar…" (context menus).
 pub fn customize_menu_items(ui: &mut Ui, app: &mut WordApp) {
+    if app.services.embedded_editor { return; }
     if ui.button(tl!("Customize the Ribbon…")).clicked() {
         crate::dialogs_ribbon::open(app, crate::dialogs_ribbon::Page::Ribbon);
         ui.close();

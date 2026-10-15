@@ -94,7 +94,7 @@ pub fn tab_letter(tab: &str) -> &'static str {
 
 /// The tabs that carry a badge, in display order.
 pub fn badge_tabs(app: &WordApp) -> Vec<&'static str> {
-    let mut v: Vec<&'static str> = TAB_LETTERS.iter().filter(|(_, l)| !l.is_empty()).map(|(t, _)| *t).collect();
+    let mut v: Vec<&'static str> = TAB_LETTERS.iter().filter(|(tab, l)| !l.is_empty() && (!app.services.embedded_editor || crate::embedding::tab_visible(tab))).map(|(t, _)| *t).collect();
     if crate::ribbon::in_table_public(app) {
         v.extend_from_slice(&["Table Design", "Table Layout"]);
     }
@@ -600,6 +600,11 @@ pub(crate) fn qat_label(index: usize, count: usize) -> String {
 }
 
 fn qat_key(app: &mut WordApp, name: &str) {
+    if app.services.embedded_editor {
+        app.ui.keytips = Phase::Off;
+        app.ui.keytip_prefix.clear();
+        return;
+    }
     app.ui.keytip_prefix.push_str(name);
     let ids = app.session.ribbon.qat();
     let mut hit = None;

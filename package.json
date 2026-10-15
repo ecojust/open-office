@@ -1,6 +1,6 @@
 {
   "name": "open-office",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -72,6 +72,7 @@
     "word:build": "node scripts/build-wordcraft.mjs",
     "word:check": "node scripts/build-wordcraft.mjs --check",
     "test:browser:word-engine": "node tests/browser/wordcraft-engine.cjs",
+    "test:browser:word-embedded": "node tests/browser/wordcraft-embedded-ui.cjs",
     "test:browser:wordcraft": "node tests/browser/wordcraft-engine.cjs",
     "test:native:word-engine": "node scripts/rust-word-native-smoke.mjs"
   },

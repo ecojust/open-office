@@ -196,11 +196,13 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     // contextual ones (the Outlining tab right after File). A contextual tab (Table, Picture
     // Format) may be stored while the selection moved away, and a tab may have been hidden.
     let user_tabs = app.session.ribbon.tabs().into_owned();
-    let mut tabs: Vec<(String, bool)> = vec![("File".to_string(), false)];
-    tabs.extend(user_tabs.iter().filter(|e| !e.hidden).map(|e| (e.name.clone(), e.custom)));
+    let embedded = app.services.embedded_editor;
+    let mut tabs: Vec<(String, bool)> = if embedded { Vec::new() } else { vec![("File".to_string(), false)] };
+    tabs.extend(user_tabs.iter().filter(|e| !e.hidden && (!embedded || (!e.custom && crate::embedding::tab_visible(&e.name))))
+        .map(|e| (e.name.clone(), e.custom)));
     for ct in contextual_tabs(&app.session) {
         if ct == "Outlining" {
-            tabs.insert(1.min(tabs.len()), (ct.to_string(), false));
+            tabs.insert(if embedded { 0 } else { 1.min(tabs.len()) }, (ct.to_string(), false));
         } else if !tabs.iter().any(|(n, _)| n == ct) {
             tabs.push((ct.to_string(), false));
         }
@@ -227,22 +229,27 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                     }
                     // Share, Editing mode, Comments, drawn first so the tabs get only the room
                     // left of them (#897).
-                    let share = tl!("Share");
-                    let share_w = ui.ctx().fonts_mut(|f| f.layout_no_wrap(share.to_string(), medium(12.0), t.text).size().x);
-                    let (r, resp) = ui.allocate_exact_size(vec2((share_w + 36.0).max(74.0), 24.0), Sense::click());
-                    ui.painter().rect_filled(r, 4.0, if resp.hovered() { t.accent_text } else { t.accent });
-                    icons::paint(
-                        ui.painter(),
-                        Rect::from_center_size(pos2(r.min.x + 14.0, r.center().y), vec2(14.0, 14.0)),
-                        "share",
-                        t.on_accent,
-                        t.on_accent,
-                    );
-                    ui.painter().text(pos2(r.min.x + 26.0, r.center().y), Align2::LEFT_CENTER, share, medium(12.0), t.on_accent);
-                    if resp.on_hover_text(tl!("Export a copy to share (PDF, Word document)")).clicked() {
-                        let _ = app.run("ui.backstage", json!({"value": true, "page": "export"}));
+                    if embedded {
+                        crate::chrome::editing_history(ui, app);
+                    } else {
+                        let share = tl!("Share");
+                        let share_w = ui.ctx().fonts_mut(|f| f.layout_no_wrap(share.to_string(), medium(12.0), t.text).size().x);
+                        let (r, resp) = ui.allocate_exact_size(vec2((share_w + 36.0).max(74.0), 24.0), Sense::click());
+                        ui.painter().rect_filled(r, 4.0, if resp.hovered() { t.accent_text } else { t.accent });
+                        icons::paint(
+                            ui.painter(),
+                            Rect::from_center_size(pos2(r.min.x + 14.0, r.center().y), vec2(14.0, 14.0)),
+                            "share",
+                            t.on_accent,
+                            t.on_accent,
+                        );
+                        ui.painter().text(pos2(r.min.x + 26.0, r.center().y), Align2::LEFT_CENTER, share, medium(12.0), t.on_accent);
+                        crate::embedding::record(ui.ctx(), "share", share, "", r);
+                        if resp.on_hover_text(tl!("Export a copy to share (PDF, Word document)")).clicked() {
+                            let _ = app.run("ui.backstage", json!({"value": true, "page": "export"}));
+                        }
+                        ui.add_space(6.0);
                     }
-                    ui.add_space(6.0);
                     let track = app.session.doc.settings.track_changes;
                     let mode =
                         crate::widgets::icon_text_menu_button(ui, "pencil", if track { tl!("Reviewing") } else { tl!("Editing") }, regular(12.0));
@@ -282,6 +289,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                             let shown = if custom { tab } else { tl!(tab) };
                             let w = ui.ctx().fonts_mut(|f| f.layout_no_wrap(shown.to_string(), medium(12.5), t.text).size().x) + 18.0;
                             let (r, resp) = ui.allocate_exact_size(vec2(w, 30.0), Sense::click());
+                            crate::embedding::record(ui.ctx(), &format!("tab:{tab}"), shown, crate::keytips::tab_letter(tab), r);
                             if app.ui.keytips == crate::keytips::Phase::Tabs {
                                 crate::keytips::record_tab(r, tab, &app.ui.keytip_prefix, &mut app.keytip_rects);
                             }
@@ -380,7 +388,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
                         "Chart Design" => chart_design(app, ui),
                         _ => home(app, ui),
                     }
-                    if let Some(e) = entry {
+                    if let Some(e) = entry.filter(|_| !embedded) {
                         custom_groups(app, ui, &e.groups);
                     }
                 });
@@ -675,7 +683,9 @@ pub(crate) fn language_menu(ui: &mut Ui, app: &mut WordApp) {
     mi_check(ui, app, "Do Not Check Spelling or Grammar", no_proof, "review.language", json!({"noProof": !no_proof}));
     ui.separator();
     mi_check(ui, app, "Set Proofing Language…", false, "review.language", json!({}));
-    mi_check(ui, app, "Language Preferences…", false, "file.options", json!({"pane": "language"}));
+    if !app.services.embedded_editor {
+        mi_check(ui, app, "Language Preferences…", false, "file.options", json!({"pane": "language"}));
+    }
 }
 
 /// The Language menu's check marks for the `current` tag: which short-list entries are checked

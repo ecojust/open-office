@@ -20,6 +20,7 @@ type Bindings = { default(options: { module_or_path: URL }): Promise<unknown>; c
 let runtime: Promise<WordcraftHost> | undefined, host: WordcraftHost | undefined
 let canvas: HTMLCanvasElement | undefined, parking: HTMLElement | undefined, started: Promise<void> | undefined
 let activeId: string | undefined, activation = 0, interactive = false, compositionId: string | undefined
+let activationSessionId: string | undefined
 let textAgent: HTMLInputElement | undefined, disableTimer: ReturnType<typeof setTimeout> | undefined
 let queue: Promise<void> = Promise.resolve()
 const sessions = new Map<string, RustWordSession>()
@@ -103,6 +104,7 @@ export class RustWordSession {
   async attach(container: HTMLElement, enabled: boolean): Promise<void> {
     this.desiredInteractive = enabled
     const token = ++activation
+    activationSessionId = this.id
     await serialize(async () => {
       this.assertOpen()
       const api = await getHost()
@@ -142,9 +144,11 @@ export class RustWordSession {
     if (enabled || compositionId !== this.id) host?.setActive(enabled)
   }
   deactivate() {
-    if (activeId !== this.id) return
-    ++activation
+    // An old tab can unmount while the next tab's attach is awaiting its turn.
+    // Cancel only this session's own request, never the newer tab's activation.
+    if (activationSessionId === this.id) { ++activation; activationSessionId = undefined }
     this.setInteractive(false)
+    if (activeId !== this.id) return
     if (document.activeElement === textAgent || document.activeElement === canvas) (document.activeElement as HTMLElement).blur()
   }
   focus() { if (activeId === this.id && interactive) canvas?.focus({ preventScroll: true }) }
@@ -214,7 +218,8 @@ export class RustWordSession {
       sessions.delete(this.id)
       this.listeners.clear(); this.eventListeners.clear()
       if (activeId === this.id) {
-        activeId = undefined; interactive = false; ++activation
+        activeId = undefined; interactive = false
+        if (activationSessionId === this.id) { ++activation; activationSessionId = undefined }
         api.setActive(false)
         if (canvas) parkingElement().append(canvas)
         if (textAgent) parkingElement().append(textAgent)

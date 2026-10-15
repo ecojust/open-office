@@ -2235,3 +2235,5 @@
 # Table Layout › Formula dialog (#1210)
 	Formula:	公式：
 	Paste function:	粘贴函数：
+
+	No spelling dictionary for {language} is installed, so it isn't checked.	尚未安装{language}的拼写词典，暂不检查该语言的拼写。

@@ -82,14 +82,53 @@ async function newDocument() {
   await idle();
 }
 async function openFile(file, shortcut = false) {
-  const choice = page.waitForEvent('filechooser');
-  if (shortcut) { await focusDocument(); await page.keyboard.press('Control+o'); }
-  else await page.locator('.command-bar').getByRole('button', { name: '打开', exact: true }).click();
-  await (await choice).setFiles(file);
+  const diagnostic = async (stage, details) => {
+    const dom = await page.evaluate(() => {
+      const app = document.querySelector('#app')?.__vue_app__?._instance?.setupState;
+      const node = document.activeElement;
+      const canvas = document.querySelector('[data-testid="wordcraft-canvas"]');
+      return {
+        activeElement: { tag: node?.tagName, testid: node?.getAttribute('data-testid'), text: node?.textContent?.slice(0, 160) },
+        canvas: canvas && { parentTestid: canvas.parentElement?.getAttribute('data-testid'),
+          parking: !!canvas.closest('[data-wordcraft-parking]'),
+          ownerSession: canvas.closest('[data-testid="rust-word-editor"]')?.getAttribute('data-session-id'),
+          rect: canvas.getBoundingClientRect().toJSON() },
+        app: app ? { activeKey: app.activeKey, home: app.home, busy: app.busy, help: app.help,
+          active: app.active && { id: app.active.document?.id, name: app.active.document?.name, ready: app.active.ready, dirty: app.active.dirty },
+          closeTarget: typeof app.closeTarget === 'string' ? app.closeTarget : app.closeTarget?.document?.id ?? null,
+          saveAs: app.saveAsDraft && { name: app.saveAsDraft.name, format: app.saveAsDraft.format } } : null,
+      };
+    });
+    let session;
+    try { session = await inspectSession(); } catch (error) { session = { error: error.message }; }
+    report.openFileDiagnostics ||= [];
+    report.openFileDiagnostics.push({ file: path.basename(file), shortcut, stage, atUtc: new Date().toISOString(), details, dom, session });
+    persist();
+  };
+  await diagnostic('before-open');
+  try {
+    if (shortcut) await focusDocument(diagnostic);
+    const [choice] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      (async () => {
+        if (shortcut) {
+          await diagnostic('before-Control+o');
+          await page.keyboard.press('Control+o');
+          await diagnostic('after-Control+o');
+        } else await page.locator('.command-bar').getByRole('button', { name: '打开', exact: true }).click();
+      })(),
+    ]);
+    await diagnostic('chooser-opened');
+    await choice.setFiles(file);
+  } catch (error) {
+    await diagnostic('open-failed', { message: error.message });
+    throw error;
+  }
 }
-async function saveFile(filename) {
+async function saveFile(filename, trigger) {
   const pending = page.waitForEvent('download');
-  await page.locator('.command-bar').getByRole('button', { name: '保存', exact: true }).click();
+  if (trigger) await trigger();
+  else await page.locator('.command-bar').getByRole('button', { name: '保存', exact: true }).click();
   const download = await pending, destination = path.join(output, filename);
   assert.match(download.suggestedFilename(), /\.docx$/i);
   await download.saveAs(destination); await idle();
@@ -121,7 +160,8 @@ async function selectAll() {
   await page.keyboard.press('Control+a');
   return waitState(value => JSON.stringify(value.selection.anchor) !== JSON.stringify(value.selection.focus), 'Ctrl+A establishes a real Rust text selection before the next operation');
 }
-async function focusDocument() {
+async function focusDocument(diagnostic) {
+  if (diagnostic) await diagnostic('focus-wait-layout');
   const state = await waitState(value => value.ui?.pages?.length > 0, 'Actual Rust canvas completes its first page layout');
   const box = await canvas().boundingBox();
   assert.ok(box && state.ui.pages.length, 'Rust supplies a visible page and actual canvas');
@@ -133,10 +173,13 @@ async function focusDocument() {
     const node = document.elementFromPoint(x, y);
     return { tag: node?.tagName, testid: node?.getAttribute('data-testid') };
   }, { x: box.x + target.x, y: box.y + target.y });
+  if (diagnostic) await diagnostic('focus-before-click', { box, target, hit });
   assert.equal(hit.testid, 'wordcraft-canvas', 'Focus click must reach the actual canvas');
   await page.mouse.click(box.x + target.x, box.y + target.y);
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  if (diagnostic) await diagnostic('focus-after-click');
   await waitState(value => value.ui.focused, 'Actual canvas receives document focus');
+  if (diagnostic) await diagnostic('focus-ready');
 }
 async function insertText(text, expected) {
   await page.keyboard.insertText(text);
@@ -512,16 +555,226 @@ async function uiTests() {
   pass('Actual import/save and PDF export retain independently authored text, table cells, image bytes, headers/footers and PAGE field');
 }
 
-async function main() {
+async function embeddedUiTests() {
+  enterPhase('embedded-editor-chrome');
+  assert.doesNotMatch(await page.locator('.create-card.word').innerText(), /wordcraft/i, 'The workbench names the product, not its implementation');
+  await newDocument();
+  const downloads = [], fileChoosers = [];
+  page.on('download', value => downloads.push(value.suggestedFilename()));
+  page.on('filechooser', value => fileChoosers.push(value));
+  const frame = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const shellText = async () => {
+    assert.doesNotMatch(await page.locator('body').innerText(), /wordcraft/i, 'Visible application chrome contains no upstream brand');
+    for (const id of ['shell-new-word', 'shell-open', 'shell-save', 'shell-save-as', 'shell-export-pdf', 'shell-print']) {
+      assert.equal(await page.getByTestId(id).count(), 1, 'Exactly one shell file control: ' + id);
+      assert.equal(await page.getByTestId(id).isVisible(), true, 'Shell file control remains accessible: ' + id);
+    }
+  };
+  const inspectChrome = async () => {
+    const value = await waitState(state => state.ui?.ribbonTabs?.length > 0 && state.ui?.drawnChrome?.length > 0, 'Actual rendered editor chrome and tab geometry');
+    const tabs = value.ui.ribbonTabs;
+    assert.ok(tabs.some(tab => tab.id === 'Home'), 'The real editing ribbon remains mounted');
+    assert.ok(tabs.some(tab => tab.id === 'Insert'), 'Insertion tools remain available');
+    for (const tab of tabs) {
+      assert.doesNotMatch(tab.label, /^(?:File|Help)$|\b(?:wordcraft|backstage)\b/i, 'Embedded ribbon excludes file/help/brand tabs');
+      assert.doesNotMatch(tab.id, /^(?:File|Help)$|\b(?:wordcraft|backstage)\b/i, 'Embedded ribbon excludes file/help/brand tab identities');
+      assert.equal(tab.rect.length, 4);
+      assert.ok(tab.rect.every(Number.isFinite) && tab.rect[2] > 0 && tab.rect[3] > 0, 'Tab evidence comes from an actual rendered widget');
+    }
+    for (const widget of value.ui.drawnChrome) {
+      assert.ok(widget.id.startsWith('tab:') || ['quickAccess:edit.undo', 'quickAccess:edit.redo'].includes(widget.id), 'Actual embedded chrome contains editing controls only: ' + widget.id);
+      assert.ok(!['tab:File', 'tab:Help'].includes(widget.id), 'Actual painted chrome excludes file and help tabs');
+      assert.doesNotMatch(widget.label, /wordcraft/i, 'Actual canvas chrome contains no upstream brand');
+      assert.ok(widget.rect.every(Number.isFinite) && widget.rect[2] > 0 && widget.rect[3] > 0, 'Chrome evidence must have real painted geometry');
+    }
+    assert.ok(value.ui.drawnChrome.some(widget => widget.id === 'quickAccess:edit.undo'), 'Compact editing undo remains rendered');
+    assert.ok(value.ui.drawnChrome.some(widget => widget.id === 'quickAccess:edit.redo'), 'Compact editing redo remains rendered');
+    assert.equal(value.ui.ui.backstage, false, 'Embedded Word has no open independent file workspace');
+    return value;
+  };
+  await shellText();
+  const initialChrome = await inspectChrome();
+  report.embeddedChrome = { initial: { tabs: initialChrome.ui.ribbonTabs, chrome: initialChrome.ui.drawnChrome } };
+  const sample = '统一文档工作区\n文字排版、表格与图片均在这里编辑。中文😀';
+  await focusDocument(); await insertText(sample.split('\n')[0], sample.split('\n')[0]);
+  await page.keyboard.press('Enter'); await insertText(sample.split('\n')[1], sample);
+  await selectAll();
+  await clickRibbon('format.bold'); await clickRibbon('format.italic'); await clickRibbon('format.underline');
+  const beforeHidden = await inspectSession(), beforeDownloads = downloads.length, beforeChoosers = fileChoosers.length;
+  await page.keyboard.press('F10'); await frame(); await page.keyboard.press('f'); await frame();
+  assert.equal((await inspectChrome()).text, sample, 'Removed File keytip cannot navigate to an independent file screen or insert text');
+  await page.keyboard.press('Escape'); await frame();
+  await page.keyboard.press('F10'); await frame(); await page.keyboard.press('1'); await frame();
+  await page.keyboard.press('Escape'); await frame();
+  await page.keyboard.press('F1'); await frame();
+  assert.equal((await inspectSession()).ui.dialog, null, 'The removed help shortcut cannot open an upstream About/Help dialog');
+  await page.keyboard.press('Escape'); await frame();
+  const afterHidden = await inspectChrome();
+  for (const key of ['documentId', 'revision', 'text', 'dirty']) assert.deepEqual(afterHidden[key], beforeHidden[key], 'Hidden file/QAT entry points cannot change ' + key);
+  assert.equal(downloads.length, beforeDownloads, 'Removed QAT keytips cannot independently save a document');
+  assert.equal(fileChoosers.length, beforeChoosers, 'Removed file keytips cannot independently open a document');
+  report.embeddedCommandSearch = [];
+  for (const query of ['', 'file', 'save', 'about', 'print', 'discord', 'bold']) {
+    await focusDocument(); await page.keyboard.press('Alt+q');
+    await waitState(value => value.ui.dialog?.dialog === 'commands', 'Real command-search shortcut opens the editing search');
+    if (query) await page.keyboard.type(query);
+    await waitState(value => value.ui.dialog?.dialog === 'commands' && value.ui.dialog.query === query, 'Real command-search input receives ' + JSON.stringify(query));
+    await frame();
+    const searching = await inspectSession();
+    const hits = searching.ui.drawnChrome.filter(widget => widget.id.startsWith('command:'));
+    for (const hit of hits) {
+      const id = hit.id.slice('command:'.length);
+      assert.ok(!id.startsWith('file.') || ['file.properties', 'file.accessibility', 'file.printMarkup', 'file.setAuthor'].includes(id), 'Command search cannot reveal independent file actions: ' + id);
+      assert.doesNotMatch(id, /^help\.|^ui\.(?:backstage|print|printSubmit|printSettings|openFileDialog|fileBrowser|makeDefaultApp|discord|saveChanges|startScreen)$|^tools\.customize/);
+      assert.doesNotMatch(hit.label, /wordcraft/i, 'Command-search results contain no upstream brand');
+    }
+    if (query === 'bold') assert.ok(hits.some(hit => hit.id === 'command:format.bold'), 'Editing commands remain discoverable in real search');
+    report.embeddedCommandSearch.push({ query, hits, text: searching.text, revision: searching.revision });
+    persist();
+    await page.keyboard.press('Escape');
+    const closedSearch = await waitState(value => value.ui.dialog === null, 'Escape closes command search');
+    assert.equal(closedSearch.text, beforeHidden.text, 'Command search must not insert its query into the document: ' + JSON.stringify(query));
+    assert.equal(closedSearch.revision, beforeHidden.revision, 'Command search must not mutate the document revision: ' + JSON.stringify(query));
+  }
+  const afterSearch = await inspectSession();
+  for (const key of ['documentId', 'revision', 'text', 'dirty']) assert.deepEqual(afterSearch[key], beforeHidden[key], 'Searching hidden file/brand commands cannot change ' + key);
+  await shellText();
+  await page.screenshot({ path: path.join(output, 'open-office-word-desktop.png') });
+  pass('Embedded canvas exposes real editing tabs and B/I/U controls, with no File/Help entry, file keytips or visible upstream branding');
+
+  enterPhase('shell-save-shortcuts-and-dirty-state');
+  const initial = await inspectSession(), originalId = initial.sessionId;
+  assert.equal(initial.dirty, true);
+  assert.equal(await page.locator('.save-state').innerText(), '尚未保存');
+  await focusDocument();
+  const firstDownload = downloads.length;
+  const saved = await saveFile('shell-shortcut-save.docx', () => page.keyboard.press('Control+s'));
+  assert.equal(downloads.length, firstDownload + 1, 'Ctrl+S delivers one shell save, without a second internal save');
+  assert.equal(bodyText(saved.inspected), sample);
+  for (const character of bodyParagraphs(saved.inspected).flatMap(paragraph => paragraph.characters)) {
+    assert.equal(character.bold, true); assert.equal(character.italic, true); assert.equal(character.underline, 'single');
+  }
+  await waitState(value => value.sessionId === originalId && !value.dirty, 'Only the exported Rust revision becomes clean');
+  assert.equal(await page.locator('.save-state').innerText(), '已保存');
+  assert.equal(await page.locator('.document-tab.active .dirty-dot').count(), 0);
+  await page.getByTestId('shell-save').focus();
+  const beforeShellSave = downloads.length;
+  const shellFocusedSave = await saveFile('shell-focused-shortcut-save.docx', () => page.keyboard.press('Control+s'));
+  assert.equal(downloads.length, beforeShellSave + 1, 'Ctrl+S with shell focus delivers exactly one document save');
+  assert.equal(bodyText(shellFocusedSave.inspected), sample, 'Shell-focused Ctrl+S saves the document, not the browser page');
+  const deliveredBeforeCancel = downloads.length;
+  const beforeSaveAs = await inspectSession();
+  await focusDocument(); await page.keyboard.press('Control+Shift+s');
+  const saveAs = page.getByTestId('save-format-dialog'); await saveAs.waitFor();
+  assert.equal(await saveAs.count(), 1, 'Save As uses the sole Open Office dialog');
+  assert.equal((await inspectSession()).ui.dialog, null, 'Save As does not open an embedded Rust dialog');
+  await page.getByTestId('save-format-name').fill('外壳另存副本');
+  await page.keyboard.press('Escape'); await saveAs.waitFor({ state: 'hidden' });
+  const canceled = await inspectSession();
+  for (const key of ['documentId', 'revision', 'text', 'dirty']) assert.deepEqual(canceled[key], beforeSaveAs[key], 'Canceled shell Save As keeps ' + key);
+  assert.equal(downloads.length, deliveredBeforeCancel, 'Canceling Save As writes nothing');
+  await focusDocument(); await page.keyboard.press('F12'); await saveAs.waitFor();
+  assert.equal((await inspectSession()).ui.dialog, null, 'F12 routes Save As through the shell, not an embedded file screen');
+  await page.keyboard.press('Escape'); await saveAs.waitFor({ state: 'hidden' });
+  assert.equal(downloads.length, deliveredBeforeCancel, 'Canceled F12 Save As writes nothing');
+  await page.getByTestId('shell-save-as').click(); await saveAs.waitFor();
+  await page.getByTestId('save-format-name').fill('外壳另存副本');
+  const copy = await saveFile('shell-save-as.docx', () => page.getByTestId('save-format-confirm').click());
+  assert.equal(bodyText(copy.inspected), sample);
+  assert.equal(await editor().getAttribute('data-session-id'), originalId, 'Save As keeps the existing Rust editing session');
+  assert.equal(await page.locator('.save-state').innerText(), '已保存');
+  pass('Shell Ctrl+S saves once, Save As cancellation preserves the document, and successful delivery updates the sole visible saved state');
+
+  enterPhase('shell-new-open-and-close');
+  await focusDocument(); await page.keyboard.press('Control+End');
+  await insertText(' 未保存修改', sample + ' 未保存修改');
+  const originalName = await page.locator('.document-tab.active .tab-name').innerText();
+  const originalText = (await inspectSession()).text, tabsBefore = await page.locator('.document-tab').count();
+  await page.keyboard.press('Control+n');
+  await page.waitForFunction(expected => document.querySelectorAll('.document-tab').length === expected, tabsBefore + 1);
+  await idle();
+  const blank = await inspectSession();
+  assert.notEqual(blank.sessionId, originalId); assert.equal(blank.text, '');
+  assert.equal((await inspectSession(originalId)).text, originalText); assert.equal((await inspectSession(originalId)).dirty, true);
+  const discardBlank = async () => {
+    const id = (await inspectSession()).sessionId;
+    await page.locator('.document-tab.active .tab-close').click();
+    const dialog = page.getByRole('dialog', { name: '保存你的修改？' });
+    await dialog.waitFor(); await dialog.getByRole('button', { name: '不保存', exact: true }).click(); await idle();
+    await assert.rejects(() => inspectSession(id), 'The shell close destroys only its target session');
+  };
+  await discardBlank();
+  await page.getByTestId('shell-new-word').click();
+  await page.waitForFunction(expected => document.querySelectorAll('.document-tab').length === expected, tabsBefore + 1);
+  await idle(); assert.equal((await inspectSession()).text, ''); await discardBlank();
+  await page.locator('.document-tab .tab-name').filter({ hasText: originalName }).click(); await idle();
+  await page.locator('.document-tab.active .tab-close').click();
+  const closeDialog = page.getByRole('dialog', { name: '保存你的修改？' }); await closeDialog.waitFor();
+  await closeDialog.getByRole('button', { name: '取消', exact: true }).click();
+  assert.equal((await inspectSession()).text, originalText); assert.equal((await inspectSession()).dirty, true);
+  const chooserCount = fileChoosers.length;
+  await openFile(copy.file, true); await idle();
+  assert.equal(fileChoosers.length, chooserCount + 1, 'Ctrl+O routes once to the shell file chooser');
+  assert.notEqual((await inspectSession()).sessionId, originalId); assert.equal((await inspectSession()).text, sample);
+  assert.equal((await inspectSession(originalId)).text, originalText); assert.equal((await inspectSession(originalId)).dirty, true);
+  await page.getByTestId('shell-open').focus();
+  const beforeShellOpen = fileChoosers.length, shellChooser = page.waitForEvent('filechooser');
+  await page.keyboard.press('Control+o'); await (await shellChooser).setFiles(copy.file); await idle();
+  assert.equal(fileChoosers.length, beforeShellOpen + 1, 'Ctrl+O with shell focus reaches exactly one application file chooser');
+  assert.equal((await inspectSession()).text, sample);
+  assert.equal((await inspectSession(originalId)).text, originalText); assert.equal((await inspectSession(originalId)).dirty, true);
+  await shellText(); await inspectChrome();
+  pass('Shell new button and Ctrl+N create distinct tabs, close cancellation retains dirty text, and Ctrl+O opens a copy without replacing unsaved work');
+
+  enterPhase('shell-pdf-and-print');
+  await focusDocument(); await page.keyboard.press('Control+End'); await insertText(' 打印与导出', sample + ' 打印与导出');
+  const beforePdf = await inspectSession();
+  const pdf = await exportPdf('shell-export.pdf');
+  assert.ok(pdf.pages.map(value => value.text).join('\n').replace(/\s/g, '').includes(beforePdf.text.replace(/\s/g, '')));
+  assert.equal((await inspectSession()).dirty, true, 'PDF export does not mark unsaved DOCX content clean');
+  assert.equal(await page.locator('.save-state').innerText(), '尚未保存');
+  await shellText(); await inspectChrome();
+  await page.screenshot({ path: path.join(output, 'open-office-word-complete.png') });
+  await page.setViewportSize({ width: 900, height: 900 }); await frame();
+  await page.screenshot({ path: path.join(output, 'open-office-word-narrow.png') });
+  await page.setViewportSize({ width: 1440, height: 1050 }); await frame();
+  const inspectPrintedPdf = async filename => {
+    const printFrame = page.locator('iframe[title="文稿打印预览"]');
+    await printFrame.waitFor({ state: 'attached' });
+    assert.equal(await printFrame.count(), 1, 'Print uses one shell-owned local PDF preview');
+    const url = await printFrame.getAttribute('src'); assert.match(url, /^blob:/);
+    const bytes = await page.evaluate(async url => Array.from(new Uint8Array(await (await fetch(url)).arrayBuffer())), url);
+    const destination = path.join(output, filename); fs.writeFileSync(destination, Buffer.from(bytes)); recordFile(destination, { kind: 'Actual shell print PDF blob' });
+    const printed = inspectPdf(destination), text = printed.pages.map(value => value.text).join('\n');
+    assert.ok(text.replace(/\s/g, '').includes(beforePdf.text.replace(/\s/g, '')), 'Print consumes the actual Rust PDF with the edited Chinese text');
+    assert.equal((await inspectSession()).dirty, true, 'Printing does not clear unsaved DOCX state');
+    return url;
+  };
+  await page.getByTestId('shell-print').click();
+  const previousPrint = await inspectPrintedPdf('shell-button-print.pdf');
+  await focusDocument(); await page.keyboard.press('Control+p');
+  await page.waitForFunction(previous => {
+    const frame = document.querySelector('iframe[title="文稿打印预览"]');
+    return frame && frame.getAttribute('src') !== previous;
+  }, previousPrint);
+  await inspectPrintedPdf('shell-shortcut-print.pdf');
+  pass('Shell PDF export and print button/Ctrl+P consume real selectable Rust PDFs while preserving unsaved document state');
+  const finalChrome = await inspectChrome();
+  report.embeddedChrome.final = { tabs: finalChrome.ui.ribbonTabs, chrome: finalChrome.ui.drawnChrome };
+  report.shellFileEvents = { downloads, fileChoosers: fileChoosers.length };
+}
+
+async function main({ scope = 'full' } = {}) {
   try {
     productFiles = products();
-    testFiles = [__filename, path.join(root, 'tests/wordcraft-core.test.mjs'), ...filesUnder(corpus)];
+    testFiles = [__filename, path.join(root, 'tests/browser/wordcraft-embedded-ui.cjs'), path.join(root, 'tests/wordcraft-core.test.mjs'), ...filesUnder(corpus)];
     report.productsBefore = hashes(productFiles); report.testsBefore = hashes(testFiles); persist();
     assert.ok(fs.existsSync(path.join(root, 'public/wordcraft/wordcraft_bg.wasm')), 'Build the real WordCraft WASM before running acceptance');
     report.artifactCheck = execFileSync(process.execPath, [path.join(root, 'scripts/build-wordcraft.mjs'), '--check'], { cwd: root, encoding: 'utf8' }).trim();
     phase = 'start-browser'; await startBrowser();
     const failures = [];
-    for (const run of [coreTests, uiTests]) {
+    report.scope = scope === 'embedded' ? 'Actual embedded editing ribbon and Open Office file shell, using local WASM, browser events and independent DOCX/PDF inspection' : report.scope;
+    for (const run of scope === 'embedded' ? [embeddedUiTests] : [coreTests, uiTests]) {
       try { await run(); }
       catch (error) {
         failures.push({ phase, message: error.message, stack: error.stack });
@@ -554,4 +807,5 @@ async function main() {
     if (server) await server.close();
   }
 }
+module.exports = { main };
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1043,6 +1043,9 @@ impl Dialog {
     }
 
     pub fn open(name: &str, app: &mut WordApp) -> Option<Dialog> {
+        if app.services.embedded_editor && !crate::embedding::dialog_visible(name) {
+            return None;
+        }
         if let Some(d) = crate::dialogs_insert::open(name, app) {
             return Some(Dialog::Insert(Box::new(d)));
         }
@@ -2584,13 +2587,18 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             } else {
                 reg.all().iter().filter(|c| command_matches(c, query)).collect()
             };
+            if app.services.embedded_editor {
+                hits.retain(|command| crate::embedding::command_visible(command.id));
+            }
             hits.truncate(14);
             let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
             let mut run: Option<&str> = enter.then(|| hits.first().map(|c| c.id)).flatten();
             for c in &hits {
                 let sc = crate::widgets::shortcut_text(app, c.id);
                 let label = format!("{}   —   {}", tl!(c.label), crate::i18n::location(c.location));
-                if ui.add(egui::Button::new(label).shortcut_text(sc).min_size(vec2(380.0, 0.0))).clicked() {
+                let response = ui.add(egui::Button::new(&label).shortcut_text(sc).min_size(vec2(380.0, 0.0)));
+                crate::embedding::record(ui.ctx(), &format!("command:{}", c.id), &label, "", response.rect);
+                if response.clicked() {
                     run = Some(c.id);
                 }
             }

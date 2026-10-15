@@ -40,6 +40,7 @@ pub mod dialogs_controls;
 pub mod dialogs_insert;
 pub mod dialogs_keyboard;
 pub mod dialogs_layout;
+mod embedding;
 pub mod dialogs_lists;
 pub mod dialogs_notes;
 pub mod dialogs_para;
@@ -92,6 +93,9 @@ pub use file_dialogs::{FileDialogAnswer, FileDialogRequest, open_filters};
 /// Platform services injected by the host (file dialogs, file I/O).
 #[derive(Default)]
 pub struct Services {
+    /// Show only document editing UI. The embedding shell owns title, files, account and help.
+    /// Defaults to false, preserving the standalone application interface.
+    pub embedded_editor: bool,
     /// An embedding shell may own files and tabs. Returning Some intercepts a command before
     /// any dialog, document replacement, download, or saved-state mutation in WordApp.
     /// Returning None preserves the standalone application's normal command handling.
@@ -760,6 +764,9 @@ impl WordApp {
         if let Some(result) = self.services.host_command.as_ref().and_then(|hook| hook(id, &params)) {
             return result;
         }
+        if self.services.embedded_editor && !embedding::command_allowed(id, &params) {
+            return Err("This application operation is managed by the host.".into());
+        }
         if id == "file.recover" && params.as_object().is_none_or(|p| p.is_empty()) {
             self.ui.backstage = true;
             self.ui.backstage_page = "recover".into();
@@ -820,6 +827,9 @@ impl WordApp {
     pub fn execute(&mut self, id: &str, params: Value) -> Result<Value, String> {
         if let Some(result) = self.services.host_command.as_ref().and_then(|hook| hook(id, &params)) {
             return result;
+        }
+        if self.services.embedded_editor && !embedding::command_allowed(id, &params) {
+            return Err("This application operation is managed by the host.".into());
         }
         // A pending Change Picture only survives until the next action (#147).
         if !matches!(id, "ui.changePicture" | "picture.change" | "insert.picture") {
@@ -1237,6 +1247,9 @@ impl WordApp {
             self.nav_search_focus = true;
         }
         if let Some(what) = req.get("open").and_then(Value::as_str) {
+            if self.services.embedded_editor && (matches!(what, "openFile" | "saveAs" | "print" | "options") || !embedding::dialog_visible(what)) {
+                return;
+            }
             match what {
                 "openFile" => self.open_dialog(),
                 "saveAs" => {
@@ -1981,6 +1994,10 @@ impl WordApp {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         let t0 = now_ms();
         let ctx = ui.ctx().clone();
+        embedding::reset_drawn(&ctx);
+        if self.services.embedded_editor {
+            self.ui.backstage = false;
+        }
         i18n::set_current(i18n::Lang::from_pref(&self.ui.language));
         // Animation effects off: egui's scroll areas get a wheel notch whole, not eased in.
         if !self.animations_on() {
@@ -2007,12 +2024,16 @@ impl WordApp {
             backstage::show(self, ui);
         } else if !self.has_document() {
             // No document open (#1129): the ribbon greyed out but for Help, and no page.
-            chrome::title_bar(self, ui);
+            if !self.services.embedded_editor {
+                chrome::title_bar(self, ui);
+            }
             ribbon::show(self, ui);
             chrome::status_bar(self, ui);
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |_| {});
         } else {
-            chrome::title_bar(self, ui);
+            if !self.services.embedded_editor {
+                chrome::title_bar(self, ui);
+            }
             if !self.session.view.focus_mode {
                 ribbon::show(self, ui);
                 chrome::status_bar(self, ui);

@@ -142,6 +142,8 @@ jobs:
           cargo test --locked --manifest-path vendor/wordcraft/Cargo.toml -p wordcraft-ui-egui --lib browser_clipboard_ -- --test-threads=1 || regression_status=1
           cargo test --locked --manifest-path vendor/wordcraft/Cargo.toml -p wordcraft-ui-egui --lib input_method_ -- --test-threads=1 || regression_status=1
           cargo test --locked --manifest-path vendor/wordcraft/Cargo.toml -p wordcraft-ui-egui --lib host_saved_copy_ -- --test-threads=1 || regression_status=1
+          cargo test --locked --manifest-path vendor/wordcraft/Cargo.toml -p wordcraft-ui-egui --lib embedded_ -- --test-threads=1 || regression_status=1
+          cargo test --locked --manifest-path vendor/wordcraft/Cargo.toml -p wordcraft-ui-egui --lib command_search_ -- --test-threads=1 || regression_status=1
           exit "$regression_status"
       - name: Build native installation package
         run: npm run desktop:build -- --bundles ${{ matrix.bundles }}

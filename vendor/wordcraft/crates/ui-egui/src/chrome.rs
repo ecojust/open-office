@@ -15,6 +15,7 @@ fn qat_button(ui: &mut Ui, app: &mut WordApp, icon: &str, tip: &str, id: &str, e
     }
     let c = if enabled { t.icon } else { t.text_disabled };
     icons::paint(ui.painter(), Rect::from_center_size(r.center(), vec2(16.0, 16.0)), icon, c, if enabled { t.accent } else { c });
+    crate::embedding::record(ui.ctx(), &format!("quickAccess:{id}"), tip, "", r);
     let sc = crate::widgets::shortcut_text(app, id);
     let resp = resp.on_hover_text(if sc.is_empty() { tip.to_string() } else { format!("{tip} ({sc})") });
     if resp.clicked() && enabled {
@@ -74,6 +75,15 @@ fn quick_access(ui: &mut Ui, app: &mut WordApp) {
         ui.set_min_width(220.0);
         qat_menu(ui, app);
     });
+}
+
+/// Editing actions stay available without the standalone file/title toolbar.
+pub(crate) fn editing_history(ui: &mut Ui, app: &mut WordApp) {
+    for (id, icon, tip) in [("edit.redo", "redo", tl!("Redo")), ("edit.undo", "undo", tl!("Undo"))] {
+        let enabled = qat_enabled(app, id);
+        qat_button(ui, app, icon, tip, id, enabled);
+    }
+    ui.add_space(6.0);
 }
 
 /// The Undo button's drop-down arrow (#701), which opens [`undo_list`].
@@ -247,6 +257,7 @@ pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
                 let max = ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false));
                 ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!max));
             }
+            crate::embedding::record(ui.ctx(), "titleBar", "", "", full);
             let mut qat_end = full.min.x;
             let mut right_start = full.max.x;
             ui.horizontal_centered(|ui| {
@@ -437,6 +448,9 @@ pub fn status_bar(app: &mut WordApp, ui: &mut Ui) {
                 let missing = crate::ribbon::caret_missing_dictionary(app);
                 let shown = if missing.is_some() { crate::i18n::fmt(tl!("{language} (no dictionary)"), &[("language", &lang)]) } else { lang.clone() };
                 let tip = match missing {
+                    Some(_) if app.services.embedded_editor => crate::i18n::fmt(
+                        tl!("No spelling dictionary for {language} is installed, so it isn't checked."), &[("language", &lang)],
+                    ),
                     Some(name) => crate::i18n::fmt(
                         tl!("No spelling dictionary for {language} is installed, so it isn't checked. WordCraft looks for the Hunspell dictionary {name} in the WORDCRAFT_DICTIONARIES folder and in the usual system locations."),
                         &[("language", &lang), ("name", name)],
