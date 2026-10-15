@@ -47,6 +47,28 @@ function command(program, args, options = {}) {
     `${basename(program)} failed: ${String(result.stderr || result.stdout || result.error?.message || result.status).slice(0, 1500)}`);
   return result.stdout.trim();
 }
+function crashReporterServiceStatus() {
+  const domain = `gui/${process.getuid()}`;
+  const queries = [['print-disabled', domain], ['print-disabled', 'system'],
+    ['print', `${domain}/com.apple.ReportCrash`], ['print', 'system/com.apple.ReportCrash.Root']];
+  return queries.map(args => {
+    try {
+      const result = spawnSync('/bin/launchctl', args, { shell: false, encoding: 'utf8', timeout: 2000, maxBuffer: 32 * 1024 });
+      const lines = [], disabled = args[0] === 'print-disabled';
+      let depth = 0;
+      for (const line of String(result.stdout || '').split('\n')) {
+        if (disabled ? /^\s*"[^"\r\n]{0,120}(?:ReportCrash|CrashReporter)[^"\r\n]{0,120}"\s*=>\s*(?:true|false)\s*$/i.test(line)
+          : depth === 1 && /^\s*(?:state|pid|last exit code)\s*=\s*[a-zA-Z0-9 _()-]{1,80}\s*$/.test(line)) {
+          if (lines.length < 8) lines.push(line.trim().slice(0, 180));
+        }
+        if (line.trim().endsWith('{')) depth++;
+        if (line.trim() === '}') depth--;
+      }
+      return { query: args.join(' '), exitCode: result.status, signal: result.signal,
+        errorCode: String(result.error?.code || '').slice(0, 40) || null, lines };
+    } catch (error) { return { query: args.join(' '), exitCode: null, errorCode: String(error.code || 'query-failed').slice(0, 40), lines: [] }; }
+  });
+}
 export function checkInputPreflight(preflight) {
   assert.equal(preflight?.schemaVersion, 1);
   assert.equal(preflight.kind, 'macos-os-input-preflight');
@@ -367,6 +389,7 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
     const blocked = checkInputPreflight(report.preflight);
     if (blocked) { report.status = 'blocked'; report.blockedReason = blocked; return report; }
     if (options.preflight) { report.status = 'preflight-passed'; return report; }
+    report.crashReporterServices = crashReporterServiceStatus();
     assert.match(env.GITHUB_SHA || '', /^[a-f0-9]{40}$/, 'Record the exact diagnostic source commit');
     const location = locateApplication({ os: 'darwin', target: 'aarch64-apple-darwin' }, { app: options['--app'] }, env, root);
     assert.equal(command('/usr/bin/lipo', ['-archs', location.executable]), 'arm64');
