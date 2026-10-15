@@ -185,6 +185,22 @@ async function checks() {
   await until(() => cell('A1'), state => state.value === null, 'Global Undo still targets the original cell edit after theme switches');
   await toolbar.getByRole('button', { name: '重做', exact: true }).click(); await idle('sheet');
   await until(() => cell('A1'), state => state.value === 42, 'Global Redo restores the same history entry');
+  // Redo becomes disabled after restoring the only edit. Give an enabled shell
+  // control actual DOM focus before testing the canvas's native focus handoff.
+  const focusedShellButton = toolbar.getByTestId('theme-dark');
+  await focusedShellButton.click();
+  assert.equal(await focusedShellButton.evaluate(button => document.activeElement === button), true,
+    'A real shell click holds DOM focus before returning to the grid');
+  await selectCell('A1');
+  await until(() => snapshot('sheet'), state => state.selection?.active?.col === 0 && state.selection?.active?.row === 0,
+    'A single real canvas click selects A1 after leaving the shell');
+  await page.keyboard.press('ArrowRight');
+  await until(() => snapshot('sheet'), state => state.selection?.active?.col === 1 && state.selection?.active?.row === 0,
+    'The real ArrowRight key reaches Rust and moves selection from A1 to B1');
+  await selectCell('A2');
+  await until(() => snapshot('sheet'), state => state.selection?.active?.col === 0 && state.selection?.active?.row === 1,
+    'A real canvas click restores A2 for the remaining checks');
+  pass('A single grid click recovers keyboard navigation from a focused global toolbar button');
   await switchTab(word, 'word');
   const wordBefore = await expectedTheme('word', 'dark', 'dark');
   assert.equal(wordBefore.text, text); assert.equal(wordBefore.dirty, true);
