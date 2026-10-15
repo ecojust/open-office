@@ -587,7 +587,7 @@ def debugger_summary(read, report, files):
             try:
                 event = json.loads(line.split(":", 1)[1])
                 if isinstance(event, dict):
-                    events.append(pick(event, ["event", "pid", "reason", "detail", "cleanup", "reasons"]))
+                    events.append(pick(event, ["event", "source", "pid", "operation", "code", "syscall", "reason", "detail", "cleanup", "reasons"]))
             except json.JSONDecodeError:
                 continue
         return {"recoveredFromTrace": True, "diagnosticOnly": True,
@@ -595,7 +595,7 @@ def debugger_summary(read, report, files):
             "events": events[-8:], "traceBytes": len(data),
             "traceTail": [crash_text(line, 160) for line in lines[-8:] if line.strip() and not line.startswith("OO_LLDB_")]}
     summary = {**pick(debugger, ["requested", "status", "reason", "pid", "ready", "safeToContinue", "cleanup", "captured", "continuedWithoutDebugger"]),
-        "diagnosticOnly": True, "events": [pick(event, ["event", "reason", "detail", "reasons"]) for event in (debugger.get("events") or [])[-8:]],
+        "diagnosticOnly": True, "events": [pick(event, ["event", "source", "operation", "code", "syscall", "reason", "detail", "reasons"]) for event in (debugger.get("events") or [])[-8:]],
         "trace": pick(debugger.get("trace"), ["bytes", "totalBytes", "truncated"])}
     filename = (debugger.get("trace") or {}).get("file")
     if debugger.get("captured") is True and isinstance(filename, str) and re.fullmatch(r"webcontent-lldb-[A-Za-z0-9_-]{1,80}/trace\.txt", filename):
