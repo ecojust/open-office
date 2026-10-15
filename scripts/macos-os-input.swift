@@ -61,7 +61,7 @@ func observeExit(pid: Int32, timeoutMs: Int) throws {
     }
     var change = kevent(ident: UInt(pid), filter: Int16(EVFILT_PROC),
         flags: UInt16(EV_ADD | EV_ENABLE | EV_ONESHOT | EV_RECEIPT),
-        fflags: UInt32(NOTE_EXIT | NOTE_EXITSTATUS | NOTE_EXIT_DETAIL), data: 0, udata: nil)
+        fflags: UInt32(NOTE_EXIT) | UInt32(NOTE_EXITSTATUS) | UInt32(NOTE_EXIT_DETAIL), data: 0, udata: nil)
     var receipt = kevent()
     var immediate = timespec(tv_sec: 0, tv_nsec: 0)
     let registered = kevent(queue, &change, 1, &receipt, 1, &immediate)
