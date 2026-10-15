@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const bridge = `
-import contextlib, importlib.util, io, json, os, sys
+import contextlib, importlib.util, io, json, os, sys, zipfile
 spec = importlib.util.spec_from_file_location('inspector', 'scripts/inspect-macos-diagnostic.py')
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
@@ -16,7 +16,19 @@ try:
         value = context
     elif request.get('mode') == 'ips':
         value = module.ips_summary(request['ips'].encode())
-    elif request.get('mode') in ('emit', 'rust-emit'):
+    elif request.get('mode') == 'verify-all-editors':
+        repo = {'id': 11, 'full_name': 'owner/repo'}
+        run = {'id': 1, 'repository': repo, 'status': 'completed', 'head_sha': 'a' * 40,
+            'workflow_id': 7, 'path': module.WORKFLOW, **request.get('run', {})}
+        artifact = {'id': 2, 'name': module.ALL_EDITORS_ARTIFACT, 'expired': False, 'size_in_bytes': 100,
+            'workflow_run': {'id': 1, 'head_sha': 'a' * 40, 'repository_id': 11}, **request.get('artifact', {})}
+        replies = {'/repos/owner/repo': repo, '/repos/owner/repo/actions/runs/1': run,
+            '/repos/owner/repo/actions/workflows/7': {'id': 7, 'path': module.WORKFLOW, **request.get('workflow', {})},
+            '/repos/owner/repo/actions/runs/1/artifacts?per_page=100': {'total_count': 1, 'artifacts': [artifact]}}
+        module.api = lambda path, token: replies[path]
+        _, selected, _ = module.verify_run('1', 'a' * 40, 'owner/repo', 'unused', request.get('artifactName', module.ALL_EDITORS_ARTIFACT))
+        value = selected['name']
+    elif request.get('mode') in ('emit', 'rust-emit', 'all-editors-emit'):
         evidence = {'report.json': request['report']}
         if request.get('log') is not None:
             evidence['system-webkit.ndjson'] = request['log'].encode()
@@ -31,6 +43,18 @@ try:
         with contextlib.redirect_stdout(stream):
             if request.get('mode') == 'rust-emit':
                 module.summarize_rust(read, {'id': 1}, {'id': 2}, 'a' * 40)
+            elif request.get('mode') == 'all-editors-emit':
+                data = io.BytesIO()
+                with zipfile.ZipFile(data, 'w') as archive:
+                    for name, text in request.get('evidence', {}).items():
+                        entry = zipfile.ZipInfo(name)
+                        if name == request.get('symlink'):
+                            entry.external_attr = 0o120777 << 16
+                        archive.writestr(entry, text)
+                with zipfile.ZipFile(data) as archive:
+                    files = module.archive_members(archive)
+                    read = lambda name, limit, as_json=True: module.read_evidence(archive, files, name, limit, as_json)
+                    module.summarize_all_editors(read, {'id': 1}, {'id': 2}, 'a' * 40)
             else:
                 module.summarize(read, request.get('files', list(evidence)), {'id': 1}, {'id': 2, 'size_in_bytes': 3}, 'a' * 40, context, request.get('crashReporterContext', False))
         value = stream.getvalue()
@@ -603,4 +627,132 @@ test('Rust regression keeps large lines bounded and rejects logs over the 2 MiB 
   const missing = annotations(inspect({ mode: 'rust-emit' }).value);
   assert.equal(missing.length, 1);
   assert.equal(missing[0].available, false);
+});
+
+const allEditorsFile = 'macos-arm64-native-smoke.json';
+function allEditorsReport() {
+  return { schemaVersion: 1, kind: 'native-gui-smoke', platformId: 'macos-arm64', commit: 'a'.repeat(40), runId: '1',
+    ok: false, errors: ['SharedArrayBuffer is unavailable in the native WebView'], durationMs: 123456,
+    process: { exitCode: 0, signal: null, timedOut: false, cleanExit: true },
+    frontend: { ok: true, crossOriginIsolated: true, sharedArrayBuffer: false, sharedMemory: false,
+      ...Object.fromEntries(['wordcraft', 'gridcraft', 'deckcraft'].map(name => [name,
+        { ok: true, checks: ['default-mounted-local-wasm-canvas-painted', 'synthetic-dom-input-chinese-emoji'], base64: 'PRIVATE_DOCUMENT' }])),
+      pdf: { ok: true, reopened: true, removedOldText: true, newTextPresent: true, text: 'PRIVATE_DOCUMENT' } },
+    nativeDiagnostics: { events: [
+      { phase: 'editing-webkit-policy', detail: JSON.stringify({ stage: 'created', supported: true, actual: 1, private: 'PRIVATE_DOCUMENT' }) },
+      ...['wordcraft-native', 'gridcraft-native', 'deckcraft-native', 'pdf-roundtrip'].flatMap((phase, index) => [
+        { phase, elapsedMs: 100 + index * 200, detail: 'starting native checks' },
+        { phase, elapsedMs: 200 + index * 200, detail: 'complete' },
+      ]), { phase: 'report-written', elapsedMs: 950, detail: 'passed' },
+    ] } };
+}
+function inspectAllEditors(report = allEditorsReport(), patch = {}) {
+  return inspect({ mode: 'all-editors-emit', time: '', pids: '', evidence: { [allEditorsFile]: JSON.stringify(report) }, ...patch });
+}
+
+test('all-editor evidence preserves harness failure, frontend successes, native times and created mode readback separately', () => {
+  const result = inspectAllEditors();
+  assert.equal(result.ok, true, result.error);
+  const rows = annotations(result.value);
+  assert.equal(rows.length, 6);
+  const [status, native, ...engines] = rows;
+  assert.equal(status.section, 'all-editors'); assert.equal(status.ok, false);
+  assert.equal(status.errors[0], 'SharedArrayBuffer is unavailable in the native WebView');
+  assert.equal(status.frontend.ok, true); assert.equal(status.frontend.sharedArrayBuffer, false);
+  assert.equal(status.frontend.crossOriginIsolated, true); assert.equal(status.durationMs, 123456);
+  assert.deepEqual(status.process, { exitCode: 0, signal: '', cleanExit: true, timedOut: false });
+  assert.equal(status.establishesFix, false);
+  assert.deepEqual(native.webKitPolicy.rows, [['created', true, 1]]);
+  assert.deepEqual(native.reportWritten, [{ elapsedMs: 950, result: 'passed' }]);
+  assert.deepEqual(engines.map(engine => [engine.engine, engine.ok]),
+    [['wordcraft', true], ['gridcraft', true], ['deckcraft', true], ['pdf', true]]);
+  assert.deepEqual(engines[1].nativeStages, [
+    { phase: 'gridcraft-native', elapsedMs: 300, complete: false },
+    { phase: 'gridcraft-native', elapsedMs: 400, complete: true },
+  ]);
+  assert.equal(engines[1].checkCount, 2); assert.equal(engines[1].checks.length, 2);
+  assert.deepEqual(engines[3].roundTrip, { reopened: true, removedOldText: true, newTextPresent: true });
+  assert.ok(!result.value.includes('PRIVATE_DOCUMENT'));
+});
+
+test('all-editor summaries distinguish absent report, missing frontend, and partial engine completion', () => {
+  const missing = inspectAllEditors(undefined, { evidence: { 'unrelated.json': '{}' } });
+  assert.equal(missing.ok, true);
+  assert.deepEqual(annotations(missing.value).map(row => row.available), [false]);
+  const report = allEditorsReport(); delete report.nativeDiagnostics; report.frontend = null;
+  const absent = annotations(inspectAllEditors(report).value);
+  assert.equal(absent[0].frontend.available, false); assert.equal(absent[1].available, false);
+  assert.ok(absent.slice(2).every(engine => !engine.available && engine.ok === null));
+  report.frontend = { ok: false, error: 'Grid failed', wordcraft: { ok: true, checks: ['roundtrip'] }, gridcraft: { ok: false, error: 'Grid failed', checks: [] } };
+  report.process = { exitCode: 1, signal: 'SIGTERM', timedOut: true, cleanExit: false };
+  const partial = annotations(inspectAllEditors(report).value);
+  assert.equal(partial[0].process.exitCode, 1); assert.equal(partial[0].process.timedOut, true);
+  assert.deepEqual(partial.slice(2).map(engine => engine.ok), [true, false, null, null]);
+  assert.equal(partial[3].error, 'Grid failed');
+});
+
+test('all-editor selection retains the exact source run, SHA, workflow and artifact identity checks', () => {
+  assert.equal(inspect({ mode: 'verify-all-editors' }).value, 'macos-editing-all-editors');
+  for (const patch of [{ run: { status: 'in_progress' } }, { run: { head_sha: 'b'.repeat(40) } },
+    { run: { path: '.github/workflows/other.yml' } }, { workflow: { path: '.github/workflows/other.yml' } },
+    { artifact: { expired: true } }, { artifact: { name: 'macos-editing-diagnostics' } },
+    { artifact: { size_in_bytes: 32 * 1024 * 1024 + 1 } },
+    { artifact: { workflow_run: { id: 2, head_sha: 'a'.repeat(40), repository_id: 11 } } },
+    { artifact: { workflow_run: { id: 1, head_sha: 'b'.repeat(40), repository_id: 11 } } },
+    { artifactName: 'arbitrary-artifact' }]) {
+    assert.equal(inspect({ mode: 'verify-all-editors', ...patch }).ok, false, JSON.stringify(patch));
+  }
+  for (const patch of [{ commit: 'b'.repeat(40) }, { commit: null }, { runId: '2' }, { runId: null },
+    { schemaVersion: 2 }, { kind: 'other' }, { platformId: 'macos-x64' }]) {
+    assert.equal(inspectAllEditors({ ...allEditorsReport(), ...patch }).ok, false, JSON.stringify(patch));
+  }
+});
+
+test('all-editor ZIP reading accepts only fixed prefixes and rejects ambiguity, unsafe members and oversized JSON', () => {
+  const body = JSON.stringify(allEditorsReport());
+  for (const prefix of ['', 'artifacts/', 'artifacts/macos-editing/', 'macos-editing/']) {
+    const result = inspectAllEditors(undefined, { evidence: { [prefix + allEditorsFile]: body } });
+    assert.equal(result.ok, true, result.error); assert.equal(annotations(result.value)[0].available, true);
+  }
+  const nested = inspectAllEditors(undefined, { evidence: { ['other/' + allEditorsFile]: body } });
+  assert.equal(annotations(nested.value)[0].available, false);
+  for (const patch of [
+    { evidence: { [allEditorsFile]: body, ['artifacts/' + allEditorsFile]: body } },
+    { symlink: allEditorsFile },
+    { evidence: { ['../' + allEditorsFile]: body } },
+    { evidence: { [allEditorsFile]: '[]' } },
+    { evidence: { [allEditorsFile]: '{invalid' } },
+    { evidence: { [allEditorsFile]: ' '.repeat(12 * 1024 * 1024 + 1) } },
+  ]) assert.equal(inspectAllEditors(undefined, patch).ok, false);
+});
+
+test('all-editor annotations bound hostile errors, checks and native stages without exposing document content', () => {
+  const report = allEditorsReport();
+  const hostile = 'fake-test-token https://private.test/query ghp_abcdefghijk /Users/private-person/file\n::error::injected\n' + '文'.repeat(4000);
+  report.errors = Array(100).fill(hostile); report.frontend.error = hostile;
+  report.frontend.wordcraft.checks = Array(100).fill(hostile); report.frontend.wordcraft.error = hostile;
+  report.nativeDiagnostics.events = Array.from({ length: 300 }, (_, index) =>
+    ({ phase: 'wordcraft-native', elapsedMs: index, detail: 'PRIVATE_DOCUMENT' }));
+  const result = inspectAllEditors(report);
+  assert.equal(result.ok, true, result.error);
+  const rows = annotations(result.value);
+  assert.equal(rows.length, 6); assert.ok(rows.every(row => !row.summaryError));
+  assert.equal(rows[0].errorCount, 100); assert.equal(rows[0].errors.length, 4);
+  assert.equal(rows[2].checks.length, 16); assert.equal(rows[2].checksOmitted, 84);
+  assert.equal(rows[2].nativeStages.length, 8); assert.equal(rows[2].nativeStageCount, 256);
+  for (const omitted of ['PRIVATE_DOCUMENT', 'fake-test-token', 'https://private.test', 'ghp_abcdefghijk', 'private-person']) {
+    assert.ok(!result.value.includes(omitted), omitted);
+  }
+});
+
+test('all-editor CLI mode rejects Rust and both context modes before requesting remote evidence', () => {
+  for (const extra of [['--rust-regression'], ['--crash-reporter-context'],
+    ['--context-time', '2026-10-15T17:16:18.24Z', '--context-pids', '15734']]) {
+    const result = spawnSync(process.platform === 'win32' ? 'python' : 'python3',
+      ['scripts/inspect-macos-diagnostic.py', '--all-editors', ...extra],
+      { cwd: root, encoding: 'utf8', timeout: 10000, maxBuffer: 4096 });
+    assert.equal(result.status, 1, result.error?.message);
+    const rows = annotations(result.stdout);
+    assert.equal(rows.length, 1); assert.match(rows[0].error, /All-editor mode cannot use/);
+  }
 });

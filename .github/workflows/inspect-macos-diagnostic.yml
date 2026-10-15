@@ -31,6 +31,11 @@ on:
         required: false
         default: false
         type: boolean
+      all_editors:
+        description: Inspect the fixed macOS ARM64 all-editor native smoke report
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -54,10 +59,12 @@ jobs:
           INSPECT_CONTEXT_PIDS: ${{ inputs.context_pids }}
           INSPECT_RUST_REGRESSION: ${{ inputs.rust_regression }}
           INSPECT_CRASH_REPORTER_CONTEXT: ${{ inputs.crash_reporter_context }}
+          INSPECT_ALL_EDITORS: ${{ inputs.all_editors }}
         run: |
           args=()
           if [[ "$INSPECT_RUST_REGRESSION" == "true" ]]; then args+=(--rust-regression); fi
           if [[ "$INSPECT_CRASH_REPORTER_CONTEXT" == "true" ]]; then args+=(--crash-reporter-context); fi
+          if [[ "$INSPECT_ALL_EDITORS" == "true" ]]; then args+=(--all-editors); fi
           python3 scripts/inspect-macos-diagnostic.py \
             --run-id "$INSPECT_RUN_ID" \
             --expected-sha "$INSPECT_EXPECTED_SHA" \

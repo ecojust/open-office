@@ -19,6 +19,7 @@ from pathlib import Path, PurePosixPath
 
 ARTIFACT = "macos-editing-diagnostics"
 RUST_ARTIFACT = "gridcraft-deferred-cell-edit-regression"
+ALL_EDITORS_ARTIFACT = "macos-editing-all-editors"
 WORKFLOW = ".github/workflows/macos-editing-diagnostic.yml"
 MAX_DOWNLOAD = 32 * 1024 * 1024
 MAX_EXPANDED = 128 * 1024 * 1024
@@ -107,7 +108,7 @@ def api(path, token, redirect=False):
 
 
 def verify_run(run_id, expected_sha, repository, token, artifact_name=ARTIFACT):
-    require(artifact_name in (ARTIFACT, RUST_ARTIFACT), "Unexpected diagnostic artifact")
+    require(artifact_name in (ARTIFACT, RUST_ARTIFACT, ALL_EDITORS_ARTIFACT), "Unexpected diagnostic artifact")
     require(re.fullmatch(r"[1-9][0-9]{0,19}", run_id), "Invalid run_id")
     require(re.fullmatch(r"[a-f0-9]{40}", expected_sha), "expected_sha must be the exact lowercase 40-character commit")
     require(re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository), "Invalid current repository")
@@ -177,7 +178,7 @@ def archive_members(archive):
 def read_evidence(archive, files, filename, limit, as_json=True):
     # upload-artifact normally strips the common directory; accept its exact
     # original prefix as well, but never search arbitrary nested locations.
-    matches = [files[name] for name in (filename, f"artifacts/macos-editing/{filename}", f"macos-editing/{filename}") if name in files]
+    matches = [files[name] for name in (filename, f"artifacts/{filename}", f"artifacts/macos-editing/{filename}", f"macos-editing/{filename}") if name in files]
     require(len(matches) <= 1, "Ambiguous evidence file")
     if not matches:
         return None
@@ -874,6 +875,51 @@ def summarize_rust(read, run, artifact, expected_sha):
             "lines": [crash_text(line, 240) for line in lines[offset:offset + 7]]})
 
 
+def summarize_all_editors(read, run, artifact, expected_sha):
+    report = read("macos-arm64-native-smoke.json", 12 * 1024 * 1024)
+    source = {"runId": run["id"], "headSha": expected_sha, "artifactId": artifact["id"],
+        "available": report is not None, "establishesFix": False}
+    if report is None:
+        notice("all-editors", source)
+        return
+    require(report.get("commit") == expected_sha, "All-editor report commit mismatch")
+    require(str(report.get("runId")) == str(run["id"]), "All-editor report run ID mismatch")
+    require(report.get("schemaVersion") == 1 and report.get("kind") == "native-gui-smoke"
+        and report.get("platformId") == "macos-arm64", "Unexpected all-editor report schema or platform")
+    obj = lambda value: value if isinstance(value, dict) else {}
+    rows = lambda value: value if isinstance(value, list) else []
+    flag = lambda value: value if type(value) is bool else None
+    elapsed = lambda value: value if type(value) in (int, float) and 0 <= value <= 86400000 else None
+    frontend, process, native = (obj(report.get(key)) for key in ("frontend", "process", "nativeDiagnostics"))
+    events = [event for event in rows(native.get("events"))[:256] if isinstance(event, dict)]
+    errors = rows(report.get("errors"))
+    notice("all-editors", {**source, "ok": flag(report.get("ok")), "durationMs": elapsed(report.get("durationMs")),
+        "errors": [crash_text(error, 300) for error in errors[:4]], "errorCount": len(errors),
+        "process": {"exitCode": process.get("exitCode") if type(process.get("exitCode")) is int and -255 <= process["exitCode"] <= 255 else None,
+            "signal": crash_text(process.get("signal") or "", 40),
+            **{key: flag(process.get(key)) for key in ("cleanExit", "timedOut")}},
+        "frontend": {"available": isinstance(report.get("frontend"), dict),
+            **{key: flag(frontend.get(key)) for key in ("ok", "sharedArrayBuffer", "crossOriginIsolated", "sharedMemory")},
+            "error": crash_text(frontend.get("error") or "", 300)}})
+    notice("all-editors-native", {"available": isinstance(report.get("nativeDiagnostics"), dict),
+        "eventCount": len(rows(native.get("events"))), "webKitPolicy": webkit_policy_summary({"events": events}),
+        "reportWritten": [{"elapsedMs": elapsed(event.get("elapsedMs")),
+            "result": event.get("detail") if event.get("detail") in ("passed", "failed") else "unknown"}
+            for event in events if event.get("phase") == "report-written"][-4:],
+        "error": crash_text(report.get("nativeDiagnosticsError") or "", 200)})
+    for name in ("wordcraft", "gridcraft", "deckcraft", "pdf"):
+        engine = obj(frontend.get(name))
+        checks = rows(engine.get("checks"))
+        stages = [event for event in events if event.get("phase") in (name, f"{name}-native", f"{name}-roundtrip")]
+        notice("all-editors-engine", {"engine": name, "available": isinstance(frontend.get(name), dict),
+            "ok": flag(engine.get("ok")), "error": crash_text(engine.get("error") or engine.get("closeError") or "", 200),
+            "checkCount": len(checks), "checks": [crash_text(check, 80) for check in checks[:16]],
+            "checksOmitted": max(0, len(checks) - 16), "nativeStageCount": len(stages),
+            "nativeStages": [{"phase": event["phase"], "elapsedMs": elapsed(event.get("elapsedMs")),
+                "complete": event.get("detail") == "complete"} for event in stages[-8:]],
+            **({"roundTrip": {key: flag(engine.get(key)) for key in ("reopened", "removedOldText", "newTextPresent")}} if name == "pdf" else {})})
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-id")
@@ -883,9 +929,12 @@ def main():
     parser.add_argument("--context-pids", default="", help="One or two exact, observed PIDs separated by a comma")
     parser.add_argument("--crash-reporter-context", action="store_true", help="Read reporting-service logs from two seconds before to ten seconds after the recorded native WebContent SIGTRAP")
     parser.add_argument("--rust-regression", action="store_true", help="Read only the fixed Grid Rust regression artifact's bounded Cargo log")
+    parser.add_argument("--all-editors", action="store_true", help="Read only the fixed macOS ARM64 all-editor native smoke report")
     args = parser.parse_args()
     try:
         context = parse_context(args.context_time, args.context_pids)
+        require(not (args.all_editors and (args.rust_regression or args.crash_reporter_context or context)),
+            "All-editor mode cannot use Rust regression or macOS context modes")
         require(not (args.rust_regression and context), "Rust regression mode cannot use macOS PID context")
         require(not (args.crash_reporter_context and (args.rust_regression or context)),
             "Crash-reporter context cannot use Rust regression or macOS PID context")
@@ -897,7 +946,9 @@ def main():
             read, files = local_evidence(args.directory)
             run = {"id": int(run_id), "conclusion": "local-evidence-only", "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT")}
             artifact = {"id": None, "size_in_bytes": None}
-            if args.rust_regression:
+            if args.all_editors:
+                summarize_all_editors(read, run, artifact, expected_sha)
+            elif args.rust_regression:
                 summarize_rust(read, run, artifact, expected_sha)
             else:
                 summarize(read, files, run, artifact, expected_sha, context, args.crash_reporter_context)
@@ -906,7 +957,7 @@ def main():
         token = os.environ.get("GH_INSPECT_TOKEN", "")
         require(bool(token), "Read-only GitHub token is required")
         run, artifact, prefix = verify_run(args.run_id, args.expected_sha, os.environ.get("GITHUB_REPOSITORY", ""), token,
-            RUST_ARTIFACT if args.rust_regression else ARTIFACT)
+            ALL_EDITORS_ARTIFACT if args.all_editors else RUST_ARTIFACT if args.rust_regression else ARTIFACT)
         url = api(f"{prefix}/actions/artifacts/{artifact['id']}/zip", token, redirect=True)
         require(isinstance(url, str), "Artifact API did not return a download redirect")
         with tempfile.TemporaryDirectory(prefix="open-office-inspect-", dir=os.environ.get("RUNNER_TEMP")) as temporary:
@@ -915,7 +966,9 @@ def main():
             with zipfile.ZipFile(destination) as archive:
                 files = archive_members(archive)
                 read = lambda filename, limit, as_json=True: read_evidence(archive, files, filename, limit, as_json)
-                if args.rust_regression:
+                if args.all_editors:
+                    summarize_all_editors(read, run, artifact, args.expected_sha)
+                elif args.rust_regression:
                     summarize_rust(read, run, artifact, args.expected_sha)
                 else:
                     summarize(read, files, run, artifact, args.expected_sha, context, args.crash_reporter_context)
