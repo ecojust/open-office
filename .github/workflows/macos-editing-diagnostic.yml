@@ -40,6 +40,9 @@ jobs:
           mkdir -p artifacts/gridcraft-deferred-cell-edit
           set -o pipefail
           cargo test --locked --manifest-path vendor/gridcraft/Cargo.toml -p gridcraft-ui-egui --test deferred_cell_edit --test merged_cells 2>&1 | tee artifacts/gridcraft-deferred-cell-edit/cargo-test.log
+      - name: Expose bounded Rust failure context through check annotations
+        if: always()
+        run: python3 scripts/inspect-macos-diagnostic.py --rust-regression --directory artifacts/gridcraft-deferred-cell-edit
       - name: Retain the Rust regression test log
         if: always()
         uses: actions/upload-artifact@v4

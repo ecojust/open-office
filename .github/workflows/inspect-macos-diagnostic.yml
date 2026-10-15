@@ -21,6 +21,11 @@ on:
         required: false
         default: ''
         type: string
+      rust_regression:
+        description: Inspect the fixed Grid Rust regression Cargo log instead of native macOS evidence
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -42,9 +47,12 @@ jobs:
           INSPECT_EXPECTED_SHA: ${{ inputs.expected_sha }}
           INSPECT_CONTEXT_TIME: ${{ inputs.context_time }}
           INSPECT_CONTEXT_PIDS: ${{ inputs.context_pids }}
-        run: >-
-          python3 scripts/inspect-macos-diagnostic.py
-          --run-id "$INSPECT_RUN_ID"
-          --expected-sha "$INSPECT_EXPECTED_SHA"
-          --context-time "$INSPECT_CONTEXT_TIME"
-          --context-pids "$INSPECT_CONTEXT_PIDS"
+          INSPECT_RUST_REGRESSION: ${{ inputs.rust_regression }}
+        run: |
+          args=()
+          if [[ "$INSPECT_RUST_REGRESSION" == "true" ]]; then args+=(--rust-regression); fi
+          python3 scripts/inspect-macos-diagnostic.py \
+            --run-id "$INSPECT_RUN_ID" \
+            --expected-sha "$INSPECT_EXPECTED_SHA" \
+            --context-time "$INSPECT_CONTEXT_TIME" \
+            --context-pids "$INSPECT_CONTEXT_PIDS" "${args[@]}"

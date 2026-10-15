@@ -18,6 +18,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 ARTIFACT = "macos-editing-diagnostics"
+RUST_ARTIFACT = "gridcraft-deferred-cell-edit-regression"
 WORKFLOW = ".github/workflows/macos-editing-diagnostic.yml"
 MAX_DOWNLOAD = 32 * 1024 * 1024
 MAX_EXPANDED = 128 * 1024 * 1024
@@ -105,7 +106,8 @@ def api(path, token, redirect=False):
         raise ValueError(f"GitHub API request failed (HTTP {error.code})") from None
 
 
-def verify_run(run_id, expected_sha, repository, token):
+def verify_run(run_id, expected_sha, repository, token, artifact_name=ARTIFACT):
+    require(artifact_name in (ARTIFACT, RUST_ARTIFACT), "Unexpected diagnostic artifact")
     require(re.fullmatch(r"[1-9][0-9]{0,19}", run_id), "Invalid run_id")
     require(re.fullmatch(r"[a-f0-9]{40}", expected_sha), "expected_sha must be the exact lowercase 40-character commit")
     require(re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository), "Invalid current repository")
@@ -124,7 +126,7 @@ def verify_run(run_id, expected_sha, repository, token):
     require(run.get("path", "").split("@")[0] == WORKFLOW, "Run workflow path mismatch")
     inventory = api(f"{prefix}/actions/runs/{run_id}/artifacts?per_page=100", token)
     require(isinstance(inventory.get("total_count"), int) and inventory["total_count"] <= 100, "Artifact inventory exceeds bound")
-    matches = [item for item in inventory.get("artifacts", []) if item.get("name") == ARTIFACT]
+    matches = [item for item in inventory.get("artifacts", []) if item.get("name") == artifact_name]
     require(len(matches) == 1, "Expected exactly one diagnostic artifact")
     artifact = matches[0]
     require(artifact.get("expired") is False, "Diagnostic artifact has expired")
@@ -349,7 +351,7 @@ def context_log_summary(data, report, samples, context):
         "lines": [row[3] for row in sorted(selected, key=lambda row: (row[1], row[2]))]}
 
 
-def system_log_summary(data, report, samples):
+def system_log_summary(data, report, samples, max_lines=20):
     start, end = system_time(report.get("startedAt")), system_time(report.get("finishedAt"))
     app_pid = (report.get("process") or {}).get("pid")
     sampled = {row["pid"] for sample in samples for row in sample["rows"]}
@@ -401,7 +403,7 @@ def system_log_summary(data, report, samples):
         selected.append((bool(severe.search(message) or invalid_message.search(message)), timestamp, item))
     # Actual failures and invalid IPC messages outrank normal assertion lifecycle
     # or verbose GPU logs; retain chronology among the selected messages.
-    selected = sorted(sorted(selected, key=lambda row: (row[0], row[1]), reverse=True)[:20], key=lambda row: row[1])
+    selected = sorted(sorted(selected, key=lambda row: (row[0], row[1]), reverse=True)[:max_lines], key=lambda row: row[1])
     return {"parsedLines": parsed_count, "skippedLines": skipped, "matchingLines": len(selected),
             "firstParsedTimestamp": first_parsed_timestamp, "lastParsedTimestamp": last_parsed_timestamp,
             "timeFilterAvailable": start is not None and end is not None,
@@ -433,6 +435,90 @@ def local_evidence(directory):
     return read, files
 
 
+def crash_text(value, limit=160):
+    # Crash symbols/reasons sometimes embed source or user paths. Emit only
+    # bounded explanatory text, never image paths, registers or raw report JSON.
+    text = re.sub(r"(?<![\w:])(?:/[^\s\"'<>]+|[A-Za-z]:\\[^\s\"'<>]+)", "[path redacted]", str(value))
+    return compact_text(text, limit)
+
+
+def crash_metadata(report, files):
+    collected = report.get("crashReports") or {}
+    directories = [{**pick(item, ["directory", "readable", "recentCount"]),
+        "recent": [{"file": crash_text(PurePosixPath(str(row.get("file", ""))).name, 70), **pick(row, ["matched", "bytes"])}
+            for row in (item.get("recent") or [])[:2]]} for item in (collected.get("directories") or [])[:2]]
+    services = [{"query": crash_text(item.get("query", ""), 80), **pick(item, ["exitCode", "signal", "errorCode"]),
+        "lines": [crash_text(line, 100) for line in (item.get("lines") or [])[:3]]}
+        for item in (report.get("crashReporterServices") or [])[:4]]
+    return {"crashReports": {"available": "crashReports" in report, **pick(collected, ["scanCount", "waitMs", "maxWaitMs"]),
+        "fileCount": len(collected.get("files") or []), "gapCount": len(collected.get("gaps") or []),
+        "gaps": [crash_text(gap, 100) for gap in (collected.get("gaps") or [])[:2]], "directories": directories},
+        "reportCrashLog": {"available": any(PurePosixPath(name).name == "system-reportcrash.ndjson" for name in files),
+            **pick(report.get("reportCrashLog"), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine"])},
+        "crashReporterServices": services, "serviceEvidenceAvailable": "crashReporterServices" in report,
+        "limits": "At most two recent filenames per directory and three status lines per service; service state does not establish the crash cause."}
+
+
+def ips_summary(data):
+    require(len(data) <= 8 * 1024 * 1024, "IPS exceeds read bound")
+    text = data.decode("utf-8-sig").strip()
+    decoder = json.JSONDecoder()
+    header, end = decoder.raw_decode(text)
+    require(isinstance(header, dict), "IPS must contain an object")
+    # Modern .ips commonly contains a one-line metadata object followed by the
+    # actual crash object. A single crash object is valid as well.
+    remaining = text[end:].strip()
+    body = header
+    if remaining:
+        body, end = decoder.raw_decode(remaining)
+        require(isinstance(body, dict) and not remaining[end:].strip(), "Unexpected IPS trailing data")
+    exception = {key: crash_text(value, 180) for key, value in pick(body.get("exception"), ["type", "signal", "subtype", "codes"]).items() if isinstance(value, (str, int))}
+    termination = {key: crash_text(value, 180) if isinstance(value, str) else value for key, value in
+        pick(body.get("termination"), ["namespace", "code", "indicator", "byProc", "byPid"]).items() if isinstance(value, (str, int))}
+    reasons = (body.get("termination") or {}).get("reasons") if isinstance(body.get("termination"), dict) else None
+    if isinstance(reasons, list):
+        termination["reasons"] = [crash_text(reason, 160) for reason in reasons[:2] if isinstance(reason, str)]
+    threads = body.get("threads") if isinstance(body.get("threads"), list) else []
+    index = body.get("faultingThread")
+    if type(index) is not int or not 0 <= index < len(threads):
+        index = next((i for i, thread in enumerate(threads) if isinstance(thread, dict) and thread.get("triggered") is True), None)
+    thread = threads[index] if index is not None and isinstance(threads[index], dict) else {}
+    frames = thread.get("frames") if isinstance(thread.get("frames"), list) else []
+    images = body.get("usedImages") if isinstance(body.get("usedImages"), list) else []
+    excerpt = []
+    for frame in frames[:6]:
+        if not isinstance(frame, dict):
+            continue
+        image_index = frame.get("imageIndex")
+        image = images[image_index] if type(image_index) is int and 0 <= image_index < len(images) and isinstance(images[image_index], dict) else {}
+        excerpt.append({"symbol": crash_text(frame.get("symbol") or "[unsymbolicated]", 180),
+            "image": crash_text(PurePosixPath(str(image.get("name") or "[unknown]")).name, 60),
+            **{key: value for key, value in pick(frame, ["symbolLocation", "imageOffset"]).items() if type(value) is int}})
+    return {"pid": body.get("pid") if type(body.get("pid")) is int else None,
+        "process": crash_text(body.get("procName") or header.get("app_name") or "[unknown]", 80),
+        "exception": exception, "termination": termination, "triggeredThread": index,
+        "frameCount": len(frames), "frames": excerpt, "causalityEstablished": False,
+        "limitation": "Reported exception and up to six triggered-thread frames only; report ownership and root cause require correlation."}
+
+
+def crash_summaries(read, files):
+    names = sorted({PurePosixPath(name).name for name in files if PurePosixPath(name).parent in
+        (PurePosixPath("."), PurePosixPath("artifacts/macos-editing"), PurePosixPath("macos-editing"))
+        and PurePosixPath(name).name.startswith("crash-") and name.endswith(".ips")},
+        key=lambda name: ("webcontent" not in name.lower(), name))
+    summaries = []
+    for name in names[:2]:
+        try:
+            data = read(name, 8 * 1024 * 1024, False)
+            require(data is not None, "IPS is missing")
+            summary = ips_summary(data)
+        except Exception as error:
+            # Parser/read errors may include local paths or raw report text.
+            summary = {"error": type(error).__name__, "parsed": False}
+        summaries.append({"file": crash_text(name, 100), **summary})
+    return summaries, len(names)
+
+
 def summarize(read, files, run, artifact, expected_sha, context=None):
     report = read("report.json", 12 * 1024 * 1024) or {}
     host = read("host.json", 64 * 1024) or {}
@@ -456,8 +542,8 @@ def summarize(read, files, run, artifact, expected_sha, context=None):
     native = read("native-diagnostics.json", 1024 * 1024) or report.get("nativeDiagnostics") or {}
     frontend = read("frontend-report.json", 12 * 1024 * 1024) or report.get("frontend") or {}
     editing = frontend.get("editing") or {}
-    # GitHub retains only ten notices per step. Spend five on compact summaries
-    # and at most five on filtered log excerpts; never emit a large JSON notice.
+    # GitHub retains only ten notices per step. Reserve six for metadata, at
+    # most two for IPS excerpts, and spend the remaining slots on system logs.
     state = editing.get("lastState") or {}
     notice("status", {"runId": run["id"], "headSha": expected_sha, "conclusion": run.get("conclusion"), "artifactId": artifact["id"], "bytes": artifact["size_in_bytes"], "establishesFix": False,
         "report": {**pick(report, ["status", "ok", "blockedReason", "durationMs"]), "error": compact_text(report.get("error") or "", 500)},
@@ -478,10 +564,37 @@ def summarize(read, files, run, artifact, expected_sha, context=None):
         "rssSamples": recent, "rssColumns": ["pid", "rssKiB", "cpuPercent", "process"], "rssLimit": "Last six samples; top three App/WebContent rows, at most 40 source rows. Snapshot only, not evidence of a memory kill.",
         "crashes": [compact_text(PurePosixPath(name).name, 100) for name in files if PurePosixPath(name).name.startswith("crash-") and name.endswith((".ips", ".crash"))][:4]})
     log = read("system-webkit.ndjson", 8 * 1024 * 1024, False)
-    summary = system_log_summary(log or b"", report, samples)
+    crashes, crash_count = crash_summaries(read, files)
+    summary = system_log_summary(log or b"", report, samples, max_lines=4 * (4 - len(crashes)))
     notice("system-log", {"available": log is not None, **pick(report.get("systemLog"), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine", "stderr"]), **pick(summary, ["parsedLines", "skippedLines", "matchingLines", "firstParsedTimestamp", "lastParsedTimestamp", "timeFilterAvailable", "limitation"])})
-    for offset in range(0, len(summary["lines"]), 4):
-        notice("related-system-log", {"part": offset // 4 + 1, "lines": summary["lines"][offset:offset + 4], "causalityEstablished": False})
+    notice("crash-evidence", {**crash_metadata(report, files), "ipsCount": crash_count, "ipsSummarized": len(crashes)})
+    for crash in crashes:
+        notice("crash-report", crash)
+    # Apply the smaller quota during severity ranking, preserving actual crash
+    # messages over later routine GPU/focus chatter.
+    lines = summary["lines"]
+    for offset in range(0, len(lines), 4):
+        notice("related-system-log", {"part": offset // 4 + 1, "lines": lines[offset:offset + 4], "causalityEstablished": False})
+
+
+def summarize_rust(read, run, artifact, expected_sha):
+    data = read("cargo-test.log", 2 * 1024 * 1024, False)
+    lines = (data or b"").decode("utf-8", "replace").splitlines()
+    pattern = re.compile(r"^error(?:\[|:)|panicked at|^test result: FAILED|^test .* \.\.\. FAILED")
+    anchors = [index for index, line in enumerate(lines) if pattern.search(line)]
+    selected = list(dict.fromkeys(anchors[:2] + anchors[-1:]))
+    notice("rust-regression", {"runId": run["id"], "headSha": expected_sha, "artifactId": artifact["id"],
+        "available": data is not None, "bytes": len(data or b""), "lineCount": len(lines),
+        "failureMarkers": len(anchors), "establishesFix": False,
+        "limits": "Read at most 2 MiB; at most three failure contexts and fourteen tail lines, each line capped at 240 bytes."})
+    for part, index in enumerate(selected, 1):
+        start, end = max(0, index - 4), min(len(lines), index + 5)
+        notice("rust-failure-context", {"part": part, "firstLine": start + 1,
+            "lines": [crash_text(line, 240) for line in lines[start:end]]})
+    start = max(0, len(lines) - 14)
+    for offset in range(start, len(lines), 7):
+        notice("rust-log-tail", {"firstLine": offset + 1,
+            "lines": [crash_text(line, 240) for line in lines[offset:offset + 7]]})
 
 
 def main():
@@ -491,21 +604,29 @@ def main():
     parser.add_argument("--directory", type=Path, help="Summarize this run's local evidence without API access")
     parser.add_argument("--context-time", default="", help="UTC instant for an optional fixed one-second context window")
     parser.add_argument("--context-pids", default="", help="One or two exact, observed PIDs separated by a comma")
+    parser.add_argument("--rust-regression", action="store_true", help="Read only the fixed Grid Rust regression artifact's bounded Cargo log")
     args = parser.parse_args()
     try:
         context = parse_context(args.context_time, args.context_pids)
+        require(not (args.rust_regression and context), "Rust regression mode cannot use macOS PID context")
         if args.directory:
             run_id = args.run_id or os.environ.get("GITHUB_RUN_ID", "")
             expected_sha = args.expected_sha or os.environ.get("GITHUB_SHA", "")
             require(re.fullmatch(r"[1-9][0-9]{0,19}", run_id), "Invalid local run ID")
             require(re.fullmatch(r"[a-f0-9]{40}", expected_sha), "Invalid local source SHA")
             read, files = local_evidence(args.directory)
-            summarize(read, files, {"id": int(run_id), "conclusion": "local-evidence-only", "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT")}, {"id": None, "size_in_bytes": None}, expected_sha, context)
+            run = {"id": int(run_id), "conclusion": "local-evidence-only", "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT")}
+            artifact = {"id": None, "size_in_bytes": None}
+            if args.rust_regression:
+                summarize_rust(read, run, artifact, expected_sha)
+            else:
+                summarize(read, files, run, artifact, expected_sha, context)
             return 0
         require(bool(args.run_id and args.expected_sha), "--run-id and --expected-sha are required for remote inspection")
         token = os.environ.get("GH_INSPECT_TOKEN", "")
         require(bool(token), "Read-only GitHub token is required")
-        run, artifact, prefix = verify_run(args.run_id, args.expected_sha, os.environ.get("GITHUB_REPOSITORY", ""), token)
+        run, artifact, prefix = verify_run(args.run_id, args.expected_sha, os.environ.get("GITHUB_REPOSITORY", ""), token,
+            RUST_ARTIFACT if args.rust_regression else ARTIFACT)
         url = api(f"{prefix}/actions/artifacts/{artifact['id']}/zip", token, redirect=True)
         require(isinstance(url, str), "Artifact API did not return a download redirect")
         with tempfile.TemporaryDirectory(prefix="open-office-inspect-", dir=os.environ.get("RUNNER_TEMP")) as temporary:
@@ -513,7 +634,11 @@ def main():
             download_zip(url, destination)
             with zipfile.ZipFile(destination) as archive:
                 files = archive_members(archive)
-                summarize(lambda filename, limit, as_json=True: read_evidence(archive, files, filename, limit, as_json), files, run, artifact, args.expected_sha, context)
+                read = lambda filename, limit, as_json=True: read_evidence(archive, files, filename, limit, as_json)
+                if args.rust_regression:
+                    summarize_rust(read, run, artifact, args.expected_sha)
+                else:
+                    summarize(read, files, run, artifact, args.expected_sha, context)
         return 0
     except Exception as error:
         # Only locally generated validation messages are exposed. URL-bearing
