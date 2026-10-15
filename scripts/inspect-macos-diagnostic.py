@@ -274,7 +274,8 @@ def system_log_summary(data, report, samples):
     app_pid = (report.get("process") or {}).get("pid")
     sampled = {row["pid"] for sample in samples for row in sample["rows"]}
     keywords = re.compile(r"\b(crash(?:ed|ing)?|terminat\w*|kill(?:ed|ing)?|memory|memorystatus|jetsam|GPU|assert\w*|exception|fatal|abort(?:ed)?|error|fault)\b", re.I)
-    severe = re.compile(r"\b(crash\w*|terminat\w*|kill\w*|jetsam|assert\w*|exception|fatal|abort\w*)\b", re.I)
+    invalid_message = re.compile(r"\b(?:received\s+invalid\s+(?:IPC\s+)?message|didReceiveInvalidMessage|invalid\s+IPC\s+message)\b", re.I)
+    severe = re.compile(r"\b(crash\w*|terminat\w*|kill\w*|jetsam|exception|fatal|abort\w*)\b|\bassert(?:ion)?\s+(?:failed|failure)\b|\bfailed\s+assertion\b", re.I)
     selected, parsed_count, skipped = [], 0, 0
     first_parsed_timestamp, last_parsed_timestamp = None, None
     for line in data.splitlines():
@@ -295,7 +296,7 @@ def system_log_summary(data, report, samples):
             last_parsed_timestamp = scrub(event["timestamp"], 80)
             if first_parsed_timestamp is None:
                 first_parsed_timestamp = last_parsed_timestamp
-        if not isinstance(message, str) or not keywords.search(message):
+        if not isinstance(message, str) or not (keywords.search(message) or invalid_message.search(message)):
             continue
         if start is None or end is None or timestamp is None or not start - 2 <= timestamp <= end + 2:
             continue
@@ -317,9 +318,9 @@ def system_log_summary(data, report, samples):
         # 20 KB output budget, even when messages contain multibyte characters.
         while len(json.dumps(item, ensure_ascii=False).encode("utf-8")) > 630:
             item["message"] = item["message"][:-20]
-        selected.append((bool(severe.search(message)), timestamp, item))
-    # Preserve the most relevant failure messages if verbose GPU diagnostics
-    # fill the bounded log; retain chronology among the selected messages.
+        selected.append((bool(severe.search(message) or invalid_message.search(message)), timestamp, item))
+    # Actual failures and invalid IPC messages outrank normal assertion lifecycle
+    # or verbose GPU logs; retain chronology among the selected messages.
     selected = sorted(sorted(selected, key=lambda row: (row[0], row[1]), reverse=True)[:20], key=lambda row: row[1])
     return {"parsedLines": parsed_count, "skippedLines": skipped, "matchingLines": len(selected),
             "firstParsedTimestamp": first_parsed_timestamp, "lastParsedTimestamp": last_parsed_timestamp,
