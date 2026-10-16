@@ -1,7 +1,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import * as native from '../native'
 import type { NativeDocument, SaveDocumentRequest, SaveResult } from '../types'
-import type { OfficeWordSmokeEditor } from '../word/rust/office-word-native-smoke'
+import { focusOfficeWordCanvas, type OfficeWordSmokeEditor } from '../word/rust/office-word-native-smoke'
 import { AUTOSAVE_INTERVAL_MS } from './autosave'
 import { createWorkspaceTransport, type BrowserServerStatus, type WorkspaceExtension } from './browser-workspace'
 
@@ -201,14 +201,17 @@ export async function runWorkspaceNativeSmoke(
       saves.push({ documentId: request.documentId, extension: request.extension, expectedSha256: request.expectedSha256, saveAs: request.saveAs === true, status: result.status,
         ...(result.status === 'saved' ? { savedId: result.document.id, savedSha256: result.document.sha256, savedSizeBytes: result.document.sizeBytes } : {}) })
     })
-    const canvas = document.querySelector<HTMLElement>('[data-testid="office-word-canvas"]')
-    assert(canvas, 'mounted Word canvas is missing before autosave')
-    canvas.focus({ preventScroll: true })
-    // Let eframe complete its normal canvas/text-agent focus handoff before
-    // observing the save. The background transaction must preserve that focus.
-    await bounded(new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))), 'editor focus handoff')
-    const focus = document.activeElement
-    assert(focus === canvas || focus === document.querySelector('[data-testid="office-word-input"]'), 'native Word input did not retain focus')
+    const session = await editor.inspect()
+    const element = [...document.querySelectorAll<HTMLElement>('[data-testid="rust-word-editor"]')].find(node => node.dataset.sessionId === session.sessionId)
+    assert(element, 'mounted Word editor is missing before autosave')
+    // DOM canvas focus alone does not establish Rust's editing focus. Reuse the
+    // already verified pointer path, then observe the real text-input agent.
+    // Its normal canvas-to-input handoff must finish before the save interval.
+    await focusOfficeWordCanvas({ ...mounted, element })
+    const focus = element.querySelector<HTMLInputElement>('[data-testid="office-word-input"]')
+    assert(focus, 'native Word input agent is missing before autosave')
+    focus.focus({ preventScroll: true })
+    assert(document.activeElement === focus, 'native Word input did not retain focus')
     let blurEvents = 0, dialogObserved = false
     const onBlur = () => { blurEvents++ }
     focus?.addEventListener('blur', onBlur)
@@ -235,10 +238,13 @@ export async function runWorkspaceNativeSmoke(
     const final = await digest(saved.base64)
     assert(elapsedMs >= AUTOSAVE_INTERVAL_MS && saved.id === temporary.id && saved.sha256 === final.sha256 && saved.sizeBytes === final.sizeBytes && final.sha256 !== initial.sha256, 'autosave did not write and read back the approved file after the normal interval')
     assert(saves.length === 1 && saves[0]!.status === 'saved' && saves[0]!.documentId === temporary.id && saves[0]!.savedId === temporary.id && saves[0]!.expectedSha256 === initial.sha256 && saves[0]!.savedSha256 === final.sha256 && saves[0]!.saveAs === false, 'autosave bypassed the normal direct save request')
-    assert(!afterSave.dirty && !dialogObserved && document.activeElement === focus && blurEvents === 0, 'autosave interrupted focus or left the editor unsaved')
     report.autosave = { intervalMs: AUTOSAVE_INTERVAL_MS, elapsedMs, targetId: temporary.id, initialSha256: initial.sha256, initialSizeBytes: initial.sizeBytes, finalSha256: final.sha256, finalSizeBytes: final.sizeBytes,
       readbackBase64: saved.base64, beforeRevision: beforeSave.revision, afterRevision: afterSave.revision, beforeDirty: beforeSave.dirty, afterDirty: afterSave.dirty,
       focusRetained: document.activeElement === focus, blurEvents, dialogObserved, expectedText, reopenedText: '', saves }
+    assert(!afterSave.dirty, 'autosave left the Rust document dirty after its saved receipt')
+    assert(!dialogObserved, 'autosave displayed a document dialog')
+    assert(document.activeElement === focus, 'autosave changed the focused editor element')
+    assert(blurEvents === 0, 'autosave blurred the focused editor element')
     report.checks.push(WORKSPACE_NATIVE_CHECKS[3])
     removeBlurListener(); removeBlurListener = undefined
     unobserve(); unobserve = undefined

@@ -81,7 +81,7 @@ function observePaint() {
   }
   return { calls: () => calls, restore: () => { for (const reset of restore.reverse()) reset() } }
 }
-async function focusCanvas(mounted: MountedOfficeWordSmokeEditor) {
+export async function focusOfficeWordCanvas(mounted: MountedOfficeWordSmokeEditor) {
   type CanvasUi = { pages?: number[][]; focused?: boolean }
   const state = await eventually(() => mounted.editor.inspect(), value => !!(value.ui as CanvasUi | undefined)?.pages?.length, 'Rust page layout')
   const canvas = mounted.element.querySelector<HTMLCanvasElement>('[data-testid="office-word-canvas"]')
@@ -155,7 +155,7 @@ export async function verifyMountedOfficeWordEditor(adapter: OfficeWordSmokeAdap
   try {
     const first = await open('', 'OfficeWord native smoke.docx')
     assert(first.element.dataset.engine === 'office-word-wasm', 'the default editor is not OfficeWord')
-    const canvas = await focusCanvas(first)
+    const canvas = await focusOfficeWordCanvas(first)
     await eventually(async () => paint.calls(), count => count > 0, 'actual WebGL drawing')
     let state = await first.editor.inspect()
     report.canvas = { width: canvas.width, height: canvas.height, pageCount: state.pages, paintCalls: paint.calls() }
@@ -213,7 +213,7 @@ export async function verifyMountedOfficeWordEditor(adapter: OfficeWordSmokeAdap
     report.failures = { staleSaveRejected, invalidOpenRejected, preserved }
     passed('stale-save-and-invalid-open-preserve-active-document')
     const reopened = await open(exported.base64, 'OfficeWord native reopen.docx')
-    await focusCanvas(reopened)
+    await focusOfficeWordCanvas(reopened)
     state = await reopened.editor.command('select.text', { text: inputText })
     const reopenedFormat = state.format as typeof format
     assert(state.text === inputText && !state.dirty, 'saved DOCX text or clean baseline changed on reopen')
