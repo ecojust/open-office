@@ -1,0 +1,14 @@
+[package]
+name = "office-sheet-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficeSheet MCP server: JSON-RPC 2.0 over stdio, driving a running app or a headless session"
+
+[lints]
+workspace = true
+
+[dependencies]
+office-sheet-engine = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }

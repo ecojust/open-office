@@ -1,0 +1,1619 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/ecojust/open-office",
+  "families": [
+    {
+      "old": "wordcraft",
+      "title": "WordCraft",
+      "pascal": "Wordcraft",
+      "short": "word",
+      "directory": "office-word",
+      "identifier": "office_word",
+      "type": "OfficeWord",
+      "host": "open-office-word-host",
+      "resourceKeys": [
+        "word"
+      ]
+    },
+    {
+      "old": "gridcraft",
+      "title": "GridCraft",
+      "pascal": "Gridcraft",
+      "short": "sheet",
+      "directory": "office-sheet",
+      "identifier": "office_sheet",
+      "type": "OfficeSheet",
+      "host": "open-office-sheet-host",
+      "resourceKeys": [
+        "sheet"
+      ]
+    },
+    {
+      "old": "deckcraft",
+      "title": "DeckCraft",
+      "pascal": "Deckcraft",
+      "short": "presentation",
+      "directory": "office-presentation",
+      "identifier": "office_presentation",
+      "type": "OfficePresentation",
+      "host": "open-office-presentation-host",
+      "resourceKeys": [
+        "presentation",
+        "deck"
+      ]
+    },
+    {
+      "old": "pdfcraft",
+      "title": "PdfCraft",
+      "pascal": "Pdfcraft",
+      "titleAliases": [
+        "PDFCraft"
+      ],
+      "short": "pdf",
+      "directory": "office-pdf",
+      "identifier": "office_pdf",
+      "type": "OfficePdf",
+      "host": "open-office-pdf-host",
+      "resourceKeys": [
+        "pdf"
+      ]
+    }
+  ],
+  "marketingNames": [
+    "ArtCraft",
+    "PhotoCraft",
+    "VectorCraft",
+    "FilmCraft",
+    "LightCraft",
+    "EffectCraft",
+    "DesignCraft",
+    "PrintCraft",
+    "SlideCraft",
+    "getartcraft"
+  ],
+  "marketingHosts": [
+    "getartcraft.com"
+  ],
+  "marketingUrls": [
+    "https://discord.gg/artcraft"
+  ],
+  "retiredPdfNames": [
+    "PyMuPDF",
+    "PDF.js",
+    "pdfjs",
+    "MuPDF"
+  ],
+  "legalDirectories": [
+    "public/legal/"
+  ],
+  "legalFiles": [
+    "THIRD_PARTY_NOTICES.md",
+    "DISTRIBUTION_LICENSE.md",
+    "scripts/office-branding-policy.json",
+    "vendor/office-word/contributors/contributors.json",
+    "vendor/office-word/contributors/people.toml",
+    "vendor/office-sheet/contributors/contributors.json",
+    "vendor/office-sheet/contributors/people.toml",
+    "vendor/office-presentation/contributors/contributors.json",
+    "vendor/office-presentation/contributors/people.toml",
+    "vendor/office-pdf/contributors/contributors.json",
+    "vendor/office-pdf/contributors/people.toml",
+    "vendor/office-sheet/OPEN_OFFICE_UPSTREAM.md"
+  ],
+  "legalBasenames": [
+    "LICENSE",
+    "LICENSE.txt",
+    "LICENSE.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+    "NOTICE",
+    "NOTICE.txt",
+    "NOTICE.md",
+    "COPYING",
+    "COPYING.txt",
+    "COPYRIGHT",
+    "ATTRIBUTION.md",
+    "ATTRIBUTION.toml"
+  ],
+  "legalFilenamePrefixes": [
+    "LICENSE-",
+    "LICENSE_",
+    "OFL-",
+    "COPYING."
+  ],
+  "excludedDirectories": [
+    ".git",
+    "node_modules",
+    "target",
+    "dist",
+    "artifacts",
+    "test-results",
+    "coverage",
+    ".build",
+    ".venv",
+    "__pycache__",
+    "fuzz-out",
+    "fuzz-corpus"
+  ],
+  "compatibility": [
+    {
+      "id": "word-canvas-transform-uri",
+      "reason": "Read the drawing-canvas transform extension written by previous versions. New exports use the current namespace.",
+      "paths": [
+        "vendor/office-word/crates/docx/src/lib.rs",
+        "vendor/office-word/crates/docx/src/compatibility.rs",
+        "vendor/office-word/crates/docx/tests/roundtrip.rs",
+        "vendor/office-word/crates/docx/tests/compatibility.rs"
+      ],
+      "literals": [
+        "urn:wordcraft:canvas-xfrm"
+      ]
+    },
+    {
+      "id": "word-recovery-passthrough-keys",
+      "reason": "Migrate serialized passthrough metadata without losing macros, embedded parts, custom XML or settings.",
+      "paths": [
+        "vendor/office-word/crates/doc/src/lib.rs",
+        "vendor/office-word/crates/doc/src/compatibility.rs",
+        "vendor/office-word/crates/docx/src/package.rs",
+        "vendor/office-word/crates/docx/src/compatibility.rs",
+        "vendor/office-word/crates/docx/tests/settings_merge.rs",
+        "vendor/office-word/crates/engine/tests/recovery_format.rs"
+      ],
+      "literals": [
+        "wordcraft:vbaProject.related",
+        "wordcraft:embedded.parts",
+        "wordcraft:customXml.roots",
+        "wordcraft:settings.orig",
+        "wordcraft:app.kept",
+        "wordcraft:unmodelled.roots"
+      ]
+    },
+    {
+      "id": "presentation-native-format",
+      "reason": "Read historical native presentation files and recovery entries. New files use the current format identifier.",
+      "paths": [
+        "vendor/office-presentation/crates/format/src/lib.rs",
+        "vendor/office-presentation/crates/format/src/compatibility.rs",
+        "vendor/office-presentation/crates/engine/src/recovery.rs",
+        "vendor/office-presentation/crates/engine/src/cmd/file.rs",
+        "vendor/office-presentation/crates/ui-egui/src/lib.rs"
+      ],
+      "literals": [
+        "application/vnd.storyteller.deckcraft+zip",
+        "application/vnd.storyteller.slidecraft+zip",
+        "\"deckcraft\"",
+        "\"slidecraft\"",
+        ".deckcraft",
+        ".slidecraft"
+      ]
+    },
+    {
+      "id": "presentation-stable-identifiers",
+      "reason": "Keep previously generated table-style, comment and author identifiers stable across saves.",
+      "paths": [
+        "vendor/office-presentation/crates/pptx/src/tables.rs",
+        "vendor/office-presentation/crates/pptx/src/write/mod.rs",
+        "vendor/office-presentation/crates/pptx/src/compatibility.rs"
+      ],
+      "literals": [
+        "deckcraft-table-style:",
+        "deckcraft-comment:",
+        "deckcraft-comment-author:"
+      ]
+    },
+    {
+      "id": "pdf-settings-migration",
+      "reason": "Read previous native and web preferences; write current settings under the current key.",
+      "paths": [
+        "vendor/office-pdf/crates/ui-egui/src/compatibility.rs"
+      ],
+      "literals": [
+        "\"pdfcraft\"",
+        "\"printcraft\"",
+        "\"PdfCraft\"",
+        "\"PrintCraft\""
+      ]
+    }
+  ],
+  "dependencyIdentities": [
+    {
+      "paths": [
+        "tests/compatibility/inspect-output.py",
+        "tests/browser/pdf-verify.py",
+        "tests/browser/pdf-fixtures.py",
+        "tests/compatibility/generate-complex-pdf.py",
+        "tests/compatibility/pdf-choices/make-fixture.py"
+      ],
+      "patterns": [
+        "\\b(?:import|from)\\s+pymupdf\\b",
+        "\\b(?:import|from)\\s+fitz\\b"
+      ],
+      "reason": "Independent PDF oracle imports identify the installed external package; they do not select the application runtime."
+    }
+  ],
+  "historicalFiles": [
+    "docs/calc-input-fix-results.json",
+    "docs/calc-short-viewport-results.json",
+    "docs/compatibility-preservation-results.json",
+    "docs/compatibility-results.md",
+    "docs/memory-optimization.md",
+    "docs/memory-results.json",
+    "docs/office-compatibility-followup-results.json",
+    "docs/office-completion-results.json",
+    "docs/office-completion-results.md",
+    "docs/office-viewport-results.json",
+    "docs/onlyoffice-compatibility-results.json",
+    "docs/pdf-choice-fields-results.json",
+    "docs/presentation-color-results.json",
+    "docs/presentation-complex-results.json",
+    "docs/presentation-font-results.json",
+    "docs/presentation-opacity-results.json",
+    "docs/presentation-range-results.json",
+    "docs/presentation-table-layout-results.json",
+    "docs/presentation-text-decoration-results.json",
+    "docs/presentation-text-highlight-results.json",
+    "docs/presentation-text-opacity-results.json",
+    "docs/presentation-typography-results.json",
+    "docs/releases/0.10.0.md",
+    "docs/releases/0.5.0.md",
+    "docs/releases/0.6.0.md",
+    "docs/releases/0.6.1.md",
+    "docs/releases/0.6.2.md",
+    "docs/releases/0.7.0.md",
+    "docs/releases/0.8.0.md",
+    "docs/releases/0.8.1.md",
+    "docs/releases/0.9.0.md",
+    "docs/smartart-child-results.json",
+    "docs/smartart-text-results.json",
+    "docs/standalone-presentation-results.json",
+    "docs/word-import-performance-results.json",
+    "docs/word-list-and-sheet-format-results.json",
+    "docs/word-package-performance-results.json",
+    "docs/word-performance-after.json",
+    "docs/word-performance-baseline.json",
+    "tests/compatibility/results/browser-summary.json",
+    "tests/compatibility/results/chart-summary.json",
+    "tests/compatibility/results/pdf-summary.json",
+    "tests/compatibility/results/wps-attachment-audit.json",
+    "tests/compatibility/results/wps-attachment-final-audit.json",
+    "docs/history/pdf-0.4-capabilities.md",
+    "docs/history/local-only-0.4.md",
+    "docs/history/word-integration-0.8.md",
+    "vendor/office-pdf/docs/images/pdfcraft-bookmarks.png",
+    "vendor/office-pdf/docs/images/pdfcraft-dark.png",
+    "vendor/office-pdf/docs/images/pdfcraft-find.png",
+    "vendor/office-pdf/docs/images/pdfcraft-forms.png",
+    "vendor/office-pdf/docs/images/pdfcraft-layers.png",
+    "vendor/office-pdf/docs/images/pdfcraft-organize.png",
+    "vendor/office-pdf/docs/images/pdfcraft-palette.png",
+    "vendor/office-pdf/docs/images/pdfcraft-properties.png",
+    "vendor/office-pdf/docs/images/pdfcraft-scripts.png",
+    "vendor/office-pdf/docs/images/pdfcraft-split.png",
+    "vendor/office-pdf/docs/images/pdfcraft-twoup.png",
+    "vendor/office-pdf/docs/images/pdfcraft-viewer.png",
+    "docs/office-compatibility-followup.md",
+    "docs/office-completion-review.md",
+    "docs/office-feature-coverage.md",
+    "docs/onlyoffice-compatibility-iteration.md",
+    "docs/pdf-choice-fields.md",
+    "docs/pdf-completion.md",
+    "docs/pdf-form-filling.md",
+    "docs/powerpoint-365-parity.md",
+    "docs/presentation-color-transforms.md",
+    "docs/presentation-complex-compatibility.md",
+    "docs/presentation-opacity.md",
+    "docs/presentation-typography-iteration.md",
+    "docs/standalone-presentation.md",
+    "docs/word-excel-365-parity.md"
+  ],
+  "resourceIdentifierPaths": [
+    "tests/browser/global-shell-theme.cjs",
+    "tests/browser/macos-editing-helper.cjs"
+  ],
+  "historicalReferences": [
+    "docs/images/pdfcraft-bookmarks.png",
+    "docs/images/pdfcraft-dark.png",
+    "docs/images/pdfcraft-find.png",
+    "docs/images/pdfcraft-forms.png",
+    "docs/images/pdfcraft-layers.png",
+    "docs/images/pdfcraft-organize.png",
+    "docs/images/pdfcraft-palette.png",
+    "docs/images/pdfcraft-properties.png",
+    "docs/images/pdfcraft-scripts.png",
+    "docs/images/pdfcraft-split.png",
+    "docs/images/pdfcraft-twoup.png",
+    "docs/images/pdfcraft-viewer.png"
+  ],
+  "sourceReferences": [
+    {
+      "paths": [
+        "tests/compatibility/office-word-core/run.mjs",
+        "tests/compatibility/office-word-core/generate.py"
+      ],
+      "patterns": [
+        "WordCraft independent 中文😀"
+      ],
+      "reason": "Exact authored document text in immutable source and independently saved native specimens. Preserve the fixture contract and reproducible generator without rewriting historical binary evidence."
+    },
+    {
+      "paths": [
+        "scripts/office-presentation-inspect-presentation.py",
+        "tests/browser/pdf-fixtures.py",
+        "tests/browser/pdf-verify.py",
+        "tests/compatibility/INSPECTOR.md",
+        "tests/compatibility/generate-complex-pdf.py",
+        "tests/compatibility/independent-word-auto-color/README.md",
+        "tests/compatibility/independent-word-auto-color/inspect_docx.py",
+        "tests/compatibility/independent-word-baseline-offset/README.md",
+        "tests/compatibility/independent-word-line-rule/README.md",
+        "tests/compatibility/independent-word-page-settings/README.md",
+        "tests/compatibility/independent-word-paragraph-spacing/README.md",
+        "tests/compatibility/independent-word-paragraph-spacing/geometry.py",
+        "tests/compatibility/inspect-output.py",
+        "tests/compatibility/office-word-core/README.md",
+        "tests/compatibility/pdf-choices/make-fixture.py",
+        "tests/compatibility/pdf-choices/probe-pymupdf.py",
+        "tests/compatibility/pdf-complex.cjs",
+        "tests/compatibility/presentation-opacity/audit-ui-pdf.py",
+        "tests/compatibility/presentation-typography/README.md",
+        "tests/compatibility/presentation-typography/verify.py",
+        "tests/compatibility/test_inspect_output.py",
+        "tests/requirements-pdf-inspection.txt",
+        "vendor/office-pdf/.github/pull_request_template.md",
+        "vendor/office-pdf/.github/workflows/ci.yml",
+        "vendor/office-pdf/CLAUDE.md",
+        "vendor/office-pdf/README.md",
+        "vendor/office-pdf/ROADMAP.md",
+        "vendor/office-pdf/crates/cos/tests/corpus.rs",
+        "vendor/office-pdf/crates/cos/tests/writer.rs",
+        "vendor/office-pdf/crates/fonts/src/lib.rs",
+        "vendor/office-pdf/crates/organize/src/tests.rs",
+        "vendor/office-pdf/crates/render/src/raster.rs",
+        "vendor/office-pdf/crates/render/src/text.rs",
+        "vendor/office-pdf/crates/render/tests/jbig2_invariants.rs",
+        "vendor/office-pdf/docs/architecture.md",
+        "vendor/office-pdf/docs/file-format-parity.md",
+        "vendor/office-pdf/docs/gaps.md",
+        "vendor/office-pdf/docs/roadmap.md",
+        "vendor/office-pdf/vendor/README.md",
+        "vendor/office-pdf/vendor/hayro-interpret/src/color.rs",
+        "vendor/office-pdf/vendor/hayro-interpret/src/font/blob.rs",
+        "vendor/office-pdf/vendor/hayro-interpret/src/font/cid.rs",
+        "vendor/office-pdf/vendor/hayro-interpret/src/font/mod.rs",
+        "vendor/office-pdf/vendor/hayro-interpret/src/font/standard_font.rs",
+        "vendor/office-pdf/vendor/hayro-interpret/src/font/true_type.rs",
+        "vendor/office-pdf/vendor/hayro-interpret/src/interpret/path.rs",
+        "vendor/office-pdf/vendor/hayro-interpret/src/x_object.rs",
+        "vendor/office-pdf/vendor/hayro-syntax/src/crypto/aes.rs",
+        "vendor/office-pdf/vendor/hayro-syntax/src/crypto/md5.rs",
+        "vendor/office-pdf/vendor/hayro-syntax/src/crypto/mod.rs",
+        "vendor/office-pdf/vendor/hayro-syntax/src/crypto/rc4.rs",
+        "vendor/office-pdf/vendor/hayro-syntax/src/crypto/sha256.rs",
+        "vendor/office-pdf/vendor/hayro-syntax/src/crypto/sha384.rs",
+        "vendor/office-pdf/vendor/hayro-syntax/src/crypto/sha512.rs",
+        "vendor/office-pdf/vendor/hayro-syntax/src/filter/dct.rs",
+        "vendor/office-pdf/vendor/hayro-syntax/src/filter/lzw_flate.rs",
+        "vendor/office-pdf/vendor/hayro-syntax/src/object/number.rs",
+        "vendor/office-pdf/vendor/hayro-syntax/src/pdf.rs",
+        "vendor/office-pdf/vendor/hayro/README.md",
+        "vendor/office-pdf/vendor/hayro/src/lib.rs",
+        "vendor/office-pdf/vendor/lopdf/src/object.rs",
+        "vendor/office-pdf/vendor/lopdf/src/parser/mod.rs",
+        "vendor/office-pdf/vendor/lopdf/src/reader.rs",
+        "vendor/office-pdf/vendor/lopdf/tests/brotli_decode.rs",
+        "vendor/office-pdf/xtask/baselines/pdfjs.json",
+        "vendor/office-pdf/xtask/src/corpus.rs",
+        "vendor/office-pdf/xtask/src/fuzz.rs",
+        "vendor/office-pdf/xtask/src/gates.rs",
+        "vendor/office-pdf/xtask/src/main.rs",
+        "vendor/office-word/crates/pdf/src/lib.rs",
+        "vendor/office-word/crates/pdf/src/tests.rs",
+        "docs/macos-editing-investigation.md"
+      ],
+      "patterns": [
+        "\\b(?:[Pp][Dd][Ff]\\.?[Jj][Ss]|[Pp][Yy][Mm][Uu][Pp][Dd][Ff]|[Mm][Uu][Pp][Dd][Ff])\\b"
+      ],
+      "reason": "Exact external test-corpus, independent oracle and code-origin identities. These names are factual references rather than the application engine; only these tokens are exempt, never other text or runtime logs."
+    },
+    {
+      "paths": [
+        "scripts/check-editor-boundaries.mjs",
+        "tests/editor-boundaries.test.mjs"
+      ],
+      "patterns": [
+        "\\bpdfjs\\b"
+      ],
+      "reason": "Retired dependency signatures used by negative regression guards. Preserve signatures so the guards continue detecting removed runtime packages."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/dialogs.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ egui::RichText::new\\(tl!\\(\"MIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\"\\)\\)"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/vi.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Bản\\ quyền\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ và\\ các\\ cộng\\ tác\\ viên\\ WordCraft\\.",
+        "\\\tCopyright\\ Sign\\\tKý\\ hiệu\\ bản\\ quyền",
+        "\\\tCopyright\\\tBản\\ quyền"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/ru.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ и\\ участники\\ проекта\\ WordCraft\\.",
+        "\\\tCopyright\\\tЗнак\\ авторского\\ права",
+        "\\\tCopyright\\ Sign\\\tЗнак\\ авторского\\ права"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/et.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Autoriõigus\\ \\(c\\)\\ 2026\\ ArtCrafti\\ meeskond\\ ja\\ WordCrafti\\ kaasautorid\\.",
+        "\\\tCopyright\\\tAutoriõigus",
+        "\\\tCopyright\\ Sign\\\tAutoriõiguse\\ märk"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/bg.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Авторско\\ право\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ и\\ сътрудниците\\ на\\ WordCraft\\.",
+        "\\\tCopyright\\ Sign\\\tЗнак\\ за\\ авторско\\ право",
+        "\\\tCopyright\\\tАвторско\\ право"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/pl.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ lub\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ i\\ współtwórcy\\ WordCraft\\.",
+        "\\\tCopyright\\\tPrawa\\ autorskie",
+        "\\\tCopyright\\ Sign\\\tZnak\\ praw\\ autorskich"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/tr.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Telif\\ hakkı\\ \\(c\\)\\ 2026\\ ArtCraft\\ ekibi\\ ve\\ WordCraft'a\\ katkıda\\ bulunanlar\\.",
+        "\\\tCopyright\\\tTelif\\ Hakkı",
+        "\\\tCopyright\\ Sign\\\tTelif\\ Hakkı\\ İşareti"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/hu.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ vagy\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ és\\ a\\ WordCraft\\ közreműködői\\.",
+        "\\\tCopyright\\\tCopyright",
+        "\\\tCopyright\\ Sign\\\tCopyright\\ jel"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/cs.tsv"
+      ],
+      "patterns": [
+        "\\\tCopyright\\\tZnak\\ autorských\\ práv",
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ a\\ přispěvatelé\\ projektu\\ WordCraft\\.",
+        "\\\tCopyright\\ Sign\\\tSymbol\\ autorských\\ práv"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/sr-latn.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Autorska\\ prava\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ i\\ saradnici\\ na\\ WordCraft\\-u\\.",
+        "\\\tCopyright\\ Sign\\\tZnak\\ autorskog\\ prava",
+        "\\\tCopyright\\\tZnak\\ autorskog\\ prava"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/de.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.",
+        "\\\tCopyright\\\tCopyright",
+        "\\\tCopyright\\ Sign\\\tCopyrightzeichen"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/sr.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Ауторска\\ права\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ и\\ сарадници\\ на\\ WordCraft\\-у\\.",
+        "\\\tCopyright\\ Sign\\\tЗнак\\ ауторског\\ права",
+        "\\\tCopyright\\\tЗнак\\ ауторског\\ права"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/uk.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Авторські\\ права\\ \\(c\\)\\ 2026\\ команди\\ ArtCraft\\ і\\ учасників\\ WordCraft\\.",
+        "\\\tCopyright\\ Sign\\\tЗнак\\ авторського\\ права",
+        "\\\tCopyright\\\tЗнак\\ авторського\\ права"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/es.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ o\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ y\\ los\\ colaboradores\\ de\\ WordCraft\\.",
+        "\\\tCopyright\\ Sign\\\tSigno\\ de\\ copyright",
+        "\\\tCopyright\\\tCopyright"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/it.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ e\\ i\\ collaboratori\\ di\\ WordCraft\\.",
+        "\\\tCopyright\\\tCopyright",
+        "\\\tCopyright\\ Sign\\\tSimbolo\\ di\\ copyright"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/zh-hans.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0。版权所有\\ \\(c\\)\\ 2026\\ ArtCraft\\ 团队及\\ WordCraft\\ 贡献者。",
+        "\\\tCopyright\\ Sign\\\t版权符号",
+        "\\\tCopyright\\\t版权"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/pt-br.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ e\\ os\\ colaboradores\\ do\\ WordCraft\\.",
+        "\\\tCopyright\\ Sign\\\tSinal\\ de\\ copyright",
+        "\\\tCopyright\\\tCopyright"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/zh-hant.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0。著作權所有\\ \\(c\\)\\ 2026\\ ArtCraft\\ 團隊及\\ WordCraft\\ 貢獻者。",
+        "\\\tCopyright\\ Sign\\\t著作權符號",
+        "\\\tCopyright\\\t著作權"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/ja.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0。Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ チームおよび\\ WordCraft\\ の貢献者。",
+        "\\\tCopyright\\ Sign\\\t著作権記号",
+        "\\\tCopyright\\\t著作権記号"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/fr.tsv"
+      ],
+      "patterns": [
+        "\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ WordCraft\\ contributors\\.\\\tMIT\\ OR\\ Apache\\-2\\.0\\.\\ Copyright\\ \\(c\\)\\ 2026\\ ArtCraft\\ Team\\ et\\ les\\ contributeurs\\ de\\ WordCraft\\.",
+        "\\\tCopyright\\ Sign\\\tSymbole\\ de\\ copyright",
+        "\\\tCopyright\\\tCopyright"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/apps/office-word/build.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ \\ \\ \\ \\ \\.set\\(\"LegalCopyright\",\\ \"Copyright\\ \\(c\\)\\ the\\ WordCraft\\ authors\\.\\ MIT\\ OR\\ Apache\\-2\\.0\\.\"\\)"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-sheet/apps/office-sheet/build.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ \\ \\ \\ \\ \\.set\\(\"LegalCopyright\",\\ \"Copyright\\ \\(c\\)\\ the\\ GridCraft\\ authors\\.\\ MIT\\ OR\\ Apache\\-2\\.0\\.\"\\)"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-sheet/packaging/macos/Info.plist.in"
+      ],
+      "patterns": [
+        "\\ \\ <key>NSHumanReadableCopyright</key>",
+        "\\ \\ <string>Copyright\\ ©\\ the\\ GridCraft\\ authors\\.\\ MIT\\ OR\\ Apache\\-2\\.0\\.</string>"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-sheet/packaging/windows/app-build.rs.in"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ \\ \\ \\ \\ \\.set\\(\"LegalCopyright\",\\ \"Copyright\\ \\(c\\)\\ the\\ GridCraft\\ authors\\.\\ MIT\\ OR\\ Apache\\-2\\.0\\.\"\\)"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/apps/office-presentation/build.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ \\ \\ \\ \\ \\.set\\(\"LegalCopyright\",\\ \"Copyright\\ \\(c\\)\\ the\\ DeckCraft\\ authors\\.\\ MIT\\ OR\\ Apache\\-2\\.0\\.\"\\)"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/packaging/macos/Info.plist.in"
+      ],
+      "patterns": [
+        "\\ \\ <key>NSHumanReadableCopyright</key>",
+        "\\ \\ <string>Copyright\\ ©\\ the\\ DeckCraft\\ authors\\.\\ MIT\\ OR\\ Apache\\-2\\.0\\.</string>"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/apps/office-pdf/build.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ \\ \\ \\ \\ \\.set\\(\"LegalCopyright\",\\ \"Copyright\\ \\(c\\)\\ the\\ PdfCraft\\ contributors\\.\\ MIT\\ OR\\ Apache\\-2\\.0\\.\"\\)"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/apps/office-pdf-cli/build.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ \\ \\ \\ \\ \\.set\\(\"LegalCopyright\",\\ \"Copyright\\ \\(c\\)\\ the\\ PdfCraft\\ contributors\\.\\ MIT\\ OR\\ Apache\\-2\\.0\\.\"\\)"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/apps/office-pdf-cli/tests/version_resource.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ \\ \\ \\ \\ \\(\"LegalCopyright\",\\ \"Copyright\\ \\(c\\)\\ the\\ PdfCraft\\ contributors\\.\\ MIT\\ OR\\ Apache\\-2\\.0\\.\"\\),"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/packaging/macos/Info.plist.in"
+      ],
+      "patterns": [
+        "\\ \\ <key>NSHumanReadableCopyright</key>",
+        "\\ \\ <string>Copyright\\ ©\\ the\\ PdfCraft\\ authors\\.\\ MIT\\ OR\\ Apache\\-2\\.0\\.</string>"
+      ],
+      "reason": "Original upstream copyright attribution retained verbatim in structured metadata or translated notices; only exact attribution text is exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/assets/spelling/en-extra.txt"
+      ],
+      "patterns": [
+        "Written\\ by\\ WordCraft\\ contributors"
+      ],
+      "reason": "Original upstream asset or copyright attribution; only these exact credit strings are exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-word/assets/spelling/ru-extra.txt"
+      ],
+      "patterns": [
+        "Written\\ by\\ WordCraft\\ contributors"
+      ],
+      "reason": "Original upstream asset or copyright attribution; only these exact credit strings are exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/crates/ui-egui/src/dialogs.rs"
+      ],
+      "patterns": [
+        "MIT\\ OR\\ Apache\\-2\\.0\\ ·\\ ©\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ DeckCraft\\ contributors"
+      ],
+      "reason": "Original upstream asset or copyright attribution; only these exact credit strings are exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/crates/ui-egui/src/i18n/dialogs.rs"
+      ],
+      "patterns": [
+        "MIT\\ OR\\ Apache\\-2\\.0\\ ·\\ ©\\ 2026\\ ArtCraft\\ Team\\ and\\ the\\ DeckCraft\\ contributors",
+        "MIT\\ OR\\ Apache\\-2\\.0\\ ·\\ ©\\ 2026\\ ArtCraft\\ 团队及\\ DeckCraft\\ 贡献者"
+      ],
+      "reason": "Original upstream asset or copyright attribution; only these exact credit strings are exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/assets/app-icon/office-pdf-document.svg"
+      ],
+      "patterns": [
+        "PDF\\ badge\\ and\\ outlined\\ lettering:\\ PdfCraft\\ contributors,\\ MIT\\ OR\\ Apache\\-2\\.0\\."
+      ],
+      "reason": "Original upstream asset or copyright attribution; only these exact credit strings are exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/xtask/src/assets.rs"
+      ],
+      "patterns": [
+        "Adobe\\ \\(Core14\\ AFM\\ metrics\\);\\ tables\\ by\\ the\\ PdfCraft\\ contributors"
+      ],
+      "reason": "Original upstream asset or copyright attribution; only these exact credit strings are exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/xtask/src/screenshots.rs"
+      ],
+      "patterns": [
+        "author\\ =\\ \\\\\"PdfCraft\\ contributors\\ \\(generated\\ by\\ `cargo\\ xtask\\ screenshots`\\)\\\\\""
+      ],
+      "reason": "Original upstream asset or copyright attribution; only these exact credit strings are exempt."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/AGENTS.md"
+      ],
+      "patterns": [
+        "\\*\\*One\\ narrow\\ exception:\\ the\\ ArtCraft\\ brand\\.\\*\\*\\ The\\ ArtCraft\\ name,\\ wordmark\\ and\\ logos\\ in\\ `docs/brand/`\\ are\\ trademarks\\ of\\ the\\ ArtCraft\\ Team\\ and\\ are\\ \\*\\*not\\*\\*\\ open\\ source\\ \\(manifest\\ identifier\\ `LicenseRef\\-Storyteller\\-Trademark`,\\ terms\\ in\\ `docs/brand/LICENSE\\-brand\\.txt`\\)\\.\\ They\\ may\\ be\\ used\\ only\\ unmodified,\\ only\\ within\\ PdfCraft,\\ and\\ only\\ as\\ `kind\\ =\\ \"logo\"`\\ entries\\ from\\ that\\ directory,\\ to\\ identify\\ the\\ project\\.\\ Forks\\ and\\ modified\\ versions\\ must\\ remove\\ them\\.\\ Never\\ add\\ other\\ files\\ under\\ this\\ licence,\\ and\\ never\\ modify\\ the\\ logos\\.",
+        "\\-\\ Shared\\ real\\-file\\ test\\ oracles\\ \\(Photoshop\\-authored\\ PSDs,\\ etc\\.\\)\\ live\\ in\\ \\[`storytold/photocraft\\-corpus`\\]\\(https://github\\.com/storytold/photocraft\\-corpus\\),\\ explained\\ in\\ \\[craftrules\\ `standards/test\\-corpora\\.md`\\]\\(https://github\\.com/storytold/craftrules/blob/main/standards/test\\-corpora\\.md\\)\\ \\(internal\\)\\.\\ Never\\ commit\\ large\\ binary\\ fixtures\\ to\\ this\\ repo;\\ fetch\\ them\\ pinned\\ by\\ commit\\ and\\ sha256\\-verified,\\ as\\ PhotoCraft\\ does\\ with\\ `cargo\\ xtask\\ corpus`\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/CLAUDE.md"
+      ],
+      "patterns": [
+        "OfficePdf\\ is\\ a\\ clean\\-room,\\ open\\-source,\\ Rust\\-native\\ PDF\\ application\\ targeting\\ Adobe\\ Acrobat\\ Pro\\ parity\\.\\ It\\ runs\\ natively\\ on\\ macOS,\\ Windows,\\ Linux\\ and\\ FreeBSD,\\ and\\ on\\ the\\ web\\ via\\ WASM\\.\\ It\\ is\\ the\\ sibling\\ of\\ `\\.\\./photocraft`\\ \\(a\\ Photoshop\\-class\\ editor\\)\\ and\\ follows\\ the\\ same\\ conventions\\.",
+        "`plan/`\\ is\\ gitignored\\ \\(local\\-only,\\ like\\ PhotoCraft\\)\\.\\ The\\ machine\\-readable\\ parity\\ checklist\\ lives\\ in\\ `parity/`\\ \\(committed\\)\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/README.md"
+      ],
+      "patterns": [
+        ">\\ Source\\ integration:\\ this\\ directory\\ adapts\\ \\[PdfCraft\\]\\(https://github\\.com/storytold/pdfcraft\\)\\ for\\ Open\\ Office\\.\\ The\\ feature\\ descriptions\\ below\\ document\\ the\\ upstream\\ engine;\\ see\\ the\\ \\[Open\\ Office\\ README\\]\\(\\.\\./\\.\\./README\\.md\\)\\ for\\ the\\ integrated\\ application\\ and\\ supported\\ workflows\\.\\ Original\\ licenses\\ and\\ notices\\ remain\\ in\\ this\\ directory\\.",
+        "ArtCraft\\ Team\\ and\\ are\\ not\\ covered\\ by\\ this\\ license\\.\\ They\\ may\\ be\\ used\\ only\\ unmodified,\\ and\\ only\\ as",
+        "The\\ ArtCraft\\ name,\\ wordmark\\ and\\ logos\\ in\\ \\[`docs/brand/`\\]\\(docs/brand/\\)\\ are\\ trademarks\\ of\\ the",
+        "part\\ of\\ this\\ repository\\ and\\ PdfCraft,\\ under\\ \\[`docs/brand/LICENSE\\-brand\\.txt`\\]\\(docs/brand/LICENSE\\-brand\\.txt\\)\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/ROADMAP.md"
+      ],
+      "patterns": [
+        "\\-\\ \\*\\*2026\\-10\\-07\\ \\(localization\\):\\*\\*\\ The\\ interface\\ translates\\ through\\ the\\ same\\ system\\ as\\ PhotoCraft:\\ one\\ TSV\\ catalog\\ per\\ language\\ \\(`crates/ui\\-egui/src/i18n/ja\\.tsv`\\),\\ the\\ `tl!`\\ macro,\\ entries\\ keyed\\ by\\ command\\ id\\ or\\ with\\ plural\\ forms,\\ and\\ catalog\\ tests\\ \\(format,\\ duplicates,\\ placeholders,\\ command\\ ids\\)\\.\\ Catalogs\\ are\\ validated\\ strictly\\ \\(unknown\\ escapes,\\ reserved\\ contexts,\\ placeholders,\\ ellipses,\\ plural\\ forms\\),\\ a\\ bad\\ line\\ is\\ skipped\\ and\\ logged\\ at\\ run\\ time,\\ `fmt`\\ substitutes\\ in\\ one\\ pass,\\ the\\ drawing\\ language\\ is\\ per\\ thread,\\ and\\ each\\ `\\.tsv`\\ is\\ an\\ attributed\\ asset\\ \\(`kind\\ =\\ \"translation\"`,\\ checked\\ by\\ `cargo\\ xtask\\ assets`\\);\\ validation,\\ attribution\\ and\\ the\\ language\\-switch\\ control\\ test\\ folded\\ in\\ from\\ \\#175\\.\\ The\\ 49\\ existing\\ Japanese\\ strings\\ moved\\ over\\ unchanged,\\ plus\\ `Auto`\\.\\ The\\ `language`\\ preference\\ now\\ defaults\\ to\\ `auto`\\ \\(follow\\ the\\ system\\ language;\\ English\\ when\\ it\\ has\\ no\\ catalog\\);\\ `en`/`ja`\\ still\\ persist,\\ and\\ unknown\\ values\\ are\\ rejected\\.\\ Not\\ covered:\\ dialogs\\ and\\ panels,\\ Windows\\ system\\-language\\ detection\\.\\ ≈\\ 30–35%\\ \\(unchanged\\)\\.",
+        "\\-\\ \\*\\*2026\\-10\\-07\\ \\(session\\ 16\\):\\*\\*\\ PrintCraft\\ is\\ renamed\\ PdfCraft:\\ repo\\ `storytold/pdfcraft`,\\ crates\\ and\\ binaries\\ `pdfcraft\\*`,\\ bundle\\ id\\ `ai\\.storyteller\\.pdfcraft`\\.\\ On\\ first\\ launch\\ the\\ app\\ moves\\ the\\ old\\ PrintCraft\\ settings\\ and\\ crash\\-recovery\\ folders\\ to\\ the\\ new\\ name,\\ so\\ upgrades\\ keep\\ recent\\ files,\\ preferences\\ and\\ unsaved\\ work\\.\\ No\\ feature\\ change\\.\\ ≈\\ 30–35%\\.",
+        "\\-\\ \\*\\*2026\\-10\\-08\\ \\(M14,\\ Simplified\\ Chinese\\):\\*\\*\\ Added\\ 208\\ translations,\\ bringing\\ the\\ catalog\\ from\\ 1,625\\ to\\ 1,833\\ entries\\.\\ PhotoCraft\\-style\\ coverage\\ checks\\ protect\\ registered\\ commands,\\ All\\ tools\\ labels\\ and\\ UI\\ `tl!`\\ literals;\\ generated\\ history\\ and\\ diagnostic\\ regressions\\ preserve\\ user\\ values\\.\\ Chinese\\ font\\ delivery\\ remains\\ incomplete:\\ the\\ release\\-pinned\\ craft\\-fonts\\ input\\ has\\ no\\ Hans\\ face\\ and\\ the\\ web\\ build\\ only\\ embeds\\ the\\ Japanese\\ UI\\ face\\ \\(see\\ \\#112\\ and\\ \\#140\\)\\.\\ Localization\\ remains\\ partial;\\ overall\\ ≈\\ 30–35%\\ \\(unchanged\\)\\.",
+        "\\-\\ \\*\\*2026\\-10\\-10\\ \\(progress\\ docs,\\ gate\\ consistency\\ check\\):\\*\\*\\ Re\\-judged\\ the\\ convert\\-and\\-share\\ row\\ with\\ the\\ rule\\ applied\\ across\\ all\\ Crafting\\ Apps\\ \\(a\\ workflow\\ blocks\\ only\\ when\\ it\\ can't\\ be\\ completed\\ at\\ all;\\ lossy\\ exchange\\ and\\ missing\\ sub\\-cases\\ are\\ beta\\ items,\\ as\\ for\\ FilmCraft's\\ \\.prproj\\ or\\ VectorCraft's\\ \\.ai\\)\\.\\ Unencrypted\\ sharing\\ works,\\ encryption\\ interop\\ \\(\\#774\\)\\ and\\ Office→PDF\\ are\\ sub\\-cases,\\ Word\\ export\\ is\\ lossy\\ rather\\ than\\ absent:\\ partial,\\ not\\ blocking\\.\\ \\*\\*Stage\\ pre\\-alpha\\ →\\ alpha\\*\\*;\\ numbers\\ unchanged\\ \\(47%,\\ mainstream\\ 55%;\\ beta\\ ≈\\ 400–700\\ h\\)\\.\\ Added\\ an\\ essentials\\-user\\ score:\\ ≈\\ 66%\\ for\\ someone\\ who\\ only\\ opens,\\ reads,\\ comments,\\ fills,\\ signs,\\ prints\\ and\\ rearranges\\ pages\\.",
+        "\\-\\ \\*\\*2026\\-10\\-11\\ \\(M10\\.5\\):\\*\\*\\ Extracted\\ printer\\ discovery,\\ options\\ and\\ PDF\\ submission\\ into\\ craft\\-libs/craft\\-print,\\ shared\\ with\\ DesignCraft\\.\\ Windows\\ preserves\\ composed\\ sheet\\ size\\ and\\ orientation\\ without\\ fitting\\ into\\ default\\ margins;\\ duplex\\ binding\\ edges\\ are\\ corrected\\.\\ PdfCraft\\ retains\\ permission\\ checks\\ and\\ imposition\\.\\ Shared\\ transport\\ and\\ local\\ composition,\\ engine,\\ automation\\ and\\ UI\\ coverage\\ validate\\ the\\ boundary;\\ native\\ Windows\\ CI\\ passes,\\ including\\ paused\\-queue\\ submission\\ and\\ cleanup;\\ physical\\ printer\\ fidelity\\ remains\\ a\\ hardware\\ check\\.\\ Rust\\ 1\\.95\\ is\\ required\\ by\\ the\\ shared\\ crate\\.\\ No\\ readiness\\ percentage\\ change\\.",
+        "\\-\\ \\*\\*2026\\-10\\-11\\ \\(M14,\\ absolute\\ interface\\ sizes\\):\\*\\*\\ A\\ chosen\\ Interface\\ size\\ is\\ now\\ absolute,\\ as\\ PhotoCraft's\\ UI\\ Scale\\ is:\\ \"100%\"\\ is\\ one\\ screen\\ pixel\\ per\\ point\\ whatever\\ scale\\ the\\ display\\ reports,\\ so\\ on\\ a\\ 1080p\\ screen\\ whose\\ system\\ reports\\ 200\\ %\\ it\\ draws\\ at\\ a\\ true\\ 100\\ %\\ \\(\\#456,\\ reported\\ after\\ the\\ first\\ change\\)\\.\\ Auto\\ still\\ keeps\\ the\\ display's\\ scale\\ and\\ adds\\ GNOME's\\ text\\ scaling,\\ and\\ its\\ menu\\ entry\\ shows\\ the\\ size\\ it\\ draws\\ at\\.\\ The\\ menu\\ offers\\ PhotoCraft's\\ sizes\\ \\(75–300\\ %\\)\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/assets/app-icon/README.md"
+      ],
+      "patterns": [
+        "\\*\\*Provenance:\\*\\*\\ the\\ project\\ owner's\\ original\\ drawing,\\ made\\ in\\ ArtCraft\\ \\(2880\\ px,\\ keyed\\ to\\ the\\ palette\\),\\ then",
+        "warping\\)\\.\\ The\\ source\\ drawing\\ is\\ kept\\ in\\ craftrules\\ at\\ `assets/app\\-icons/pdfcraft/source\\.png`,\\ not\\ here\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/automation/README.md"
+      ],
+      "patterns": [
+        "Following\\ FilmCraft's\\ MCP\\ conventions,\\ `command_list\\ \\{doc\\?,\\ filter\\?,\\ enabled_only\\?\\}`\\ keeps\\ its"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/sign/tests/data/README.md"
+      ],
+      "patterns": [
+        "openssl\\ req\\ \\-newkey\\ rsa:2048\\ \\-nodes\\ \\-keyout\\ leaf\\.key\\ \\-out\\ leaf\\.csr\\ \\-subj\\ \"/CN=Ada\\ Lovelace/O=PrintCraft\\ Tests/emailAddress=ada@example\\.com\"",
+        "openssl\\ req\\ \\-x509\\ \\-newkey\\ ec\\ \\-pkeyopt\\ ec_paramgen_curve:P\\-256\\ \\-nodes\\ \\-keyout\\ ca\\.key\\ \\-out\\ ca\\.crt\\ \\-days\\ 3650\\ \\-subj\\ \"/CN=PrintCraft\\ Test\\ Root\\ CA/O=PrintCraft\\ Tests\"\\ \\-set_serial\\ 1\\ \\-addext\\ \"basicConstraints=critical,CA:TRUE\"\\ \\-addext\\ \"keyUsage=critical,keyCertSign,cRLSign\"",
+        "openssl\\ req\\ \\-x509\\ \\-newkey\\ ec\\ \\-pkeyopt\\ ec_paramgen_curve:P\\-256\\ \\-nodes\\ \\-keyout\\ ec\\.key\\ \\-out\\ ec\\.crt\\ \\-days\\ 3650\\ \\-subj\\ \"/CN=Test\\ Signer\\ EC/O=PrintCraft\\ Tests\"\\ \\-set_serial\\ 2002",
+        "openssl\\ req\\ \\-x509\\ \\-newkey\\ rsa:2048\\ \\-nodes\\ \\-keyout\\ rsa\\.key\\ \\-out\\ rsa\\.crt\\ \\-days\\ 3650\\ \\-subj\\ \"/CN=Test\\ Signer\\ RSA/O=PrintCraft\\ Tests/C=US\"\\ \\-set_serial\\ 1001"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/docs/development.md"
+      ],
+      "patterns": [
+        "The\\ existing\\ PrintCraft\\-to\\-PdfCraft\\ migration\\ runs\\ first\\.\\ macOS,\\ Windows\\ and\\ portable"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/docs/localization.md"
+      ],
+      "patterns": [
+        "Japanese,\\ Simplified\\ Chinese,\\ French,\\ German\\ and\\ Brazilian\\ Portuguese\\ coverage\\ tests,\\ following\\ PhotoCraft's\\ complete\\-catalog\\ approach,\\ check\\ every\\ registered\\ command,\\ All\\ tools\\ label\\ and\\ `tl!\\(\"literal\"\\)`\\ in\\ the\\ UI\\ source\\.\\ Simplified\\ Chinese\\ also\\ checks\\ direct\\ `i18n::t`\\ calls\\ and\\ multiline\\ literals,\\ plus\\ the\\ About\\ tabs,\\ contributor\\ name\\ modes,\\ sort\\ options,\\ table\\ headers\\ and\\ model\\ columns\\.\\ Generated\\ history\\ labels,\\ contributor\\ summaries\\ and\\ diagnostics\\ are\\ tested\\ with\\ user\\-supplied\\ names\\ and\\ error\\ details\\.\\ Catalog\\ coverage\\ does\\ not\\ guarantee\\ glyph\\ coverage:\\ the\\ release\\-pinned\\ craft\\-fonts\\ input\\ currently\\ has\\ no\\ `Hans`\\ face,\\ and\\ the\\ web\\ build\\ embeds\\ only\\ BIZ\\ UDPGothic\\ Regular\\.\\ Chinese\\ font\\ delivery\\ remains\\ separate\\ work,\\ as\\ discussed\\ in\\ \\[\\#112\\]\\(https://github\\.com/storytold/pdfcraft/pull/112\\)\\ and\\ \\[\\#140\\]\\(https://github\\.com/storytold/pdfcraft/pull/140\\)\\.",
+        "OfficePdf\\ uses\\ the\\ same\\ system\\ as\\ PhotoCraft\\ \\(`crates/ui\\-egui/src/i18n/`\\):"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/docs/mcp.md"
+      ],
+      "patterns": [
+        "The\\ two\\ flags\\ \\(VectorCraft,\\ PhotoCraft\\ and\\ the\\ other\\ Craft\\ apps\\ take\\ the\\ same\\ ones,\\ so\\ one\\ client"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/docs/releasing.md"
+      ],
+      "patterns": [
+        "The\\ pipeline\\ was\\ ported\\ from\\ PhotoCraft's\\.\\ User\\-facing\\ names\\ say\\ \\*\\*OfficePdf\\*\\*;\\ files,\\ binaries\\ and"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/docs/roadmap.md"
+      ],
+      "patterns": [
+        "\\|\\ M14\\ \\|\\ 1\\.0\\ polish:\\ performance,\\ localization,\\ installers\\ \\|\\ 120–250\\ \\|\\ 15%\\ \\|\\ 80–150\\ \\|\\ Done:\\ PhotoCraft's\\ translation\\ system\\ \\(`i18n/`:\\ TSV\\ catalogs,\\ `tl!`,\\ command\\-id\\ and\\ plural\\ entries,\\ system\\-language\\ detection,\\ strict\\ catalog\\ tests\\);\\ every\\ dialog,\\ panel\\ and\\ notice\\ goes\\ through\\ `tl!`\\.\\ Catalogs\\ of\\ ≈\\ 2,000–2,140\\ entries\\ for\\ Japanese,\\ Simplified\\ and\\ Traditional\\ Chinese,\\ Russian,\\ Bulgarian,\\ German,\\ Spanish,\\ French,\\ Telugu,\\ Hungarian,\\ Ukrainian,\\ Brazilian\\ Portuguese\\ and\\ Arabic\\ \\(logical\\-order\\ catalog\\ put\\ into\\ display\\ order;\\ layout\\ not\\ yet\\ mirrored\\);\\ Czech\\ covers\\ the\\ menus\\.\\ Italian\\ has\\ 2,528\\ entries:\\ every\\ key\\ of\\ the\\ other\\ catalogs\\ that\\ the\\ code\\ looks\\ up\\.\\ Signed\\ and\\ notarized\\ macOS\\ builds,\\ signed\\ Windows\\ installers\\ \\(x64,\\ x86,\\ ARM64\\),\\ AppImage,\\ deb,\\ rpm,\\ Flatpak\\ and\\ FreeBSD\\ packages\\.\\ \\#307\\ \\(bounded\\ large\\-PDF\\ memory\\):\\ shared\\ resource\\ indexes\\ and\\ parser\\ metadata,\\ lazy\\ inspection,\\ bounded\\ caches;\\ a\\ 9,156\\-page\\ file\\ inspects\\ in\\ ≈\\ 1\\.8\\ s\\ at\\ ≈\\ 500\\ MiB\\ instead\\ of\\ exceeding\\ 10\\ GiB\\.\\ Edits\\ let\\ go\\ of\\ the\\ previous\\ working\\ file\\ before\\ writing\\ the\\ next\\ \\(a\\ 1\\ GiB\\ file\\ peaks\\ at\\ two\\ copies\\ while\\ editing,\\ not\\ three;\\ gap\\ 13\\)\\.\\ Shortcut\\ display\\ uses\\ localized\\ modifier/key\\ names\\ across\\ menus,\\ toolbar,\\ palette,\\ Help\\ and\\ tooltips\\ \\(\\#496\\)\\.\\ Lithuanian\\ adds\\ a\\ 2,578\\-entry\\ catalog\\ and\\ date\\ names,\\ reviewed\\ by\\ a\\ native\\-speaking\\ contributor\\.\\ Validated\\ candidate\\ \\(macOS\\ raster\\ probe;\\ Windows\\ runtime\\ unverified\\):\\ the\\ Windows\\ policy\\ changes\\ only\\ embedded\\ JetBrains\\ Mono;\\ horizontal\\ alpha\\-edge\\ energy\\ per\\ ink\\ improves\\ 2\\.78%,\\ 3\\.87%\\ and\\ 1\\.59%\\ at\\ 100%,\\ 125%\\ and\\ 150%,\\ and\\ is\\ down\\ 0\\.79%\\ at\\ 200%\\.\\ Inter\\ is\\ pixel\\-identical;\\ layout\\ hashes,\\ glyph\\ coverage\\ and\\ the\\ 8\\ MiB\\ atlas\\ are\\ unchanged\\.\\ Timing\\ and\\ RSS\\ ranges\\ overlap,\\ with\\ no\\ improvement\\ claimed\\.\\ Estimates\\ unchanged\\.\\ Missing:\\ a\\ right\\-to\\-left\\ layout,\\ a\\ Chinese\\ UI\\ face\\ in\\ releases,\\ Hindi/Indonesian/Korean/Vietnamese,\\ file\\-backed\\ input\\ and\\ global\\ memory\\ budgets,\\ performance\\ budgets,\\ keyboard\\-only\\ operation\\ Linux/Unix\\ UI\\ fallback\\ fonts\\ also\\ use\\ Fontconfig\\ directories,\\ including\\ Nix\\ store\\ paths,\\ with\\ bounded\\ discovery\\ and\\ the\\ existing\\ candidate\\ allowlist;\\ relative\\ includes\\ and\\ digit\\-prefixed\\ config\\ filtering\\ have\\ isolated\\ regressions\\.\\ \\|",
+        "\\|\\ M14\\ \\|\\ 1\\.0\\ polish:\\ performance,\\ localization,\\ installers\\ \\|\\ 120–250\\ \\|\\ 15%\\ \\|\\ 80–150\\ \\|\\ Done:\\ PhotoCraft's\\ translation\\ system\\ \\(`i18n/`:\\ TSV\\ catalogs,\\ `tl!`,\\ command\\-id\\ and\\ plural\\ entries,\\ system\\-language\\ detection,\\ strict\\ catalog\\ tests\\);\\ every\\ dialog,\\ panel\\ and\\ notice\\ goes\\ through\\ `tl!`\\.\\ Catalogs\\ of\\ ≈\\ 2,000–2,140\\ entries\\ for\\ Japanese,\\ Simplified\\ and\\ Traditional\\ Chinese,\\ Russian,\\ Bulgarian,\\ German,\\ Spanish,\\ French,\\ Telugu,\\ Hungarian,\\ Ukrainian,\\ Brazilian\\ Portuguese\\ and\\ Arabic\\ \\(logical\\-order\\ catalog\\ put\\ into\\ display\\ order;\\ layout\\ not\\ yet\\ mirrored\\);\\ Czech\\ covers\\ the\\ menus\\.\\ Italian\\ has\\ 2,528\\ entries:\\ every\\ key\\ of\\ the\\ other\\ catalogs\\ that\\ the\\ code\\ looks\\ up\\.\\ Signed\\ and\\ notarized\\ macOS\\ builds,\\ signed\\ Windows\\ installers\\ \\(x64,\\ x86,\\ ARM64\\),\\ AppImage,\\ deb,\\ rpm,\\ Flatpak\\ and\\ FreeBSD\\ packages\\.\\ \\#307\\ \\(bounded\\ large\\-PDF\\ memory\\):\\ shared\\ resource\\ indexes\\ and\\ parser\\ metadata,\\ lazy\\ inspection,\\ bounded\\ caches;\\ a\\ 9,156\\-page\\ file\\ inspects\\ in\\ ≈\\ 1\\.8\\ s\\ at\\ ≈\\ 500\\ MiB\\ instead\\ of\\ exceeding\\ 10\\ GiB\\.\\ Edits\\ let\\ go\\ of\\ the\\ previous\\ working\\ file\\ before\\ writing\\ the\\ next\\ \\(a\\ 1\\ GiB\\ file\\ peaks\\ at\\ two\\ copies\\ while\\ editing,\\ not\\ three;\\ gap\\ 13\\)\\.\\ Shortcut\\ display\\ uses\\ localized\\ modifier/key\\ names\\ across\\ menus,\\ toolbar,\\ palette,\\ Help\\ and\\ tooltips\\ \\(\\#496\\)\\.\\ Lithuanian\\ adds\\ a\\ 2,578\\-entry\\ catalog\\ and\\ date\\ names,\\ reviewed\\ by\\ a\\ native\\-speaking\\ contributor\\.\\ Validated\\ candidate\\ \\(macOS\\ raster\\ probe;\\ Windows\\ runtime\\ unverified\\):\\ the\\ Windows\\ policy\\ changes\\ only\\ embedded\\ JetBrains\\ Mono;\\ horizontal\\ alpha\\-edge\\ energy\\ per\\ ink\\ improves\\ 2\\.78%,\\ 3\\.87%\\ and\\ 1\\.59%\\ at\\ 100%,\\ 125%\\ and\\ 150%,\\ and\\ is\\ down\\ 0\\.79%\\ at\\ 200%\\.\\ Inter\\ is\\ pixel\\-identical;\\ layout\\ hashes,\\ glyph\\ coverage\\ and\\ the\\ 8\\ MiB\\ atlas\\ are\\ unchanged\\.\\ Timing\\ and\\ RSS\\ ranges\\ overlap,\\ with\\ no\\ improvement\\ claimed\\.\\ Estimates\\ unchanged\\.\\ Missing:\\ a\\ right\\-to\\-left\\ layout,\\ a\\ Chinese\\ UI\\ face\\ in\\ releases,\\ Hindi/Indonesian/Korean/Vietnamese,\\ file\\-backed\\ input\\ and\\ global\\ memory\\ budgets,\\ performance\\ budgets,\\ keyboard\\-only\\ operation\\ XDG\\ desktops\\ use\\ the\\ configuration\\ base\\ for\\ preferences\\ with\\ non\\-overwriting\\ migration\\ and\\ original\\-data\\ preservation\\ \\(\\#1395\\)\\.\\ \\|",
+        "\\|\\ M14\\ \\|\\ 1\\.0\\ polish:\\ performance,\\ localization,\\ installers\\ \\|\\ 120–250\\ \\|\\ 15%\\ \\|\\ 80–150\\ \\|\\ Done:\\ PhotoCraft's\\ translation\\ system\\ \\(`i18n/`:\\ TSV\\ catalogs,\\ `tl!`,\\ command\\-id\\ and\\ plural\\ entries,\\ system\\-language\\ detection,\\ strict\\ catalog\\ tests\\);\\ every\\ dialog,\\ panel\\ and\\ notice\\ goes\\ through\\ `tl!`\\.\\ Catalogs\\ of\\ ≈\\ 2,000–2,140\\ entries\\ for\\ Japanese,\\ Simplified\\ and\\ Traditional\\ Chinese,\\ Russian,\\ Bulgarian,\\ German,\\ Spanish,\\ French,\\ Telugu,\\ Hungarian,\\ Ukrainian,\\ Brazilian\\ Portuguese\\ and\\ Arabic\\ \\(logical\\-order\\ catalog\\ put\\ into\\ display\\ order;\\ layout\\ not\\ yet\\ mirrored\\);\\ Czech\\ covers\\ the\\ menus\\.\\ Italian\\ has\\ 2,528\\ entries:\\ every\\ key\\ of\\ the\\ other\\ catalogs\\ that\\ the\\ code\\ looks\\ up\\.\\ Signed\\ and\\ notarized\\ macOS\\ builds,\\ signed\\ Windows\\ installers\\ \\(x64,\\ x86,\\ ARM64\\),\\ AppImage,\\ deb,\\ rpm,\\ Flatpak\\ and\\ FreeBSD\\ packages\\.\\ \\#307\\ \\(bounded\\ large\\-PDF\\ memory\\):\\ shared\\ resource\\ indexes\\ and\\ parser\\ metadata,\\ lazy\\ inspection,\\ bounded\\ caches;\\ a\\ 9,156\\-page\\ file\\ inspects\\ in\\ ≈\\ 1\\.8\\ s\\ at\\ ≈\\ 500\\ MiB\\ instead\\ of\\ exceeding\\ 10\\ GiB\\.\\ Edits\\ let\\ go\\ of\\ the\\ previous\\ working\\ file\\ before\\ writing\\ the\\ next\\ \\(a\\ 1\\ GiB\\ file\\ peaks\\ at\\ two\\ copies\\ while\\ editing,\\ not\\ three;\\ gap\\ 13\\)\\.\\ Shortcut\\ display\\ uses\\ localized\\ modifier/key\\ names\\ across\\ menus,\\ toolbar,\\ palette,\\ Help\\ and\\ tooltips\\ \\(\\#496\\)\\.\\ Traditional\\ Chinese\\ accessibility\\ statuses,\\ rule\\ semantics\\ and\\ Taiwan\\ form/table\\ terms\\ have\\ catalog\\ regressions\\.\\ Missing:\\ a\\ right\\-to\\-left\\ layout,\\ a\\ Chinese\\ UI\\ face\\ in\\ releases,\\ Hindi/Indonesian/Korean/Vietnamese,\\ file\\-backed\\ input\\ and\\ global\\ memory\\ budgets,\\ performance\\ budgets,\\ keyboard\\-only\\ operation\\ \\|"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/packaging/macos/dmg/README.md"
+      ],
+      "patterns": [
+        "This\\ follows\\ VectorCraft's\\ `packaging/macos/dmg/`\\ \\(storytold/vectorcraft\\#493\\)\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/AGENTS.md"
+      ],
+      "patterns": [
+        "ArtCraft\\ Team\\ \\(not\\ open\\ source,\\ terms\\ in\\ `docs/brand/LICENSE\\-brand\\.txt`\\),\\ used\\ only\\ unmodified\\ to",
+        "One\\ narrow\\ exception:\\ the\\ ArtCraft\\ name,\\ wordmark\\ and\\ logos\\ in\\ `docs/brand/`\\ are\\ trademarks\\ of\\ the",
+        "PhotoCraft,\\ VectorCraft,\\ FilmCraft,\\ LightCraft,\\ PdfCraft,\\ EffectCraft,\\ DesignCraft"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/README.md"
+      ],
+      "patterns": [
+        ">\\ Source\\ integration:\\ this\\ directory\\ adapts\\ \\[DeckCraft\\]\\(https://github\\.com/storytold/deckcraft\\)\\ for\\ Open\\ Office\\.\\ The\\ feature\\ descriptions\\ below\\ document\\ the\\ upstream\\ engine;\\ see\\ the\\ \\[Open\\ Office\\ README\\]\\(\\.\\./\\.\\./README\\.md\\)\\ for\\ the\\ integrated\\ application\\ and\\ supported\\ workflows\\.\\ Original\\ licenses\\ and\\ notices\\ remain\\ in\\ this\\ directory\\.",
+        "ArtCraft\\ Team\\ and\\ are\\ not\\ covered\\ by\\ this\\ license\\.\\ They\\ may\\ be\\ used\\ only\\ unmodified,\\ and\\ only\\ as",
+        "The\\ ArtCraft\\ name,\\ wordmark\\ and\\ logos\\ in\\ \\[`docs/brand/`\\]\\(docs/brand/\\)\\ are\\ trademarks\\ of\\ the",
+        "part\\ of\\ this\\ repository\\ and\\ DeckCraft,\\ under\\ \\[`docs/brand/LICENSE\\-brand\\.txt`\\]\\(docs/brand/LICENSE\\-brand\\.txt\\)\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/ROADMAP.md"
+      ],
+      "patterns": [
+        "\\|\\ 2026\\-10\\-06\\ \\|\\ Renamed\\ SlideCraft\\ to\\ DeckCraft\\.\\ PPTX\\ import/export,\\ PDF\\ export,\\ media\\ playback\\ with\\ pure\\-Rust\\ codecs,\\ connectors\\ with\\ glue,\\ freeform\\ tools,\\ merge\\ shapes,\\ AutoRecover,\\ gradient\\ editor,\\ web\\ build,\\ release\\ CI,\\ parity\\ catalogue\\ \\|",
+        "\\|\\ 2026\\-10\\-07\\ \\|\\ v0\\.1\\.0\\ released,\\ signed\\ and\\ notarized;\\ About\\ window\\ with\\ contributor\\ credits\\ \\(\\#3\\);\\ PrintCraft\\ renamed\\ PdfCraft\\ \\|"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/docs/architecture.md"
+      ],
+      "patterns": [
+        "FilmCraft\\.",
+        "\\ \\ ignore\\ unknown\\ fields;\\ `\\.slidecraft`\\ files\\ from\\ before\\ the\\ rename\\ still\\ open\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/docs/file-format-parity.md"
+      ],
+      "patterns": [
+        "\\|\\ `\\.office\\-presentation`\\ native\\ \\(zip\\ \\+\\ JSON\\)\\ \\|\\ n/a\\ \\|\\ yes\\ \\(also\\ `\\.slidecraft`\\)\\ \\|\\ yes\\ \\|\\ Lossless\\ for\\ the\\ OfficePresentation\\ model,\\ forward\\ compatible\\ \\|\\ `crates/format`\\ tests\\ \\|"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/docs/gaps.md"
+      ],
+      "patterns": [
+        "\\ \\ FilmCraft's\\ hardware\\ decode\\)\\.",
+        "\\ \\ transitions\\ and\\ builds;\\ an\\ H\\.264\\ encoder\\ is\\ the\\ hard\\ part,\\ FilmCraft\\ has\\ one\\ to\\ copy\\)\\.",
+        "\\-\\ \\*\\*Estimate:\\*\\*\\ 20–35\\ h:\\ grow\\ the\\ owned\\ corpus\\ in\\ `storytold/photocraft\\-corpus`\\ style\\ \\(craftrules"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/docs/hardware-parity.md"
+      ],
+      "patterns": [
+        "\\|\\ Hardware\\ video\\ decode\\ \\(copy\\ FilmCraft's\\ VideoToolbox\\ /\\ Media\\ Foundation\\ /\\ VA\\-API\\ paths\\)\\ \\|\\ 8–14\\ \\|"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/docs/localization-parity.md"
+      ],
+      "patterns": [
+        "sibling\\ app's\\ approach,\\ e\\.g\\.\\ EffectCraft's\\ menu\\ and\\ panel\\ catalogs\\),\\ a\\ language\\ setting\\ that\\ follows"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/docs/mcp.md"
+      ],
+      "patterns": [
+        "The\\ two\\ flags\\ \\(VectorCraft,\\ PhotoCraft\\ and\\ the\\ other\\ Craft\\ apps\\ take\\ the\\ same\\ ones,\\ so\\ one\\ client"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/docs/target-app-parity.md"
+      ],
+      "patterns": [
+        "\\ \\ release\\ pipeline\\ \\(today\\ 117k\\ lines\\ of\\ Rust,\\ 59k\\ of\\ them\\ media\\ codecs\\ and\\ containers\\ ported\\ from\\ FilmCraft\\)\\ took\\ about",
+        "\\|\\ File\\ exchange\\ with\\ PowerPoint\\ users\\ \\|\\ ×0\\.88\\ \\|\\ Harsher\\ than\\ VectorCraft's\\ ×0\\.92\\ because\\ swapping\\ `\\.pptx`\\ is\\ daily\\ work\\ for\\ this\\ user:\\ never\\ tested\\ on\\ real\\ decks,\\ EMF\\ pictures\\ blank,\\ icons\\ from\\ PowerPoint\\ don't\\ come\\ through\\ \\(\\#56\\),\\ comment\\ threads,\\ media\\ options\\ and\\ rewind\\ lost\\ on\\ save\\ \\(\\#70,\\ \\#74,\\ \\#77\\)\\ \\|"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/packaging/macos/dmg/README.md"
+      ],
+      "patterns": [
+        "This\\ follows\\ VectorCraft's\\ `packaging/macos/dmg/`\\ \\(storytold/vectorcraft\\#493\\)\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-sheet/AGENTS.md"
+      ],
+      "patterns": [
+        "OfficeSheet\\ is\\ a\\ clean\\-room,\\ open\\-source,\\ Rust\\-native\\ spreadsheet\\ targeting\\ Microsoft\\ Excel\\ parity\\ —\\ and\\ superiority\\ \\(speed,\\ openness,\\ agent\\ control\\)\\.\\ It\\ runs\\ natively\\ on\\ macOS,\\ Windows,\\ Linux\\ and\\ BSD,\\ and\\ on\\ the\\ web\\ via\\ WASM\\.\\ Siblings\\ with\\ the\\ same\\ conventions:\\ `\\.\\./designcraft`\\ \\(InDesign\\-class,\\ the\\ closest\\ reference\\),\\ `\\.\\./photocraft`\\ \\(Photoshop\\),\\ `\\.\\./vectorcraft`\\ \\(Illustrator\\),\\ `\\.\\./pdfcraft`\\ \\(Acrobat\\),\\ `\\.\\./filmcraft`\\ \\(Premiere\\),\\ `\\.\\./lightcraft`\\ \\(Lightroom\\),\\ `\\.\\./effectcraft`\\ \\(After\\ Effects\\)\\.",
+        "\\-\\ Every\\ asset\\ in\\ the\\ repo\\ is\\ original\\ work\\ by\\ GridCraft\\ contributors,\\ or\\ public\\ domain\\ /\\ CC0,\\ or\\ open\\ source\\ /\\ Creative\\ Commons\\ that\\ allows\\ redistribution\\ \\(or\\ licensed\\ open\\ source\\ by\\ the\\ contributor\\ who\\ created\\ it\\)\\.",
+        "\\-\\ The\\ ArtCraft\\ brand\\ files\\ in\\ `docs/brand/`\\ are\\ ArtCraft\\ trademarks\\ under\\ `docs/brand/LICENSE\\-brand\\.txt`,\\ the\\ one\\ exception\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-sheet/CLAUDE.md"
+      ],
+      "patterns": [
+        "OfficeSheet\\ is\\ a\\ clean\\-room,\\ open\\-source,\\ Rust\\-native\\ spreadsheet\\ targeting\\ Microsoft\\ Excel\\ parity\\ —\\ and\\ superiority\\ \\(speed,\\ openness,\\ agent\\ control\\)\\.\\ It\\ runs\\ natively\\ on\\ macOS,\\ Windows,\\ Linux\\ and\\ BSD,\\ and\\ on\\ the\\ web\\ via\\ WASM\\.\\ Siblings\\ with\\ the\\ same\\ conventions:\\ `\\.\\./designcraft`\\ \\(InDesign\\-class,\\ the\\ closest\\ reference\\),\\ `\\.\\./photocraft`\\ \\(Photoshop\\),\\ `\\.\\./vectorcraft`\\ \\(Illustrator\\),\\ `\\.\\./pdfcraft`\\ \\(Acrobat\\),\\ `\\.\\./filmcraft`\\ \\(Premiere\\),\\ `\\.\\./lightcraft`\\ \\(Lightroom\\),\\ `\\.\\./effectcraft`\\ \\(After\\ Effects\\)\\.",
+        "\\-\\ Every\\ asset\\ in\\ the\\ repo\\ is\\ original\\ work\\ by\\ GridCraft\\ contributors,\\ or\\ public\\ domain\\ /\\ CC0,\\ or\\ open\\ source\\ /\\ Creative\\ Commons\\ that\\ allows\\ redistribution\\ \\(or\\ licensed\\ open\\ source\\ by\\ the\\ contributor\\ who\\ created\\ it\\)\\.",
+        "\\-\\ The\\ ArtCraft\\ brand\\ files\\ in\\ `docs/brand/`\\ are\\ ArtCraft\\ trademarks\\ under\\ `docs/brand/LICENSE\\-brand\\.txt`,\\ the\\ one\\ exception\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-sheet/README.md"
+      ],
+      "patterns": [
+        ">\\ Source\\ integration:\\ this\\ directory\\ adapts\\ \\[GridCraft\\]\\(https://github\\.com/storytold/gridcraft\\)\\ for\\ Open\\ Office\\.\\ The\\ feature\\ descriptions\\ below\\ document\\ the\\ upstream\\ engine;\\ see\\ the\\ \\[Open\\ Office\\ README\\]\\(\\.\\./\\.\\./README\\.md\\)\\ for\\ the\\ integrated\\ application\\ and\\ supported\\ workflows\\.\\ Original\\ licenses\\ and\\ notices\\ remain\\ in\\ this\\ directory\\.",
+        "ArtCraft\\ Team\\ and\\ are\\ not\\ covered\\ by\\ this\\ license\\.\\ They\\ may\\ be\\ used\\ only\\ unmodified,\\ and\\ only\\ as",
+        "The\\ ArtCraft\\ name,\\ wordmark\\ and\\ logos\\ in\\ \\[`docs/brand/`\\]\\(docs/brand/\\)\\ are\\ trademarks\\ of\\ the",
+        "part\\ of\\ this\\ repository\\ and\\ GridCraft,\\ under\\ \\[`docs/brand/LICENSE\\-brand\\.txt`\\]\\(docs/brand/LICENSE\\-brand\\.txt\\)\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-sheet/assets/app-icon/README.md"
+      ],
+      "patterns": [
+        "DesignCraft's\\ `\\#7bb51c`\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-sheet/docs/release-playbook.md"
+      ],
+      "patterns": [
+        "OfficeSheet's\\ copy\\ was\\ taken\\ from\\ DesignCraft\\ \\(`\\.github/workflows/release\\.yml`,\\ `packaging/`,"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-sheet/docs/releasing.md"
+      ],
+      "patterns": [
+        "\\(craftrules\\ `release/playbook\\.md`\\),\\ copied\\ from\\ DesignCraft\\ and\\ renamed\\.\\ User\\-facing\\ names\\ say"
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-sheet/packaging/macos/dmg/README.md"
+      ],
+      "patterns": [
+        "This\\ follows\\ VectorCraft's\\ `packaging/macos/dmg/`\\ \\(storytold/vectorcraft\\#493\\)\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-word/README.md"
+      ],
+      "patterns": [
+        ">\\ Source\\ integration:\\ this\\ directory\\ adapts\\ \\[WordCraft\\]\\(https://github\\.com/storytold/wordcraft\\)\\ for\\ Open\\ Office\\.\\ The\\ feature\\ descriptions\\ below\\ document\\ the\\ upstream\\ engine;\\ see\\ the\\ \\[Open\\ Office\\ README\\]\\(\\.\\./\\.\\./README\\.md\\)\\ for\\ the\\ integrated\\ application\\ and\\ supported\\ workflows\\.\\ Original\\ licenses\\ and\\ notices\\ remain\\ in\\ this\\ directory\\.",
+        "ArtCraft\\ Team\\ and\\ are\\ not\\ covered\\ by\\ this\\ license\\.\\ They\\ may\\ be\\ used\\ only\\ unmodified,\\ and\\ only\\ as",
+        "The\\ ArtCraft\\ name,\\ wordmark\\ and\\ logos\\ in\\ \\[`docs/brand/`\\]\\(docs/brand/\\)\\ are\\ trademarks\\ of\\ the",
+        "option\\)\\.\\ The\\ sample\\ documents\\ and\\ templates\\ are\\ original\\ text\\ written\\ for\\ WordCraft\\.",
+        "part\\ of\\ this\\ repository\\ and\\ WordCraft,\\ under\\ \\[`docs/brand/LICENSE\\-brand\\.txt`\\]\\(docs/brand/LICENSE\\-brand\\.txt\\)\\."
+      ],
+      "reason": "Exact original upstream provenance, historical compatibility, author credit, or trademark restriction; not local product branding."
+    },
+    {
+      "paths": [
+        "vendor/office-sheet/docs/releasing.md"
+      ],
+      "patterns": [
+        "\\ \\ \\(or\\ `gh\\ workflow\\ run\\ packaging\\-lint\\.yml\\ \\-\\-repo\\ storytold/gridcraft\\ \\-\\-ref\\ BRANCH`\\)\\.\\ No\\ release",
+        "admin\\.\\ Done\\ for\\ storytold/gridcraft\\ on\\ 2026\\-10\\-07;\\ the\\ `release\\-managers`\\ team\\ also\\ has\\ write",
+        "REPO=storytold/gridcraft"
+      ],
+      "reason": "Original upstream repository identity and dated release-administration record; not a local repository or signing claim."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/theme.rs"
+      ],
+      "patterns": [
+        "///\\ PhotoCraft\\ and\\ PdfCraft\\ \\(\\#822\\):\\ \"100%\"\\ is\\ one\\ screen\\ pixel\\ per\\ point\\ whatever\\ the\\ display\\ reports,",
+        "\\ \\ \\ \\ ///\\ The\\ sizes\\ File\\ ›\\ Options\\ offers\\ after\\ Auto,\\ in\\ percent\\ \\(PhotoCraft's\\ and\\ PdfCraft's\\)\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/ui-egui/src/i18n/mod.rs"
+      ],
+      "patterns": [
+        "//!\\ This\\ is\\ the\\ system\\ PdfCraft\\ and\\ PhotoCraft\\ use\\ \\(`pdfcraft/crates/ui\\-egui/src/i18n`\\),\\ so\\ the"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/proof/src/patterns.rs"
+      ],
+      "patterns": [
+        "//!\\ DesignCraft's\\ patgen\\ \\(see\\ `examples/hyphgen\\.rs`\\)\\.\\ The\\ Polish\\ set\\ is\\ the\\ TeX\\ one\\ by\\ Hanna"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-word/crates/proof/src/hyphen.rs"
+      ],
+      "patterns": [
+        "//!\\ \\ \\ \\ set,\\ trained\\ from\\ the\\ same\\ list\\ by\\ DesignCraft's\\ patgen\\ \\(generated\\ by\\ DesignCraft's\\ `hyphgen`\\ example\\);"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-word/apps/office-word/src/apple_events.rs"
+      ],
+      "patterns": [
+        "//!\\ workspace\\ forbids\\.\\ The\\ `fmv\\-macos\\-events`\\ crate\\ \\(also\\ used\\ by\\ PdfCraft\\ and\\ PhotoCraft\\)"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-sheet/apps/office-sheet/src/apple_events.rs"
+      ],
+      "patterns": [
+        "//!\\ workspace\\ forbids\\.\\ The\\ audited\\ `fmv\\-macos\\-events`\\ crate\\ \\(also\\ used\\ by\\ PdfCraft\\ and\\ PhotoCraft\\)"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/xtask/src/layers.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ //\\ Codecs\\ and\\ containers\\ \\(ported\\ from\\ FilmCraft\\):\\ L0\\ standalone\\ leaves,\\ L1\\ codecs\\ over"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/crates/ogg/src/lib.rs"
+      ],
+      "patterns": [
+        "///\\ Random\\-access,\\ read\\-only\\ byte\\ source\\ \\(same\\ shape\\ as\\ the\\ other\\ FilmCraft\\ demuxers'\\)\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/crates/bitstream/src/lib.rs"
+      ],
+      "patterns": [
+        "//!\\ Bit\\-level\\ reading\\ and\\ writing\\ shared\\ by\\ OfficePresentation's\\ codec\\ crates\\ \\(ported\\ from\\ FilmCraft\\)\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/crates/av1/src/lib.rs"
+      ],
+      "patterns": [
+        "//\\ Spec\\-style\\ indexed\\ loops\\ \\(FilmCraft\\ allows\\ this\\ lint\\ workspace\\-wide\\)\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/crates/h264/src/synth_tests.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ //\\ The\\ ffmpeg\\ cross\\-check\\ lives\\ in\\ FilmCraft\\ \\(test\\ oracle\\);\\ this\\ copy\\ checks\\ the\\ expected\\ planes\\ only\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/crates/media/src/lib.rs"
+      ],
+      "patterns": [
+        "//!\\ \\ \\ \\[`video::Frame`\\]s\\ \\(our\\ own\\ decoders,\\ ported\\ from\\ FilmCraft\\);\\ \\[`video::poster_png`\\]\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/crates/opus/src/lib.rs"
+      ],
+      "patterns": [
+        "//\\ Spec\\-style\\ indexed\\ loops\\ \\(FilmCraft\\ allows\\ this\\ lint\\ workspace\\-wide\\)\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-presentation/crates/hevc/src/synth_tests.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ //\\ The\\ ffmpeg\\ cross\\-check\\ lives\\ in\\ FilmCraft\\ \\(test\\ oracle\\)\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/xtask/src/layers.rs"
+      ],
+      "patterns": [
+        "//!\\ `from_metadata`\\ builds\\ that\\ model\\ from\\ `cargo\\ metadata`\\.\\ \\(Structure\\ shared\\ with\\ PhotoCraft\\.\\)"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/render/src/raster.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ ///\\ Item\\ 1\\ of\\ storytold/pdfcraft\\#623:\\ a\\ page's\\ content\\ used\\ to\\ be\\ cut\\ at\\ `MAX_DECODED_STREAM`,"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/render/examples/synth_sheet.rs"
+      ],
+      "patterns": [
+        "//!\\ sample\\ from\\ storytold/pdfcraft\\#623\\ \\(item\\ 8\\)\\.\\ It\\ follows\\ the\\ sample's\\ content\\ layout:\\ 1684\\ ×\\ 2384"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/render/examples/page_timing.rs"
+      ],
+      "patterns": [
+        "//!\\ comparisons\\ \\(storytold/pdfcraft\\#623,\\ item\\ 8\\)\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/automation/src/file_access.rs"
+      ],
+      "patterns": [
+        "//!\\ files\\ an\\ agent's\\ tools\\ reach,\\ with\\ the\\ names\\ and\\ wording\\ VectorCraft\\ uses\\.\\ \\[`AutomationRoots`\\]"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/automation/tests/automation_roots.rs"
+      ],
+      "patterns": [
+        "//!\\ link\\)\\ are\\ refused\\ with\\ the\\ wording\\ VectorCraft\\ uses,\\ nothing\\ is\\ read\\ into\\ the\\ result\\ and"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/xfdf/src/tests.rs"
+      ],
+      "patterns": [
+        "///\\ storytold/pdfcraft\\#809:\\ XFDF\\ exchange\\ dropped\\ polygon\\ and\\ polyline\\ vertices,\\ so\\ the"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/ui-egui/src/ui_scale.rs"
+      ],
+      "patterns": [
+        "//!\\ small\\ and\\ showing\\ their\\ pixels\\ on\\ a\\ 1×\\ display\\.\\ A\\ chosen\\ size\\ is\\ absolute,\\ as\\ PhotoCraft's"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/ui-egui/src/portable.rs"
+      ],
+      "patterns": [
+        "//!\\ Windows\\ portable\\ zip\\ ships\\ with\\ `portable\\.txt`;\\ the\\ MSI\\ doesn't\\.\\ PhotoCraft\\ uses\\ the\\ same",
+        "//!\\ scheme\\ \\(`photocraft/apps/photocraft/src/app_dirs\\.rs`\\)\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/ui-egui/src/i18n/mod.rs"
+      ],
+      "patterns": [
+        "//!\\ The\\ system\\ is\\ the\\ one\\ PhotoCraft\\ uses\\ \\(`photocraft/crates/ui\\-egui/src/i18n`\\),\\ so\\ catalogs\\ and",
+        "\\ \\ \\ \\ //\\ Per\\ thread,\\ as\\ in\\ PhotoCraft:\\ independent\\ app\\ and\\ test\\ threads\\ \\(kittest\\ harnesses\\ run\\ in",
+        "\\ \\ \\ \\ ///\\ Like\\ PhotoCraft's\\ complete\\-catalog\\ gates,\\ derive\\ coverage\\ from\\ the\\ UI,\\ not\\ another\\ language\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/sign/tests/crypto.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ //\\ The\\ fixtures\\ were\\ made\\ when\\ the\\ app\\ was\\ called\\ PrintCraft\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/apps/office-pdf/src/apple_events.rs"
+      ],
+      "patterns": [
+        "//!\\ workspace\\ forbids\\.\\ The\\ audited\\ `fmv\\-macos\\-events`\\ crate\\ \\(also\\ used\\ by\\ PhotoCraft\\)\\ wraps\\ exactly"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/apps/office-pdf/src/main.rs"
+      ],
+      "patterns": [
+        "///\\ Move\\ the\\ settings\\ and\\ crash\\-recovery\\ folders\\ of\\ the\\ app's\\ former\\ name,\\ PrintCraft,\\ to\\ the\\ new",
+        "\\ \\ \\ \\ //\\ no\\ file\\ behind\\)\\ and\\ after\\ the\\ PrintCraft\\ migration\\ \\(which\\ a\\ fresh\\ folder\\ would\\ block\\)\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/vendor/winit/src/platform_impl/windows/event_loop.rs"
+      ],
+      "patterns": [
+        "\\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ //\\ \\(rust\\-windowing/winit\\#4041,\\ \\#4600;\\ storytold/pdfcraft\\#324\\)\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/crates/ui-egui/src/chrome.rs"
+      ],
+      "patterns": [
+        "///\\ WordCraft\\ \\(storytold/wordcraft\\#255\\)\\."
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/xtask/src/assets.rs"
+      ],
+      "patterns": [
+        "///\\ Storyteller's\\ own\\ brand\\ marks\\ \\(the\\ ArtCraft\\ name\\ and\\ logos\\):\\ shipped\\ in\\ the\\ app\\ and\\ docs,\\ but"
+      ],
+      "reason": "Exact upstream issue reference or factual source attribution in a comment; original project identities are preserved."
+    },
+    {
+      "paths": [
+        "vendor/office-pdf/apps/office-pdf/src/updates.rs"
+      ],
+      "patterns": [
+        "https://api\\.github\\.com/repos/storytold/pdfcraft/releases/latest"
+      ],
+      "reason": "The standalone upstream application keeps its own release/version stream; embedded mode disables this updater."
+    }
+  ],
+  "embeddedLegalNotices": [
+    {
+      "assetBasename": "office-word_bg.wasm",
+      "reason": "Original copyright notices and spelling-dictionary authorship embedded in the actual packaged WASM. Match only each complete UTF-8 notice, never isolated product names or runtime logs.",
+      "notices": [
+        {
+          "literal": "MIT OR Apache-2.0. Copyright (c) 2026 ArtCraft Team and the WordCraft contributors.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/bg.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/cs.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/de.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/de.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/es.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/et.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/fr.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/hu.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/it.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/ja.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/pl.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/pt-br.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/ru.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/sr-latn.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/sr.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/tr.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/uk.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/vi.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/zh-hans.tsv",
+            "vendor/office-word/crates/ui-egui/src/i18n/zh-hant.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0. Авторско право (c) 2026 ArtCraft Team и сътрудниците на WordCraft.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/bg.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0. Copyright (c) 2026 ArtCraft Team a přispěvatelé projektu WordCraft.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/cs.tsv"
+          ]
+        },
+        {
+          "literal": "MIT o Apache-2.0. Copyright (c) 2026 ArtCraft Team y los colaboradores de WordCraft.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/es.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0. Autoriõigus (c) 2026 ArtCrafti meeskond ja WordCrafti kaasautorid.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/et.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0. Copyright (c) 2026 ArtCraft Team et les contributeurs de WordCraft.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/fr.tsv"
+          ]
+        },
+        {
+          "literal": "MIT vagy Apache-2.0. Copyright (c) 2026 ArtCraft Team és a WordCraft közreműködői.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/hu.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0. Copyright (c) 2026 ArtCraft Team e i collaboratori di WordCraft.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/it.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0。Copyright (c) 2026 ArtCraft チームおよび WordCraft の貢献者。",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/ja.tsv"
+          ]
+        },
+        {
+          "literal": "MIT lub Apache-2.0. Copyright (c) 2026 ArtCraft Team i współtwórcy WordCraft.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/pl.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0. Copyright (c) 2026 ArtCraft Team e os colaboradores do WordCraft.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/pt-br.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0. Copyright (c) 2026 ArtCraft Team и участники проекта WordCraft.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/ru.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0. Autorska prava (c) 2026 ArtCraft Team i saradnici na WordCraft-u.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/sr-latn.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0. Ауторска права (c) 2026 ArtCraft Team и сарадници на WordCraft-у.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/sr.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0. Telif hakkı (c) 2026 ArtCraft ekibi ve WordCraft'a katkıda bulunanlar.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/tr.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0. Авторські права (c) 2026 команди ArtCraft і учасників WordCraft.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/uk.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0. Bản quyền (c) 2026 ArtCraft Team và các cộng tác viên WordCraft.",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/vi.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0。版权所有 (c) 2026 ArtCraft 团队及 WordCraft 贡献者。",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/zh-hans.tsv"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0。著作權所有 (c) 2026 ArtCraft 團隊及 WordCraft 貢獻者。",
+          "sourcePaths": [
+            "vendor/office-word/crates/ui-egui/src/i18n/zh-hant.tsv"
+          ]
+        },
+        {
+          "literal": "# Written by WordCraft contributors (MIT OR Apache-2.0); see ATTRIBUTION.md.",
+          "sourcePaths": [
+            "vendor/office-word/assets/spelling/en-extra.txt",
+            "vendor/office-word/assets/spelling/ru-extra.txt"
+          ]
+        }
+      ]
+    },
+    {
+      "assetBasename": "office-presentation_bg.wasm",
+      "reason": "Exact original English and Chinese copyright notices observed in the packaged WASM. Preserve complete legal payloads; never exempt isolated product names or runtime logs.",
+      "notices": [
+        {
+          "literal": "MIT OR Apache-2.0 · © 2026 ArtCraft Team and the DeckCraft contributors",
+          "sourcePaths": [
+            "vendor/office-presentation/crates/ui-egui/src/dialogs.rs",
+            "vendor/office-presentation/crates/ui-egui/src/i18n/dialogs.rs"
+          ]
+        },
+        {
+          "literal": "MIT OR Apache-2.0 · © 2026 ArtCraft 团队及 DeckCraft 贡献者",
+          "sourcePaths": [
+            "vendor/office-presentation/crates/ui-egui/src/i18n/dialogs.rs"
+          ]
+        }
+      ]
+    }
+  ],
+  "embeddedCompatibilitySequences": [
+    {
+      "assetBasename": "office-presentation_bg.wasm",
+      "literal": "office-presentationdeckcraftslidecraft\u0000",
+      "parts": [
+        {
+          "literal": "office-presentation",
+          "sourcePath": "vendor/office-presentation/crates/format/src/lib.rs"
+        },
+        {
+          "literal": "deckcraft",
+          "sourcePath": "vendor/office-presentation/crates/format/src/compatibility.rs"
+        },
+        {
+          "literal": "slidecraft",
+          "sourcePath": "vendor/office-presentation/crates/format/src/compatibility.rs"
+        }
+      ],
+      "reason": "Observed contiguous Rust data for NATIVE_EXTENSIONS: current extension followed by two historical read aliases, then NUL. The short names are already source-allowlisted; only this complete compiled sequence in this exact WASM basename is additionally accepted, never logs or standalone product names."
+    }
+  ],
+  "invalidProjectReferences": [
+    "getopen[_-]?office\\.com",
+    "storytold/(?:office[-_])?(?:word|sheet|presentation|pdf)(?=[/#?.\\s\\x22\\x27)]|$)",
+    "storytold/open_office-corpus"
+  ]
+}

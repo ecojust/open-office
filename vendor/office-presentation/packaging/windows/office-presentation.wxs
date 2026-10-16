@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  OfficePresentation MSI (WiX Toolset v5: `dotnet tool install -g wix`). Built by package.ps1:
+
+    wix build office-presentation.wxs -arch x64 -d Version=1.2.3 -d BinDir=... -d IconPath=... -o out.msi
+
+  Per-machine install into Program Files, a Start Menu shortcut, `.office-presentation` owned by
+  OfficePresentation, and OfficePresentation offered under "Open with" for .pptx/.potx/.ppsx (without taking over
+  the user's default app for them).
+
+  UpgradeCode is fixed for OfficePresentation forever (playbook §6); never change it.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="Open Office"
+      Manufacturer="Learning Machines LLC"
+      Version="$(var.Version)"
+      UpgradeCode="6F9C69E7-7825-40D2-BF26-C274DA676425"
+      Scope="perMachine"
+      Compressed="yes"
+      Language="1033">
+    <SummaryInformation Description="OfficePresentation presentations and slide shows" Manufacturer="Learning Machines LLC" />
+    <!-- Same-version upgrades let successive pre-releases of one X.Y.Z replace each other
+         (MSI versions are numeric, so 1.2.3-rc.1 and 1.2.3-rc.2 are both 1.2.3). -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+        DowngradeErrorMessage="A newer version of OfficePresentation is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="OfficePresentationIcon.ico" SourceFile="$(var.IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="OfficePresentationIcon.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/ecojust/open-office" />
+    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/ecojust/open-office" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/ecojust/open-office" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="Open Office" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Feature Id="Main" Title="Open Office" Level="1">
+      <ComponentGroupRef Id="OfficePresentationFiles" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="OfficePresentationFiles" Directory="INSTALLFOLDER">
+      <Component Id="OfficePresentationApp" Guid="D87EA444-41A4-4C19-922E-66D1A29461FF">
+        <File Id="OfficePresentationExe" Source="$(var.BinDir)\office-presentation.exe" KeyPath="yes">
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Open Office"
+              Description="OfficePresentation presentations and slide shows" WorkingDirectory="INSTALLFOLDER" Advertise="yes"
+              Icon="OfficePresentationIcon.ico" IconIndex="0" />
+        </File>
+
+        <!-- .presentation: OfficePresentation's own format. -->
+        <ProgId Id="OfficePresentation.Presentation" Description="OfficePresentation Presentation" Icon="OfficePresentationExe" IconIndex="0">
+          <Extension Id="presentation" ContentType="application/x-presentation">
+            <Verb Id="open" Command="Open" TargetFile="OfficePresentationExe" Argument="&quot;%1&quot;" />
+          </Extension>
+        </ProgId>
+
+        <!-- "Open with" for PowerPoint formats, without becoming the default. -->
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\office-presentation.exe" Name="FriendlyAppName" Value="Open Office" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\office-presentation.exe\shell\open\command" Value="&quot;[#OfficePresentationExe]&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\office-presentation.exe\SupportedTypes" Name=".office-presentation" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\office-presentation.exe\SupportedTypes" Name=".pptx" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\office-presentation.exe\SupportedTypes" Name=".potx" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\office-presentation.exe\SupportedTypes" Name=".ppsx" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.pptx\OpenWithProgids" Name="OfficePresentation.Presentation" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.potx\OpenWithProgids" Name="OfficePresentation.Presentation" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.ppsx\OpenWithProgids" Name="OfficePresentation.Presentation" Value="" Type="string" />
+
+        <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\office-presentation.exe" Value="[#OfficePresentationExe]" Type="string" />
+      </Component>
+
+      <Component Id="OfficePresentationCli">
+        <File Id="OfficePresentationCliExe" Source="$(var.BinDir)\office-presentation-cli.exe" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

@@ -3,21 +3,23 @@
 * text=auto eol=lf
 # Preserve upstream license bytes used by published-archive checksum evidence.
 public/legal/rust/unicode-script@0.5.8/LICENSE-* -text
-# Preserve WordCraft sources and redistributed notices byte-for-byte for the
+# Preserve OfficeWord sources and redistributed notices byte-for-byte for the
 # source/artifact and upstream license manifests, including original CRLFs.
-vendor/wordcraft/** -text
+vendor/office-word/** -text
 public/legal/rust/** -text
 public/legal/npm/** -text
 public/legal/wordcraft/** -text
-vendor/gridcraft/** -text
-vendor/deckcraft/** -text
+vendor/office-sheet/** -text
+vendor/office-presentation/** -text
+vendor/office-pdf/** -text
 public/legal/gridcraft/** -text
 public/legal/deckcraft/** -text
+public/legal/office-pdf/** -text
 assets/fonts/** -text
 # Verbatim upstream notices/source tables retain their original whitespace.
 public/legal/npm/tslib@1.14.1/*.txt whitespace=cr-at-eol,-blank-at-eof
 assets/fonts/deck/LICENSE-LXGW-WenKai.txt whitespace=-blank-at-eol
 public/legal/deckcraft/fonts/LICENSE-LXGW-WenKai.txt whitespace=-blank-at-eol
 public/legal/deckcraft/dependencies/*/upstream-LICENSE whitespace=-blank-at-eol
-vendor/deckcraft/crates/engine/Cargo.toml whitespace=-blank-at-eof
-vendor/deckcraft/crates/vp9/src/spec_tables.rs whitespace=-blank-at-eof
+vendor/office-presentation/crates/engine/Cargo.toml whitespace=-blank-at-eof
+vendor/office-presentation/crates/vp9/src/spec_tables.rs whitespace=-blank-at-eof

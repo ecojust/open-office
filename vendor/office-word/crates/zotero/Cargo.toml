@@ -1,0 +1,21 @@
+[package]
+name = "office-word-zotero"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficeWord Zotero integration: Zotero's word-processor wire protocol, answered against an engine Session"
+
+[lints]
+workspace = true
+
+[dependencies]
+office-word-doc = { workspace = true }
+office-word-engine = { workspace = true }
+office-word-formats = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+office-word-docx = { workspace = true }
+proptest = { workspace = true }

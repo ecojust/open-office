@@ -53,9 +53,9 @@ export function knownNodeTests(root = 'tests') {
 
 export function knownRepositoryTests() {
   // Enumerate source roots explicitly: never scan vendored build output or target/.
-  const rustRoots = ['src-tauri/src', 'vendor/wordcraft/crates/ui-egui/src', 'vendor/wordcraft/crates/engine/src',
-    'vendor/gridcraft/apps/open-office-host/src', 'vendor/gridcraft/crates/ui-egui/src', 'vendor/gridcraft/crates/pdf/src',
-    'vendor/deckcraft/apps/open-office-host/src', 'vendor/deckcraft/crates/ui-egui/src', 'vendor/deckcraft/crates/pptx/src', 'vendor/deckcraft/crates/pdf/src'];
+  const rustRoots = ['src-tauri/src', 'vendor/office-word/crates/ui-egui/src', 'vendor/office-word/crates/engine/src',
+    'vendor/office-sheet/apps/open-office-host/src', 'vendor/office-sheet/crates/ui-egui/src', 'vendor/office-sheet/crates/pdf/src',
+    'vendor/office-presentation/apps/open-office-host/src', 'vendor/office-presentation/crates/ui-egui/src', 'vendor/office-presentation/crates/pptx/src', 'vendor/office-presentation/crates/pdf/src'];
   return new Set([...rustRoots.flatMap(root => [...knownRustTests(root)]), ...knownNodeTests()]);
 }
 

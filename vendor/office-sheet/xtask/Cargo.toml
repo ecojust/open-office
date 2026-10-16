@@ -1,0 +1,20 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "OfficeSheet workspace tooling: cargo xtask ci | layers | assets | wasm | parity | version | stats | ico"
+
+[lints]
+workspace = true
+
+[features]
+# `cargo xtask parity` reads the command catalog from the engine. CI steps that only need the
+# version or the layer/asset checks run with --no-default-features and skip compiling it.
+default = ["engine"]
+engine = ["dep:office-sheet-engine"]
+
+[dependencies]
+serde_json = { workspace = true }
+office-sheet-engine = { workspace = true, optional = true }

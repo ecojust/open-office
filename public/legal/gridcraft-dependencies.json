@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "target": "wasm32-unknown-unknown",
-  "rootPackage": "open-office-gridcraft-host",
-  "scope": "Normal and build dependency closure from cargo tree --locked --target wasm32-unknown-unknown --edges normal,build. Local GridCraft workspace sources are attributed separately. This records resolved dependencies, not proof that each crate contributes code to the final optimized binary.",
-  "lockfile": "vendor/gridcraft/Cargo.lock",
-  "lockfileSha256": "984e53d91c77d85729c8cb71c1bc3fb7786b684de2f50a5fcbdb187ec7b59588",
+  "rootPackage": "open-office-sheet-host",
+  "scope": "Normal and build dependency closure from cargo tree --locked --target wasm32-unknown-unknown --edges normal,build. Local Open Office spreadsheet workspace sources are attributed separately. This records resolved dependencies, not proof that each crate contributes code to the final optimized binary.",
+  "lockfile": "vendor/office-sheet/Cargo.lock",
+  "lockfileSha256": "d196073d2b691d8d234153559c650796d9e5335cb94f350db4a3391834c8769f",
   "packages": [
     {
       "name": "accesskit",

@@ -1,0 +1,21 @@
+[package]
+name = "office-pdf-cos"
+description = "PDF object layer: lazy tolerant parsing, copy-on-write edits, incremental and full saving"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+office-pdf-crypt = { workspace = true }
+office-pdf-filters = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+office-pdf-oracle = { workspace = true }
+office-pdf-testkit = { workspace = true }
+serde_json = { workspace = true }
+proptest = { workspace = true }
+hayro-syntax = { workspace = true }

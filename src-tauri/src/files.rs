@@ -366,6 +366,36 @@ impl DocumentStore {
         })
     }
 
+    /// The caller must be the opt-in native smoke session. The directory is
+    /// owned by that session; neither its path nor a filename comes from IPC.
+    pub(crate) fn create_smoke_document(
+        &self,
+        directory: &Path,
+        extension: DocExt,
+        encoded: &str,
+    ) -> Result<NativeDocument, String> {
+        let _operation = self.begin_operation()?;
+        if !matches!(
+            extension,
+            DocExt::Docx | DocExt::Xlsx | DocExt::Pptx | DocExt::Pdf
+        ) {
+            return Err("Native smoke requires an editable document format.".into());
+        }
+        let bytes = decode_document(encoded)?;
+        validate_document_signature(&bytes, extension)?;
+        let path = directory.join(format!("native-workspace.{}", extension.as_str()));
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map_err(|error| format!("Unable to create isolated native smoke document: {error}"))?;
+        file.write_all(&bytes)
+            .and_then(|_| file.sync_all())
+            .map_err(|error| format!("Unable to write isolated native smoke document: {error}"))?;
+        drop(file);
+        self.register_open(path)
+    }
+
     fn save_to_target(
         &self,
         snapshot: TargetSnapshot,
@@ -912,6 +942,43 @@ mod tests {
             bytes[position..position + 2].copy_from_slice(&value.to_le_bytes());
         }
         bytes
+    }
+
+    #[test]
+    fn smoke_document_registration_is_isolated_and_never_overwrites_a_fixture() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = DocumentStore::new(directory.path().join("store")).unwrap();
+        let original = zip_header_fixture(b"native document");
+        let encoded = STANDARD.encode(&original);
+        let opened = store
+            .create_smoke_document(directory.path(), DocExt::Docx, &encoded)
+            .unwrap();
+        assert_eq!(opened.name, "native-workspace.docx");
+        assert_eq!(opened.base64, encoded);
+        assert_eq!(opened.sha256, hash_bytes(&original));
+        assert_eq!(
+            store.approved_document_path(&opened.id).unwrap(),
+            directory
+                .path()
+                .join("native-workspace.docx")
+                .canonicalize()
+                .unwrap()
+        );
+        assert!(store
+            .create_smoke_document(
+                directory.path(),
+                DocExt::Docx,
+                &STANDARD.encode(zip_header_fixture(b"replacement"))
+            )
+            .is_err());
+        assert_eq!(
+            fs::read(directory.path().join("native-workspace.docx")).unwrap(),
+            original
+        );
+        assert!(store
+            .create_smoke_document(directory.path(), DocExt::Potx, &encoded)
+            .is_err());
+        assert!(!directory.path().join("native-workspace.potx").exists());
     }
 
     #[test]

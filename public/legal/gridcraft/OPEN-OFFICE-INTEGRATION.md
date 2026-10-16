@@ -6,7 +6,7 @@ Copyright (c) 2026 ArtCraft Team and the GridCraft contributors. The original [M
 
 ## Local modifications
 
-The source is in `vendor/gridcraft/`. Open Office adds `apps/open-office-host` and a local WebAssembly bridge, adapts the editing interface to the host shell, and coordinates tabs, file import/export and successful-save acknowledgements. The application shell owns file pickers, save destinations and document closing. Original internal crate names and legal notices are retained. The Open Office source commit records the local changes; the upstream commit alone is not a description of the modified executable.
+The source is in `vendor/office-sheet/`. Open Office adds `apps/open-office-host` and a local WebAssembly bridge, adapts the editing interface to the host shell, and coordinates tabs, file import/export and successful-save acknowledgements. The application shell owns file pickers, save destinations and document closing. Local application and crate identifiers use Open Office names; original copyrights, legal notices, shared dependency identities and source URLs are retained. The Open Office source commit records the local changes; the upstream commit alone is not a description of the modified executable.
 
 ArtCraft logo and mark image assets have been removed from `docs/brand/` under the upstream [brand terms](LICENSE-brand.txt). Those terms do not grant a modified product the right to use ArtCraft's marks. The unchanged upstream NOTICE and attribution still describe those upstream assets; they do not imply that Open Office includes them or is endorsed by ArtCraft.
 

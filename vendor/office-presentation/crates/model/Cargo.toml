@@ -1,0 +1,17 @@
+[package]
+name = "office-presentation-model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficePresentation document model: presentations, masters, layouts, slides, shapes, text, themes, transitions, animations"
+
+[lints]
+workspace = true
+
+[dependencies]
+office-presentation-geom = { workspace = true }
+office-presentation-color = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+unicode-segmentation = { workspace = true }

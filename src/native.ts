@@ -1,6 +1,7 @@
 import { invoke, isTauri as detectTauri } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { AppBootstrap, NativeDocument, NativeImage, RecentDocument, SaveDocumentRequest, SaveResult } from './types'
+import type { BrowserServerStatus, WorkspaceDispatcher } from './shared/browser-workspace'
 
 export const isTauri = (): boolean => detectTauri()
 export const bootstrap = (): Promise<AppBootstrap> => invoke('bootstrap')
@@ -11,6 +12,11 @@ export const saveDocument = (request: SaveDocumentRequest): Promise<SaveResult> 
 export const pickImage = (): Promise<NativeImage | null> => invoke('pick_image')
 export const confirmClose = (): Promise<void> => invoke('confirm_close')
 export const onCloseRequested = (callback: () => void): Promise<UnlistenFn> => listen('app-close-requested', callback)
+export const startBrowserServer = (): Promise<BrowserServerStatus> => invoke('start_browser_server')
+export const statusBrowserServer = (): Promise<BrowserServerStatus> => invoke('status_browser_server')
+export const stopBrowserServer = (): Promise<BrowserServerStatus> => invoke('stop_browser_server')
+export const dispatchBrowserWorkspace: WorkspaceDispatcher = (method, path, body) =>
+  invoke('dispatch_browser_workspace', { method, path, body: body ?? null })
 
 export function bytesToBase64(bytes: Uint8Array): string {
   const chunks: string[] = []

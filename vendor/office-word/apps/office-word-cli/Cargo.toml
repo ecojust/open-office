@@ -1,0 +1,23 @@
+[package]
+name = "office-word-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "OfficeWord command line: convert, inspect, render, run commands, MCP server"
+
+[[bin]]
+name = "office-word-cli"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+office-word-doc = { workspace = true }
+office-word-engine = { workspace = true }
+office-word-render = { workspace = true }
+office-word-mcp = { workspace = true }
+office-word-zotero = { workspace = true }
+serde_json = { workspace = true }
+sys-locale = "0.3"

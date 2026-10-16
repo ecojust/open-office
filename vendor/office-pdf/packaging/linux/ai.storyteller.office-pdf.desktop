@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=OfficePdf
+GenericName=PDF Editor
+Comment=Read, organize, combine, split and secure PDFs
+Exec=office-pdf %U
+TryExec=office-pdf
+Icon=ai.storyteller.office-pdf
+Terminal=false
+StartupNotify=true
+StartupWMClass=ai.storyteller.office-pdf
+Categories=Office;Viewer;
+Keywords=pdf;viewer;editor;annotate;sign;forms;merge;split;
+MimeType=application/pdf;

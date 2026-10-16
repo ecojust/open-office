@@ -5,8 +5,8 @@
 <title>Open Office — 开源许可与对应源码</title>
 <style>body{max-width:880px;margin:40px auto;padding:0 20px;font:16px/1.8 system-ui,sans-serif;color:#23314b}a{color:#2455aa}li{margin:.4em 0}code{font-size:.92em}footer{margin-top:3em;color:#637087}</style>
 <h1>开源许可与对应源码</h1>
-<p>Open Office 使用 WordCraft、GridCraft、DeckCraft、PyMuPDF / MuPDF、Vue、PDF.js、Tauri 等开源组件。各组件保留原作者的版权、许可和免责条款，本应用不是这些项目的官方发行版。</p>
-<p>PDF 内核使用 AGPL 许可；本项目未购买其商业授权。三套 Office 编辑器保留上游 MIT OR Apache-2.0 及依赖各自的许可。</p>
+<p>Open Office 使用 WordCraft、GridCraft、DeckCraft、PdfCraft、Vue、Tauri 等开源组件。各组件保留原作者的版权、许可和免责条款，本应用不是这些项目的官方发行版。</p>
+<p>四套本地 Rust 编辑器保留上游 MIT OR Apache-2.0 及依赖各自的许可。旧 PDF 后台已从当前产品移除。</p>
 <h2>主要许可原文</h2>
 <ul>
 <li>WordCraft：<a href="wordcraft/LICENSE-MIT">MIT</a> · <a href="wordcraft/LICENSE-APACHE">Apache-2.0</a> · <a href="wordcraft/NOTICE">NOTICE</a> · <a href="wordcraft/ATTRIBUTION.md">资产归属</a> · <a href="wordcraft/OPEN-OFFICE-INTEGRATION.md">本地集成与字体说明</a> · <a href="wordcraft/source-manifest.json">固定来源及 SHA-256</a></li>
@@ -15,12 +15,12 @@
 <li>craft-ui / craft-libs：<a href="wordcraft/craft-libs/LICENSE-MIT">MIT</a> · <a href="wordcraft/craft-libs/LICENSE-APACHE">Apache-2.0</a> · <a href="wordcraft/craft-libs/NOTICE">NOTICE 与代码来源</a></li>
 <li>WordCraft 字体：<a href="wordcraft/fonts/OFL-Inter.txt">Inter</a> · <a href="wordcraft/fonts/OFL-JetBrainsMono.txt">JetBrains Mono</a> · <a href="wordcraft/fonts/OFL-SourceSans3.txt">Source Sans 3</a> · <a href="wordcraft/fonts/OFL-SourceSerif4.txt">Source Serif 4</a> · <a href="wordcraft/fonts/open-office/LICENSE-Noto-CJK.txt">Noto CJK</a></li>
 <li>egui 内嵌字体：<a href="rust/epaint_default_fonts@0.36.2/fonts/OFL.txt">Noto Emoji OFL</a> · <a href="rust/epaint_default_fonts@0.36.2/fonts/UFL.txt">Ubuntu 字体许可</a> · <a href="rust/epaint_default_fonts@0.36.2/fonts/Hack-Regular.txt">Hack / Bitstream Vera / DejaVu</a> · <a href="rust/epaint_default_fonts@0.36.2/fonts/emoji-icon-font-mit-license.txt">emoji-icon-font MIT</a></li>
-<li><a href="AGPL-3.0.txt">GNU AGPL 第 3 版 — PyMuPDF / MuPDF</a></li>
+<li>PdfCraft：<a href="office-pdf/LICENSE-MIT">MIT</a> · <a href="office-pdf/LICENSE-APACHE">Apache-2.0</a> · <a href="office-pdf/NOTICE">NOTICE</a> · <a href="office-pdf/OPEN-OFFICE-INTEGRATION.md">PDF 集成说明</a> · <a href="office-pdf/source-manifest.json">固定来源与摘要</a></li>
 <li><a href="MPL-2.0.txt">Mozilla Public License 2.0</a> · <a href="LGPL-3.0.txt">GNU LGPL 第 3 版</a></li>
 <li><a href="npm/fflate@0.8.2/LICENSE">fflate 0.8.2 MIT — 开发测试</a></li>
 <li><a href="Apache-2.0.txt">Apache License 2.0</a> · <a href="OFL-1.1.txt">SIL Open Font License 1.1</a> · <a href="NOTO-CJK-NOTICE.txt">Noto 字体版权</a></li>
 <li>共用字体：<a href="wordcraft/fonts/open-office/LICENSE-DejaVu.txt">DejaVu 许可</a> · <a href="wordcraft/fonts/open-office/LICENSE-Noto-CJK.txt">Noto CJK 许可</a> · <a href="wordcraft/fonts/open-office/LICENSE-Noto-Core.txt">Noto Sans Symbols2 许可</a> · <a href="wordcraft/fonts/open-office/manifest.json">字体来源与 SHA-256</a></li>
-<li><a href="PYTHON-LICENSE.txt">Python 许可</a> · <a href="PYINSTALLER-COPYING.txt">PyInstaller 许可及 bootloader 例外</a></li>
+
 </ul>
 <h2>逐项清单和源码</h2>
 <ul>
@@ -29,9 +29,10 @@
 <li><a href="wordcraft-dependencies.json">WordCraft WASM 实际依赖及许可索引</a>（normal / build 依赖）</li>
 <li><a href="gridcraft-dependencies.json">GridCraft WASM 实际依赖及许可索引</a>（normal / build 依赖）</li>
 <li><a href="deckcraft-dependencies.json">DeckCraft WASM 实际依赖及许可索引</a>（包含 Symphonia MPL-2.0 音频依赖）</li>
+<li><a href="office-pdf-dependencies.json">PDF WASM 依赖及许可索引</a></li>
 <li><a href="CORRESPONDING-SOURCE.md">对应源码组装与发行说明</a></li>
 <li><a href="corresponding-sources-manifest.json">固定源码提交、下载地址和 SHA-256</a></li>
 </ul>
-<p>源码归档通过项目中的 <code>scripts/fetch-corresponding-sources.mjs</code> 获取，适合与发行版一同提供。清单固定 PDF 依赖源码；三套 Office 编辑器的源码与本地改动随本应用提供。精确来源不等于所有平台已实现二进制逐字节可重现。</p>
+<p>源码归档通过项目中的 <code>scripts/fetch-corresponding-sources.mjs</code> 获取，适合与发行版一同提供。四套编辑器的源码与本地改动随本应用提供；外部依赖源码见各自索引。精确来源不等于所有平台已实现二进制逐字节可重现。</p>
 <footer>所有商标归各自权利人所有。第三方许可原文优先于此中文概述。软件按适用许可原样提供，不作保证。</footer>
 </html>

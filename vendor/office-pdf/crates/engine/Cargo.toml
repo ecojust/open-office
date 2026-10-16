@@ -1,0 +1,48 @@
+[package]
+name = "office-pdf-engine"
+description = "OfficePdf engine façade: session, documents, command/tool catalogue"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+office-pdf-measure = { workspace = true }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff"] }
+office-pdf-render = { workspace = true }
+office-pdf-cos = { workspace = true }
+office-pdf-organize = { workspace = true }
+office-pdf-annot = { workspace = true }
+office-pdf-forms = { workspace = true }
+office-pdf-xfa = { workspace = true }
+office-pdf-edit = { workspace = true }
+office-pdf-audit = { workspace = true }
+office-pdf-redact = { workspace = true }
+office-pdf-print = { workspace = true }
+office-pdf-xfdf = { workspace = true }
+office-pdf-sign = { workspace = true }
+office-pdf-optimize = { workspace = true }
+office-pdf-a11y = { workspace = true }
+office-pdf-ocr = { workspace = true }
+office-pdf-js = { workspace = true }
+office-pdf-compare = { workspace = true }
+office-pdf-preflight = { workspace = true }
+office-pdf-export = { workspace = true }
+office-pdf-fonts = { workspace = true }
+office-pdf-create = { workspace = true }
+office-pdf-model = { workspace = true }
+office-pdf-geom = { workspace = true }
+thiserror = { workspace = true }
+png = "0.18"
+# Already in the graph (url and idna through webbrowser, icu_properties through boa): they show
+# the host of a document's link the way the browser reads it (links::display_host).
+url = "2.5"
+idna = "1.1"
+icu_properties = "2.3"
+unicode-segmentation = "1.13"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# Already in the graph through lopdf; used only for the local UTC offset ("today").
+chrono = { version = "0.4", default-features = false, features = ["clock"] }

@@ -8,9 +8,12 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { inspectInstalledWordcraft, validateNativeWordcraftEvidence, validateWordcraftNativeReport } from './wordcraft-native-smoke.mjs';
-import { inspectInstalledGridcraft, validateNativeGridcraftEvidence, validateGridcraftNativeReport } from './gridcraft-native-smoke.mjs';
-import { inspectInstalledDeckcraft, validateNativeDeckcraftEvidence, validateDeckcraftNativeReport } from './deckcraft-native-smoke.mjs';
+import { inspectInstalledOfficeWord, validateNativeOfficeWordEvidence, validateOfficeWordNativeReport } from './office-word-native-smoke.mjs';
+import { inspectInstalledOfficeSheet, validateNativeOfficeSheetEvidence, validateOfficeSheetNativeReport } from './office-sheet-native-smoke.mjs';
+import { inspectInstalledPdf, validateNativePdfEvidence, validatePdfNativeReport } from './office-pdf-native-smoke.mjs';
+import { inspectInstalledOfficePresentation, validateNativeOfficePresentationEvidence, validateOfficePresentationNativeReport } from './office-presentation-native-smoke.mjs';
+import { validateNativeWorkspaceReport } from './workspace-native-smoke.mjs';
+export { validateNativeWorkspaceReport } from './workspace-native-smoke.mjs';
 
 // This launches the final packaged GUI, not a source executable or an isolated
 // engine substitute. A native desktop session is required on the CI runner.
@@ -109,38 +112,39 @@ export function emitFailureDiagnostics(report, env, reportPath) {
   }
 }
 
-/** Require the actual three mounted Rust editors and the retained PDF engine. */
+/** Require the actual four mounted Rust editors plus native Server/autosave. */
 export function validateFrontendReport(report) {
   requireCheck(report && typeof report === 'object' && !Array.isArray(report), 'Missing native frontend report');
   requireCheck(report.ok === true, 'The native GUI reported a failed smoke test');
   requireCheck(report.crossOriginIsolated === true, 'Native WebView is not cross-origin isolated');
-  // These editor WASM modules use unshared memory; PDF.js transfers ordinary
-  // ArrayBuffers. WebKit compatibility mode can withhold shared memory even
+  // These editor WASM modules use unshared memory and ordinary ArrayBuffers.
+  // WebKit compatibility mode can withhold shared memory even
   // with isolation intact. Preserve that limitation as an observed capability,
   // rather than treating its availability as an editor acceptance requirement.
   requireCheck(typeof report.sharedArrayBuffer === 'boolean', 'Missing native WebView SharedArrayBuffer capability');
   requireCheck(typeof report.userAgent === 'string' && report.userAgent.length > 10, 'Missing native WebView user agent');
-  validateWordcraftNativeReport(report.wordcraft);
-  validateGridcraftNativeReport(report.gridcraft);
-  validateDeckcraftNativeReport(report.deckcraft);
+  validateOfficeWordNativeReport(report.word);
+  validateOfficeSheetNativeReport(report.sheet);
+  validateOfficePresentationNativeReport(report.presentation);
 
-  const pdf = report.pdf;
-  requireCheck(pdf?.ok === true && pdf.reopened === true, 'The bundled PDF engine did not reopen its edited output');
-  requireCheck(pdf.removedOldText === true && pdf.newTextPresent === true, 'PDF original-text replacement checks failed');
-  requireCheck(pdf.metadata?.pageCount === 1, 'PDF round-trip page count is incorrect');
-  requireCheck(typeof pdf.text === 'string'
-    && pdf.text.includes('NEW_NATIVE_TEXT') && pdf.text.includes('新的合同')
-    && !pdf.text.includes('OLD_NATIVE_TEXT') && !pdf.text.includes('旧合同'), 'PDF reopened text does not match the replacement fixture');
+  validatePdfNativeReport(report.pdf);
+  const workspaceChecks = validateNativeWorkspaceReport(report.workspace);
+  for (const [extension, expected] of [
+    ['xlsx', report.sheet.reopenedXlsxBase64], ['pptx', report.presentation.reopenedPptxBase64], ['pdf', report.pdf.reopenedPdfBase64],
+  ]) requireCheck(report.workspace.server.formats.find(document => document.extension === extension)?.base64 === expected,
+    `Native workspace ${extension} bytes differ from the independently verified editor round trip`);
 
   return {
-    wordcraftDefaultCanvas: true, wordcraftDomInput: true, wordcraftDocxReadback: true,
-    wordcraftFailureAtomicity: true, wordcraftSessionCleanup: true,
-    gridcraftDefaultCanvas: true, gridcraftDomInput: true, gridcraftXlsxReadback: true,
-    gridcraftFormulaRoundTrip: true, gridcraftFailureAtomicity: true, gridcraftSessionCleanup: true,
-    deckcraftDefaultCanvas: true, deckcraftDomInput: true, deckcraftPptxReadback: true,
-    deckcraftPdfReadback: true, deckcraftFailureAtomicity: true, deckcraftSessionCleanup: true,
+    wordDefaultCanvas: true, wordDomInput: true, wordDocxReadback: true,
+    wordFailureAtomicity: true, wordSessionCleanup: true,
+    sheetDefaultCanvas: true, sheetDomInput: true, sheetXlsxReadback: true,
+    sheetFormulaRoundTrip: true, sheetFailureAtomicity: true, sheetSessionCleanup: true,
+    presentationDefaultCanvas: true, presentationDomInput: true, presentationPptxReadback: true,
+    presentationPdfReadback: true, presentationFailureAtomicity: true, presentationSessionCleanup: true,
     crossOriginIsolated: true,
-    pdfOriginalTextReplacementRoundTrip: true,
+    pdfOriginalTextReplacementRoundTrip: true, pdfDefaultCanvas: true,
+    pdfUndoRedo: true, pdfFailureAtomicity: true, pdfSessionCleanup: true,
+    ...workspaceChecks,
   };
 }
 
@@ -208,15 +212,14 @@ function rosettaPreflight(evidence) {
   Object.assign(evidence, validateRosettaProbe(evidence.raw));
 }
 
-export function validateMacArchitectures(mainArchitectures, pdfArchitectures, nativeArch) {
-  requireCheck(mainArchitectures.length === 1 && mainArchitectures[0] === nativeArch
-    && pdfArchitectures.length === 1 && pdfArchitectures[0] === nativeArch,
-  'Main app and PDF runtime must each contain exactly the selected macOS architecture');
+export function validateMacArchitectures(mainArchitectures, nativeArch) {
+  requireCheck(mainArchitectures.length === 1 && mainArchitectures[0] === nativeArch,
+  'Main app must contain exactly the selected macOS architecture');
 }
 
-function macPreflight(app, mainExecutable, pdfExecutable, nativeArch) {
+function macPreflight(app, mainExecutable, nativeArch) {
   const signatures = [], descriptions = {}, cdHashes = {};
-  for (const [label, path] of [['app', app], ['main', mainExecutable], ['pdfRuntime', pdfExecutable]]) {
+  for (const [label, path] of [['app', app], ['main', mainExecutable]]) {
     nativeTool('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=4', path], `codesign ${label} (${basename(path)})`);
     const description = nativeTool('/usr/bin/codesign', ['--display', '--verbose=4', path], `codesign ${label} metadata (${basename(path)})`);
     const cdHash = /^CDHash=([a-f0-9]{40})\s*$/mi.exec(description);
@@ -234,15 +237,14 @@ function macPreflight(app, mainExecutable, pdfExecutable, nativeArch) {
   requireCheck(/^Signature=adhoc\s*$/m.test(description), 'Final macOS app does not have the required ad-hoc bundle signature');
   requireCheck(!/linker-signed/i.test(description), 'Final macOS app still has a linker-only signature instead of a sealed bundle signature');
   const mainArchitectures = nativeTool('/usr/bin/lipo', ['-archs', mainExecutable]).trim().split(/\s+/);
-  const pdfArchitectures = nativeTool('/usr/bin/lipo', ['-archs', pdfExecutable]).trim().split(/\s+/);
-  validateMacArchitectures(mainArchitectures, pdfArchitectures, nativeArch);
+  validateMacArchitectures(mainArchitectures, nativeArch);
   return {
     strictSignatureVerification: signatures,
     cdHashes,
     sealedResources: { version: Number(sealed[1]), rules: Number(sealed[2]), files: Number(sealed[3]) },
     signature: 'adhoc', infoPlistEntries: Number(plist[1]), linkerSigned: false,
     developerIdSigned: false, notarized: false,
-    mainArchitectures, pdfArchitectures, originalAppResigned: false,
+    mainArchitectures, originalAppResigned: false,
   };
 }
 
@@ -273,9 +275,9 @@ export function locateApplication(configuration, options, env, root) {
     containedFile(app, join(resourceRoot, 'frontend', 'index.html'));
   }
   containedFile(resourceRoot, join(resourceRoot, 'frontend', 'index.html'));
-  const pdfExecutable = containedFile(resourceRoot, join(resourceRoot, 'pdf-runtime', configuration.os === 'win32' ? 'open-office-pdf.exe' : 'open-office-pdf'));
-  requireCheck(statSync(join(resourceRoot, 'pdf-runtime', '_internal')).isDirectory(), 'The installed PDF runtime is missing its onedir dependencies');
-  return { app, executable, resourceRoot, pdfExecutable };
+  const pdfDirectory = join(resourceRoot, 'frontend', 'office-pdf');
+  for (const name of ['office_pdf.js', 'office_pdf_bg.wasm', 'manifest.json']) containedFile(resourceRoot, join(pdfDirectory, name));
+  return { app, executable, resourceRoot, pdfDirectory };
 }
 
 function killTree(child, env, force = false) {
@@ -348,7 +350,7 @@ async function runGui(executable, output, workingDirectory, env, diagnostic, exe
     child.on('close', (code, signal) => {
       diagnostic.exitCode = code; diagnostic.signal = signal;
       if (diagnostic.timedOut) {
-        // A detached PDF worker must not survive the app's timeout/exit.
+        // A descendant process must not survive the app's timeout/exit.
         try { killTree(child, env, true); } catch { diagnostic.cleanupError = 'Process-tree cleanup could not be confirmed'; }
         finish(new Error('Native GUI did not finish its smoke test within 300 seconds'));
       } else if (code !== 0 || signal) {
@@ -431,12 +433,12 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     report.preflight.installedResourceLayout = true;
     report.preflight.finalExecutable = basename(location.executable);
     report.preflight.finalExecutableSha256 = hashFile(location.executable);
-    report.preflight.pdfExecutableSha256 = hashFile(location.pdfExecutable);
-    report.preflight.wordcraft = inspectInstalledWordcraft(location.resourceRoot, { root });
-    report.preflight.gridcraft = inspectInstalledGridcraft(location.resourceRoot, { root });
-    report.preflight.deckcraft = inspectInstalledDeckcraft(location.resourceRoot, { root });
+    report.preflight.pdf = inspectInstalledPdf(location.resourceRoot, { root });
+    report.preflight.word = inspectInstalledOfficeWord(location.resourceRoot, { root });
+    report.preflight.sheet = inspectInstalledOfficeSheet(location.resourceRoot, { root });
+    report.preflight.presentation = inspectInstalledOfficePresentation(location.resourceRoot, { root });
     if (configuration.os === 'darwin') {
-      report.preflight.macos = macPreflight(location.app, location.executable, location.pdfExecutable, configuration.nativeArch);
+      report.preflight.macos = macPreflight(location.app, location.executable, configuration.nativeArch);
       if (execution.executionMode === 'rosetta2') {
         report.preflight.rosetta = {};
         rosettaPreflight(report.preflight.rosetta);
@@ -444,7 +446,7 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     } else {
       report.preflight.installedNSISLayout = true;
       report.preflight.windows = {
-        main: verifyWindowsExecutable(location.executable), pdfRuntime: verifyWindowsExecutable(location.pdfExecutable),
+        main: verifyWindowsExecutable(location.executable),
       };
     }
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'open-office-native-smoke-'));
@@ -454,9 +456,10 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     await runGui(location.executable, rawReport, temporaryDirectory, env, report.process, execution.executionMode);
     report.frontend = readFrontendReport(rawReport);
     report.checks = validateFrontendReport(report.frontend);
-    Object.assign(report.checks, validateNativeWordcraftEvidence(report, { root }));
-    Object.assign(report.checks, validateNativeGridcraftEvidence(report, { root }));
-    Object.assign(report.checks, validateNativeDeckcraftEvidence(report, { root }));
+    Object.assign(report.checks, validateNativeOfficeWordEvidence(report, { root }));
+    Object.assign(report.checks, validateNativeOfficeSheetEvidence(report, { root }));
+    Object.assign(report.checks, validateNativeOfficePresentationEvidence(report, { root }));
+    Object.assign(report.checks, validateNativePdfEvidence(report, { root }));
     requireCheck(report.process.cleanExit === true && report.process.exitCode === 0 && !report.process.signal && !report.process.timedOut, 'Native GUI did not exit cleanly after its checks');
     report.ok = true;
   } catch (error) {

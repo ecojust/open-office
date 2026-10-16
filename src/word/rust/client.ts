@@ -1,9 +1,10 @@
 import type { NativeDocument } from '../../types'
 import type { Appearance } from '../../shared/appearance'
 import { base64ToBytes } from '../../shared/document'
-import type { WordcraftEvent, WordcraftFileAction, WordcraftSnapshot } from './wordcraft-types'
+import { createId } from '../../shared/id'
+import type { OfficeWordEvent, OfficeWordFileAction, OfficeWordSnapshot } from './office-word-types'
 
-interface WordcraftHost {
+interface OfficeWordHost {
   prepare(id: string, name: string, bytes: Uint8Array): string
   start(canvas: HTMLCanvasElement): Promise<void>
   activate(id: string): string
@@ -18,8 +19,8 @@ interface WordcraftHost {
   setTheme(theme: Appearance): void
   destroy(): void
 }
-type Bindings = { default(options: { module_or_path: URL }): Promise<unknown>; createHost(callback: (event: string) => void): WordcraftHost }
-let runtime: Promise<WordcraftHost> | undefined, host: WordcraftHost | undefined
+type Bindings = { default(options: { module_or_path: URL }): Promise<unknown>; createHost(callback: (event: string) => void): OfficeWordHost }
+let runtime: Promise<OfficeWordHost> | undefined, host: OfficeWordHost | undefined
 let canvas: HTMLCanvasElement | undefined, parking: HTMLElement | undefined, started: Promise<void> | undefined
 let activeId: string | undefined, activation = 0, interactive = false, compositionId: string | undefined
 let activationSessionId: string | undefined
@@ -27,21 +28,21 @@ let textAgent: HTMLInputElement | undefined, disableTimer: ReturnType<typeof set
 let queue: Promise<void> = Promise.resolve()
 let interfaceTheme: Appearance = 'system'
 const sessions = new Map<string, RustWordSession>()
-const fileActions = new Set<WordcraftFileAction>(['new', 'open', 'save', 'saveAs', 'exportPdf', 'print', 'close'])
+const fileActions = new Set<OfficeWordFileAction>(['new', 'open', 'save', 'saveAs', 'exportPdf', 'print', 'close'])
 
 function serialize<T>(work: () => Promise<T> | T): Promise<T> {
   const result = queue.then(work)
   queue = result.then(() => undefined, () => undefined)
   return result
 }
-function snapshotOf(raw: string, sessionId: string): WordcraftSnapshot {
-  const value = JSON.parse(raw) as WordcraftSnapshot
+function snapshotOf(raw: string, sessionId: string): OfficeWordSnapshot {
+  const value = JSON.parse(raw) as OfficeWordSnapshot
   if (value.sessionId !== sessionId || !Number.isSafeInteger(value.documentId) || !Number.isSafeInteger(value.revision) || value.revision < 0 || typeof value.dirty !== 'boolean' || !Number.isSafeInteger(value.pages)) throw Error('文字编辑器返回了无效的文稿状态。')
   return value
 }
 function receive(raw: string) {
   try {
-    const event = JSON.parse(raw) as { type: string; sessionId: string; snapshot?: WordcraftSnapshot; action?: WordcraftFileAction | 'pickFile'; purpose?: string; revision?: number; documentId?: number; selection?: unknown; message?: string; error?: string }
+    const event = JSON.parse(raw) as { type: string; sessionId: string; snapshot?: OfficeWordSnapshot; action?: OfficeWordFileAction | 'pickFile'; purpose?: string; revision?: number; documentId?: number; selection?: unknown; message?: string; error?: string }
     const session = sessions.get(event.sessionId)
     if (!session) return
     if (event.type === 'change' && event.snapshot) session.accept(snapshotOf(JSON.stringify(event.snapshot), session.id))
@@ -53,10 +54,10 @@ function receive(raw: string) {
     session?.event({ type: 'error', sessionId: session.id, message: cause instanceof Error ? cause.message : String(cause) })
   }
 }
-async function loadHost(): Promise<WordcraftHost> {
-  const url = new URL('wordcraft/wordcraft.js', document.baseURI)
+async function loadHost(): Promise<OfficeWordHost> {
+  const url = new URL('office-word/office-word.js', document.baseURI)
   const bindings = await import(/* @vite-ignore */ url.href) as Bindings
-  await bindings.default({ module_or_path: new URL('wordcraft/wordcraft_bg.wasm', document.baseURI) })
+  await bindings.default({ module_or_path: new URL('office-word/office-word_bg.wasm', document.baseURI) })
   host = bindings.createHost(receive)
   host.setTheme(interfaceTheme)
   return host
@@ -72,7 +73,7 @@ function parkingElement() {
   if (!parking) {
     parking = document.createElement('div')
     parking.hidden = true
-    parking.dataset.wordcraftParking = ''
+    parking.dataset.wordParking = ''
     document.body.append(parking)
   }
   return parking
@@ -87,8 +88,8 @@ function endComposition(event: Event) {
 }
 function newCanvas() {
   const element = document.createElement('canvas')
-  element.id = 'open-office-wordcraft-canvas'
-  element.dataset.testid = 'wordcraft-canvas'
+  element.id = 'open-office-office-word-canvas'
+  element.dataset.testid = 'office-word-canvas'
   element.setAttribute('aria-label', '文字文稿与功能区')
   element.tabIndex = 0
   Object.assign(element.style, { display: 'block', width: '100%', height: '100%', outline: 'none' })
@@ -99,17 +100,17 @@ export class RustWordSession {
   readonly id: string
   private closed = false
   private desiredInteractive = false
-  private listeners = new Set<(snapshot: WordcraftSnapshot) => void>()
-  private eventListeners = new Set<(event: WordcraftEvent) => void>()
-  constructor(public snapshot: WordcraftSnapshot) { this.id = snapshot.sessionId }
-  subscribe(listener: (snapshot: WordcraftSnapshot) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
-  onEvent(listener: (event: WordcraftEvent) => void) { this.eventListeners.add(listener); return () => { this.eventListeners.delete(listener) } }
-  accept(snapshot: WordcraftSnapshot) {
+  private listeners = new Set<(snapshot: OfficeWordSnapshot) => void>()
+  private eventListeners = new Set<(event: OfficeWordEvent) => void>()
+  constructor(public snapshot: OfficeWordSnapshot) { this.id = snapshot.sessionId }
+  subscribe(listener: (snapshot: OfficeWordSnapshot) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
+  onEvent(listener: (event: OfficeWordEvent) => void) { this.eventListeners.add(listener); return () => { this.eventListeners.delete(listener) } }
+  accept(snapshot: OfficeWordSnapshot) {
     if (this.closed) return
     this.snapshot = snapshot
     for (const listener of this.listeners) listener(snapshot)
   }
-  event(event: WordcraftEvent) { if (!this.closed) for (const listener of this.eventListeners) listener(event) }
+  event(event: OfficeWordEvent) { if (!this.closed) for (const listener of this.eventListeners) listener(event) }
   private assertOpen() { if (this.closed || sessions.get(this.id) !== this) throw Error('此文稿已关闭。') }
   async attach(container: HTMLElement, enabled: boolean): Promise<void> {
     this.desiredInteractive = enabled
@@ -128,7 +129,7 @@ export class RustWordSession {
       await started
       if (!textAgent && canvas.nextElementSibling instanceof HTMLInputElement) {
         textAgent = canvas.nextElementSibling
-        textAgent.dataset.testid = 'wordcraft-input'
+        textAgent.dataset.testid = 'office-word-input'
         // eframe's 1px input needs a real content box. The shell's border-box
         // reset plus default input padding otherwise leaves zero content width;
         // Chromium then keeps committed text's DOM caret at the start.
@@ -162,7 +163,7 @@ export class RustWordSession {
     if (document.activeElement === textAgent || document.activeElement === canvas) (document.activeElement as HTMLElement).blur()
   }
   focus() { if (activeId === this.id && interactive) canvas?.focus({ preventScroll: true }) }
-  private async flushInput(api: WordcraftHost) {
+  private async flushInput(api: OfficeWordHost) {
     if (compositionId === this.id) {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
       await new Promise<void>(resolve => setTimeout(resolve, 0))
@@ -175,30 +176,44 @@ export class RustWordSession {
   settled(): Promise<void> {
     return serialize(async () => { this.assertOpen(); const api = await getHost(); await this.flushInput(api) })
   }
-  inspect(): Promise<WordcraftSnapshot> {
+  inspect(): Promise<OfficeWordSnapshot> {
     return serialize(async () => {
       this.assertOpen()
       this.accept(snapshotOf((await getHost()).inspect(this.id), this.id))
       return this.snapshot
     })
   }
-  command(commandId: string, params: Record<string, unknown> = {}, expected?: Pick<WordcraftSnapshot, 'documentId' | 'revision' | 'selection'>): Promise<WordcraftSnapshot> {
+  private backgroundExportReady(api: OfficeWordHost): boolean {
+    if (compositionId === this.id) return false
+    const ui = snapshotOf(api.inspect(this.id), this.id).ui
+    if (!ui || typeof ui !== 'object' || Array.isArray(ui)) return false
+    return (ui as { dialog?: unknown }).dialog === null
+  }
+  canBackgroundExport(): Promise<boolean> {
+    return serialize(async () => {
+      this.assertOpen()
+      return this.backgroundExportReady(await getHost())
+    })
+  }
+  command(commandId: string, params: Record<string, unknown> = {}, expected?: Pick<OfficeWordSnapshot, 'documentId' | 'revision' | 'selection'>): Promise<OfficeWordSnapshot> {
     return serialize(async () => {
       this.assertOpen()
       const api = await getHost()
       await this.flushInput(api)
       if (expected && (expected.documentId !== this.snapshot.documentId || expected.revision !== this.snapshot.revision || JSON.stringify(expected.selection) !== JSON.stringify(this.snapshot.selection))) throw Error('选择文件期间文稿或选区已有变化，请重新选择插入位置。')
-      const result = JSON.parse(api.command(this.id, commandId, JSON.stringify(params))) as { ok: boolean; snapshot?: WordcraftSnapshot; error?: string }
+      const result = JSON.parse(api.command(this.id, commandId, JSON.stringify(params))) as { ok: boolean; snapshot?: OfficeWordSnapshot; error?: string }
       if (!result.ok) throw Error(result.error || '文稿操作失败。')
       this.accept(snapshotOf(result.snapshot ? JSON.stringify(result.snapshot) : api.inspect(this.id), this.id))
       return this.snapshot
     })
   }
-  export(format: 'docx' | 'pdf' = 'docx'): Promise<{ bytes: Uint8Array; snapshot: WordcraftSnapshot }> {
+  export(format: 'docx' | 'pdf' = 'docx', options: { background?: boolean } = {}): Promise<{ bytes: Uint8Array; snapshot: OfficeWordSnapshot }> {
     return serialize(async () => {
       this.assertOpen()
       const api = await getHost()
-      await this.flushInput(api)
+      if (options.background) {
+        if (!this.backgroundExportReady(api)) throw Error('文稿正在输入或显示对话框，稍后再自动保存。')
+      } else await this.flushInput(api)
       // Both calls are synchronous: no input or other task can run between the
       // exported bytes and their revision receipt.
       const bytes = api.exportFile(this.id, format)
@@ -208,11 +223,13 @@ export class RustWordSession {
       return { bytes, snapshot }
     })
   }
-  markSaved(documentId: number, revision: number): Promise<void> {
+  markSaved(documentId: number, revision: number, options: { background?: boolean } = {}): Promise<void> {
     return serialize(async () => {
       this.assertOpen()
       const api = await getHost()
-      await this.flushInput(api)
+      if (options.background) {
+        if (!this.backgroundExportReady(api)) throw Error('文稿正在输入或显示对话框，稍后再自动保存。')
+      } else await this.flushInput(api)
       if (!api.markSaved(this.id, documentId, revision)) throw Error('导出后文稿又有修改，请再次保存当前内容。')
       this.accept(snapshotOf(api.inspect(this.id), this.id))
     })
@@ -246,7 +263,7 @@ export class RustWordSession {
   }
 }
 
-export function inspectWordcraftSession(id: string): Promise<WordcraftSnapshot> {
+export function inspectOfficeWordSession(id: string): Promise<OfficeWordSnapshot> {
   const session = sessions.get(id)
   return session ? session.inspect() : Promise.reject(Error('此文稿尚未打开。'))
 }
@@ -260,7 +277,7 @@ export async function prepareRustWordDocument(source: Source): Promise<PreparedR
   if (source.base64.length > 56 * 1024 * 1024) throw Error('请选择不超过 40 MB 的文稿。')
   const bytes = base64ToBytes(source.base64)
   const session = await serialize(async () => {
-    const api = await getHost(), id = `word-${crypto.randomUUID()}`
+    const api = await getHost(), id = `word-${createId()}`
     const next = new RustWordSession(snapshotOf(api.prepare(id, source.name, bytes), id))
     sessions.set(id, next)
     return next

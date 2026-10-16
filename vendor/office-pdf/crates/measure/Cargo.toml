@@ -1,0 +1,20 @@
+[package]
+name = "office-pdf-measure"
+description = "Calibrated 2D PDF measurements, viewports and snapping"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+office-pdf-cos = { workspace = true }
+office-pdf-model = { workspace = true }
+office-pdf-content = { workspace = true }
+office-pdf-annot = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+office-pdf-testkit = { workspace = true }

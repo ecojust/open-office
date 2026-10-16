@@ -1,0 +1,13 @@
+[package]
+name = "office-sheet-functions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficeSheet worksheet function library: math, statistics, text, dates, lookup, financial, engineering"
+
+[lints]
+workspace = true
+
+[dependencies]
+office-sheet-core = { workspace = true }
+regex = { workspace = true }

@@ -1,0 +1,17 @@
+[package]
+name = "office-word-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficeWord MCP server: every command as a tool, headless or bridged to the running app"
+
+[lints]
+workspace = true
+
+[dependencies]
+office-word-doc = { workspace = true }
+office-word-engine = { workspace = true }
+office-word-render = { workspace = true }
+office-word-control-key = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }

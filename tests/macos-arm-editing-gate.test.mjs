@@ -7,12 +7,15 @@ import { dirname, join } from 'node:path';
 import { appInventory, sha256File } from '../scripts/macos-intel-transfer.mjs';
 import { verifyMacosArmEditingProof, readMacosArmEditingProof, runMacosArmEditingGate } from '../scripts/macos-arm-editing-gate.mjs';
 import { EDITING_ACTIONS, EDITING_CHECKS, viewportMapping, inputForWindow } from '../scripts/macos-editing-diagnostic.mjs';
-import { inspectInstalledWordcraft, wordcraftSourceHash, validateInstalledWordcraftEvidence } from '../scripts/wordcraft-native-smoke.mjs';
-import { inspectInstalledGridcraft, gridcraftSourceHash, validateInstalledGridcraftEvidence } from '../scripts/gridcraft-native-smoke.mjs';
-import { inspectInstalledDeckcraft, deckcraftSourceHash } from '../scripts/deckcraft-native-smoke.mjs';
-import { wordcraftReport } from './helpers/wordcraft-smoke-report.mjs';
-import { gridcraftReport } from './helpers/gridcraft-smoke-report.mjs';
-import { deckcraftReport } from './helpers/deckcraft-smoke-report.mjs';
+import { inspectInstalledOfficeWord, wordSourceHash, validateInstalledOfficeWordEvidence } from '../scripts/office-word-native-smoke.mjs';
+import { inspectInstalledOfficeSheet, sheetSourceHash, validateInstalledOfficeSheetEvidence } from '../scripts/office-sheet-native-smoke.mjs';
+import { inspectInstalledOfficePresentation, presentationSourceHash } from '../scripts/office-presentation-native-smoke.mjs';
+import { inspectInstalledPdf } from '../scripts/office-pdf-native-smoke.mjs';
+import { workspaceReport } from './helpers/workspace-smoke-report.mjs';
+import { installPdfFixture, pdfReport } from './helpers/pdf-smoke-report.mjs';
+import { wordReport } from './helpers/office-word-smoke-report.mjs';
+import { sheetReport } from './helpers/office-sheet-smoke-report.mjs';
+import { presentationReport } from './helpers/office-presentation-smoke-report.mjs';
 
 // Independent native-event fixture: no OS injection or successful gate flags substitute for its model observations.
 const geometry = { actionId: 'single-a1', viewport: { width: 1200, height: 800 }, pid: 1234, windowId: 92, x: 40, y: 70,
@@ -44,9 +47,9 @@ function fixture() {
   });
   const actions = EDITING_ACTIONS.map(([actionId, kind, target, value], index) => ({ actionId, kind, target, completed: true,
     before: snapshot(index), after: snapshot(index, true), events: ['click', 'doubleClick'].includes(kind)
-      ? [{ type: kind === 'doubleClick' ? 'dblclick' : 'click', target: target === 'shell:undo' ? 'button:撤销' : target.startsWith('word:') ? 'wordcraft-canvas' : 'gridcraft-canvas',
+      ? [{ type: kind === 'doubleClick' ? 'dblclick' : 'click', target: target === 'shell:undo' ? 'button:撤销' : target.startsWith('word:') ? 'office-word-canvas' : 'office-sheet-canvas',
         isTrusted: true, clientX: 300, clientY: 200, detail: kind === 'doubleClick' ? 2 : 1 }]
-      : (kind === 'key' ? [value] : [...value]).map(key => ({ type: 'keyup', key, isTrusted: true, target: target.startsWith('word:') ? 'wordcraft-input' : 'gridcraft-input' })) }));
+      : (kind === 'key' ? [value] : [...value]).map(key => ({ type: 'keyup', key, isTrusted: true, target: target.startsWith('word:') ? 'office-word-input' : 'office-sheet-input' })) }));
   const editing = { schemaVersion: 1, kind: 'macos-editing', transport: 'local-wasm-in-native-webview', ok: true,
     bootId: 'd3b1ead1-d8e1-418f-b964-cd13826da6ac', timeOrigin: 1700000000000, checks: [...EDITING_CHECKS],
     initialTabIds: sessions.slice(0, 2).map(item => item.key), finalTabIds: sessions.map(item => item.key), sessions, actions,
@@ -68,32 +71,33 @@ function installation(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const write = (path, contents) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, contents); };
   write(join(root, 'package.json'), JSON.stringify({ version: '0.10.1' }));
-  for (const path of ['scripts/build-wordcraft.mjs', 'scripts/build-gridcraft.mjs', 'scripts/build-deckcraft.mjs', 'scripts/build-office-icons.mjs',
-    'vendor/wordcraft/src/lib.rs', 'vendor/gridcraft/src/lib.rs', 'vendor/deckcraft/src/lib.rs',
+  for (const path of ['scripts/build-office-word.mjs', 'scripts/build-office-sheet.mjs', 'scripts/build-office-presentation.mjs', 'scripts/build-office-icons.mjs',
+    'vendor/office-word/src/lib.rs', 'vendor/office-sheet/src/lib.rs', 'vendor/office-presentation/src/lib.rs',
     'assets/fonts/open-office/license.txt', 'assets/fonts/deck/license.txt', 'src/icons/test.svg']) write(join(root, path), `fixture: ${path}`);
   const app = join(root, 'Open Office.app'), resourceRoot = join(app, 'Contents/Resources');
   write(join(app, 'Contents/MacOS/open-office'), 'ARM application fixture');
-  write(join(resourceRoot, 'pdf-runtime/open-office-pdf'), 'ARM PDF fixture');
+  installPdfFixture(root, resourceRoot);
   for (const [engine, name, upstream, hash] of [
-    ['wordcraft', 'WordCraft', '3292ba05d3c15c003823be6849e87a1c6e205242', wordcraftSourceHash],
-    ['gridcraft', 'GridCraft', 'e6b6b349708ab4978cb3f061f6bd6ecbc25667cb', gridcraftSourceHash],
-    ['deckcraft', 'DeckCraft', '9859da39255c0262cd592bb57101d7f2fa961f72', deckcraftSourceHash],
+    ['word', 'Open Office', '3292ba05d3c15c003823be6849e87a1c6e205242', wordSourceHash],
+    ['sheet', 'Open Office', 'e6b6b349708ab4978cb3f061f6bd6ecbc25667cb', sheetSourceHash],
+    ['presentation', 'Open Office', '9859da39255c0262cd592bb57101d7f2fa961f72', presentationSourceHash],
   ]) {
-    const files = { [`${engine}.js`]: Buffer.from('export const fixture=true;'), [`${engine}.d.ts`]: Buffer.from('export const fixture:boolean;'),
-      [`${engine}_bg.wasm`]: Buffer.from('0061736d01000000', 'hex'), [`${engine}_bg.wasm.d.ts`]: Buffer.from('export const memory:WebAssembly.Memory;') };
-    for (const [name, bytes] of Object.entries(files)) write(join(resourceRoot, 'frontend', engine, name), bytes);
+    const basename = `office-${engine}`;
+    const files = { [`${basename}.js`]: Buffer.from('export const fixture=true;'), [`${basename}.d.ts`]: Buffer.from('export const fixture:boolean;'),
+      [`${basename}_bg.wasm`]: Buffer.from('0061736d01000000', 'hex'), [`${basename}_bg.wasm.d.ts`]: Buffer.from('export const memory:WebAssembly.Memory;') };
+    for (const [name, bytes] of Object.entries(files)) write(join(resourceRoot, 'frontend', basename, name), bytes);
     const manifest = { engine: name, upstreamCommit: upstream, sourceHash: hash(root), target: 'wasm32-unknown-unknown', wasmBindgenVersion: '0.2.129',
       files: Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, digest(bytes)])), sizeBytes: 8 };
-    write(join(resourceRoot, 'frontend', engine, 'manifest.json'), JSON.stringify(manifest));
+    write(join(resourceRoot, 'frontend', basename, 'manifest.json'), JSON.stringify(manifest));
   }
   const dmgPath = join(root, 'Open-Office-0.10.1-macos-arm64.dmg'); write(dmgPath, 'immutable DMG fixture');
-  const scenario = fixture(), signatures = { app: '1'.repeat(40), main: '2'.repeat(40), pdfRuntime: '3'.repeat(40) };
+  const scenario = fixture(), signatures = { app: '1'.repeat(40), main: '2'.repeat(40) };
   const inventory = appInventory(app);
   const proof = { schemaVersion: 1, kind: 'macos-arm-editing-gate', platformId: 'macos-arm64', target: 'aarch64-apple-darwin',
     commit, runId, ok: true, status: 'passed', releaseAcceptance: true,
     host: { platform: 'darwin', arch: 'arm64', machine: 'arm64', productVersion: '26.5', buildVersion: '25A362' },
     dmg: { name: 'Open-Office-0.10.1-macos-arm64.dmg', bytes: readFileSync(dmgPath).length, sha256: sha256File(dmgPath) },
-    app: inventory, copiedAppPath: app, signatures, architectures: { main: 'arm64', pdfRuntime: 'arm64' },
+    app: inventory, copiedAppPath: app, signatures, architectures: { main: 'arm64' },
     transfer: { readonlyMount: true, originalAppResigned: false, unchangedAppBytesAndSymlinks: true,
       copiedInventorySha256: inventory.sha256, finalInventorySha256: inventory.sha256, copiedSignatures: { ...signatures }, finalSignatures: { ...signatures } },
     cleanup: { detached: true, removedTemporaryApp: true },
@@ -101,26 +105,25 @@ function installation(t) {
       preflight: { schemaVersion: 1, kind: 'macos-os-input-preflight', permissions: { ...permissions } },
       process: { pid: 1234, exitCode: 0, signal: null }, system: { machine: 'arm64', swVers: 'ProductName:\tmacOS\nProductVersion:\t26.5\nBuildVersion:\t25A362' },
       application: { app, executableSha256: sha256File(join(app, 'Contents/MacOS/open-office')),
-        wordcraft: inspectInstalledWordcraft(resourceRoot, { root }), gridcraft: inspectInstalledGridcraft(resourceRoot, { root }) },
+        word: inspectInstalledOfficeWord(resourceRoot, { root }), sheet: inspectInstalledOfficeSheet(resourceRoot, { root }) },
       frontend: scenario.frontend, nativeDiagnostics: scenario.diagnostics, actions: scenario.sent } };
   const frontend = { ok: true, crossOriginIsolated: true, sharedArrayBuffer: false, userAgent: 'Native WebView contract test',
-    wordcraft: wordcraftReport(), gridcraft: gridcraftReport(), deckcraft: deckcraftReport(),
-    pdf: { ok: true, reopened: true, removedOldText: true, newTextPresent: true,
-      metadata: { pageCount: 1 }, text: 'NEW_NATIVE_TEXT 新的合同' } };
-  const installed = { wordcraft: inspectInstalledWordcraft(resourceRoot, { root }), gridcraft: inspectInstalledGridcraft(resourceRoot, { root }),
-    deckcraft: inspectInstalledDeckcraft(resourceRoot, { root }) };
+    word: wordReport(), sheet: sheetReport(), presentation: presentationReport(),
+    pdf: pdfReport(inspectInstalledPdf(resourceRoot, { root })), workspace: workspaceReport() };
+  const installed = { word: inspectInstalledOfficeWord(resourceRoot, { root }), sheet: inspectInstalledOfficeSheet(resourceRoot, { root }),
+    presentation: inspectInstalledOfficePresentation(resourceRoot, { root }), pdf: inspectInstalledPdf(resourceRoot, { root }) };
   for (const [engine, evidence] of Object.entries(installed)) {
-    const manifest = JSON.parse(evidence.manifestText);
+    const manifest = JSON.parse(evidence.manifestText), basename = engine === 'pdf' ? 'office_pdf' : `office-${engine}`;
     Object.assign(frontend[engine].resources, { manifestSha256: evidence.manifestSha256, sourceHash: manifest.sourceHash,
-      files: Object.fromEntries([`${engine}.js`, `${engine}_bg.wasm`].map(name => [name, { ...evidence.files[name] }])) });
+      files: Object.fromEntries([`${basename}.js`, `${basename}_bg.wasm`].map(name => [name, { ...evidence.files[name] }])) });
   }
   proof.fullSmoke = { schemaVersion: 1, kind: 'native-gui-smoke', ok: true, platformId: 'macos-arm64', target: 'aarch64-apple-darwin',
     commit, runId, host: { platform: 'darwin', architecture: 'arm64' }, targetArch: 'arm64', hostArch: 'arm64', executionMode: 'native', timeoutMs: 300_000,
     preflight: { installedResourceLayout: true, finalExecutable: 'open-office',
       finalExecutableSha256: sha256File(join(app, 'Contents/MacOS/open-office')),
-      pdfExecutableSha256: sha256File(join(resourceRoot, 'pdf-runtime/open-office-pdf')), ...installed,
-      macos: { mainArchitectures: ['arm64'], pdfArchitectures: ['arm64'], cdHashes: { ...signatures },
-        strictSignatureVerification: ['app', 'main', 'pdfRuntime'], originalAppResigned: false } },
+      ...installed,
+      macos: { mainArchitectures: ['arm64'], cdHashes: { ...signatures },
+        strictSignatureVerification: ['app', 'main'], originalAppResigned: false } },
     process: { launchExecutable: join(app, 'Contents/MacOS/open-office'), launchArguments: [], pid: 5678,
       cleanExit: true, exitCode: 0, signal: null, timedOut: false }, frontend, errors: [],
     nativeDiagnostics: { schemaVersion: 1, scope: 'full', generation: 1, terminations: 0,
@@ -149,7 +152,7 @@ test('publication rejects absent, failed, foreign or non-native full-editor smok
     ['another run', p => { p.fullSmoke.runId = '1'; }],
     ['another app', p => { p.fullSmoke.process.launchExecutable += '-other'; }],
     ['another executable', p => { p.fullSmoke.preflight.finalExecutableSha256 = 'f'.repeat(64); }],
-    ['another PDF runtime', p => { p.fullSmoke.preflight.pdfExecutableSha256 = 'f'.repeat(64); }],
+    ['another PDF WASM', p => { p.fullSmoke.preflight.pdf.files['office_pdf_bg.wasm'].sha256 = 'f'.repeat(64); }],
     ['another signature', p => { p.fullSmoke.preflight.macos.cdHashes.main = 'f'.repeat(40); }],
     ['another target', p => { p.fullSmoke.target = 'x86_64-apple-darwin'; }],
     ['another platform', p => { p.fullSmoke.platformId = 'macos-x64'; }],
@@ -176,16 +179,16 @@ test('full-editor functional acceptance is mandatory even without shared memory'
     const changed = structuredClone(proof); changed.fullSmoke.frontend.sharedArrayBuffer = available;
     assert.equal(verifyMacosArmEditingProof(changed, options), true);
   }
-  for (const engine of ['wordcraft', 'gridcraft', 'deckcraft']) await t.test(engine, () => {
+  for (const engine of ['word', 'sheet', 'presentation', 'pdf', 'workspace']) await t.test(engine, () => {
     const changed = structuredClone(proof); delete changed.fullSmoke.frontend[engine];
     assert.throws(() => verifyMacosArmEditingProof(changed, options));
   });
   for (const mutate of [
     frontend => { frontend.pdf.reopened = false; },
     frontend => { frontend.pdf.text += ' OLD_NATIVE_TEXT'; },
-    frontend => { frontend.gridcraft.formula.value = 0; },
-    frontend => { frontend.deckcraft.failures.preserved = false; },
-    frontend => { frontend.wordcraft.reopenedDocxBase64 = Buffer.from('invalid saved document').toString('base64'); },
+    frontend => { frontend.sheet.formula.value = 0; },
+    frontend => { frontend.presentation.failures.preserved = false; },
+    frontend => { frontend.word.reopenedDocxBase64 = Buffer.from('invalid saved document').toString('base64'); },
     frontend => { delete frontend.sharedArrayBuffer; },
   ]) {
     const changed = structuredClone(proof); mutate(changed.fullSmoke.frontend);
@@ -243,18 +246,18 @@ test('both real editing and full smoke must read back the created WebView compat
 
 test('full-editor evidence binds all installed assets and WebView resources to the tested App and checkout', t => {
   const { proof, options, root } = installation(t);
-  for (const engine of ['wordcraft', 'gridcraft', 'deckcraft']) {
+  for (const engine of ['word', 'sheet', 'presentation', 'pdf']) {
     const changed = structuredClone(proof);
-    changed.fullSmoke.frontend[engine].resources.files[`${engine}.js`].sha256 = 'f'.repeat(64);
+    changed.fullSmoke.frontend[engine].resources.files[`${engine === 'pdf' ? 'office_pdf' : `office-${engine}`}.js`].sha256 = 'f'.repeat(64);
     assert.throws(() => verifyMacosArmEditingProof(changed, options), /independently verified installed file/);
   }
   // Deck assets are only covered by the new full-editor run, not real OS editing.
   const changed = structuredClone(proof);
-  changed.app.entries.find(entry => entry.path.endsWith('/frontend/deckcraft/deckcraft.js')).sha256 = 'f'.repeat(64);
+  changed.app.entries.find(entry => entry.path.endsWith('/frontend/office-presentation/office-presentation.js')).sha256 = 'f'.repeat(64);
   changed.app.sha256 = digest(JSON.stringify(changed.app.entries));
   changed.transfer.copiedInventorySha256 = changed.transfer.finalInventorySha256 = changed.app.sha256;
   assert.throws(() => verifyMacosArmEditingProof(changed, options), /differs from the mounted App/);
-  writeFileSync(join(root, 'vendor/deckcraft/src/lib.rs'), 'different presentation source');
+  writeFileSync(join(root, 'vendor/office-presentation/src/lib.rs'), 'different presentation source');
   assert.throws(() => verifyMacosArmEditingProof(proof, options), /current checkout source/);
 });
 
@@ -313,17 +316,17 @@ test('published DMG bytes and exact source-version filename must match the teste
 
 test('installed-only wrappers reject stale source and bind every installed asset to the mounted App', t => {
   const { proof, options, root } = installation(t);
-  for (const [engine, validate] of [['wordcraft', validateInstalledWordcraftEvidence], ['gridcraft', validateInstalledGridcraftEvidence]]) {
+  for (const [engine, validate] of [['word', validateInstalledOfficeWordEvidence], ['sheet', validateInstalledOfficeSheetEvidence]]) {
     const installed = proof.diagnostic.application[engine];
-    assert.equal(validate(installed, { root }).engine, engine === 'wordcraft' ? 'WordCraft' : 'GridCraft');
+    assert.equal(validate(installed, { root }).engine, engine === 'word' ? 'Open Office' : 'Open Office');
     const damaged = structuredClone(installed); damaged.manifestText += ' ';
     assert.throws(() => validate(damaged, { root }), /manifest digest/);
-    const source = join(root, `vendor/${engine}/src/lib.rs`), bytes = readFileSync(source);
+    const source = join(root, `vendor/office-${engine}/src/lib.rs`), bytes = readFileSync(source);
     writeFileSync(source, 'different source');
     assert.throws(() => verifyMacosArmEditingProof(proof, options), /current checkout source/);
     writeFileSync(source, bytes);
     const changed = structuredClone(proof);
-    const entry = changed.app.entries.find(entry => entry.path.endsWith(`/frontend/${engine}/${engine}.js`));
+    const entry = changed.app.entries.find(entry => entry.path.endsWith(`/frontend/office-${engine}/office-${engine}.js`));
     entry.sha256 = 'f'.repeat(64);
     changed.app.sha256 = digest(JSON.stringify(changed.app.entries));
     changed.transfer.copiedInventorySha256 = changed.transfer.finalInventorySha256 = changed.app.sha256;

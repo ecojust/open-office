@@ -1,9 +1,10 @@
 import type { NativeDocument } from '../../types'
 import type { Appearance } from '../../shared/appearance'
 import { base64ToBytes } from '../../shared/document'
-import type { DeckcraftEvent, DeckcraftFileAction, DeckcraftSnapshot } from './deckcraft-types'
+import { createId } from '../../shared/id'
+import type { OfficePresentationEvent, OfficePresentationFileAction, OfficePresentationSnapshot } from './office-presentation-types'
 
-interface DeckcraftHost {
+interface OfficePresentationHost {
   prepare(id: string, name: string, bytes: Uint8Array): string
   start(canvas: HTMLCanvasElement): Promise<void>
   activate(id: string): string
@@ -18,8 +19,8 @@ interface DeckcraftHost {
   setTheme(theme: Appearance): void
   destroy(): void
 }
-type Bindings = { default(options: { module_or_path: URL }): Promise<unknown>; createHost(callback: (event: string) => void): DeckcraftHost }
-let runtime: Promise<DeckcraftHost> | undefined, host: DeckcraftHost | undefined
+type Bindings = { default(options: { module_or_path: URL }): Promise<unknown>; createHost(callback: (event: string) => void): OfficePresentationHost }
+let runtime: Promise<OfficePresentationHost> | undefined, host: OfficePresentationHost | undefined
 let canvas: HTMLCanvasElement | undefined, parking: HTMLElement | undefined, started: Promise<void> | undefined
 let activeId: string | undefined, activation = 0, interactive = false, compositionId: string | undefined
 let activationSessionId: string | undefined
@@ -27,21 +28,21 @@ let textAgent: HTMLInputElement | undefined, disableTimer: ReturnType<typeof set
 let queue: Promise<void> = Promise.resolve()
 let interfaceTheme: Appearance = 'system'
 const sessions = new Map<string, RustPresentationSession>()
-const fileActions = new Set<DeckcraftFileAction>(['new', 'open', 'save', 'saveAs', 'exportPdf', 'print', 'close'])
+const fileActions = new Set<OfficePresentationFileAction>(['new', 'open', 'save', 'saveAs', 'exportPdf', 'print', 'close'])
 
 function serialize<T>(work: () => Promise<T> | T): Promise<T> {
   const result = queue.then(work)
   queue = result.then(() => undefined, () => undefined)
   return result
 }
-function snapshotOf(raw: string, sessionId: string): DeckcraftSnapshot {
-  const value = JSON.parse(raw) as DeckcraftSnapshot
+function snapshotOf(raw: string, sessionId: string): OfficePresentationSnapshot {
+  const value = JSON.parse(raw) as OfficePresentationSnapshot
   if (value.sessionId !== sessionId || !Number.isSafeInteger(value.documentId) || !Number.isSafeInteger(value.revision) || value.revision < 0 || typeof value.dirty !== 'boolean' || !Array.isArray(value.slides)) throw Error('演示编辑器返回了无效的演示文稿状态。')
   return value
 }
 function receive(raw: string) {
   try {
-    const event = JSON.parse(raw) as { type: string; sessionId: string; snapshot?: DeckcraftSnapshot; action?: DeckcraftFileAction | 'pickFile'; purpose?: string; requestId?: string | number; revision?: number; documentId?: number; selection?: unknown; message?: string; error?: string }
+    const event = JSON.parse(raw) as { type: string; sessionId: string; snapshot?: OfficePresentationSnapshot; action?: OfficePresentationFileAction | 'pickFile'; purpose?: string; requestId?: string | number; revision?: number; documentId?: number; selection?: unknown; message?: string; error?: string }
     const session = sessions.get(event.sessionId)
     if (!session) return
     if (event.type === 'change' && event.snapshot) session.accept(snapshotOf(JSON.stringify(event.snapshot), session.id))
@@ -53,10 +54,10 @@ function receive(raw: string) {
     session?.event({ type: 'error', sessionId: session.id, message: cause instanceof Error ? cause.message : String(cause) })
   }
 }
-async function loadHost(): Promise<DeckcraftHost> {
-  const url = new URL('deckcraft/deckcraft.js', document.baseURI)
+async function loadHost(): Promise<OfficePresentationHost> {
+  const url = new URL('office-presentation/office-presentation.js', document.baseURI)
   const bindings = await import(/* @vite-ignore */ url.href) as Bindings
-  await bindings.default({ module_or_path: new URL('deckcraft/deckcraft_bg.wasm', document.baseURI) })
+  await bindings.default({ module_or_path: new URL('office-presentation/office-presentation_bg.wasm', document.baseURI) })
   host = bindings.createHost(receive)
   host.setTheme(interfaceTheme)
   return host
@@ -72,7 +73,7 @@ function parkingElement() {
   if (!parking) {
     parking = document.createElement('div')
     parking.hidden = true
-    parking.dataset.deckcraftParking = ''
+    parking.dataset.presentationParking = ''
     document.body.append(parking)
   }
   return parking
@@ -95,8 +96,8 @@ function endComposition(event: Event) {
 }
 function newCanvas() {
   const element = document.createElement('canvas')
-  element.id = 'open-office-deckcraft-canvas'
-  element.dataset.testid = 'deckcraft-canvas'
+  element.id = 'open-office-office-presentation-canvas'
+  element.dataset.testid = 'office-presentation-canvas'
   element.setAttribute('aria-label', '演示文稿与功能区')
   element.tabIndex = 0
   Object.assign(element.style, { display: 'block', width: '100%', height: '100%', outline: 'none' })
@@ -107,19 +108,19 @@ export class RustPresentationSession {
   readonly id: string
   private closed = false
   private desiredInteractive = false
-  private listeners = new Set<(snapshot: DeckcraftSnapshot) => void>()
-  private eventListeners = new Set<(event: DeckcraftEvent) => void>()
-  constructor(public snapshot: DeckcraftSnapshot) { this.id = snapshot.sessionId }
-  subscribe(listener: (snapshot: DeckcraftSnapshot) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
-  onEvent(listener: (event: DeckcraftEvent) => void) { this.eventListeners.add(listener); return () => { this.eventListeners.delete(listener) } }
-  accept(snapshot: DeckcraftSnapshot) {
+  private listeners = new Set<(snapshot: OfficePresentationSnapshot) => void>()
+  private eventListeners = new Set<(event: OfficePresentationEvent) => void>()
+  constructor(public snapshot: OfficePresentationSnapshot) { this.id = snapshot.sessionId }
+  subscribe(listener: (snapshot: OfficePresentationSnapshot) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
+  onEvent(listener: (event: OfficePresentationEvent) => void) { this.eventListeners.add(listener); return () => { this.eventListeners.delete(listener) } }
+  accept(snapshot: OfficePresentationSnapshot) {
     // Renderer notifications run in a later microtask than synchronous commands and
     // exports. A delayed frame must not replace their newer revision receipt.
     if (this.closed || snapshot.documentId !== this.snapshot.documentId || snapshot.revision < this.snapshot.revision) return
     this.snapshot = snapshot
     for (const listener of this.listeners) listener(snapshot)
   }
-  event(event: DeckcraftEvent) { if (!this.closed) for (const listener of this.eventListeners) listener(event) }
+  event(event: OfficePresentationEvent) { if (!this.closed) for (const listener of this.eventListeners) listener(event) }
   private assertOpen() { if (this.closed || sessions.get(this.id) !== this) throw Error('此演示文稿已关闭。') }
   async attach(container: HTMLElement, enabled: boolean): Promise<void> {
     this.desiredInteractive = enabled
@@ -138,7 +139,7 @@ export class RustPresentationSession {
       await started
       if (!textAgent && canvas.nextElementSibling instanceof HTMLInputElement) {
         textAgent = canvas.nextElementSibling
-        textAgent.dataset.testid = 'deckcraft-input'
+        textAgent.dataset.testid = 'office-presentation-input'
         // eframe's 1px input needs a real content box. The shell's border-box
         // reset plus default input padding otherwise leaves zero content width;
         // Chromium then keeps committed text's DOM caret at the start.
@@ -173,7 +174,7 @@ export class RustPresentationSession {
     if (document.activeElement === textAgent || document.activeElement === canvas) (document.activeElement as HTMLElement).blur()
   }
   focus() { if (activeId === this.id && interactive) canvas?.focus({ preventScroll: true }) }
-  private async flushInput(api: DeckcraftHost) {
+  private async flushInput(api: OfficePresentationHost) {
     if (compositionId === this.id) {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
       await new Promise<void>(resolve => setTimeout(resolve, 0))
@@ -186,20 +187,33 @@ export class RustPresentationSession {
   settled(): Promise<void> {
     return serialize(async () => { this.assertOpen(); const api = await getHost(); await this.flushInput(api) })
   }
-  inspect(): Promise<DeckcraftSnapshot> {
+  inspect(): Promise<OfficePresentationSnapshot> {
     return serialize(async () => {
       this.assertOpen()
       this.accept(snapshotOf((await getHost()).inspect(this.id), this.id))
       return this.snapshot
     })
   }
-  command(commandId: string, params: Record<string, unknown> = {}, expected?: Pick<DeckcraftSnapshot, 'documentId' | 'revision' | 'selection'>): Promise<DeckcraftSnapshot> {
+  private backgroundExportReady(api: OfficePresentationHost): boolean {
+    if (compositionId === this.id) return false
+    const ui = snapshotOf(api.inspect(this.id), this.id).ui
+    if (!ui || typeof ui !== 'object' || Array.isArray(ui)) return false
+    const state = ui as { dialog?: unknown; showing?: unknown; home?: unknown }
+    return state.dialog === null && state.showing === null && state.home === false
+  }
+  canBackgroundExport(): Promise<boolean> {
+    return serialize(async () => {
+      this.assertOpen()
+      return this.backgroundExportReady(await getHost())
+    })
+  }
+  command(commandId: string, params: Record<string, unknown> = {}, expected?: Pick<OfficePresentationSnapshot, 'documentId' | 'revision' | 'selection'>): Promise<OfficePresentationSnapshot> {
     return serialize(async () => {
       this.assertOpen()
       const api = await getHost()
       await this.flushInput(api)
       if (expected && (expected.documentId !== this.snapshot.documentId || expected.revision !== this.snapshot.revision || JSON.stringify(expected.selection) !== JSON.stringify(this.snapshot.selection))) throw Error('选择文件期间演示文稿或选区已有变化，请重新选择插入位置。')
-      const result = JSON.parse(api.command(this.id, commandId, JSON.stringify(params))) as { ok: boolean; snapshot?: DeckcraftSnapshot; error?: string }
+      const result = JSON.parse(api.command(this.id, commandId, JSON.stringify(params))) as { ok: boolean; snapshot?: OfficePresentationSnapshot; error?: string }
       this.accept(snapshotOf(result.snapshot ? JSON.stringify(result.snapshot) : api.inspect(this.id), this.id))
       if (!result.ok) throw Error(result.error || '演示文稿操作失败。')
       return this.snapshot
@@ -215,11 +229,13 @@ export class RustPresentationSession {
       return result.result
     })
   }
-  export(format: 'pptx' | 'pdf' = 'pptx'): Promise<{ bytes: Uint8Array; snapshot: DeckcraftSnapshot }> {
+  export(format: 'pptx' | 'pdf' = 'pptx', options: { background?: boolean } = {}): Promise<{ bytes: Uint8Array; snapshot: OfficePresentationSnapshot }> {
     return serialize(async () => {
       this.assertOpen()
       const api = await getHost()
-      await this.flushInput(api)
+      if (options.background) {
+        if (!this.backgroundExportReady(api)) throw Error('演示文稿正在输入或显示对话框，稍后再自动保存。')
+      } else await this.flushInput(api)
       // Both calls are synchronous: no input or other task can run between the
       // exported bytes and their revision receipt.
       const bytes = api.exportFile(this.id, format)
@@ -229,11 +245,13 @@ export class RustPresentationSession {
       return { bytes, snapshot }
     })
   }
-  markSaved(documentId: number, revision: number): Promise<void> {
+  markSaved(documentId: number, revision: number, options: { background?: boolean } = {}): Promise<void> {
     return serialize(async () => {
       this.assertOpen()
       const api = await getHost()
-      await this.flushInput(api)
+      if (options.background) {
+        if (!this.backgroundExportReady(api)) throw Error('演示文稿正在输入或显示对话框，稍后再自动保存。')
+      } else await this.flushInput(api)
       if (!api.markSaved(this.id, documentId, revision)) throw Error('导出后演示文稿又有修改，请再次保存当前内容。')
       this.accept(snapshotOf(api.inspect(this.id), this.id))
     })
@@ -268,11 +286,11 @@ export class RustPresentationSession {
   }
 }
 
-export function inspectDeckcraftSession(id: string): Promise<DeckcraftSnapshot> {
+export function inspectOfficePresentationSession(id: string): Promise<OfficePresentationSnapshot> {
   const session = sessions.get(id)
   return session ? session.inspect() : Promise.reject(Error('此演示文稿尚未打开。'))
 }
-export function queryDeckcraftSession(id: string, commandId: string, params: Record<string, unknown> = {}): Promise<unknown> {
+export function queryOfficePresentationSession(id: string, commandId: string, params: Record<string, unknown> = {}): Promise<unknown> {
   const session = sessions.get(id)
   return session ? session.query(commandId, params) : Promise.reject(Error('此演示文稿尚未打开。'))
 }
@@ -291,7 +309,7 @@ export async function prepareRustPresentationDocument(source: Source): Promise<P
   const bytes = base64ToBytes(source.base64)
   if (bytes.length > 40 * 1024 * 1024) throw Error('请选择不超过 40 MB 的演示文稿。')
   const session = await serialize(async () => {
-    const api = await getHost(), id = `presentation-${crypto.randomUUID()}`
+    const api = await getHost(), id = `presentation-${createId()}`
     const next = new RustPresentationSession(snapshotOf(api.prepare(id, source.name, bytes), id))
     sessions.set(id, next)
     return next

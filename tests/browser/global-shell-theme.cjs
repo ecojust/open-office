@@ -22,14 +22,14 @@ const sha = file => crypto.createHash('sha256').update(fs.readFileSync(file)).di
 const products = () => Object.fromEntries([
   'src/App.vue', 'src/style.css', 'src/shared/appearance.ts', 'src/components/Icon.vue',
   ...['word', 'sheet'].flatMap(kind => [`src/${kind}/rust/client.ts`, `src/components/Rust${kind === 'word' ? 'Word' : 'Sheet'}Editor.vue`]),
-  ...['wordcraft', 'gridcraft'].flatMap(engine => [`public/${engine}/manifest.json`, `public/${engine}/${engine}.js`, `public/${engine}/${engine}_bg.wasm`]),
+  ...['office-word', 'office-sheet'].flatMap(engine => [`public/${engine}/manifest.json`, `public/${engine}/${engine}.js`, `public/${engine}/${engine}_bg.wasm`]),
 ].map(file => [file, sha(path.join(root, file))]));
 const record = file => { report.files.push({ path: path.relative(root, file), bytes: fs.statSync(file).size, sha256: sha(file) }); return file; };
-const inspectXlsx = file => JSON.parse(execFileSync('python3', [path.join(__dirname, 'gridcraft-inspect-xlsx.py'), file], { encoding: 'utf8' }));
-const inspectDocx = file => JSON.parse(execFileSync('python3', [path.join(root, 'tests/compatibility/wordcraft-core/inspect_docx.py'), file], { encoding: 'utf8' }));
+const inspectXlsx = file => JSON.parse(execFileSync('python3', [path.join(__dirname, 'office-sheet-inspect-xlsx.py'), file], { encoding: 'utf8' }));
+const inspectDocx = file => JSON.parse(execFileSync('python3', [path.join(root, 'tests/compatibility/office-word-core/inspect_docx.py'), file], { encoding: 'utf8' }));
 let server, browser, context, page, origin;
 const editor = kind => page.locator(`[data-testid="rust-${kind}-editor"]:visible`);
-const canvas = kind => editor(kind).getByTestId(kind === 'word' ? 'wordcraft-canvas' : 'gridcraft-canvas');
+const canvas = kind => editor(kind).getByTestId(kind === 'word' ? 'office-word-canvas' : 'office-sheet-canvas');
 const frames = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 async function until(read, predicate, description, timeout = 30000) {
   const start = Date.now(); let last;
@@ -52,12 +52,12 @@ async function idle(kind) {
 async function snapshot(kind, id) {
   id ||= await editor(kind).getAttribute('data-session-id');
   return page.evaluate(async ({ kind, id }) => kind === 'word'
-    ? (await import('/src/word/rust/client.ts')).inspectWordcraftSession(id)
-    : (await import('/src/sheet/rust/client.ts')).inspectGridcraftSession(id), { kind, id });
+    ? (await import('/src/word/rust/client.ts')).inspectOfficeWordSession(id)
+    : (await import('/src/sheet/rust/client.ts')).inspectOfficeSheetSession(id), { kind, id });
 }
 async function cell(address, id) {
   id ||= await editor('sheet').getAttribute('data-session-id');
-  return page.evaluate(async ({ id, address }) => (await import('/src/sheet/rust/client.ts')).queryGridcraftSession(id, 'cell.get', { cell: address }), { id, address });
+  return page.evaluate(async ({ id, address }) => (await import('/src/sheet/rust/client.ts')).queryOfficeSheetSession(id, 'cell.get', { cell: address }), { id, address });
 }
 async function clickRect(kind, rect) {
   const box = await canvas(kind).boundingBox();
@@ -73,7 +73,7 @@ async function focusWord() {
   const state = await until(() => snapshot('word'), state => state.ui?.pages?.length, 'Word page layout');
   const box = await canvas('word').boundingBox(), [x, y, width, height] = state.ui.pages[0];
   await page.mouse.click(box.x + x + width * .7, box.y + Math.min(y + Math.min(200, height / 4), box.height - 50));
-  await until(() => page.evaluate(() => document.activeElement?.getAttribute('data-testid')), id => id === 'wordcraft-input', 'Actual Word text agent focus');
+  await until(() => page.evaluate(() => document.activeElement?.getAttribute('data-testid')), id => id === 'office-word-input', 'Actual Word text agent focus');
 }
 async function newDocument(kind) {
   await page.getByTestId('shell-new').click();
@@ -222,7 +222,7 @@ async function checks() {
 
   phase('pending-draft-theme-and-global-save');
   await selectCell('A2'); await page.keyboard.press('F2');
-  await until(() => page.evaluate(() => document.activeElement?.getAttribute('data-testid')), id => id === 'gridcraft-input', 'Cell editor has real text focus');
+  await until(() => page.evaluate(() => document.activeElement?.getAttribute('data-testid')), id => id === 'office-sheet-input', 'Cell editor has real text focus');
   const draftText = '主题切换保留草稿'; await page.keyboard.insertText(draftText);
   const draftBefore = await until(() => snapshot('sheet'), state => state.ui?.editor?.text === draftText, 'Actual uncommitted cell draft');
   assert.equal((await cell('A2')).value, null);
@@ -258,7 +258,7 @@ async function checks() {
   await page.getByTestId('shell-open').focus(); await page.keyboard.press('Control+s'); await frames();
   assert.equal(report.downloads.length, downloadCount, 'Home shortcut cannot save a retained hidden editor');
   const fixture = path.join(output, 'generic-open.xlsx');
-  execFileSync('python3', [path.join(__dirname, 'gridcraft-inspect-xlsx.py'), '--fixture', fixture]);
+  execFileSync('python3', [path.join(__dirname, 'office-sheet-inspect-xlsx.py'), '--fixture', fixture]);
   const chooserCount = report.fileChoosers;
   const pending = page.waitForEvent('filechooser'); await page.keyboard.press('Control+o');
   await (await pending).setFiles(fixture); await idle('sheet');
@@ -287,7 +287,7 @@ async function main() {
   try {
     phase('checking-frozen-runtimes');
     report.artifactChecks = {};
-    for (const engine of ['wordcraft', 'gridcraft']) report.artifactChecks[engine] = execFileSync(process.execPath, [path.join(root, `scripts/build-${engine}.mjs`), '--check'], { cwd: root, encoding: 'utf8' }).trim();
+    for (const engine of ['office-word', 'office-sheet']) report.artifactChecks[engine] = execFileSync(process.execPath, [path.join(root, `scripts/build-${engine}.mjs`), '--check'], { cwd: root, encoding: 'utf8' }).trim();
     report.productSourcesBefore = products();
     const { createServer } = await import('vite');
     server = await createServer({ root, clearScreen: false, cacheDir: path.join(output, 'vite-cache'), optimizeDeps: { entries: ['index.html'] },

@@ -77,7 +77,7 @@ jobs:
           python-version: '3.12'
           architecture: arm64
           cache: pip
-          cache-dependency-path: pdf-backend/requirements.txt
+          cache-dependency-path: tests/requirements-pdf-inspection.txt
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
@@ -85,9 +85,10 @@ jobs:
         with:
           workspaces: |
             src-tauri -> target
-            vendor/wordcraft -> target
-            vendor/gridcraft -> target
-            vendor/deckcraft -> target
+            vendor/office-word -> target
+            vendor/office-sheet -> target
+            vendor/office-presentation -> target
+            vendor/office-pdf -> target
           key: aarch64-apple-darwin
           cache-on-failure: true
       - name: Require native build interpreters
@@ -105,19 +106,18 @@ jobs:
         run: npm ci
       - name: Install the pinned editor WASM bridge
         run: cargo install --locked wasm-bindgen-cli --version 0.2.129
-      - name: Prepare the local PDF engine
-        run: node scripts/ensure-pdf-backend.mjs --dev
+      - name: Install independent test-only PDF inspector
+        run: python -m pip install -r tests/requirements-pdf-inspection.txt
       - name: Check frontend types, diagnostic contracts and PDF round trips
         run: npm test 2>&1 | tee artifacts/macos-editing/tests.log
-      - name: Freeze and verify the native PDF runtime
-        run: node scripts/build-pdf-backend.mjs 2>&1 | tee artifacts/macos-editing/pdf-build.log
-      - name: Build the three Rust editors and complete frontend resources
+      - name: Build all four Rust editors and complete frontend resources
         run: npm run build 2>&1 | tee artifacts/macos-editing/frontend-build.log
       - name: Verify the generated editor resources against their source
         run: |
           npm run word:check
           npm run sheet:check
           npm run deck:check
+          npm run pdf:check
           npm run engine:check:dist
       - name: Compile and test the native lifecycle and file bridge
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml -- --include-ignored 2>&1 | tee artifacts/macos-editing/native-tests.log

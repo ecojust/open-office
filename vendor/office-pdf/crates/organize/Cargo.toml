@@ -1,0 +1,18 @@
+[package]
+name = "office-pdf-organize"
+description = "Page and document-structure edits: rotate, delete, move, insert pages; document info"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+office-pdf-content = { workspace = true }
+office-pdf-cos = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+office-pdf-oracle = { workspace = true }
+hayro-syntax = { workspace = true }

@@ -1,4 +1,4 @@
-const PHASES = new Set(['wordcraft-native','gridcraft-native','deckcraft-native','wordcraft','gridcraft','deckcraft','wordcraft-roundtrip','gridcraft-roundtrip','deckcraft-roundtrip','pdf-roundtrip','ipc-smoke-report']);
+const PHASES = new Set(['office-word-native','office-sheet-native','office-presentation-native','word','sheet','presentation','office-word-roundtrip','office-sheet-roundtrip','office-presentation-roundtrip','pdf-roundtrip','ipc-smoke-report']);
 const PLATFORM = new Set(['windows-x64','macos-arm64','macos-x64']);
 const CONFLICT = '文档在导出后又有修改，已保留内容。请重新保存或明确放弃修改。';
 const FAILURES = new Map([
@@ -27,7 +27,7 @@ export function nativeReportSummary(report) {
     events.push(item);
   }
   const groups = {};
-  for (const name of ['wordcraft','gridcraft','deckcraft','pdf']) {
+  for (const name of ['word','sheet','presentation','pdf']) {
     groups[name] = { present: !!frontend[name] && typeof frontend[name] === 'object', ok: frontend[name]?.ok === true };
   }
   return { schemaVersion: 1, platformId: PLATFORM.has(report.platformId) ? report.platformId : 'unknown',

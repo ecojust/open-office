@@ -1,0 +1,12 @@
+[package]
+name = "office-word-geom"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficeWord geometry and units: points, twips, EMU, inches, centimetres; rectangles; measurement parsing"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }

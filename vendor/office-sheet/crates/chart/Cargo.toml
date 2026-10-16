@@ -1,0 +1,16 @@
+[package]
+name = "office-sheet-chart"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficeSheet charts: data resolution, layout into toolkit-free primitives, sparklines and a small rasteriser"
+
+[lints]
+workspace = true
+
+[dependencies]
+office-sheet-core = { workspace = true }
+office-sheet-model = { workspace = true }
+office-sheet-calc = { workspace = true }
+office-sheet-numfmt = { workspace = true }
+serde = { workspace = true }

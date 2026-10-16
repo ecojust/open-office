@@ -21,11 +21,14 @@ export function saveFileName(stem: string, extension: SaveExtension): string {
  if (new TextEncoder().encode(name).length > 240) throw Error('文件名过长，请缩短后再保存。')
  return name
 }
-export type EditorExport = {base64:string; extension:Extension; name?:string; saveAs?:boolean; dirty?:boolean}
+export type EditorExport = {base64:string; extension:Extension; name?:string; saveAs?:boolean; dirty?:boolean; revision?:string}
 export type EditorHandle = {
- exportFile(options?:{format?:Extension}):Promise<EditorExport>;
- markSaved?(base64?:string):void|Promise<void>;
+ exportFile(options?:{format?:Extension;background?:boolean}):Promise<EditorExport>;
+ markSaved?(base64?:string,options?:{background?:boolean}):void|Promise<void>;
  discardChanges?(options?:{force?:boolean}):void|Promise<void>;
+ inspect?():Promise<{documentId:number;revision:number;dirty:boolean}>;
+ syncRevision?():Promise<{documentId:number;revision:number;dirty:boolean}>;
+ canBackgroundExport?():Promise<boolean>;
  undo?():void|Promise<void>;
  redo?():void|Promise<void>;
  search?(value:string):void|Promise<void>;

@@ -7,9 +7,10 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { appInventory, sha256File } from './macos-intel-transfer.mjs';
 import { checkInputPreflight, runMacosEditingDiagnostic, validateEditingReport } from './macos-editing-diagnostic.mjs';
-import { validateInstalledWordcraftEvidence, validateNativeWordcraftEvidence } from './wordcraft-native-smoke.mjs';
-import { validateInstalledGridcraftEvidence, validateNativeGridcraftEvidence } from './gridcraft-native-smoke.mjs';
-import { validateNativeDeckcraftEvidence } from './deckcraft-native-smoke.mjs';
+import { validateInstalledOfficeWordEvidence, validateNativeOfficeWordEvidence } from './office-word-native-smoke.mjs';
+import { validateInstalledOfficeSheetEvidence, validateNativeOfficeSheetEvidence } from './office-sheet-native-smoke.mjs';
+import { validateNativeOfficePresentationEvidence } from './office-presentation-native-smoke.mjs';
+import { validateNativePdfEvidence } from './office-pdf-native-smoke.mjs';
 import { runNativeSmoke, validateFrontendReport } from './native-smoke.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -44,7 +45,7 @@ function dmgName(root) {
   return `Open-Office-${version}-macos-arm64.dmg`;
 }
 function signatureInventory(signatures) {
-  assert.deepEqual(Object.keys(signatures || {}).sort(), ['app', 'main', 'pdfRuntime']);
+  assert.deepEqual(Object.keys(signatures || {}).sort(), ['app', 'main']);
   for (const value of Object.values(signatures)) assert.match(value, /^[a-f0-9]{40}$/, 'Code-signature CDHash is invalid');
 }
 function fileEntry(app, path) {
@@ -131,16 +132,14 @@ function validateFullSmoke(proof, root) {
   assert.equal(installed?.installedResourceLayout, true);
   assert.equal(installed.finalExecutable, 'open-office');
   assert.equal(installed.finalExecutableSha256, fileEntry(proof.app, 'Contents/MacOS/open-office').sha256, 'Full-editor smoke ran another executable');
-  assert.equal(installed.pdfExecutableSha256, fileEntry(proof.app, 'Contents/Resources/pdf-runtime/open-office-pdf').sha256, 'Full-editor smoke ran another PDF runtime');
   assert.deepEqual(installed.macos?.mainArchitectures, ['arm64']);
-  assert.deepEqual(installed.macos.pdfArchitectures, ['arm64']);
-  assert.deepEqual(installed.macos.strictSignatureVerification, ['app', 'main', 'pdfRuntime']);
+  assert.deepEqual(installed.macos.strictSignatureVerification, ['app', 'main']);
   assert.deepEqual(installed.macos.cdHashes, proof.signatures, 'Full-editor smoke signatures differ from the mounted App');
   assert.equal(installed.macos.originalAppResigned, false);
   // Re-run the functional and independent document readback checks at publish
   // time; an ok flag or optional shared-memory capability is not sufficient.
   validateFrontendReport(report.frontend);
-  for (const [engine, validate] of [['wordcraft', validateNativeWordcraftEvidence], ['gridcraft', validateNativeGridcraftEvidence], ['deckcraft', validateNativeDeckcraftEvidence]]) {
+  for (const [engine, validate] of [['word', validateNativeOfficeWordEvidence], ['sheet', validateNativeOfficeSheetEvidence], ['presentation', validateNativeOfficePresentationEvidence], ['pdf', validateNativePdfEvidence]]) {
     validate(report, { root });
     bindInstalledFiles(proof.app, installed[engine], engine);
   }
@@ -186,7 +185,7 @@ export function verifyMacosArmEditingProof(proof, { commit, runId, dmgPath, root
   assert.equal(proof.transfer.finalInventorySha256, proof.app.sha256, 'App changed during the editing check');
   assert.deepEqual(proof.transfer.copiedSignatures, proof.signatures, 'Copied App signatures changed');
   assert.deepEqual(proof.transfer.finalSignatures, proof.signatures, 'App signatures changed during the editing check');
-  assert.deepEqual(proof.architectures, { main: 'arm64', pdfRuntime: 'arm64' });
+  assert.deepEqual(proof.architectures, { main: 'arm64' });
 
   const report = proof.diagnostic;
   assert.equal(report?.schemaVersion, 1);
@@ -210,8 +209,7 @@ export function verifyMacosArmEditingProof(proof, { commit, runId, dmgPath, root
   assert.ok(isAbsolute(proof.copiedAppPath || ''));
   assert.equal(report.application?.app, proof.copiedAppPath, 'Diagnostic ran another App');
   assert.equal(report.application.executableSha256, fileEntry(proof.app, 'Contents/MacOS/open-office').sha256, 'Diagnostic ran another executable');
-  fileEntry(proof.app, 'Contents/Resources/pdf-runtime/open-office-pdf');
-  for (const [engine, validate] of [['wordcraft', validateInstalledWordcraftEvidence], ['gridcraft', validateInstalledGridcraftEvidence]]) {
+  for (const [engine, validate] of [['word', validateInstalledOfficeWordEvidence], ['sheet', validateInstalledOfficeSheetEvidence]]) {
     const installed = report.application[engine];
     validate(installed, { root });
     bindInstalledFiles(proof.app, installed, engine);
@@ -231,8 +229,7 @@ function command(program, args, timeout = 30000) {
 }
 function signaturesFor(app) {
   const signatures = {}, architectures = {};
-  for (const [label, path] of [['app', app], ['main', join(app, 'Contents/MacOS/open-office')],
-    ['pdfRuntime', join(app, 'Contents/Resources/pdf-runtime/open-office-pdf')]]) {
+  for (const [label, path] of [['app', app], ['main', join(app, 'Contents/MacOS/open-office')]]) {
     command('/usr/bin/codesign', ['--verify', '--deep', '--strict', path]);
     const display = command('/usr/bin/codesign', ['--display', '--verbose=4', path]);
     signatures[label] = /^CDHash=([a-f0-9]+)$/m.exec(display)?.[1];

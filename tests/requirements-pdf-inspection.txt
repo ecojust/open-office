@@ -1,0 +1,2 @@
+# Independent test-only PDF reader; never bundled into the application.
+PyMuPDF==1.28.2

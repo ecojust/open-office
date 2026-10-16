@@ -12,23 +12,21 @@ for (const os of ['darwin', 'win32']) {
     const app = join(root, 'Open Office.app');
     const resourceRoot = os === 'darwin' ? join(app, 'Contents', 'Resources') : join(root, 'installed');
     const executable = os === 'darwin' ? join(app, 'Contents', 'MacOS', 'open-office') : join(resourceRoot, 'open-office.exe');
-    const pdfExecutable = join(resourceRoot, 'pdf-runtime', os === 'darwin' ? 'open-office-pdf' : 'open-office-pdf.exe');
+    const pdfFiles = ['office_pdf.js', 'office_pdf_bg.wasm', 'manifest.json'].map(name => join(resourceRoot, 'frontend/office-pdf', name));
     const index = join(resourceRoot, 'frontend', 'index.html');
-    for (const path of [executable, pdfExecutable, index]) {
+    for (const path of [executable, ...pdfFiles, index]) {
       mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, 'fixture');
     }
-    const dependencies = join(resourceRoot, 'pdf-runtime', '_internal');
-    mkdirSync(dependencies);
     const locate = () => locateApplication({ os }, os === 'darwin' ? { app } : {}, { OPEN_OFFICE_INSTALLED_APP: resourceRoot }, root);
     const located = locate();
     assert.equal(located.executable, realpathSync(executable));
     assert.equal(located.resourceRoot, realpathSync(resourceRoot));
-    // The three editor manifests and their source/content hashes are checked
-    // by inspectInstalled{Wordcraft,Gridcraft,Deckcraft} after this layout check.
-    for (const path of [index, pdfExecutable]) {
+    // All four editor manifests and their source/content hashes are checked
+    // by the installed-editor inspectors after this layout check.
+    for (const path of [index, ...pdfFiles]) {
       rmSync(path); assert.throws(locate); writeFileSync(path, 'fixture');
     }
-    rmSync(dependencies, { recursive: true });
-    assert.throws(locate);
+    assert.equal(located.pdfDirectory, join(realpathSync(resourceRoot), 'frontend/office-pdf'));
+    assert.equal('pdfExecutable' in located, false);
   });
 }

@@ -12,7 +12,7 @@ fs.mkdirSync(output, { recursive: true });
 let server, browser, page;
 (async () => {
   try {
-    report.artifacts = ['wordcraft', 'gridcraft'].map(engine => execFileSync(process.execPath, [`scripts/build-${engine}.mjs`, '--check'], { cwd: root, encoding: 'utf8' }).trim());
+    report.artifacts = ['office-word', 'office-sheet'].map(engine => execFileSync(process.execPath, [`scripts/build-${engine}.mjs`, '--check'], { cwd: root, encoding: 'utf8' }).trim());
     const { createServer } = await import('vite');
     server = await createServer({ root, clearScreen: false, optimizeDeps: { entries: ['index.html'] }, cacheDir: path.join(output, 'vite-cache'), server: { host: '127.0.0.1', port: 5304, strictPort: true, hmr: false, watch: { ignored: ['**/vendor/**', '**/target/**', '**/test-results/**'] } } });
     await server.listen();

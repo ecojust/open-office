@@ -4,17 +4,18 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { preserveNativeDiagnostics, validateFrontendReport } from '../scripts/native-smoke.mjs';
-import { wordcraftReport } from './helpers/wordcraft-smoke-report.mjs';
-import { gridcraftReport } from './helpers/gridcraft-smoke-report.mjs';
-import { deckcraftReport } from './helpers/deckcraft-smoke-report.mjs';
+import { wordReport } from './helpers/office-word-smoke-report.mjs';
+import { sheetReport } from './helpers/office-sheet-smoke-report.mjs';
+import { pdfReport } from './helpers/pdf-smoke-report.mjs';
+import { presentationReport } from './helpers/office-presentation-smoke-report.mjs';
+import { workspaceReport } from './helpers/workspace-smoke-report.mjs';
 
 function completeReport() {
   return {
     ok: true, crossOriginIsolated: true, sharedArrayBuffer: true,
     userAgent: 'Native WebView contract test',
-    wordcraft: wordcraftReport(), gridcraft: gridcraftReport(), deckcraft: deckcraftReport(),
-    pdf: { ok: true, reopened: true, removedOldText: true, newTextPresent: true,
-      metadata: { pageCount: 1 }, text: 'NEW_NATIVE_TEXT 新的合同' },
+    word: wordReport(), sheet: sheetReport(), presentation: presentationReport(),
+    pdf: pdfReport(), workspace: workspaceReport(),
   };
 }
 
@@ -56,15 +57,27 @@ test('missing or malformed successful-run diagnostics stay observational outside
   assert.equal(report.ok, true);
 });
 
-test('release evidence requires all three current Rust canvases and real PDF text replacement', () => {
+test('release evidence requires four Rust canvases, PDF text replacement, and native Server/autosave', () => {
   const checks = validateFrontendReport(completeReport());
   for (const required of [
-    'wordcraftDefaultCanvas', 'wordcraftDomInput', 'wordcraftDocxReadback', 'wordcraftFailureAtomicity', 'wordcraftSessionCleanup',
-    'gridcraftDefaultCanvas', 'gridcraftDomInput', 'gridcraftXlsxReadback', 'gridcraftFormulaRoundTrip', 'gridcraftFailureAtomicity', 'gridcraftSessionCleanup',
-    'deckcraftDefaultCanvas', 'deckcraftDomInput', 'deckcraftPptxReadback', 'deckcraftPdfReadback', 'deckcraftFailureAtomicity', 'deckcraftSessionCleanup',
-    'pdfOriginalTextReplacementRoundTrip', 'crossOriginIsolated',
+    'wordDefaultCanvas', 'wordDomInput', 'wordDocxReadback', 'wordFailureAtomicity', 'wordSessionCleanup',
+    'sheetDefaultCanvas', 'sheetDomInput', 'sheetXlsxReadback', 'sheetFormulaRoundTrip', 'sheetFailureAtomicity', 'sheetSessionCleanup',
+    'presentationDefaultCanvas', 'presentationDomInput', 'presentationPptxReadback', 'presentationPdfReadback', 'presentationFailureAtomicity', 'presentationSessionCleanup',
+    'pdfOriginalTextReplacementRoundTrip', 'pdfDefaultCanvas', 'pdfUndoRedo', 'pdfFailureAtomicity', 'pdfSessionCleanup', 'crossOriginIsolated',
+    'workspaceNativeServer', 'workspaceFourFormats', 'workspaceHttpConflictProtection', 'workspaceLocalAutosave', 'workspaceSavedFileReadback', 'workspaceStopRevocation',
   ]) assert.equal(checks[required], true);
   assert.equal(Object.hasOwn(checks, 'sharedArrayBuffer'), false);
+});
+
+test('editor evidence cannot substitute for missing native Server/autosave or different workspace bytes', () => {
+  for (const mutate of [
+    report => { delete report.workspace; },
+    report => { report.workspace = { ok: true, transport: 'browser' }; },
+    report => { report.sheet.reopenedXlsxBase64 = report.sheet.xlsxBase64; report.workspace.server.formats[1].base64 += '\n'; },
+  ]) {
+    const report = completeReport(); mutate(report);
+    assert.throws(() => validateFrontendReport(report), /workspace/i);
+  }
 });
 
 test('shared memory availability is recorded without substituting for editor acceptance', () => {
@@ -81,7 +94,7 @@ test('shared memory availability is recorded without substituting for editor acc
 });
 
 test('legacy engines and isolated IPC probes cannot substitute for any current editor', () => {
-  for (const available of [true, false]) for (const [key, label] of [['wordcraft', /WordCraft/], ['gridcraft', /GridCraft/], ['deckcraft', /DeckCraft/]]) {
+  for (const available of [true, false]) for (const [key, label] of [['word', /OfficeWord/], ['sheet', /OfficeSheet/], ['presentation', /OfficePresentation/], ['pdf', /Open Office PDF/]]) {
     for (const value of [undefined, null, [], {}, { ok: true }, { ...completeReport()[key], transport: 'local-wasm-in-browser' }]) {
       const report = completeReport(); report.sharedArrayBuffer = available; report[key] = value;
       report.office = { ok: true, engine: 'LibreOffice', writer: { ok: true }, calc: { ok: true }, impress: { ok: true } };
@@ -93,7 +106,7 @@ test('legacy engines and isolated IPC probes cannot substitute for any current e
 });
 
 test('unavailable shared memory cannot bypass failed-open protection or exported document validation', () => {
-  for (const [key, bytes] of [['wordcraft', 'reopenedDocxBase64'], ['gridcraft', 'reopenedXlsxBase64'], ['deckcraft', 'reopenedPptxBase64']]) {
+  for (const [key, bytes] of [['word', 'reopenedDocxBase64'], ['sheet', 'reopenedXlsxBase64'], ['presentation', 'reopenedPptxBase64'], ['pdf', 'reopenedPdfBase64']]) {
     for (const mutate of [
       editor => { editor.checks.pop(); },
       editor => { editor.failures.invalidOpenRejected = false; },

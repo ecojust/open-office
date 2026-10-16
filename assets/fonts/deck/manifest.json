@@ -18,7 +18,7 @@
         "Inter-SemiBold.ttf"
       ],
       "source": "https://github.com/rsms/inter",
-      "vendoredSource": "vendor/wordcraft/assets/fonts",
+      "vendoredSource": "vendor/office-word/assets/fonts",
       "license": "OFL-1.1",
       "licenseFile": "OFL-Inter.txt",
       "author": "Rasmus Andersson / The Inter Project Authors",

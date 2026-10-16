@@ -1,0 +1,19 @@
+[package]
+name = "office-sheet-model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficeSheet document model: workbooks, sheets, cells, styles, tables, charts"
+
+[lints]
+workspace = true
+
+[dependencies]
+office-sheet-core = { workspace = true }
+sha2 = { workspace = true }
+office-sheet-formula = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

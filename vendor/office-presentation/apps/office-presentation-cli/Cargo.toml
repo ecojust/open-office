@@ -1,0 +1,19 @@
+[package]
+name = "office-presentation-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficePresentation on the command line: render, convert, run commands, inspect, and serve MCP"
+publish = false
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "office-presentation-cli"
+path = "src/main.rs"
+
+[dependencies]
+office-presentation-engine = { workspace = true }
+office-presentation-mcp = { workspace = true }
+serde_json = { workspace = true }

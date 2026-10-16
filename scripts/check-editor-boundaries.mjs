@@ -3,8 +3,11 @@ import { dirname, extname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const editors = ['wordcraft', 'gridcraft', 'deckcraft']
+const editors = [['office-word', 'office-word'], ['office-sheet', 'office-sheet'], ['office-presentation', 'office-presentation'], ['office-pdf', 'office_pdf']]
 const retiredSource = [
+  'pdf-backend', 'src-tauri/src/pdf.rs', 'src/components/PdfEditor.vue',
+  'src/pdf/backend.ts', 'src/pdf/protocol.ts', 'src/pdf/resources.ts', 'src/pdf/readback.ts', 'src/pdf/pdf.css',
+  'scripts/build-pdf-backend.mjs', 'scripts/ensure-pdf-backend.mjs', 'scripts/copy-pdf-assets.mjs', 'scripts/pdf-dev-plugin.ts',
   'crates/word-engine', 'crates/word-package', 'src/office', 'src/word/core', 'src/presentation/core',
   'src/components/OfficeEditor.vue', 'src/components/PresentationEffects.vue',
   'src/components/PresentationFontNotice.vue', 'src/components/PresentationWorkbench.vue',
@@ -19,10 +22,11 @@ const retiredSource = [
   'scripts/office-mouse-time-patch.mjs', 'scripts/rust-word-native-smoke.mjs',
   'scripts/word-package-native-smoke.mjs', 'vendor/office-runtime-manifest.json',
 ]
-const retiredAssetRoots = ['office', 'office-runtime', 'word-engine', 'word-package']
-// Match concrete runtime entry points, not historical product names or PDF.js's
-// supported legacy/build entry point. Legal notices and Markdown are not code.
+const retiredAssetRoots = ['office', 'office-runtime', 'word-engine', 'word-package', 'pdfjs']
+// Match retired runtime entry points; legal notices and Markdown are not code.
 const runtimeReferences = [
+  ['retired PDF backend', /\b(?:pdf_request|cancel_pdf|__pdf-dev)\b/],
+  ['retired PDF viewer', /\bpdfjs-dist\b|(?:[\/"'`])pdfjs\//],
   ['retired Office host', /(?:^|[\/"'`])office\/host\.(?:html|js)\b/],
   ['retired Office runtime', /\boffice-runtime[\/]/],
   ['retired Word runtime', /\bword-engine[\/]/],
@@ -31,7 +35,7 @@ const runtimeReferences = [
   ['retired Office bootstrap URL', /\bruntimeBaseUrl\b/],
 ]
 const codeExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.vue', '.html', '.rs'])
-const retiredDependency = /^(?:word[-_]engine|word[-_]package|zetajs|zetaoffice|libreoffice)(?:$|[-/])/i
+const retiredDependency = /^(?:word[-_]engine|word[-_]package|zetajs|zetaoffice|libreoffice|pdfjs-dist)(?:$|[-/])/i
 
 const slash = value => value.replaceAll('\\', '/')
 async function stat(path) {
@@ -87,7 +91,7 @@ export async function checkEditorBoundaries({ root = repoRoot, dist = false } = 
       }
     }
     for (const [name, command] of Object.entries(manifest.scripts ?? {})) {
-      if (/\b(?:build-word-engine|fetch-office-runtime|office-mouse-time-patch|rust-word-native-smoke|word-package-native-smoke)\.(?:mjs|cjs)\b/.test(command)) {
+      if (/\b(?:build-word-engine|fetch-office-runtime|office-mouse-time-patch|rust-word-native-smoke|word-package-native-smoke|build-pdf-backend|ensure-pdf-backend|copy-pdf-assets)\.(?:mjs|cjs)\b/.test(command)) {
         errors.push(`package.json: script ${name} runs a retired engine`)
       }
     }
@@ -129,8 +133,8 @@ export async function checkEditorBoundaries({ root = repoRoot, dist = false } = 
     for (const path of await files(root, join(root, directory), errors)) {
       const asset = slash(relative(join(root, directory), path))
       if (/(?:^|\/)(?:soffice(?:\.|$)|word_engine(?:\.|$)|zeta\.js$)/.test(asset)) errors.push(`${directory}/${asset}: retired runtime artifact`)
-      if (asset.endsWith('.wasm') && !editors.some(name => asset === `${name}/${name}_bg.wasm`) && !asset.startsWith('pdfjs/wasm/')) {
-        errors.push(`${directory}/${asset}: unexpected WASM engine; only the three current editors and PDF.js are allowed`)
+      if (asset.endsWith('.wasm') && !editors.some(([name, stem]) => asset === `${name}/${stem}_bg.wasm`)) {
+        errors.push(`${directory}/${asset}: unexpected WASM engine; only the four current Rust editors are allowed`)
       }
       await inspectCode(path)
     }
@@ -140,19 +144,11 @@ export async function checkEditorBoundaries({ root = repoRoot, dist = false } = 
     if (!(await stat(join(root, 'dist')))?.isDirectory()) errors.push('dist: missing build output; run npm run build first')
     else {
       await inspectAssets('dist')
-      for (const name of editors) {
-        for (const filename of [`${name}.js`, `${name}_bg.wasm`, 'manifest.json']) {
+      for (const [name, stem] of editors) {
+        for (const filename of [`${stem}.js`, `${stem}_bg.wasm`, 'manifest.json']) {
           const path = `dist/${name}/${filename}`
           if (!(await stat(join(root, path)))?.isFile()) errors.push(`${path}: missing current editor artifact`)
         }
-      }
-      for (const name of ['cmaps', 'standard_fonts', 'wasm']) {
-        const directory = `dist/pdfjs/${name}`
-        if (!(await files(root, join(root, directory), errors)).length) errors.push(`${directory}: missing offline PDF.js assets`)
-      }
-      const assets = await files(root, join(root, 'dist/assets'), errors)
-      if (!assets.some(path => /^pdf\.worker(?:\.min)?-[\w-]+\.mjs$/.test(path.split(/[\\/]/).at(-1)))) {
-        errors.push('dist/assets: missing bundled PDF.js worker')
       }
       if (!(await stat(join(root, 'dist/index.html')))?.isFile()) errors.push('dist/index.html: missing application entry point')
     }
@@ -167,5 +163,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (!result.ok) {
     console.error(`Editor boundary audit failed (${result.errors.length} findings):\n${result.errors.map(message => `- ${message}`).join('\n')}`)
     process.exitCode = 1
-  } else console.log(`Editor boundaries verified: retired source, native dependencies and public assets are absent${process.argv.includes('--dist') ? '; distribution contains the three current editors and offline PDF assets' : ''}.`)
+  } else console.log(`Editor boundaries verified: retired source, native dependencies and public assets are absent${process.argv.includes('--dist') ? '; distribution contains all four current Rust editors' : ''}.`)
 }

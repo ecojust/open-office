@@ -29,9 +29,9 @@ test('physical ARM, untranslated orchestration and translated x64 execution must
 });
 
 test('universal or ARM executables cannot silently substitute for the delivered Intel binaries', () => {
-  assert.doesNotThrow(() => validateMacArchitectures(['x86_64'], ['x86_64'], 'x86_64'));
-  assert.throws(() => validateMacArchitectures(['x86_64', 'arm64'], ['x86_64'], 'x86_64'));
-  assert.throws(() => validateMacArchitectures(['x86_64'], ['arm64'], 'x86_64'));
+  assert.doesNotThrow(() => validateMacArchitectures(['x86_64'], 'x86_64'));
+  assert.throws(() => validateMacArchitectures(['x86_64', 'arm64'], 'x86_64'));
+  assert.throws(() => validateMacArchitectures(['arm64'], 'x86_64'));
   const executable = '/tmp/Original App.app/Contents/MacOS/open-office';
   assert.deepEqual(guiLaunchCommand(executable, 'rosetta2'), { command: '/usr/bin/arch', args: ['-x86_64', executable] });
 });

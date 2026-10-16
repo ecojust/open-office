@@ -1,0 +1,34 @@
+[package]
+name = "office-presentation-ui-egui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficePresentation egui frontend (PowerPoint-style UI); swappable — nothing below depends on it"
+
+[lints]
+workspace = true
+
+[dependencies]
+office-presentation-geom = { workspace = true }
+office-presentation-color = { workspace = true }
+office-presentation-model = { workspace = true }
+office-presentation-fonts = { workspace = true }
+office-presentation-text = { workspace = true }
+office-presentation-render = { workspace = true }
+office-presentation-anim = { workspace = true }
+office-presentation-engine = { workspace = true }
+office-presentation-media = { workspace = true }
+egui = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3"
+
+[dev-dependencies]
+egui_kittest = { workspace = true, features = ["wgpu", "snapshot"] }
+
+[build-dependencies]
+serde_json = { workspace = true }
+toml = "1"

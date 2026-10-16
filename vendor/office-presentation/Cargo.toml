@@ -1,0 +1,98 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "apps/*", "xtask"]
+default-members = ["crates/*", "apps/office-presentation", "apps/office-presentation-cli"]
+
+[workspace.package]
+version = "0.7.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+rust-version = "1.95"
+repository = "https://github.com/ecojust/open-office"
+
+[workspace.dependencies]
+# internal
+office-presentation-geom = { path = "crates/geom" }
+office-presentation-color = { path = "crates/color" }
+office-presentation-metafile = { path = "crates/metafile" }
+office-presentation-model = { path = "crates/model" }
+office-presentation-fonts = { path = "crates/fonts" }
+office-presentation-text = { path = "crates/text" }
+office-presentation-render = { path = "crates/render" }
+office-presentation-pdf = { path = "crates/pdf" }
+office-presentation-pptx = { path = "crates/pptx" }
+office-presentation-format = { path = "crates/format" }
+office-presentation-anim = { path = "crates/anim" }
+office-presentation-engine = { path = "crates/engine" }
+office-presentation-mcp = { path = "crates/mcp" }
+office-presentation-ui-egui = { path = "crates/ui-egui" }
+office-presentation-media = { path = "crates/media" }
+# codecs (ported from OpenOffice, same owner and licence)
+office-presentation-bitstream = { path = "crates/bitstream" }
+office-presentation-h264 = { path = "crates/h264" }
+office-presentation-hevc = { path = "crates/hevc" }
+office-presentation-vp9 = { path = "crates/vp9" }
+office-presentation-av1 = { path = "crates/av1" }
+office-presentation-isobmff = { path = "crates/isobmff" }
+office-presentation-matroska = { path = "crates/matroska" }
+office-presentation-ogg = { path = "crates/ogg" }
+office-presentation-opus = { path = "crates/opus" }
+
+# foundation
+kurbo = { version = "0.13", features = ["serde"] }
+thiserror = "2"
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+log = "0.4"
+proptest = "1"
+rayon = "1"
+unicode-bidi = "0.3"
+unicode-segmentation = "1"
+unicode-linebreak = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
+# text / rendering / formats
+skrifa = "0.47"
+harfrust = "0.13"
+vello_cpu = "0.2"
+vello_common = { version = "0.2", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "tiff", "bmp"] }
+craft-pdf = { git = "https://github.com/storytold/craft-libs", rev = "c3487320b2d1de657b860b3c8abb44e1f2b32bd8", version = "=0.1.0", default-features = false, features = ["write"] }
+i_overlay = "9"
+quick-xml = "0.41"
+zip = { version = "3", default-features = false, features = ["deflate"] }
+
+# ui
+egui = "0.36"
+egui_extras = { version = "0.36", default-features = false }
+eframe = { version = "0.36", default-features = false }
+egui_kittest = "0.36"
+rfd = "0.17"
+arboard = { version = "3.6", default-features = false }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+too_many_arguments = "allow"
+type_complexity = "allow"
+self_named_constructors = "allow"
+large_enum_variant = "allow"
+result_large_err = "allow"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+debug = 0
+
+[patch.crates-io]
+krilla = { git = "https://github.com/storytold/craft-libs", rev = "c3487320b2d1de657b860b3c8abb44e1f2b32bd8", version = "=0.8.2" }

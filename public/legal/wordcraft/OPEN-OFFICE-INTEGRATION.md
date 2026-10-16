@@ -8,7 +8,7 @@ Copyright (c) 2026 ArtCraft Team and the WordCraft contributors. WordCraft is av
 
 ## Local integration
 
-The upstream source is in `vendor/wordcraft/`. Open Office adds `apps/open-office-host`, a WASM bridge for the Vue/Tauri application shell, local document lifecycle and save coordination, a reproducible build entry point, and adaptation of the canvas interface to the host. Local changes to vendored files are included in the Open Office source distribution and tracked in its Git history. The generated `wordcraft/manifest.json` records the build inputs and artifact hashes; the upstream commit alone does not describe these local changes.
+The upstream source is in `vendor/office-word/`. Open Office adds `apps/open-office-host`, a WASM bridge for the Vue/Tauri application shell, local document lifecycle and save coordination, a reproducible build entry point, and adaptation of the canvas interface to the host. Local changes to vendored files are included in the Open Office source distribution and tracked in its Git history. The generated `public/office-word/manifest.json` records the build inputs and artifact hashes; the upstream commit alone does not describe these local changes.
 
 The restricted ArtCraft brand files under upstream `docs/brand/` are not copied or distributed. References to those files in the unchanged upstream NOTICE and attribution describe the upstream repository; they do not mean those assets are present here. Upstream agent instruction files are also not included. Original copyright notices are retained.
 

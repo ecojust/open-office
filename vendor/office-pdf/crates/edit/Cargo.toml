@@ -1,0 +1,24 @@
+[package]
+name = "office-pdf-edit"
+description = "Page content editing: headers and footers, watermarks, backgrounds, Bates numbers (ISO 32000-2 §14.8)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+office-pdf-annot = { workspace = true }
+office-pdf-cos = { workspace = true }
+office-pdf-content = { workspace = true }
+office-pdf-fonts = { workspace = true }
+office-pdf-model = { workspace = true }
+thiserror = { workspace = true }
+kurbo = { workspace = true }
+# Display order of right-to-left lines in added text, and reading and writing order in Edit text;
+# already in the tree via the interface.
+unicode-bidi = "0.3"
+
+[dev-dependencies]
+hayro-syntax = { workspace = true }

@@ -206,9 +206,9 @@ function fixture() {
   });
   const actions = EDITING_ACTIONS.map(([actionId, kind, target, value], index) => ({ actionId, kind, target, completed: true,
     before: snapshot(index), after: snapshot(index, true), events: ['click', 'doubleClick'].includes(kind)
-      ? [{ type: kind === 'doubleClick' ? 'dblclick' : 'click', target: target === 'shell:undo' ? 'button:撤销' : target.startsWith('word:') ? 'wordcraft-canvas' : 'gridcraft-canvas',
+      ? [{ type: kind === 'doubleClick' ? 'dblclick' : 'click', target: target === 'shell:undo' ? 'button:撤销' : target.startsWith('word:') ? 'office-word-canvas' : 'office-sheet-canvas',
         isTrusted: true, clientX: 300, clientY: 200, detail: kind === 'doubleClick' ? 2 : 1 }]
-      : (kind === 'key' ? [value] : [...value]).map(key => ({ type: 'keyup', key, isTrusted: true, target: target.startsWith('word:') ? 'wordcraft-input' : 'gridcraft-input' })) }));
+      : (kind === 'key' ? [value] : [...value]).map(key => ({ type: 'keyup', key, isTrusted: true, target: target.startsWith('word:') ? 'office-word-input' : 'office-sheet-input' })) }));
   const editing = { schemaVersion: 1, kind: 'macos-editing', transport: 'local-wasm-in-native-webview', ok: true,
     bootId: 'd3b1ead1-d8e1-418f-b964-cd13826da6ac', timeOrigin: 1700000000000, checks: [...EDITING_CHECKS],
     initialTabIds: sessions.slice(0, 2).map(item => item.key), finalTabIds: sessions.map(item => item.key), sessions, actions,
@@ -293,7 +293,7 @@ test('incomplete, synthetic, unrelated, restarted or state-losing evidence canno
     ['uncompleted gesture', v => { v.frontend.editing.actions[0].completed = false; }],
     ['synthetic event', v => { v.frontend.editing.actions[0].events[0].isTrusted = false; }],
     ['unrelated event type', v => { v.frontend.editing.actions[0].events[0].type = 'mousemove'; }],
-    ['wrong canvas', v => { v.frontend.editing.actions[0].events[0].target = 'wordcraft-canvas'; }],
+    ['wrong canvas', v => { v.frontend.editing.actions[0].events[0].target = 'office-word-canvas'; }],
     ['wrong pointer location', v => { v.frontend.editing.actions[0].events[0].clientX += 20; }],
     ['wrong native key', v => { v.frontend.editing.actions[1].events[0].key = '5'; }],
     ['no actual model edit', v => { v.frontend.editing.observations.singleClickValue = null; }],

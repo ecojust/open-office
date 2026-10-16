@@ -86,7 +86,7 @@ test('Unsupported SVG constructs and ambiguous fill geometry fail explicitly', (
 test('Complete name coverage and --check reject drift without writing or creating output', async () => {
   const root = await mkdtemp(join(tmpdir(), 'office-icons-'))
   const directory = join(root, 'src/icons/svg/word')
-  const generated = join(root, 'vendor/wordcraft/crates/ui-egui/src/office_icons.rs')
+  const generated = join(root, 'vendor/office-word/crates/ui-egui/src/office_icons.rs')
   try {
     await mkdir(directory, { recursive: true })
     await writeFile(join(root, 'src/icons/shared.json'), '{}')
@@ -129,14 +129,20 @@ test('Shared icon contracts reject cross-workspace drift and unsafe references w
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-test('Presentation controls have complete original SVG coverage alongside existing editor families', async () => {
+test('Presentation and PDF controls have complete original SVG coverage alongside existing editor families', async () => {
   const root = new URL('../', import.meta.url)
   const names = JSON.parse(await readFile(new URL('src/icons/svg/deck/names.json', root), 'utf8'))
-  const adapter = await readFile(new URL('vendor/deckcraft/crates/ui-egui/src/icons.rs', root), 'utf8')
+  const adapter = await readFile(new URL('vendor/office-presentation/crates/ui-egui/src/icons.rs', root), 'utf8')
   const declared = [...adapter.matchAll(/^\s+\w+ => "([^"]+)",/gm)].map(match => match[1])
   assert.deepEqual([...names].sort(), declared.sort(), 'every typed toolbar icon must use an authored SVG')
   const products = await buildOfficeIcons({ check: true })
-  assert.deepEqual(products.map(product => product.family), ['word', 'sheet', 'deck'])
+  assert.deepEqual(products.map(product => product.family), ['word', 'sheet', 'deck', 'pdf'])
   assert.equal(products.find(product => product.family === 'deck').count, names.length)
+  const pdfNames = JSON.parse(await readFile(new URL('src/icons/svg/pdf/names.json', root), 'utf8'))
+  const pdfCatalog = await readFile(new URL('vendor/office-pdf/crates/engine/src/catalog.rs', root), 'utf8')
+  const pdfDeclared = [...pdfCatalog.matchAll(/\bicon:\s*"([^"]+)"/g)].map(match => match[1])
+  assert.ok(pdfDeclared.length > 20, 'PDF tool catalog must declare its icons')
+  for (const name of pdfDeclared) assert.ok(pdfNames.includes(name), `PDF tool icon ${name} needs an authored SVG`)
+  assert.equal(products.find(product => product.family === 'pdf').count, pdfNames.length)
   assert.ok(products.every(product => !product.changed), 'checking presentation icons must preserve all generated editor geometry')
 })

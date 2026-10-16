@@ -5,7 +5,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import { fetchSourceArchives, validateManifest, validatePdfRuntimeSources } from '../scripts/fetch-corresponding-sources.mjs';
+import { fetchSourceArchives, validateManifest } from '../scripts/fetch-corresponding-sources.mjs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 const bytes=gzipSync(Buffer.from('owned fixture, no third-party code'));
@@ -26,15 +26,6 @@ test('active source listing works offline after retirement of the old office run
   const expected = JSON.parse(await readFile(new URL('../public/legal/corresponding-sources-manifest.json', import.meta.url), 'utf8'));
   const actual = JSON.parse(execFileSync(process.execPath, [fileURLToPath(new URL('../scripts/fetch-corresponding-sources.mjs', import.meta.url)), '--list'], { encoding: 'utf8' }));
   assert.deepEqual(actual, expected);
-  assert.deepEqual(actual.archives.map(entry => entry.id), ['pymupdf', 'mupdf', 'python']);
   for (const retired of ['runtimeManifestSha256', 'runtimeAssetSha256', 'zetaJsShippedSha256', 'localRuntimeDerivations', 'localModificationMaterials']) assert.equal(retired in actual, false);
   assert.ok(actual.archives.every(entry => entry.bytes > 0 && /^[a-f0-9]{64}$/.test(entry.sha256)));
-});
-
-test('PDF sources must match the shipped backend and include both PyMuPDF and MuPDF', () => {
-  const active = { archives: [{ id: 'pymupdf', version: '1.28.2' }, { id: 'mupdf', version: '1.28.2' }] };
-  assert.doesNotThrow(() => validatePdfRuntimeSources(active, 'PyMuPDF==1.28.2\n'));
-  assert.throws(() => validatePdfRuntimeSources(active, 'PyMuPDF==1.28.1\n'), /matching PyMuPDF and MuPDF/);
-  assert.throws(() => validatePdfRuntimeSources({ archives: active.archives.slice(0, 1) }, 'PyMuPDF==1.28.2\n'), /matching PyMuPDF and MuPDF/);
-  assert.throws(() => validatePdfRuntimeSources({ archives: [{ id: 'pymupdf', version: '1.28.2' }, { id: 'mupdf', version: '1.28.1' }] }, 'PyMuPDF==1.28.2\n'), /matching PyMuPDF and MuPDF/);
 });

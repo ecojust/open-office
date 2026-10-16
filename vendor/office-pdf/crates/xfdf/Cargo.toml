@@ -1,0 +1,17 @@
+[package]
+name = "office-pdf-xfdf"
+description = "Comment and form data exchange: XFDF (ISO 19444-1) and FDF import/export, form data as XML, CSV and tab-delimited text"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+office-pdf-cos = { workspace = true }
+office-pdf-annot = { workspace = true }
+office-pdf-forms = { workspace = true }
+office-pdf-model = { workspace = true }
+roxmltree = "0.20"
+thiserror = { workspace = true }

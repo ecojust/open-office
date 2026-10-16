@@ -1,0 +1,19 @@
+[package]
+name = "office-pdf-forms"
+description = "Interactive forms (AcroForm): field model, filling, appearances, reset (ISO 32000-2 §12.7)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+office-pdf-cos = { workspace = true }
+office-pdf-fonts = { workspace = true }
+office-pdf-content = { workspace = true }
+office-pdf-model = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+hayro-syntax = { workspace = true }

@@ -6,8 +6,8 @@ import { homedir, tmpdir } from 'node:os';
 import { basename, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { appendLogTail, decodeLogTail, locateApplication } from './native-smoke.mjs';
-import { inspectInstalledWordcraft } from './wordcraft-native-smoke.mjs';
-import { inspectInstalledGridcraft } from './gridcraft-native-smoke.mjs';
+import { inspectInstalledOfficeWord } from './office-word-native-smoke.mjs';
+import { inspectInstalledOfficeSheet } from './office-sheet-native-smoke.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const delay = milliseconds => new Promise(done => setTimeout(done, milliseconds));
@@ -217,8 +217,8 @@ export function validateEditingReport(frontend, diagnostics, sent) {
     assert.ok(Number.isFinite(action.result.startedAt) && action.result.finishedAt >= action.result.startedAt);
     assert.ok(Array.isArray(evidence.events) && evidence.events.length > 0 && evidence.events.length <= 100, 'OS action has no received event evidence');
     assert.ok(evidence.events.every(event => event.isTrusted === true), 'Untrusted event cannot validate native OS input');
-    const pointerTarget = target === 'shell:undo' ? 'button:撤销' : target.startsWith('word:') ? 'wordcraft-canvas' : 'gridcraft-canvas';
-    const keyTargets = target.startsWith('word:') ? ['wordcraft-input'] : ['gridcraft-canvas', 'gridcraft-input'];
+    const pointerTarget = target === 'shell:undo' ? 'button:撤销' : target.startsWith('word:') ? 'office-word-canvas' : 'office-sheet-canvas';
+    const keyTargets = target.startsWith('word:') ? ['office-word-input'] : ['office-sheet-canvas', 'office-sheet-input'];
     if (kind === 'click' || kind === 'doubleClick') {
       assert.ok(evidence.events.some(event => event.type === (kind === 'doubleClick' ? 'dblclick' : 'click')
         && event.target === pointerTarget && event.detail === (kind === 'doubleClick' ? 2 : 1)
@@ -395,7 +395,7 @@ export async function runMacosEditingDiagnostic(args = process.argv.slice(2), en
     assert.equal(command('/usr/bin/lipo', ['-archs', location.executable]), 'arm64');
     command('/usr/bin/codesign', ['--verify', '--deep', '--strict', location.app]);
     report.application = { app: location.app, executableSha256: hash(readFileSync(location.executable)),
-      wordcraft: inspectInstalledWordcraft(location.resourceRoot, { root }), gridcraft: inspectInstalledGridcraft(location.resourceRoot, { root }) };
+      word: inspectInstalledOfficeWord(location.resourceRoot, { root }), sheet: inspectInstalledOfficeSheet(location.resourceRoot, { root }) };
     temporary = mkdtempSync(join(tmpdir(), 'open-office-macos-editing-'));
     rawPath = join(temporary, 'frontend.json');
     const predicate = 'process == "open-office" OR process CONTAINS "WebContent" OR process CONTAINS "WebKit" OR process == "ReportCrash" OR subsystem BEGINSWITH "com.apple.WebKit"';

@@ -4,25 +4,25 @@ import type { NativeDocument } from '../types'
 import type { Appearance } from '../shared/appearance'
 import { bytesToBase64, type EditorExport, type Extension } from '../shared/document'
 import { prepareRustPresentationDocument, setRustPresentationTheme, type PreparedRustPresentationDocument, type RustPresentationSession } from '../presentation/rust/client'
-import type { DeckcraftEvent, DeckcraftFileAction, DeckcraftSnapshot } from '../presentation/rust/deckcraft-types'
+import type { OfficePresentationEvent, OfficePresentationFileAction, OfficePresentationSnapshot } from '../presentation/rust/office-presentation-types'
 import { validatePresentationMedia } from '../presentation/rust/media'
 
 const props = withDefaults(defineProps<{ document: NativeDocument; prepared?: PreparedRustPresentationDocument; active?: boolean; disabled?: boolean; theme?: Appearance }>(), { active: true, disabled: false, theme: 'system' })
-const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: DeckcraftFileAction] }>()
-const viewport = ref<HTMLElement>(), snapshot = shallowRef<DeckcraftSnapshot>()
+const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: OfficePresentationFileAction] }>()
+const viewport = ref<HTMLElement>(), snapshot = shallowRef<OfficePresentationSnapshot>()
 const mediaInput = ref<HTMLInputElement>()
 const loading = ref(true), problem = ref('')
 let session: RustPresentationSession | undefined, unsubscribe: (() => void) | undefined, unlisten: (() => void) | undefined
 let disposed = false, generation = 0, opening: Promise<void> = Promise.resolve()
 let lastExport: { generation: number; documentId: number; revision: number; base64: string } | undefined
 let printUrl: string | undefined, printFrame: HTMLIFrameElement | undefined
-let mediaRequest: { session: RustPresentationSession; generation: number; expected: Extract<DeckcraftEvent, { type: 'pick-file' }> } | undefined
+let mediaRequest: { session: RustPresentationSession; generation: number; expected: Extract<OfficePresentationEvent, { type: 'pick-file' }> } | undefined
 function report(cause: unknown) {
   if (disposed) return
   problem.value = cause instanceof Error ? cause.message : String(cause)
   emit('error', problem.value)
 }
-function accept(value: DeckcraftSnapshot, token: number) {
+function accept(value: OfficePresentationSnapshot, token: number) {
   if (disposed || generation !== token) return
   snapshot.value = value
   emit('dirty', value.dirty)
@@ -47,22 +47,28 @@ async function flush() {
   if (!session) throw Error('请等待演示文稿打开。')
   await session.settled()
 }
-async function exportFile(options: { format?: Extension } = {}): Promise<EditorExport> {
-  await flush()
+async function exportFile(options: { format?: Extension; background?: boolean } = {}): Promise<EditorExport> {
+  if (options.background) {
+    await opening
+    if (!session) throw Error('请等待演示文稿打开。')
+  } else await flush()
   const format = options.format ?? 'pptx'
   if (!['pptx', 'pdf'].includes(format)) throw Error('演示文稿支持保存 PPTX 或导出 PDF。')
   const current = session!, token = generation
-  const result = await current.export(format as 'pptx' | 'pdf')
+  const result = await current.export(format as 'pptx' | 'pdf', options)
   if (disposed || generation !== token || current !== session) throw Error('演示文稿已切换，请重新保存。')
   const base64 = bytesToBase64(result.bytes)
   if (format === 'pptx') lastExport = { generation: token, documentId: result.snapshot.documentId, revision: result.snapshot.revision, base64 }
-  return { base64, extension: format, name: (result.snapshot.name || props.document.name).replace(/\.[^.]+$/, '') + '.' + format, dirty: result.snapshot.dirty }
+  return { base64, extension: format, name: (result.snapshot.name || props.document.name).replace(/\.[^.]+$/, '') + '.' + format, dirty: result.snapshot.dirty, revision: `${result.snapshot.documentId}:${result.snapshot.revision}` }
 }
-async function markSaved(base64?: string) {
-  await flush()
+async function markSaved(base64?: string, options: { background?: boolean } = {}) {
+  if (options.background) {
+    await opening
+    if (!session) throw Error('请等待演示文稿打开。')
+  } else await flush()
   const receipt = lastExport
   if (!receipt || receipt.generation !== generation || base64 !== receipt.base64) throw Error('保存的文件与当前导出结果不同，请重新保存当前演示文稿。')
-  try { await session!.markSaved(receipt.documentId, receipt.revision) }
+  try { await session!.markSaved(receipt.documentId, receipt.revision, options) }
   catch (cause) { emit('dirty', true); throw cause }
 }
 async function discardChanges(options: { force?: boolean } = {}) {
@@ -79,10 +85,12 @@ async function search(value: string) { await flush(); await session!.command('te
 async function present() { await flush(); await session!.command('show.start', { from: 0 }) }
 async function stopPresentation() { await opening; if (session && props.active) await session.command('show.end') }
 async function inspect() { await opening; if (!session) throw Error('请等待演示文稿打开。'); return session.inspect() }
+async function syncRevision() { return inspect() }
+async function canBackgroundExport() { await opening; return !disposed && !loading.value && !mediaRequest && !!session && session.canBackgroundExport() }
 async function command(id: string, params: Record<string, unknown> = {}) { await flush(); return session!.command(id, params) }
 async function query(id: string, params: Record<string, unknown> = {}) { await opening; if (!session) throw Error('请等待演示文稿打开。'); return session.query(id, params) }
 function focus() { session?.focus() }
-function pickFile(event: Extract<DeckcraftEvent, { type: 'pick-file' }>) {
+function pickFile(event: Extract<OfficePresentationEvent, { type: 'pick-file' }>) {
   if (!session || !props.active || props.disabled) return
   if (event.purpose === 'document' || event.purpose === 'open') { emit('file-action', 'open'); return }
   if (!['picture', 'audio', 'video'].includes(event.purpose)) { emit('status', '此文件导入功能尚未接入，当前演示文稿已保留。'); return }
@@ -187,18 +195,18 @@ onBeforeUnmount(() => {
   void session?.close(true).catch(cause => console.error('Presentation session cleanup failed', cause))
   printFrame?.remove(); if (printUrl) URL.revokeObjectURL(printUrl)
 })
-defineExpose({ exportFile, markSaved, discardChanges, undo, redo, search, print, focus, present, stopPresentation, inspect, command, query })
+defineExpose({ exportFile, markSaved, discardChanges, undo, redo, search, print, focus, present, stopPresentation, inspect, syncRevision, canBackgroundExport, command, query })
 </script>
 
 <template>
-  <section class="rust-presentation-editor" data-testid="rust-presentation-editor" data-engine="deckcraft-wasm" :data-ready="!!snapshot && !loading" :data-session-id="snapshot?.sessionId" :data-revision="snapshot?.revision" :data-slides="snapshot?.slides.length" :data-dirty="snapshot?.dirty" :aria-busy="loading">
-    <div ref="viewport" class="deckcraft-viewport" data-testid="deckcraft-viewport" />
-    <input ref="mediaInput" data-testid="deckcraft-media-input" type="file" accept=".png,.jpg,.jpeg" hidden @change="insertMedia" @cancel="cancelMedia" />
-    <div v-if="loading" class="deckcraft-loading" role="status"><span class="deckcraft-spinner" />正在打开演示文稿…</div>
-    <p v-if="problem" class="deckcraft-error" role="alert">{{ problem }}</p>
+  <section class="rust-presentation-editor" data-testid="rust-presentation-editor" data-engine="office-presentation-wasm" :data-ready="!!snapshot && !loading" :data-session-id="snapshot?.sessionId" :data-revision="snapshot?.revision" :data-slides="snapshot?.slides.length" :data-dirty="snapshot?.dirty" :aria-busy="loading">
+    <div ref="viewport" class="office-presentation-viewport" data-testid="office-presentation-viewport" />
+    <input ref="mediaInput" data-testid="office-presentation-media-input" type="file" accept=".png,.jpg,.jpeg" hidden @change="insertMedia" @cancel="cancelMedia" />
+    <div v-if="loading" class="office-presentation-loading" role="status"><span class="office-presentation-spinner" />正在打开演示文稿…</div>
+    <p v-if="problem" class="office-presentation-error" role="alert">{{ problem }}</p>
   </section>
 </template>
 
 <style scoped>
-.rust-presentation-editor{display:flex;flex:1;position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--ui-bg)}.deckcraft-viewport{position:absolute;inset:0;min-width:0;min-height:0}.deckcraft-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--ui-surface-muted);color:var(--ui-muted);font-size:13px}.deckcraft-spinner{width:17px;height:17px;border:2px solid var(--ui-line);border-top-color:var(--ui-accent);border-radius:50%;animation:deckcraft-spin .8s linear infinite}.deckcraft-error{position:absolute;z-index:2;left:18px;right:18px;bottom:12px;padding:12px 15px;border:1px solid var(--ui-danger);background:var(--ui-danger-soft);color:var(--ui-danger);border-radius:7px;font-size:13px;line-height:1.6}@keyframes deckcraft-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.deckcraft-spinner{animation:none}}
+.rust-presentation-editor{display:flex;flex:1;position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--ui-bg)}.office-presentation-viewport{position:absolute;inset:0;min-width:0;min-height:0}.office-presentation-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--ui-surface-muted);color:var(--ui-muted);font-size:13px}.office-presentation-spinner{width:17px;height:17px;border:2px solid var(--ui-line);border-top-color:var(--ui-accent);border-radius:50%;animation:office-presentation-spin .8s linear infinite}.office-presentation-error{position:absolute;z-index:2;left:18px;right:18px;bottom:12px;padding:12px 15px;border:1px solid var(--ui-danger);background:var(--ui-danger-soft);color:var(--ui-danger);border-radius:7px;font-size:13px;line-height:1.6}@keyframes office-presentation-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.office-presentation-spinner{animation:none}}
 </style>

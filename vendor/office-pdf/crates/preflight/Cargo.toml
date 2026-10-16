@@ -1,0 +1,16 @@
+[package]
+name = "office-pdf-preflight"
+description = "Standards: verify PDF/A (ISO 19005) conformance and convert documents to PDF/A-2b or 3b"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+office-pdf-content = { workspace = true }
+office-pdf-cos = { workspace = true }
+office-pdf-model = { workspace = true }

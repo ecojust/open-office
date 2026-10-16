@@ -5,8 +5,8 @@
     "repository": "https://github.com/storytold/wordcraft",
     "commit": "3292ba05d3c15c003823be6849e87a1c6e205242",
     "license": "MIT OR Apache-2.0",
-    "sourceDirectory": "vendor/wordcraft",
-    "localIntegrationDirectory": "vendor/wordcraft/apps/open-office-host",
+    "sourceDirectory": "vendor/office-word",
+    "localIntegrationDirectory": "vendor/office-word/apps/open-office-host",
     "excluded": [
       "docs/brand",
       "AGENTS.md",
@@ -22,7 +22,7 @@
       "licenseDirectory": "craft-libs"
     }
   ],
-  "scope": "Pinned upstream source, bundled asset attribution and exact license copies. This is not a compiled-crate SBOM or a claim that every upstream feature is verified in Open Office. Local changes are tracked by the Open Office source commit and generated public/wordcraft/manifest.json.",
+  "scope": "Pinned upstream source, bundled asset attribution and exact license copies. This is not a compiled-crate SBOM or a claim that every upstream feature is verified in Open Office. Local changes are tracked by the Open Office source commit and generated public/office-word/manifest.json.",
   "licenseFiles": [
     {
       "file": "LICENSE-MIT",

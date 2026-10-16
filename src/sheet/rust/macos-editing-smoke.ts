@@ -1,10 +1,10 @@
 import { isTauri } from '@tauri-apps/api/core'
 import { smokeRequested, smokeStage } from '../../smoke'
-import type { GridcraftSmokeEditor } from './gridcraft-native-smoke'
-import type { WordcraftSmokeEditor } from '../../word/rust/wordcraft-native-smoke'
+import type { OfficeSheetSmokeEditor } from './office-sheet-native-smoke'
+import type { OfficeWordSmokeEditor } from '../../word/rust/office-word-native-smoke'
 
 type Kind = 'sheet' | 'word'
-type Snapshot = Awaited<ReturnType<GridcraftSmokeEditor['inspect']>> | Awaited<ReturnType<WordcraftSmokeEditor['inspect']>>
+type Snapshot = Awaited<ReturnType<OfficeSheetSmokeEditor['inspect']>> | Awaited<ReturnType<OfficeWordSmokeEditor['inspect']>>
 export interface EditingSmokeMount {
   key: string
   kind: Kind
@@ -98,7 +98,7 @@ function readBoot(): Boot {
 }
 function identity(mount: EditingSmokeMount, state: Snapshot): Identity { return { key: mount.key, kind: mount.kind, sessionId: state.sessionId, documentId: state.documentId } }
 type Cell = { value: unknown; input: string; style: { font: { bold: boolean } } }
-const cell = (mount: EditingSmokeMount, name: string) => bounded((mount.editor as GridcraftSmokeEditor).query('cell.get', { cell: name }), `read ${name}`) as Promise<Cell>
+const cell = (mount: EditingSmokeMount, name: string) => bounded((mount.editor as OfficeSheetSmokeEditor).query('cell.get', { cell: name }), `read ${name}`) as Promise<Cell>
 type SheetUi = { visibleCells?: Array<{ cell: string; rect: number[] }>; drawnChrome?: Array<{ id: string; rect: number[] }>; editor?: { cell: string } | null }
 function point(canvas: HTMLCanvasElement, rect: number[]) {
   assert(rect.length === 4 && rect.every(Number.isFinite), 'invalid canvas target bounds')
@@ -108,7 +108,7 @@ function point(canvas: HTMLCanvasElement, rect: number[]) {
   return { clientX, clientY }
 }
 async function sheetPoint(mount: EditingSmokeMount, name: string, chrome = false) {
-  const canvas = mount.element.querySelector<HTMLCanvasElement>('[data-testid="gridcraft-canvas"]')
+  const canvas = mount.element.querySelector<HTMLCanvasElement>('[data-testid="office-sheet-canvas"]')
   assert(canvas, 'spreadsheet canvas is missing')
   const state = await until(() => mount.editor.inspect(), state => {
     const ui = state.ui as SheetUi
@@ -204,7 +204,7 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
     assert((await cell(first, 'A1')).value === null, 'editing second workbook changed first workbook')
     report.checks.push(MACOS_EDITING_CHECKS[1])
     await input('double-d6', 'sheet:D6', { kind: 'doubleClick', ...await sheetPoint(sheet, 'D6') })
-    await until(() => sheet.editor.inspect(), value => (value.ui as SheetUi)?.editor?.cell === 'D6' && document.activeElement === sheet.element.querySelector('[data-testid="gridcraft-input"]'), 'double-click editor and natural input focus')
+    await until(() => sheet.editor.inspect(), value => (value.ui as SheetUi)?.editor?.cell === 'D6' && document.activeElement === sheet.element.querySelector('[data-testid="office-sheet-input"]'), 'double-click editor and natural input focus')
     await input('type-d6', 'sheet:D6', { kind: 'type', text: 'sheetnative' })
     await input('enter-d6', 'sheet:D6', { kind: 'key', key: 'Enter' })
     report.observations.doubleClickValue = (await until(() => cell(sheet, 'D6'), value => value.value === 'sheetnative', 'double-click edit committed')).value
@@ -226,14 +226,14 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
     report.checks.push(MACOS_EDITING_CHECKS[5])
     const word = await open('word', 'Word input control.docx')
     const wordState = await until(() => word.editor.inspect(), value => !!(value.ui as { pages?: number[][] })?.pages?.length, 'Word page bounds')
-    const canvas = word.element.querySelector<HTMLCanvasElement>('[data-testid="wordcraft-canvas"]')
+    const canvas = word.element.querySelector<HTMLCanvasElement>('[data-testid="office-word-canvas"]')
     assert(canvas, 'Word canvas missing')
     const [x, y, width, height] = (wordState.ui as { pages: number[][] }).pages[0]!
     const box = canvas.getBoundingClientRect()
     const clientX = box.x + x! + width! * .6, clientY = box.y + Math.min(y! + Math.min(200, height! / 4), box.height - 50)
     assert(document.elementFromPoint(clientX, clientY) === canvas, 'Word click target covered')
     await input('word-click', 'word:page', { kind: 'click', clientX, clientY })
-    await until(async () => document.activeElement, value => value === word.element.querySelector('[data-testid="wordcraft-input"]'), 'natural Word input focus')
+    await until(async () => document.activeElement, value => value === word.element.querySelector('[data-testid="office-word-input"]'), 'natural Word input focus')
     await input('word-type', 'word:page', { kind: 'type', text: 'wordnative' })
     const wordResult = await until(() => word.editor.inspect(), value => 'text' in value && value.text === 'wordnative', 'Word native typing control')
     report.observations.wordText = 'text' in wordResult ? wordResult.text : undefined

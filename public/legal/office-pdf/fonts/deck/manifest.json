@@ -1,0 +1,59 @@
+{
+  "fonts": [
+    {
+      "family": "LXGW WenKai",
+      "style": "Regular",
+      "file": "LXGWWenKai-Regular.ttf",
+      "source": "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf",
+      "version": "v1.522",
+      "license": "OFL-1.1",
+      "licenseFile": "LICENSE-LXGW-WenKai.txt",
+      "author": "LXGW; Klee Project Authors (Fontworks)"
+    },
+    {
+      "family": "Inter",
+      "style": "Regular / SemiBold",
+      "files": [
+        "Inter-Regular.ttf",
+        "Inter-SemiBold.ttf"
+      ],
+      "source": "https://github.com/rsms/inter",
+      "vendoredSource": "vendor/wordcraft/assets/fonts",
+      "license": "OFL-1.1",
+      "licenseFile": "OFL-Inter.txt",
+      "author": "Rasmus Andersson / The Inter Project Authors",
+      "vendoredSourceCommit": "3292ba05d3c15c003823be6849e87a1c6e205242",
+      "sourceFiles": {
+        "Inter-Regular.ttf": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/Inter-Regular.ttf",
+        "Inter-SemiBold.ttf": "https://raw.githubusercontent.com/storytold/wordcraft/3292ba05d3c15c003823be6849e87a1c6e205242/assets/fonts/Inter-SemiBold.ttf"
+      }
+    }
+  ],
+  "files": [
+    {
+      "file": "Inter-Regular.ttf",
+      "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+      "bytes": 411640
+    },
+    {
+      "file": "Inter-SemiBold.ttf",
+      "sha256": "78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3",
+      "bytes": 419744
+    },
+    {
+      "file": "LICENSE-LXGW-WenKai.txt",
+      "sha256": "c38b1994a5e48ac30ac7d1da7d0409fd8fd8127dfe28a13d6e787d5b1ef34a5e",
+      "bytes": 4448
+    },
+    {
+      "file": "LXGWWenKai-Regular.ttf",
+      "sha256": "39ad71264b588165b469e35e6afb162a378dacd1f95348160240ba9038ac3009",
+      "bytes": 25575676
+    },
+    {
+      "file": "OFL-Inter.txt",
+      "sha256": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a",
+      "bytes": 4380
+    }
+  ]
+}

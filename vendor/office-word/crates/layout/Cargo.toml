@@ -1,0 +1,27 @@
+[package]
+name = "office-word-layout"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficeWord layout: shaping, line breaking, tabs, lists, tables, pagination, headers/footers, hit testing"
+
+[lints]
+workspace = true
+
+[dependencies]
+office-word-geom = { workspace = true }
+office-word-doc = { workspace = true }
+office-word-fonts = { workspace = true }
+office-word-proof = { workspace = true }
+kurbo = { workspace = true }
+unicode-bidi = { workspace = true }
+unicode-linebreak = { workspace = true }
+unicode-segmentation = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+image = { workspace = true }
+log = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# The browser clock (`SystemTime::now()`/`Instant::now()` panic on wasm32).
+js-sys = "0.3"

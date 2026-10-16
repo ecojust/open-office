@@ -18,6 +18,7 @@ const icons: Record<string, IconPath[]> = Object.fromEntries(Object.entries(sour
   })
   return [file.split('/').at(-1)!.replace(/\.svg$/, ''), paths]
 }))
+icons.server = [{d:'M6 3.5h12a2 2 0 0 1 2 2v4H4v-4a2 2 0 0 1 2-2Z M4 9.5h16v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6Z M7.5 6.5h.01M7.5 13.5h.01M11 6.5h5.5M11 13.5h5.5M12 17.5v3M7.5 20.5h9'}]
 const paths = computed(() => icons[props.name] ?? icons.file ?? [])
 </script>
 

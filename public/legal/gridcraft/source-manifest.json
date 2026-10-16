@@ -6,8 +6,8 @@
     "commit": "e6b6b349708ab4978cb3f061f6bd6ecbc25667cb",
     "version": "0.7.0",
     "license": "MIT OR Apache-2.0",
-    "sourceDirectory": "vendor/gridcraft",
-    "localIntegrationDirectory": "vendor/gridcraft/apps/open-office-host",
+    "sourceDirectory": "vendor/office-sheet",
+    "localIntegrationDirectory": "vendor/office-sheet/apps/open-office-host",
     "excludedBrandAssets": [
       "docs/brand/artcraft-logo-white.png",
       "docs/brand/artcraft-logo-white.svg",

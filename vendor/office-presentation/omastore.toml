@@ -1,0 +1,11 @@
+kind = "app"
+categories = ["Office"]
+icon = "assets/app-icon/hicolor/256x256/apps/ai.storyteller.office-presentation.png"
+
+[linux.x86_64]
+asset = "office-presentation-{version}-linux-x86_64.tar.gz"
+exec = "office-presentation-{version}-linux-x86_64/bin/office-presentation"
+
+[linux.aarch64]
+asset = "office-presentation-{version}-linux-aarch64.tar.gz"
+exec = "office-presentation-{version}-linux-aarch64/bin/office-presentation"

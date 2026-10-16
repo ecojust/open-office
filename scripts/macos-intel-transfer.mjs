@@ -5,6 +5,7 @@ import { closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, rea
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { inspectInstalledPdf, validateInstalledPdfEvidence } from './office-pdf-native-smoke.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ID = 'macos-x64';
@@ -48,7 +49,7 @@ export function appInventory(app) {
   return { entries, sha256: sha256Json(entries) };
 }
 
-export function verifyTransferProof(proof, { commit, runId, dmgPath, inventory, signatures }) {
+export function verifyTransferProof(proof, { commit, runId, dmgPath, inventory, signatures, root = ROOT }) {
   assert.equal(proof.schemaVersion, 1);
   assert.equal(proof.platformId, ID);
   assert.equal(proof.target, TARGET);
@@ -63,6 +64,18 @@ export function verifyTransferProof(proof, { commit, runId, dmgPath, inventory, 
     assert.equal(inventory.sha256, proof.app.sha256, 'The App copied from the Intel DMG differs from its original bundle');
     assert.deepEqual(inventory.entries, proof.app.entries, 'App file bytes, permissions, or symlinks changed');
   }
+  validateInstalledPdfEvidence(proof.pdf, { root });
+  const prefix = `Contents/Resources/${proof.pdf.directory}/`;
+  for (const [name, evidence] of Object.entries({ ...proof.pdf.files,
+    'manifest.json': { sha256: proof.pdf.manifestSha256, bytes: Buffer.byteLength(proof.pdf.manifestText) } })) {
+    const entries = proof.app.entries.filter(entry => entry.path === prefix + name);
+    assert.equal(entries.length, 1, 'PDF file is missing or duplicated in the original App inventory');
+    assert.equal(entries[0].type, 'file');
+    assert.equal(entries[0].sha256, evidence.sha256, 'PDF installed file differs from the original App inventory');
+    assert.equal(entries[0].size, evidence.bytes, 'PDF installed size differs from the original App inventory');
+  }
+  assert.deepEqual(Object.keys(proof.signatures || {}).sort(), ['app', 'main']);
+  for (const value of Object.values(proof.signatures)) assert.match(value, /^[a-f0-9]{40}$/);
   if (signatures) assert.deepEqual(signatures, proof.signatures, 'App or nested code signature changed during transfer');
 }
 
@@ -77,7 +90,6 @@ function signaturesFor(app) {
   const signatures = {};
   for (const [label, path] of [
     ['app', app], ['main', join(app, 'Contents/MacOS/open-office')],
-    ['pdfRuntime', join(app, 'Contents/Resources/pdf-runtime/open-office-pdf')],
   ]) {
     command('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=4', path]);
     const display = command('/usr/bin/codesign', ['--display', '--verbose=4', path]);
@@ -122,6 +134,7 @@ function recordBuild() {
     metalProbe, displays, nativeIntelGpuGuiValidated: false,
     dmg: { name: basename(dmg), sha256: sha256File(dmg), bytes: lstatSync(dmg).size },
     signatures: signaturesFor(app), app: appInventory(app),
+    pdf: inspectInstalledPdf(join(app, 'Contents/Resources')),
   };
   writeFileSync(PROOF, `${JSON.stringify(proof, null, 2)}\n`);
   console.log(`Intel package recorded: ${proof.dmg.name}; Metal available=${metalProbe.available}; App digest=${proof.app.sha256}`);

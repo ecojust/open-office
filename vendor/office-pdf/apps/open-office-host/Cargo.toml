@@ -1,0 +1,27 @@
+[package]
+name = "open-office-pdf-host"
+description = "Open Office local PDF canvas host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+office-pdf-engine = { workspace = true }
+office-pdf-ui-egui = { workspace = true }
+office-pdf-render = { workspace = true }
+egui = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+eframe = { workspace = true, features = ["default_fonts", "glow", "accesskit"] }
+wasm-bindgen = "=0.2.129"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["Window", "Document", "Event", "HtmlCanvasElement"] }

@@ -1,0 +1,49 @@
+# Flatpak manifest for the single-file bundle attached to every GitHub release
+# (office-sheet-<version>-linux-<arch>.flatpak). Build it with packaging/linux/flatpak-bundle.sh.
+#
+# It repackages the release's own Linux tarball (office-sheet-<version>-linux-<arch>.tar.gz,
+# built on Ubuntu 22.04 by package.sh) instead of compiling Rust inside flatpak-builder: no
+# network and no vendored crate sources during the build, a few seconds instead of 20+ minutes,
+# and byte-for-byte the same binaries as the AppImage/deb/rpm. The script unpacks the tarball
+# into `stage/` next to a copy of this file. The binaries need glibc >= 2.35 and load X11,
+# Wayland, xkbcommon and Vulkan/GL at runtime; the freedesktop runtime has all of them, and the
+# GPU driver comes from its org.freedesktop.Platform.GL extension.
+#
+# ai.storyteller.office-sheet.yml (same directory) is the from-source manifest for Flathub. Keep
+# runtime, runtime-version, sdk and finish-args identical in both (packaging-lint checks this).
+id: ai.storyteller.office-sheet
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+command: office-sheet
+finish-args:
+  # Display: Wayland first; X11 only when no Wayland compositor is running.
+  - --socket=wayland
+  - --socket=fallback-x11
+  # X11 shared memory (MIT-SHM). Without it the X11 fallback is slow or fails.
+  - --share=ipc
+  # GPU access for rendering.
+  - --device=dri
+  # Open/Save dialogs use the file-chooser portal (rfd), and drag-and-drop uses the document
+  # portal, so broad filesystem access isn't needed. Documents and Downloads are granted for
+  # opening workbooks by path from the command line.
+  - --filesystem=xdg-documents
+  - --filesystem=xdg-download
+  # Deliberately not granted: network (the optional --control channel listens on 127.0.0.1 in
+  # the sandbox; `flatpak override --user --share=network ai.storyteller.office-sheet` exposes it to
+  # host agents) and home/host filesystem access.
+modules:
+  - name: office-sheet
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 bin/office-sheet /app/bin/office-sheet
+      # Headless CLI and MCP server: `flatpak run --command=office-sheet-cli ai.storyteller.office-sheet`.
+      - install -Dm755 bin/office-sheet-cli /app/bin/office-sheet-cli
+      - install -Dm644 share/applications/ai.storyteller.office-sheet.desktop /app/share/applications/ai.storyteller.office-sheet.desktop
+      - install -Dm644 share/mime/packages/ai.storyteller.office-sheet.xml /app/share/mime/packages/ai.storyteller.office-sheet.xml
+      # Already has the release's version and date substituted by package.sh.
+      - install -Dm644 share/metainfo/ai.storyteller.office-sheet.metainfo.xml /app/share/metainfo/ai.storyteller.office-sheet.metainfo.xml
+      - mkdir -p /app/share/icons /app/share/doc && cp -R share/icons/hicolor /app/share/icons/ && cp -R share/doc/office-sheet /app/share/doc/
+    sources:
+      - type: dir
+        path: stage

@@ -12,29 +12,25 @@ async function fixture(t, { built = false } = {}) {
     await mkdir(dirname(join(root, path)), { recursive: true })
     await writeFile(join(root, path), content)
   }
-  await put('package.json', JSON.stringify({ dependencies: { vue: '3.5.22', 'pdfjs-dist': '6.4.299' } }))
+  await put('package.json', JSON.stringify({ dependencies: { vue: '3.5.22' } }))
   await put('src-tauri/Cargo.toml', '[dependencies]\nserde = "1"\n')
-  await put('src/App.vue', '<script>import PdfEditor from "./components/PdfEditor.vue"</script>')
-  await put('src/components/PdfEditor.vue', 'import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs"')
+  await put('src/App.vue', '<script>import RustPdfEditor from "./components/RustPdfEditor.vue"</script>')
+  await put('src/components/RustPdfEditor.vue', 'import { prepareRustPdfDocument } from "../pdf/rust/client"')
   await put('public/legal/retired-engine-notices.md', 'Historic office/host.html and word-engine/word_engine.wasm distributions used LibreOffice.')
   if (built) {
     await put('dist/index.html', '<script type="module" src="/assets/index-123.js"></script>')
-    await put('dist/assets/index-123.js', 'const editor = new URL("deckcraft/deckcraft.js", document.baseURI)')
-    for (const name of ['wordcraft', 'gridcraft', 'deckcraft']) {
-      await put(`dist/${name}/${name}.js`, 'export function createHost() {}')
-      await put(`dist/${name}/${name}_bg.wasm`, Buffer.from([0, 97, 115, 109]))
+    await put('dist/assets/index-123.js', 'const editor = new URL("office-presentation/office-presentation.js", document.baseURI)')
+    for (const [name, stem] of [['office-word', 'office-word'], ['office-sheet', 'office-sheet'], ['office-presentation', 'office-presentation'], ['office-pdf', 'office_pdf']]) {
+      await put(`dist/${name}/${stem}.js`, 'export function createHost() {}')
+      await put(`dist/${name}/${stem}_bg.wasm`, Buffer.from([0, 97, 115, 109]))
       await put(`dist/${name}/manifest.json`, '{}')
     }
-    await put('dist/pdfjs/cmaps/Adobe-GB1-UCS2.bcmap', 'fixture')
-    await put('dist/pdfjs/standard_fonts/FoxitSerif.pfb', 'fixture')
-    await put('dist/pdfjs/wasm/qcms_bg.wasm', Buffer.from([0, 97, 115, 109]))
-    await put('dist/assets/pdf.worker.min-abc123.mjs', 'const worker = true')
     await put('dist/legal/retired-engine-notices.md', 'Historical word-engine/word_engine.wasm and office-runtime/soffice.wasm')
   }
   return { root, put }
 }
 
-test('current sources and PDF.js legacy API pass without generated editor output', async t => {
+test('current Rust sources pass without generated editor output', async t => {
   const { root } = await fixture(t)
   await mkdir(join(root, 'crates/word-engine/src'), { recursive: true })
   await mkdir(join(root, 'public/office-runtime'), { recursive: true })
@@ -70,14 +66,14 @@ test('an npm script cannot recreate the removed Office distribution', async t =>
   assert.ok(report.errors.some(error => error.includes('script assets runs a retired engine')))
 })
 
-test('distribution requires all three current editor bundles and offline PDF assets', async t => {
+test('distribution requires all four current Rust editor bundles', async t => {
   const { root } = await fixture(t, { built: true })
   assert.deepEqual(await checkEditorBoundaries({ root, dist: true }), { ok: true, errors: [] })
-  await rm(join(root, 'dist/deckcraft/deckcraft_bg.wasm'))
-  await rm(join(root, 'dist/assets/pdf.worker.min-abc123.mjs'))
+  await rm(join(root, 'dist/office-presentation/office-presentation_bg.wasm'))
+  await rm(join(root, 'dist/office-pdf/office_pdf_bg.wasm'))
   const report = await checkEditorBoundaries({ root, dist: true })
-  assert.ok(report.errors.some(error => error.includes('dist/deckcraft/deckcraft_bg.wasm: missing')))
-  assert.ok(report.errors.some(error => error.includes('missing bundled PDF.js worker')))
+  assert.ok(report.errors.some(error => error.includes('dist/office-presentation/office-presentation_bg.wasm: missing')))
+  assert.ok(report.errors.some(error => error.includes('dist/office-pdf/office_pdf_bg.wasm: missing')))
 })
 
 test('stale distribution assets are rejected even when public has already been cleaned', async t => {
@@ -108,4 +104,15 @@ test('symlinked asset directories cannot hide retired engines outside the scan',
   await symlink(join(root, 'src'), join(root, 'public/hidden-runtime'), 'dir')
   const report = await checkEditorBoundaries({ root })
   assert.ok(report.errors.some(error => error.includes('public/hidden-runtime: symlinks are not audited')))
+})
+
+test('retired PDF dependency, native backend, worker and API references are rejected', async t => {
+  const { root, put } = await fixture(t, { built: true })
+  await put('package.json', JSON.stringify({ dependencies: { 'pdfjs-dist': '6.4.299' } }))
+  await put('src/old-pdf.ts', 'invoke("pdf_request"); fetch("/__pdf-dev")')
+  await put('pdf-backend/engine.py', 'retired')
+  await put('dist/pdfjs/wasm/old.wasm', 'retired')
+  const report = await checkEditorBoundaries({ root, dist: true })
+  assert.equal(report.ok, false)
+  for (const fragment of ['retired engine dependency', 'references retired PDF backend', 'pdf-backend: retired engine source', 'dist/pdfjs: retired runtime assets']) assert.ok(report.errors.some(error => error.includes(fragment)), fragment)
 })

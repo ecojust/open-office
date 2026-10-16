@@ -7,8 +7,8 @@
     "version": "0.7.0",
     "license": "MIT OR Apache-2.0",
     "selectedLicense": "MIT",
-    "sourceDirectory": "vendor/deckcraft",
-    "localIntegrationDirectory": "vendor/deckcraft/apps/open-office-host",
+    "sourceDirectory": "vendor/office-presentation",
+    "localIntegrationDirectory": "vendor/office-presentation/apps/open-office-host",
     "excludedBrandAssets": [
       "docs/brand/artcraft-mark.svg",
       "docs/brand/artcraft-mark-black.png",

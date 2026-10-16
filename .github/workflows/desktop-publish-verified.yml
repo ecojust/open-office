@@ -166,7 +166,7 @@ jobs:
               raise
           PYTHON
       - name: Install independent presentation PDF inspector
-        run: python -m pip install -r verified-source/pdf-backend/requirements.txt
+        run: python -m pip install -r verified-source/tests/requirements-pdf-inspection.txt
       - name: Validate all native reports and create exact source archive
         shell: bash
         run: |
@@ -178,9 +178,13 @@ jobs:
           import { readFileSync, statSync, writeFileSync } from 'node:fs';
           import { resolve } from 'node:path';
           import { validateFrontendReport } from './verified-source/scripts/native-smoke.mjs';
-          import { validateNativeWordcraftEvidence } from './verified-source/scripts/wordcraft-native-smoke.mjs';
-          import { validateNativeGridcraftEvidence } from './verified-source/scripts/gridcraft-native-smoke.mjs';
-          import { validateNativeDeckcraftEvidence } from './verified-source/scripts/deckcraft-native-smoke.mjs';
+          // Apply current workspace requirements even to artifacts whose source
+          // predates the Server/autosave acceptance gate.
+          import { validateNativeWorkspaceReport } from './scripts/native-smoke.mjs';
+          import { validateNativeOfficeWordEvidence } from './verified-source/scripts/office-word-native-smoke.mjs';
+          import { validateNativeOfficeSheetEvidence } from './verified-source/scripts/office-sheet-native-smoke.mjs';
+          import { validateNativeOfficePresentationEvidence } from './verified-source/scripts/office-presentation-native-smoke.mjs';
+          import { validateNativePdfEvidence } from './verified-source/scripts/office-pdf-native-smoke.mjs';
           import { sha256File, verifyTransferProof } from './verified-source/scripts/macos-intel-transfer.mjs';
           import { readMacosArmEditingProof, verifyMacosArmEditingProof } from './scripts/macos-arm-editing-gate.mjs';
           assert.equal(execFileSync('git', ['-C', 'verified-source', 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), process.env.VERIFIED_SOURCE_SHA);
@@ -200,9 +204,11 @@ jobs:
             assert.equal(report.process.timedOut, false);
             assert.equal(report.frontend.ok, true);
             validateFrontendReport(report.frontend);
-            validateNativeWordcraftEvidence(report);
-            validateNativeGridcraftEvidence(report);
-            validateNativeDeckcraftEvidence(report);
+            validateNativeWorkspaceReport(report.frontend.workspace);
+            validateNativeOfficeWordEvidence(report);
+            validateNativeOfficeSheetEvidence(report);
+            validateNativeOfficePresentationEvidence(report);
+            validateNativePdfEvidence(report);
             assert.equal(report.targetArch, id === 'macos-arm64' ? 'arm64' : 'x64');
             assert.equal(report.hostArch, id === 'windows-x64' ? 'x64' : 'arm64');
             assert.equal(report.executionMode, id === 'macos-x64' ? 'rosetta2' : 'native');
@@ -226,7 +232,6 @@ jobs:
               assert.deepEqual(transfer.signatures, proof.signatures);
               assert.deepEqual(report.preflight.macos.cdHashes, proof.signatures);
               assert.deepEqual(report.preflight.macos.mainArchitectures, ['x86_64']);
-              assert.deepEqual(report.preflight.macos.pdfArchitectures, ['x86_64']);
               assert.equal(report.preflight.rosetta.hardwareArm64, 1);
               assert.equal(report.preflight.rosetta.nodeProcessTranslated, 0);
               assert.equal(report.preflight.rosetta.x86ProbeTranslated, 1);
@@ -257,8 +262,8 @@ jobs:
           cp "$notes_file" release-notes.md
           cat >> release-notes.md <<EOF
 
-          演示引擎及验证记录：https://github.com/${GITHUB_REPOSITORY}/blob/${VERIFIED_SOURCE_SHA}/docs/deckcraft-integration.md
-          表格引擎及已知限制：https://github.com/${GITHUB_REPOSITORY}/blob/${VERIFIED_SOURCE_SHA}/docs/gridcraft-integration.md
+          演示引擎及验证记录：https://github.com/${GITHUB_REPOSITORY}/blob/${VERIFIED_SOURCE_SHA}/docs/office-presentation-integration.md
+          表格引擎及已知限制：https://github.com/${GITHUB_REPOSITORY}/blob/${VERIFIED_SOURCE_SHA}/docs/office-sheet-integration.md
           第三方许可与源码：https://github.com/${GITHUB_REPOSITORY}/blob/${VERIFIED_SOURCE_SHA}/THIRD_PARTY_NOTICES.md
           源码提交：${VERIFIED_SOURCE_SHA}
           构建记录：https://github.com/${GITHUB_REPOSITORY}/actions/runs/${VERIFIED_BUILD_RUN_ID}

@@ -1,0 +1,29 @@
+[package]
+name = "office-sheet-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficeSheet engine: sessions, commands, history, clipboard, fill, sort, filter"
+
+[lints]
+workspace = true
+
+[dependencies]
+office-sheet-core = { workspace = true }
+office-sheet-numfmt = { workspace = true }
+office-sheet-formula = { workspace = true }
+office-sheet-functions = { workspace = true }
+office-sheet-model = { workspace = true }
+office-sheet-calc = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+office-sheet-xlsx = { workspace = true }
+office-sheet-chart = { workspace = true }
+office-sheet-pdf = { workspace = true }
+image = { workspace = true }
+
+[dev-dependencies]
+office-sheet-xlsx = { workspace = true, features = ["test-support"] }
+zip = { workspace = true }

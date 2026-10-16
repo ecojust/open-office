@@ -871,7 +871,7 @@ mod tests {
         };
         assert!(AssetServer::allows_navigation(
             &info,
-            &"http://127.0.0.1:12345/secret/wordcraft/wordcraft.js"
+            &"http://127.0.0.1:12345/secret/office-word/office-word.js"
                 .parse()
                 .unwrap()
         ));

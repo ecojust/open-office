@@ -37,15 +37,6 @@ export function validateManifest(manifest) {
   return manifest
 }
 
-export function validatePdfRuntimeSources(manifest, requirements) {
-  const pymupdf = manifest.archives.find(asset => asset.id === 'pymupdf')
-  const mupdf = manifest.archives.find(asset => asset.id === 'mupdf')
-  if (!pymupdf || !mupdf || mupdf.version !== pymupdf.version
-      || !requirements.split(/\r?\n/).some(line => line.trim() === `PyMuPDF==${pymupdf.version}`)) {
-    throw Error('PDF backend version changed: re-audit its matching PyMuPDF and MuPDF sources before release')
-  }
-}
-
 async function matches(file, asset) {
   try {
     if ((await stat(file)).size !== asset.bytes) return false
@@ -121,8 +112,6 @@ async function main() {
     else throw Error('Usage: node scripts/fetch-corresponding-sources.mjs [--verify|--offline] [--list] [--out-dir PATH]')
   }
   const manifest = validateManifest(JSON.parse(await readFile(manifestPath, 'utf8')))
-  const requirements = await readFile(path.join(projectRoot, 'pdf-backend/requirements.txt'), 'utf8')
-  validatePdfRuntimeSources(manifest, requirements)
   if (listOnly) {
     console.log(JSON.stringify(manifest, null, 2))
     return
@@ -130,7 +119,7 @@ async function main() {
   const result = await fetchSourceArchives({ manifest, directory, verifyOnly })
   await copyFile(path.join(projectRoot, 'public/legal/CORRESPONDING-SOURCE.md'), path.join(directory, 'README.md'))
   console.log(`Verified ${result.archiveCount} upstream source archives (${result.totalBytes} bytes): ${directory}`)
-  console.log('Read README.md: application source, vendored Rust editors, and platform-specific PDF runtime source are additional release materials.')
+  console.log('Read README.md: application source and vendored Rust editor sources are additional release materials.')
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

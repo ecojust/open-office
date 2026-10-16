@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lockfileSha256": "11660475b38e4d788766ca6c267d68c2ade55c123aeb54fdf173bfcca7d41dfb",
+  "lockfileSha256": "fad0120349492b0ec55e5026e5a62f47a90c8f653302d7ddc9ffb0970375bd4f",
   "packages": [
     {
       "name": "@babel/helper-string-parser",
@@ -324,134 +324,6 @@
         "npm/@jridgewell__sourcemap-codec@1.6.0/LICENSE"
       ],
       "integrity": "sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw=="
-    },
-    {
-      "name": "@napi-rs/canvas",
-      "version": "1.0.11",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": true,
-      "installedForThisAudit": true,
-      "licenseFiles": [
-        "npm/@napi-rs__canvas@1.0.11/LICENSE"
-      ],
-      "integrity": "sha512-vt5tog1cr+QKadIddGe+3LrcX0EmjEd0izF717Uwf92mBmgYfq2XRmL2r4bZU40spB69exxhrBn9I91HYEr/7w=="
-    },
-    {
-      "name": "@napi-rs/canvas-android-arm64",
-      "version": "1.0.11",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-dtJS4FQEfH9OwSYLtMrEnj7T8DzBbJc/97LI/OkiWOYpW/iW5t6R/gcxVrUXS8l45gCVpwMufgucRe/pe0ISqA=="
-    },
-    {
-      "name": "@napi-rs/canvas-darwin-arm64",
-      "version": "1.0.11",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-J/JylWoJTG8OQqZaiqly4IODyAxNofUlZo0wtSBJtHk6AdymbdIkPynAM1JvQaZpPaG5h+msk9QuK8y4i1ooqw=="
-    },
-    {
-      "name": "@napi-rs/canvas-darwin-x64",
-      "version": "1.0.11",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-nlecCk3xy06eAGC7krZtzNDm9UNTHKuHQYK8ZYegdjzgSL8anGt/eLJZm86OWaNgZkwQwvDqfSmG8Nqe6MPZNQ=="
-    },
-    {
-      "name": "@napi-rs/canvas-linux-arm-gnueabihf",
-      "version": "1.0.11",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-DKImmG+sTPolE0kGPsYPBxTtOjb3INALp32O2lW2CfSr0bAzSEKKuu+GrQbtilClyoPOahUErS3OrznFDraoWA=="
-    },
-    {
-      "name": "@napi-rs/canvas-linux-arm64-gnu",
-      "version": "1.0.11",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-55sykACGENj5j1rhj+81AO8JbR9HYgGjRZ7/H+pNr4VE1DvINKYNMTcutk8ZmWxk276jAQvUKJ3+Kdj9GXU3lQ=="
-    },
-    {
-      "name": "@napi-rs/canvas-linux-arm64-musl",
-      "version": "1.0.11",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-6Jz6jys17yXydO+WdJgu7JhoB4K7/w9sWHByzzTmLjQghUx3TDMWvLv+UcCdnWhg4oprET67EMymnrETdeGNAg=="
-    },
-    {
-      "name": "@napi-rs/canvas-linux-riscv64-gnu",
-      "version": "1.0.11",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-lf2XeEebWiUYVOVEjLXxF7dfXrBBSEOBn9AqBh39VYXrPt5cDqI+1t58IFSjn8npqkg5jIOs8TQbjKABbFW1gQ=="
-    },
-    {
-      "name": "@napi-rs/canvas-linux-x64-gnu",
-      "version": "1.0.11",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": true,
-      "installedForThisAudit": true,
-      "licenseFiles": [
-        "npm/@napi-rs__canvas@1.0.11/LICENSE"
-      ],
-      "integrity": "sha512-iDapw7nFSE5tsmQxcH2+KotJhyfVPmHd6vUOQN/Em+8WNbkZJwJ/rDowlJMFnMl0SYSDSfgKCNUGi6Sn5++Smg==",
-      "licenseNote": "Platform binary package shares the license of its distributing wrapper @napi-rs/canvas; a lockfile presence alone does not mean it ships in browser resources."
-    },
-    {
-      "name": "@napi-rs/canvas-linux-x64-musl",
-      "version": "1.0.11",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": true,
-      "installedForThisAudit": true,
-      "licenseFiles": [
-        "npm/@napi-rs__canvas@1.0.11/LICENSE"
-      ],
-      "integrity": "sha512-26q26AyITo3CGZX4HWFIMgBMA1lu3YN07gxzBm4tW6Hglq/OVyTP50kDrmWuKybCX6dh3m8Ly+c7YhI+sqCgCQ==",
-      "licenseNote": "Platform binary package shares the license of its distributing wrapper @napi-rs/canvas; a lockfile presence alone does not mean it ships in browser resources."
-    },
-    {
-      "name": "@napi-rs/canvas-win32-arm64-msvc",
-      "version": "1.0.11",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-cUO96IdsfvIj2S+2PNcDSkTcLhjPj8pIOEWRV1Kj70MOP4wnE9zSk7N4C1EKHlFGRcgdR5AkbnBZj0dfHK9nbQ=="
-    },
-    {
-      "name": "@napi-rs/canvas-win32-x64-msvc",
-      "version": "1.0.11",
-      "license": "MIT",
-      "developmentOnly": false,
-      "optional": true,
-      "installedForThisAudit": false,
-      "licenseFiles": [],
-      "integrity": "sha512-DFYp/ZQRdKunI/LPc0UkRXG1vlNjJKOJf8O8Ctb8+wm2Nt2ELg9Eamc31D2VoakkfGo8L+z0Iejz6WtFbQwyGw=="
     },
     {
       "name": "@napi-rs/lzma-linux-x64-gnu",
@@ -1269,18 +1141,6 @@
       "integrity": "sha512-V/mpyJAoTsN4cnP31vc0wfNA1+p20evqqnap0KLoRUN0Yk/p3wN52DOEsL4oBFcLdb76hlpKPtzJIgo67j/XLw=="
     },
     {
-      "name": "pdfjs-dist",
-      "version": "6.4.299",
-      "license": "Apache-2.0",
-      "developmentOnly": false,
-      "optional": false,
-      "installedForThisAudit": true,
-      "licenseFiles": [
-        "npm/pdfjs-dist@6.4.299/LICENSE"
-      ],
-      "integrity": "sha512-AVl138zALtfaAPvADulE0PZThbYzCBS79nL4pOSL/6Sm/4AH5A21BD9VHt97OlCuzJuCpmeZtAtkinisF4Vb1g=="
-    },
-    {
       "name": "picocolors",
       "version": "1.1.1",
       "license": "ISC",
@@ -1464,16 +1324,21 @@
       "integrity": "sha512-fbMynMG7kXSnqZTRBSCh9ROYaVpXfCZbEO0gY3lqOjLbp361uuS88n6BDajiUriDIF+SGLWoinjvf6stS2J3Gg=="
     }
   ],
-  "pdfjsAssetNotices": [
-    "pdfjs/wasm/LICENSE_PDFJS_QCMS",
-    "pdfjs/wasm/LICENSE_PDFJS_OPENJPEG",
-    "pdfjs/wasm/LICENSE_JBIG2",
-    "pdfjs/wasm/LICENSE_PDFJS_JBIG2",
-    "pdfjs/wasm/LICENSE_OPENJPEG",
-    "pdfjs/wasm/LICENSE_QCMS",
-    "pdfjs/iccs/LICENSE",
-    "pdfjs/cmaps/LICENSE",
-    "pdfjs/standard_fonts/LICENSE_FOXIT",
-    "pdfjs/standard_fonts/LICENSE_LIBERATION"
-  ]
+  "lockfile": "package-lock.json",
+  "scope": "Exact package-lock.json dependency inventory, including development and optional platform packages. A locked package is not proof that it is shipped in the application. License files retained from retired components are historical records and are not current application assets. Platform-package audit availability and original licenseFiles records are preserved; an empty licenseFiles array does not claim an independently collected notice.",
+  "historicalAssetNotices": {
+    "scope": "Original notices from the retired browser PDF renderer. These assets are no longer bundled by the current application; notice files are retained as historical attribution only.",
+    "licenseFiles": [
+      "pdfjs/wasm/LICENSE_PDFJS_QCMS",
+      "pdfjs/wasm/LICENSE_PDFJS_OPENJPEG",
+      "pdfjs/wasm/LICENSE_JBIG2",
+      "pdfjs/wasm/LICENSE_PDFJS_JBIG2",
+      "pdfjs/wasm/LICENSE_OPENJPEG",
+      "pdfjs/wasm/LICENSE_QCMS",
+      "pdfjs/iccs/LICENSE",
+      "pdfjs/cmaps/LICENSE",
+      "pdfjs/standard_fonts/LICENSE_FOXIT",
+      "pdfjs/standard_fonts/LICENSE_LIBERATION"
+    ]
+  }
 }

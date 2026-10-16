@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "lockfileSha256": "870290c4a42e58e3115060e7e834b8007514edebdc6621d02d91165c69db01f5",
+  "lockfileSha256": "1705e13bbada2769c64e9a4474025922a8bf6e8d102b989549ad0bb977691687",
   "lockfiles": [
     {
       "path": "src-tauri/Cargo.lock",
-      "sha256": "870290c4a42e58e3115060e7e834b8007514edebdc6621d02d91165c69db01f5",
+      "sha256": "1705e13bbada2769c64e9a4474025922a8bf6e8d102b989549ad0bb977691687",
       "externalPackageCount": 426
     }
   ],

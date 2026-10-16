@@ -1,50 +1,24 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-15",
+  "recordedAt": "2026-10-16",
   "archives": [
     {
-      "id": "pymupdf",
-      "version": "1.28.2",
-      "license": "AGPL-3.0-only",
-      "repository": "https://github.com/pymupdf/PyMuPDF",
-      "sourceRef": "1.28.2",
-      "commit": null,
-      "provenance": "Official PyPI source distribution; SHA-256 agrees with PyPI release metadata.",
-      "file": "pymupdf-1.28.2.tar.gz",
-      "url": "https://files.pythonhosted.org/packages/a3/fb/b6761fa2d5266f2cdb24c3b91f4023070ab7848381417678e7a289a1d52a/pymupdf-1.28.2.tar.gz",
-      "bytes": 87903557,
-      "sha256": "5e0be7908a715aa20333caddd73f1d6f01e4cd0c26e869fa2dd0b7f344da2249"
-    },
-    {
-      "id": "mupdf",
-      "version": "1.28.2",
-      "license": "AGPL-3.0-or-later; additional bundled-library licenses",
-      "repository": "https://mupdf.com",
-      "sourceRef": "1.28.2",
-      "commit": null,
-      "provenance": "Official full MuPDF source archive referenced by PyMuPDF setup.py; contains its thirdparty source tree.",
-      "file": "mupdf-1.28.2-source.tar.gz",
-      "url": "https://mupdf.com/downloads/archive/mupdf-1.28.2-source.tar.gz",
-      "bytes": 68898646,
-      "sha256": "44075a84e329db55b9bef5f342a70fd26d69e48ad1d33cb89d9664581c641156"
-    },
-    {
-      "id": "python",
-      "version": "3.12.14",
-      "license": "PSF-2.0 and historical Python licenses",
-      "repository": "https://www.python.org",
-      "sourceRef": "3.12.14",
-      "commit": null,
-      "provenance": "Version used by the current native backend build environment. Other Python versions require their own matching source/notices.",
-      "file": "Python-3.12.14.tar.xz",
-      "url": "https://www.python.org/ftp/python/3.12.14/Python-3.12.14.tar.xz",
-      "bytes": 20820300,
-      "sha256": "5c8462af5790baf43a321a1559dbe0db06d1be4300fb85fb53c40060668e548a"
+      "id": "office-pdf-upstream",
+      "version": "0.8.0",
+      "license": "MIT OR Apache-2.0; dependency and asset notices apply",
+      "repository": "https://github.com/storytold/pdfcraft",
+      "sourceRef": "f65f7330418e8121ebe59c01003da899340ceee9",
+      "commit": "f65f7330418e8121ebe59c01003da899340ceee9",
+      "provenance": "Official upstream archive pinned to commit. Locally modified source and excluded trademark assets are recorded separately in the application source.",
+      "file": "office-pdf-upstream-f65f7330418e8121ebe59c01003da899340ceee9.tar.gz",
+      "url": "https://codeload.github.com/storytold/pdfcraft/tar.gz/f65f7330418e8121ebe59c01003da899340ceee9",
+      "bytes": 15246547,
+      "sha256": "39499f593d404eaa5b51e39508de656d816d92f36867a721579050e827522e2a"
     }
   ],
   "scopeNotes": [
-    "Pinned source archives for the active PDF runtime; document, spreadsheet and presentation Rust editor source is vendored with this application.",
-    "A complete distribution must also include this application source, its build scripts/lockfiles, all local editor integrations, applicable notices, and source/object material required by the selected licenses.",
-    "Python runtime versions are platform-specific build facts; 3.12.14 must not be relabeled as corresponding source for another installed Python version."
+    "Four editor source trees and local patches are included with the exact application release source.",
+    "External dependency source URLs and required notices are recorded in each dependency inventory.",
+    "This archive is original upstream provenance; it does not replace the modified application source or imply unmodified trademark assets may be shipped in this fork."
   ]
 }

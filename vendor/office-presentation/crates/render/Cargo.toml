@@ -1,0 +1,27 @@
+[package]
+name = "office-presentation-render"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OfficePresentation renderer: slides, layouts and masters to pixels (vello_cpu): fills, outlines, effects, pictures, text, tables, charts"
+
+[lints]
+workspace = true
+
+[dependencies]
+office-presentation-geom = { workspace = true }
+office-presentation-color = { workspace = true }
+office-presentation-metafile = { workspace = true }
+office-presentation-model = { workspace = true }
+office-presentation-anim = { workspace = true }
+office-presentation-fonts = { workspace = true }
+office-presentation-text = { workspace = true }
+vello_cpu = { workspace = true }
+vello_common = { workspace = true }
+image = { workspace = true }
+log = { workspace = true }
+kurbo = { workspace = true }
+skrifa = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+vello_cpu = { workspace = true, features = ["multithreading"] }
