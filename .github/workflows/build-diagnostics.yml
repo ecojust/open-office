@@ -1,6 +1,9 @@
 name: Read failed build diagnostics
 
 on:
+  push:
+    branches: ['work/release-*']
+    paths: ['.github/workflows/build-diagnostics.yml']
   workflow_dispatch:
     inputs:
       source_run_id:
@@ -25,9 +28,19 @@ jobs:
           python3 - <<'PY'
           import json, os, re, subprocess
 
-          run_id = os.environ['SOURCE_RUN_ID']
-          assert re.fullmatch(r'[0-9]+', run_id), 'Run ID must contain digits only'
           repo = os.environ['GITHUB_REPOSITORY']
+          run_id = os.environ['SOURCE_RUN_ID']
+          if not run_id:
+              # Bootstrap on a release branch before this workflow is available
+              # in the default branch's manual-dispatch menu.
+              runs = json.loads(subprocess.check_output([
+                  'gh', 'api', '--method', 'GET',
+                  f'repos/{repo}/actions/workflows/desktop-release.yml/runs',
+                  '-f', f"branch={os.environ['GITHUB_REF_NAME']}", '-f', 'per_page=1',
+              ]))['workflow_runs']
+              assert runs, 'No desktop build found on this release branch'
+              run_id = str(runs[0]['id'])
+          assert re.fullmatch(r'[0-9]+', run_id), 'Run ID must contain digits only'
           pages = json.loads(subprocess.check_output([
               'gh', 'api', '--paginate', '--slurp',
               f'repos/{repo}/actions/runs/{run_id}/jobs?per_page=100',
