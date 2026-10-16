@@ -31,7 +31,7 @@ function compile(source, require, extra = {}) {
 }
 
 
-function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], deckPrepareError, deckPrepare, deckWarnings = [], presentationSmokeError, presentationSmokeReport, presentationSmokeRun, sheetSmokeError, sheetSmokeReport, sheetSmokeRun, pdfPrepareError, pdfPrepare, pdfWarnings = [], pdfSmokeError, pdfSmokeReport, workspaceSmokeError, workspaceSmokeReport, storedAppearance, storedAutosave, systemDark = false, storageUnavailable = false, browserUrl = 'http://127.0.0.1/', browserFetch, notebookDecodeError} = {}) {
+function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], deckPrepareError, deckPrepare, deckWarnings = [], presentationSmokeError, presentationSmokeReport, presentationSmokeRun, sheetSmokeError, sheetSmokeReport, sheetSmokeRun, pdfPrepareError, pdfPrepare, pdfWarnings = [], pdfSmokeError, pdfSmokeReport, notebookSmokeError, notebookSmokeReport, notebookSmokeRun, workspaceSmokeError, workspaceSmokeReport, storedAppearance, storedAutosave, systemDark = false, storageUnavailable = false, browserUrl = 'http://127.0.0.1/', browserFetch, notebookDecodeError} = {}) {
   const rustPreparations = [], sheetPreparations = [], deckPreparations = [], pdfPreparations = []
   const calls = [], mounted = [], beforeUnmount = [], observers = [], native = {
     isTauri: () => nativeEnabled,
@@ -179,6 +179,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     if (name === './pdf/rust/native-smoke') return {async runOfficePdfNativeSmoke(){calls.push(['pdf-native-smoke']);if(pdfSmokeError)throw Error(pdfSmokeError);return pdfSmokeReport??{schemaVersion:1,ok:true,engine:'office-pdf-wasm',reopened:true,removedOldText:true,newTextPresent:true,reopenedPdfBase64:'native-pdf-reopened'}}}
     if (name === './word/rust/office-word-native-smoke') return {async runOfficeWordNativeSmoke(adapter){calls.push(['office-word-native-smoke']);if(wordSmokeError)throw Error(wordSmokeError);if(wordSmokeRun)return wordSmokeRun(adapter);return wordSmokeReport??{schemaVersion:1,ok:true,engine:'office-word-wasm'}}}
     if (name === './sheet/rust/office-sheet-native-smoke') return {async runOfficeSheetNativeSmoke(adapter){calls.push(['office-sheet-native-smoke']);if(sheetSmokeError)throw Error(sheetSmokeError);if(sheetSmokeRun)return sheetSmokeRun(adapter);return sheetSmokeReport??{schemaVersion:1,ok:true,engine:'office-sheet-wasm',reopenedXlsxBase64:'native-sheet-reopened'}}}
+    if (name === './notes/native-smoke') return {async runNotebookNativeSmoke(...args){assert.equal(args.length,1);const [adapter]=args;calls.push(['notebook-native-smoke']);for(const method of ['open','bindTemporaryFile','state','autosaveEnabled','setAutosave','observeNativeSaves','close'])assert.equal(typeof adapter[method],'function');if(notebookSmokeError)throw Error(notebookSmokeError);if(notebookSmokeRun)return notebookSmokeRun(adapter);return notebookSmokeReport??{schemaVersion:1,kind:'notebook-native',ok:true}}}
     if (name === './shared/workspace-native-smoke') return {async runWorkspaceNativeSmoke(...args){assert.equal(args.length,1);const [adapter]=args;calls.push(['workspace-native-smoke']);assert.equal(typeof adapter.observeNativeSaves,'function');if(workspaceSmokeError)throw Error(workspaceSmokeError);return workspaceSmokeReport??{schemaVersion:1,kind:'workspace-native',ok:true}}}
     if (name === '@tauri-apps/api/core') return { invoke: async (command,args) => { calls.push(['invoke',command,args]) } }
     if (name.endsWith('.vue')) return {}
@@ -1497,16 +1498,46 @@ test('F5 starts the active presentation once and native close stops it before th
   assert.ok(!h.calls.some(call=>call[0]==='close'));h.unmount()
 })
 
-test('full native smoke requires all four mounted Rust editors and actual workspace persistence gates',async()=>{
+test('full native smoke requires four Rust editors, notebook and actual workspace persistence gates',async()=>{
   const h=shell({smoke:true});h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'})
   await h.mount()
   const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
   assert.equal(report.ok,true);assert.equal(report.word.ok,true);assert.equal(report.sheet.ok,true);assert.equal(report.presentation.ok,true)
-  assert.equal(report.pdf.reopened,true);assert.equal(report.pdf.removedOldText,true);assert.equal(report.pdf.newTextPresent,true);assert.equal(report.workspace.ok,true)
-  assert.deepEqual(h.calls.filter(call=>call[0].endsWith('-native-smoke')).map(call=>call[0]),['office-word-native-smoke','office-sheet-native-smoke','office-presentation-native-smoke','pdf-native-smoke','workspace-native-smoke'])
+  assert.equal(report.pdf.reopened,true);assert.equal(report.pdf.removedOldText,true);assert.equal(report.pdf.newTextPresent,true);assert.equal(report.notebook.ok,true);assert.equal(report.workspace.ok,true)
+  assert.deepEqual(h.calls.filter(call=>call[0].endsWith('-native-smoke')).map(call=>call[0]),['office-word-native-smoke','office-sheet-native-smoke','office-presentation-native-smoke','pdf-native-smoke','notebook-native-smoke','workspace-native-smoke'])
+  assert.equal(h.calls.filter(call=>call[0]==='notebook-native-smoke').length,1)
   assert.equal(h.calls.filter(call=>call[0]==='workspace-native-smoke').length,1)
   assert.equal(report.pdf.engine,'office-pdf-wasm')
   for(const old of ['office','independentWordPackage','rustWordEngine','wordWorkbench','sheetWorkbench','presentationWorkbench'])assert.equal(Object.hasOwn(report,old),false)
+  h.unmount()
+})
+
+test('full native smoke waits for notebook verification before shared workspace cleanup',async()=>{
+  let finishNotebook,started
+  const waiting=new Promise(resolve=>{finishNotebook=resolve}),entered=new Promise(resolve=>{started=resolve})
+  const h=shell({smoke:true,notebookSmokeRun:()=>{started();return waiting}});h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'})
+  const mounted=h.mount()
+  await entered
+  assert.equal(h.calls.some(call=>call[0]==='notebook-native-smoke'),true)
+  assert.equal(h.calls.some(call=>call[0]==='workspace-native-smoke'),false)
+  assert.equal(h.calls.some(call=>call[0]==='invoke'&&call[1]==='smoke_report'),false)
+  finishNotebook({ok:true,kind:'notebook-native'});await mounted
+  assert.equal(h.calls.filter(call=>call[0]==='workspace-native-smoke').length,1)
+  assert.equal(h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report.ok,true)
+  h.unmount()
+})
+
+for(const mode of ['report','throw','cleanup','missing'])test(`failed notebook ${mode} prevents native success and subsequent workspace verification`,async()=>{
+  const failure='Controlled notebook failure'
+  const options=mode==='throw'?{notebookSmokeError:failure}:mode==='cleanup'?{notebookSmokeReport:{ok:false,cleanupError:failure}}:
+    mode==='missing'?{notebookSmokeReport:{}}:{notebookSmokeReport:{ok:false,error:failure}}
+  const h=shell({smoke:true,...options});h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'});await h.mount()
+  const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
+  assert.equal(report.ok,false);assert.match(report.error,mode==='missing'?/Native notebook verification failed/:/Controlled notebook failure/)
+  for(const engine of ['word','sheet','presentation','pdf'])assert.equal(report[engine].ok,true)
+  assert.equal(h.calls.filter(call=>call[0]==='notebook-native-smoke').length,1)
+  assert.equal(h.calls.some(call=>call[0]==='workspace-native-smoke'),false)
+  assert.equal(Object.hasOwn(report,'workspace'),false)
   h.unmount()
 })
 
@@ -1515,7 +1546,7 @@ for(const mode of ['report','throw'])test(`failed workspace ${mode} prevents a f
   h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'});await h.mount()
   const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
   assert.equal(report.ok,false);assert.match(report.error,/Controlled workspace failure/)
-  assert.equal(report.word.ok,true);assert.equal(report.sheet.ok,true);assert.equal(report.presentation.ok,true);assert.equal(report.pdf.ok,true)
+  assert.equal(report.word.ok,true);assert.equal(report.sheet.ok,true);assert.equal(report.presentation.ok,true);assert.equal(report.pdf.ok,true);assert.equal(report.notebook.ok,true)
   assert.equal(h.calls.filter(call=>call[0]==='workspace-native-smoke').length,1)
   if(mode==='report')assert.equal(report.workspace.ok,false)
   h.unmount()
@@ -1525,7 +1556,7 @@ test('native file persistence verification does not depend on removed browser wo
   const h=shell({smoke:true,sheetSmokeReport:{ok:true,engine:'office-sheet-wasm'}})
   h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'});await h.mount()
   const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
-  assert.equal(report.ok,true);assert.equal(report.workspace.ok,true)
+  assert.equal(report.ok,true);assert.equal(report.notebook.ok,true);assert.equal(report.workspace.ok,true)
   assert.equal(h.calls.filter(call=>call[0]==='workspace-native-smoke').length,1)
   h.unmount()
 })

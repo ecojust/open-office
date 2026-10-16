@@ -96,7 +96,7 @@ test('frontend and publication agree on ordered checks and honest native smoke l
 test('publish verified artifacts applies current workspace policy in addition to source-bound editor validation', () => {
   const workflow = readFileSync(new URL('../.github/workflows/desktop-publish-verified.yml', import.meta.url), 'utf8');
   assert.match(workflow, /import \{ validateFrontendReport \} from '\.\/verified-source\/scripts\/native-smoke\.mjs'/);
-  assert.match(workflow, /import \{ validateNativeWorkspaceReport \} from '\.\/scripts\/native-smoke\.mjs'/);
+  assert.match(workflow, /import \{ validateNativeWorkspaceReport, validateNativeNotebookReport \} from '\.\/scripts\/native-smoke\.mjs'/);
   assert.match(workflow, /validateFrontendReport\(report\.frontend\);\s+validateNativeWorkspaceReport\(report\.frontend\.workspace\);/);
   assert.match(workflow, /verifyMacosArmEditingProof\(editingProof,/);
 });

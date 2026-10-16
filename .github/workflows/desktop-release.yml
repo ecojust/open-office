@@ -202,7 +202,7 @@ jobs:
           if ($process.ExitCode -notin @(0, 3010)) { throw "NSIS installation failed: $($process.ExitCode)" }
           if (-not (Test-Path (Join-Path $installDirectory 'open-office.exe'))) { throw 'Installed desktop executable is missing' }
           "OPEN_OFFICE_INSTALLED_APP=$installDirectory" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Verify final desktop GUI, four editors, and local autosave
+      - name: Verify final desktop GUI, editors, notebook, and local autosave
         if: matrix.id != 'macos-x64'
         timeout-minutes: 8
         run: node scripts/native-smoke.mjs
@@ -408,7 +408,7 @@ jobs:
         with:
           name: open-office-native-macos-arm64
           path: native-package
-      - name: Verify real OS input, four editors, and autosave against the installed ARM DMG
+      - name: Verify OS input, editors, notebook, and autosave against the installed ARM DMG
         timeout-minutes: 10
         run: |
           node --input-type=module <<'NODE'

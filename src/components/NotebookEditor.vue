@@ -277,7 +277,7 @@ defineExpose({ exportFile, markSaved, discardChanges, inspect, syncRevision: ins
 </script>
 
 <template>
- <section class="notebook-editor" :data-theme="theme" data-testid="notebook-editor" @keydown="keydown">
+ <section class="notebook-editor" :data-theme="theme" :data-document-id="document.id" data-testid="notebook-editor" @keydown="keydown">
   <header class="note-toolbar" aria-label="笔记格式工具栏">
    <button class="note-navigation-toggle" title="分区与页面" aria-label="分区与页面" @click="navigation = !navigation"><Icon name="menu" :size="18" /></button>
    <button title="撤销 (Ctrl/⌘ Z)" aria-label="撤销" :disabled="!editable || !undoAvailable || composing" @mousedown.prevent @click="undo().catch(report)"><Icon name="undo" :size="18" /></button>

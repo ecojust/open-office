@@ -178,9 +178,9 @@ jobs:
           import { readFileSync, statSync, writeFileSync } from 'node:fs';
           import { resolve } from 'node:path';
           import { validateFrontendReport } from './verified-source/scripts/native-smoke.mjs';
-          // Apply current workspace requirements even to artifacts whose source
-          // predates the current native autosave acceptance contract.
-          import { validateNativeWorkspaceReport } from './scripts/native-smoke.mjs';
+          // Apply current notebook and workspace requirements even to artifacts
+          // whose source predates these native acceptance contracts.
+          import { validateNativeWorkspaceReport, validateNativeNotebookReport } from './scripts/native-smoke.mjs';
           import { validateNativeOfficeWordEvidence } from './verified-source/scripts/office-word-native-smoke.mjs';
           import { validateNativeOfficeSheetEvidence } from './verified-source/scripts/office-sheet-native-smoke.mjs';
           import { validateNativeOfficePresentationEvidence } from './verified-source/scripts/office-presentation-native-smoke.mjs';
@@ -205,6 +205,7 @@ jobs:
             assert.equal(report.frontend.ok, true);
             validateFrontendReport(report.frontend);
             validateNativeWorkspaceReport(report.frontend.workspace);
+            validateNativeNotebookReport(report.frontend.notebook, report.frontend.workspace);
             validateNativeOfficeWordEvidence(report);
             validateNativeOfficeSheetEvidence(report);
             validateNativeOfficePresentationEvidence(report);

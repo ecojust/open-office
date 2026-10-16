@@ -24,6 +24,7 @@ import type { OfficeWordSmokeEditor } from './word/rust/office-word-native-smoke
 import { inspectOfficePdfSession, prepareRustPdfDocument, type PreparedRustPdfDocument } from './pdf/rust/client'
 import type { OfficePdfSmokeEditor } from './pdf/rust/native-smoke'
 import type { EditingSmokeAdapter } from './sheet/rust/macos-editing-smoke'
+import type { NotebookNativeSmokeAdapter } from './notes/native-smoke'
 import { bytesToBase64, base64ToBytes, extensionOf, kindOf, withExtension, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFormats, saveFileName, type SaveExtension, type Kind, type Extension, type EditorHandle } from './shared/document'
 
 interface Tab { key: string; document: NativeDocument; fileId?: string; requiresSaveAs?: boolean; importWarnings?:string[]; dirty: boolean; ready: boolean; loadError?: string }
@@ -811,6 +812,48 @@ onMounted(async()=>{
           report.pdf=pdf
           if(!pdf.ok)throw Error(pdf.error||pdf.closeError||'Default PDF native verification failed')
           smokeStage('pdf-native','complete')
+          smokeStage('notebook-native','starting mounted notebook input and native original-file save verification')
+          const {runNotebookNativeSmoke}=await import('./notes/native-smoke')
+          const notebook=await runNotebookNativeSmoke({
+            open:async source=>{
+              const tab=await editorTransaction('正在验证本机笔记本',()=>addDocument(source,source.id||undefined))
+              if(!tab||tab.document.kind!=='note')throw Error('Native notebook smoke tab missing')
+              await nextTick();await awaitReady(tab);await nextTick()
+              const editor=noteHandles.get(tab.key) as Awaited<ReturnType<NotebookNativeSmokeAdapter['open']>>['editor']|undefined
+              const element=[...document.querySelectorAll<HTMLElement>('[data-testid="notebook-editor"]')].find(node=>node.dataset.documentId===tab.key)
+              if(!editor?.inspect||!editor.markSaved||!element)throw Error('Native notebook editor unavailable')
+              return {key:tab.key,element,editor}
+            },
+            bindTemporaryFile:async(key,file)=>{
+              const tab=tabs.value.find(item=>item.key===key)
+              if(!tab||tab.fileId||tab.document.kind!=='note'||file.kind!=='note'||file.extension!=='oonote')throw Error('Invalid temporary notebook capability')
+              tab.fileId=file.id;tab.document={...file,id:key};tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false
+              await nextTick()
+            },
+            state:key=>{
+              const tab=tabs.value.find(item=>item.key===key)
+              if(!tab)throw Error('Native notebook tab closed unexpectedly')
+              return {active:activeKey.value===key&&!home.value,ready:tab.ready,dirty:tab.dirty,busy:!!busy.value||autosave.running,fileId:tab.fileId,sha256:tab.document.sha256,
+                modal:!!saveAsDraft.value||!!closeTarget.value||help.value}
+            },
+            autosaveEnabled:()=>autosaveEnabled.value,
+            setAutosave:async enabled=>{autosaveEnabled.value=enabled;await nextTick();autosave.notify()},
+            observeNativeSaves:observer=>{
+              if(nativeSmokeSaveObserver)throw Error('Native save observer already installed')
+              nativeSmokeSaveObserver=observer
+              return ()=>{if(nativeSmokeSaveObserver===observer)nativeSmokeSaveObserver=undefined}
+            },
+            close:async key=>{
+              const tab=tabs.value.find(item=>item.key===key)
+              if(!tab)throw Error('Native notebook cleanup tab missing')
+              const element=[...document.querySelectorAll<HTMLElement>('[data-testid="notebook-editor"]')].find(node=>node.dataset.documentId===key)
+              await removeTab(tab,true);await nextTick()
+              if(tabs.value.some(item=>item.key===key)||noteEntries.value.some(item=>item.document.id===key)||noteHandles.has(key)||element?.isConnected)throw Error('Native notebook editor survived cleanup')
+            },
+          })
+          report.notebook=notebook
+          if(!notebook.ok)throw Error(notebook.error||notebook.cleanupError||'Native notebook verification failed')
+          smokeStage('notebook-native','complete')
           smokeStage('workspace-native','starting scheduled native file persistence verification')
           const {runWorkspaceNativeSmoke}=await import('./shared/workspace-native-smoke')
           const workspace=await runWorkspaceNativeSmoke({

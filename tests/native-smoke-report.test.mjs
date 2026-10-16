@@ -9,13 +9,14 @@ import { sheetReport } from './helpers/office-sheet-smoke-report.mjs';
 import { pdfReport } from './helpers/pdf-smoke-report.mjs';
 import { presentationReport } from './helpers/office-presentation-smoke-report.mjs';
 import { workspaceReport } from './helpers/workspace-smoke-report.mjs';
+import { notebookReport } from './helpers/notebook-smoke-report.mjs';
 
 function completeReport() {
   return {
     ok: true, crossOriginIsolated: true, sharedArrayBuffer: true,
     userAgent: 'Native WebView contract test',
     word: wordReport(), sheet: sheetReport(), presentation: presentationReport(),
-    pdf: pdfReport(), workspace: workspaceReport(),
+    pdf: pdfReport(), workspace: workspaceReport(), notebook: notebookReport(),
   };
 }
 
@@ -65,8 +66,16 @@ test('release evidence requires four Rust canvases, PDF text replacement, and na
     'presentationDefaultCanvas', 'presentationDomInput', 'presentationPptxReadback', 'presentationPdfReadback', 'presentationFailureAtomicity', 'presentationSessionCleanup',
     'pdfOriginalTextReplacementRoundTrip', 'pdfDefaultCanvas', 'pdfUndoRedo', 'pdfFailureAtomicity', 'pdfSessionCleanup', 'crossOriginIsolated',
     'workspaceLocalAutosave', 'workspaceSavedFileReadback', 'workspaceSessionCleanup',
+    'notebookDomInput', 'notebookSavedFileReadback', 'notebookSessionCleanup',
   ]) assert.equal(checks[required], true);
   assert.equal(Object.hasOwn(checks, 'sharedArrayBuffer'), false);
+});
+
+test('successful four-engine and autosave evidence cannot substitute for native notebook acceptance', () => {
+  for (const notebook of [undefined, null, {}, { ok: true, transport: 'browser' }]) {
+    const report = completeReport(); report.notebook = notebook;
+    assert.throws(() => validateFrontendReport(report), /Native notebook/);
+  }
 });
 
 test('editor evidence cannot substitute for missing native autosave or different saved-file bytes', () => {
