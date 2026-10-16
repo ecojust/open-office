@@ -10,6 +10,7 @@ interface OfficeSheetHost {
   activate(id: string): string
   inspect(id: string): string
   command(id: string, commandId: string, params: string): string
+  trustedDoubleClick(id: string, documentId: number, localCssX: number, localCssY: number, modifiers: boolean): string
   exportFile(id: string, format: 'xlsx' | 'csv' | 'tsv' | 'pdf'): Uint8Array
   flush(id: string): Promise<void>
   markSaved(id: string, documentId: number, revision: number): boolean
@@ -94,6 +95,25 @@ function endComposition(event: Event) {
   // Let that event enter the queue before disabling further input.
   if (!interactive) disableTimer = setTimeout(() => { if (!interactive) host?.setActive(false) }, 0)
 }
+function trustedDoubleClick(event: MouseEvent) {
+  const modifiers = event.shiftKey || event.ctrlKey || event.metaKey || event.altKey
+  if (!event.isTrusted || event.button !== 0 || event.detail !== 2 || modifiers || event.target !== canvas
+    || !canvas?.isConnected || !interactive || !activeId || activationSessionId !== activeId
+    || compositionId === activeId || !host) return
+  const session = sessions.get(activeId)
+  if (!session) return
+  const rect = canvas.getBoundingClientRect(), x = event.clientX - rect.left, y = event.clientY - rect.top
+  if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= rect.width || y >= rect.height) return
+  try {
+    // Preserve the browser's completed gesture when slow rendering made egui's
+    // processing-time click interval expire. Rust validates the actual grid hit
+    // and ignores an editor it already opened. This never flushes or moves focus.
+    const result = JSON.parse(host.trustedDoubleClick(session.id, session.snapshot.documentId, x, y, modifiers)) as { handled: boolean; snapshot: OfficeSheetSnapshot }
+    session.accept(snapshotOf(JSON.stringify(result.snapshot), session.id))
+  } catch (cause) {
+    session.event({ type: 'error', sessionId: session.id, message: cause instanceof Error ? cause.message : String(cause) })
+  }
+}
 function newCanvas() {
   const element = document.createElement('canvas')
   element.id = 'open-office-office-sheet-canvas'
@@ -101,6 +121,7 @@ function newCanvas() {
   element.setAttribute('aria-label', '工作簿与功能区')
   element.tabIndex = 0
   Object.assign(element.style, { display: 'block', width: '100%', height: '100%', outline: 'none' })
+  element.addEventListener('dblclick', trustedDoubleClick)
   return element
 }
 

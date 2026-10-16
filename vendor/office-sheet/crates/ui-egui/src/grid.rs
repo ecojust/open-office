@@ -145,6 +145,8 @@ pub struct GridState {
     pub hf_start: bool,
     /// The grid geometry of the last frame (hit-testing for agents and tests).
     pub geo: Option<Geo>,
+    /// The painted grid's layer and document/sheet, used by browser gesture hit-testing.
+    pub(crate) interaction_surface: Option<(egui::LayerId, u64, usize)>,
     /// The horizontal scrollbar's track in the sheet tab bar (hit-testing for tests).
     pub hscroll: Option<Rect>,
     /// Ctrl+wheel zoom in progress (see [`WheelZoom`]).
@@ -716,6 +718,7 @@ pub fn show(app: &mut SheetApp, ui: &mut egui::Ui) {
         ui.ctx().request_repaint();
     }
     app.grid.geo = Some(geo.clone());
+    app.grid.interaction_surface = Some((ui.layer_id(), place.0, place.1));
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 0.0, t.grid_bg);
     // Everything up to the headers is painted in logical (left-to-right) coordinates.
@@ -1773,6 +1776,75 @@ pub(crate) fn paint_headers(
 
 /// How close (in points) a press must be to an object's bottom-right corner to resize it instead of moving it.
 const OBJECT_RESIZE_RADIUS: f32 = 10.0;
+
+/// Accept a double-click already recognized by the browser, without re-timing its
+/// pointer releases after expensive frames. This is only a fallback for an idle
+/// selected cell: existing editors and every other grid interaction keep ownership.
+pub fn browser_double_click(app: &mut SheetApp, ctx: &egui::Context, screen_pos: Pos2, modifiers: bool) -> bool {
+    if modifiers
+        || !screen_pos.is_finite()
+        || app.session.mode != office_sheet_engine::Mode::Ready
+        || app.editor.is_some()
+        || app.text_box_editor.is_some()
+        || app.has_pending_input()
+        || app.dialog.is_some()
+        || app.message.is_some()
+        || app.backstage.is_some()
+        || app.name_box.is_some()
+        || app.keytips.prefix().is_some()
+        || !app.session.draw_tool.is_empty()
+        || app.grid.hf_edit.is_some()
+        || app.grid.ruler_drag.is_some()
+        || app.grid.drag != Drag::None
+        || app.grid.drag_select
+        || app.grid.context_menu.is_some()
+        || app.grid.header_menu.is_some()
+        || app.grid.filter_menu.is_some()
+        || app.grid.list_picker.is_some()
+        || app.grid.renaming_tab.is_some()
+        || egui::Popup::is_any_open(ctx)
+        || ctx.input(|input| input.pointer.any_down())
+    {
+        return false;
+    }
+    let Some(doc) = app.session.active() else { return false };
+    let Some(sh) = doc.wb.active() else { return false };
+    let Some((layer, uid, sheet)) = app.grid.interaction_surface else { return false };
+    if (uid, sheet) != (doc.uid, doc.wb.active_sheet) || ctx.layer_id_at(screen_pos) != Some(layer) {
+        return false;
+    }
+    let Some(geo) = app.grid.geo.as_ref() else { return false };
+    let pos = geo.mirror_pos(screen_pos);
+    if !geo.in_cells(pos) || crate::chartview::hit(app, geo, sh, pos).is_some() {
+        return false;
+    }
+    let cell = geo.cell_at(sh, pos);
+    let sel = &doc.selection;
+    if sel.active != cell
+        || app.grid.last_click != Some(cell)
+        || validation_arrow(sh, geo, sel.active).is_some_and(|rect| rect.contains(pos))
+        || is_filter_button(sh, geo, pos)
+    {
+        return false;
+    }
+    let range = sel.current();
+    let rect = geo.range_rect(sh, range);
+    let handle = Rect::from_center_size(rect.right_bottom(), vec2(9.0, 9.0));
+    if (handle.contains(pos) && geo.range_panes(RangeRef::cell(range.end)).iter().any(|pane| pane.contains(pos)))
+        || (on_border(rect, pos) && geo.range_panes(range).iter().any(|pane| pane.contains(pos)))
+    {
+        return false;
+    }
+    // The pointer path has already selected this cell. Do not replay selection,
+    // commit a draft, or synthesize another input event into the next document.
+    app.begin_edit(None, false);
+    if app.editor.is_none() {
+        return false;
+    }
+    app.grid.last_click = None;
+    ctx.request_repaint();
+    true
+}
 
 fn interact(app: &mut SheetApp, ui: &mut egui::Ui, resp: &egui::Response, geo: &Geo, sh: &Sheet, wb: &Workbook) {
     // Text selection and editing must not also move the object or edit worksheet cells.

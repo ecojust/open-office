@@ -110,6 +110,145 @@ mod tests {
     }
 
     #[test]
+    fn browser_double_click_recovers_slow_pointer_processing_without_committing_or_restarting_edits() {
+        let ctx = Context::default();
+        let mut app = app(Services { embedded_editor: true, ..Default::default() });
+        app.run("cell.set", json!({"cell":"D6", "input":"Original"})).unwrap();
+        settle(&ctx, &mut app);
+        let doc = app.session.active().unwrap();
+        let pos = app.grid.geo.as_ref().unwrap().screen_cell_rect(doc.wb.active().unwrap(), office_sheet_engine::core::CellRef::new(5, 3)).center();
+        // These are two ordinary pointer clicks processed 500 ms apart. The browser
+        // can still recognize their OS double-click while egui's 300 ms window cannot.
+        for (time, pressed) in [(1.0, true), (1.01, false), (1.5, true), (1.51, false)] {
+            let mut input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1600.0, 900.0))),
+                time: Some(time),
+                events: vec![
+                    Event::PointerMoved(pos),
+                    Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Modifiers::NONE },
+                ],
+                ..Default::default()
+            };
+            app.raw_input_hook(&mut input);
+            let mut output = ctx.run_ui(input, |ui| {
+                app.logic(ui.ctx());
+                app.ui(ui);
+            });
+            output.textures_delta.clear();
+        }
+        assert_eq!(app.session.mode, office_sheet_engine::Mode::Ready);
+        assert_eq!(app.session.active().unwrap().selection.active.a1(), "D6");
+        assert!(app.editor.is_none());
+        let workbook = app.session.active().unwrap().wb.clone();
+        let revision = app.session.active().unwrap().revision;
+        assert!(crate::grid::browser_double_click(&mut app, &ctx, pos, false));
+        assert_eq!(app.editor.as_ref().unwrap().text, "Original");
+        assert_eq!(app.session.mode, office_sheet_engine::Mode::Edit);
+        assert!(std::sync::Arc::ptr_eq(&workbook, &app.session.active().unwrap().wb));
+        assert_eq!(app.session.active().unwrap().revision, revision);
+        frame(&ctx, &mut app, vec![]);
+        assert_eq!(app.editor.as_ref().unwrap().text, "Original", "the consumed pointer release must not close the new editor on repaint");
+        assert_eq!(app.session.mode, office_sheet_engine::Mode::Edit);
+
+        let editor = app.editor.as_mut().unwrap();
+        editor.text = "=1+".into();
+        editor.caret = 2;
+        editor.request_focus = false;
+        assert!(!crate::grid::browser_double_click(&mut app, &ctx, pos, false));
+        let editor = app.editor.as_ref().unwrap();
+        assert_eq!((editor.text.as_str(), editor.caret, editor.request_focus), ("=1+", 2, false));
+        assert!(app.message.is_none(), "the invalid draft must never be committed");
+        assert!(std::sync::Arc::ptr_eq(&workbook, &app.session.active().unwrap().wb));
+    }
+
+    #[test]
+    fn browser_double_click_rejects_controls_menus_objects_and_stale_grid_surfaces() {
+        use office_sheet_engine::{
+            core::{CellRef, RangeRef},
+            model::{Anchor, AutoFilter, Color, Shape, ShapeKind},
+        };
+        let ctx = Context::default();
+        let mut app = app(Services { embedded_editor: true, ..Default::default() });
+        let cell = CellRef::new(5, 3);
+        app.run("selection.set", json!({"cell":"D6"})).unwrap();
+        settle(&ctx, &mut app);
+        app.grid.last_click = Some(cell);
+        let geo = app.grid.geo.clone().unwrap();
+        let sheet = app.session.active().unwrap().wb.active().unwrap();
+        let rect = geo.screen_cell_rect(sheet, cell);
+        let pos = rect.center();
+        for rejected in [
+            egui::pos2(f32::NAN, 0.0),
+            egui::pos2(5.0, 5.0),                                     // ribbon, outside the cell surface
+            egui::pos2(pos.x, geo.cells.top() - 4.0),                 // column header
+            egui::pos2(geo.cells.left() - 4.0, pos.y),                // row header
+            egui::pos2(geo.cells.right() + 3.0, pos.y),               // vertical scrollbar
+            rect.right_bottom(),                                      // fill handle
+            egui::pos2(rect.left(), pos.y),                           // move border
+            geo.screen_cell_rect(sheet, CellRef::new(5, 4)).center(), // another cell
+        ] {
+            assert!(!crate::grid::browser_double_click(&mut app, &ctx, rejected, false), "{rejected:?}");
+        }
+        assert!(!crate::grid::browser_double_click(&mut app, &ctx, pos, true));
+        app.grid.context_menu = Some(pos);
+        assert!(!crate::grid::browser_double_click(&mut app, &ctx, pos, false));
+        app.grid.context_menu = None;
+        app.grid.filter_menu = Some((3, 5, pos));
+        assert!(!crate::grid::browser_double_click(&mut app, &ctx, pos, false));
+        app.grid.filter_menu = None;
+        app.grid.list_picker = Some(cell);
+        assert!(!crate::grid::browser_double_click(&mut app, &ctx, pos, false));
+        app.grid.list_picker = None;
+        app.open_dialog("formatCells", json!({}));
+        assert!(!crate::grid::browser_double_click(&mut app, &ctx, pos, false));
+        app.dialog = None;
+        egui::Popup::open_id(&ctx, egui::Id::new("blocked-cell-menu"));
+        assert!(!crate::grid::browser_double_click(&mut app, &ctx, pos, false));
+        egui::Popup::close_all(&ctx);
+        app.grid.last_click = None;
+        assert!(!crate::grid::browser_double_click(&mut app, &ctx, pos, false));
+        app.grid.last_click = Some(cell);
+        app.grid.interaction_surface = app.grid.interaction_surface.map(|(layer, uid, sheet)| (layer, uid, sheet + 1));
+        assert!(!crate::grid::browser_double_click(&mut app, &ctx, pos, false));
+        settle(&ctx, &mut app);
+        app.grid.last_click = Some(cell);
+        let wb = std::sync::Arc::make_mut(&mut app.session.active_mut().unwrap().wb);
+        std::sync::Arc::make_mut(&mut wb.sheets[0]).shapes.push(Shape {
+            id: 1,
+            kind: ShapeKind::Rectangle,
+            anchor: Anchor { cell, width: 80.0, height: 30.0, ..Default::default() },
+            fill: Color::rgb(0, 0, 0),
+            line: Color::rgb(0, 0, 0),
+            text: String::new(),
+            format: Default::default(),
+        });
+        assert!(!crate::grid::browser_double_click(&mut app, &ctx, pos, false));
+        assert!(app.editor.is_none());
+        let wb = std::sync::Arc::make_mut(&mut app.session.active_mut().unwrap().wb);
+        let sheet = std::sync::Arc::make_mut(&mut wb.sheets[0]);
+        sheet.shapes.clear();
+        sheet.autofilter = Some(AutoFilter { range: RangeRef::new(cell, CellRef::new(9, 3)), criteria: vec![] });
+        let filter = crate::grid::filter_button_rect(&geo, sheet, cell).center();
+        assert!(!crate::grid::browser_double_click(&mut app, &ctx, filter, false));
+
+        for _ in 0..2 {
+            let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+                app.logic(ui.ctx());
+                app.ui(ui);
+                egui::Area::new(egui::Id::new("foreground-cell-cover")).order(egui::Order::Foreground).fixed_pos(pos - egui::vec2(12.0, 12.0)).show(
+                    ui.ctx(),
+                    |ui| {
+                        ui.allocate_exact_size(egui::vec2(30.0, 30.0), egui::Sense::click());
+                    },
+                );
+            });
+            output.textures_delta.clear();
+        }
+        assert_ne!(ctx.layer_id_at(pos), app.grid.interaction_surface.map(|surface| surface.0));
+        assert!(!crate::grid::browser_double_click(&mut app, &ctx, pos, false));
+    }
+
+    #[test]
     fn embedded_editor_draws_editing_controls_without_file_chrome() {
         assert!(!Services::default().embedded_editor);
         for embedded in [false, true] {

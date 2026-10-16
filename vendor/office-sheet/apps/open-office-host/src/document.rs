@@ -156,6 +156,16 @@ impl Entry {
         f64::from(self.document_id) == document_id && f64::from(self.revision) == revision
     }
 
+    pub fn trusted_double_click(&mut self, document_id: f64, ctx: &egui::Context, css_pos: egui::Pos2, modifiers: bool) -> bool {
+        let zoom = ctx.zoom_factor();
+        if f64::from(self.document_id) != document_id || !css_pos.is_finite() || !zoom.is_finite() || zoom <= 0.0 {
+            return false;
+        }
+        // eframe's mouse input divides local CSS pixels by interface zoom only.
+        // Device pixel ratio is already accounted for by the canvas renderer.
+        office_sheet_ui_egui::grid::browser_double_click(&mut self.app, ctx, css_pos / zoom, modifiers)
+    }
+
     pub fn can_close(&mut self, document_id: f64, revision: f64, force: bool) -> Result<bool, String> {
         self.sync()?;
         // Explicitly confirmed discard drops the whole session, including invalid drafts and
@@ -254,6 +264,41 @@ mod tests {
 
     fn blank() -> Entry {
         Entry::new("Book.xlsx", &[], 1, Services::default()).unwrap()
+    }
+
+    #[test]
+    fn browser_double_click_checks_document_identity_and_uses_css_interface_zoom_once() {
+        let mut entry = Entry::new("Book.xlsx", &[], 17, Services { embedded_editor: true, ..Default::default() }).unwrap();
+        let ctx = egui::Context::default();
+        entry.app.ui.interface_scale = 150;
+        ctx.set_zoom_factor(1.5);
+        entry.app.run("selection.set", json!({"cell":"D6"})).unwrap();
+        for _ in 0..5 {
+            let mut output = ctx.run_ui(
+                egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1600.0, 900.0))), ..Default::default() },
+                |ui| {
+                    entry.app.logic(ui.ctx());
+                    entry.app.ui(ui);
+                },
+            );
+            output.textures_delta.clear();
+        }
+        let cell = CellRef::new(5, 3);
+        entry.app.grid.last_click = Some(cell);
+        let doc = entry.app.session.active().unwrap();
+        let pos = entry.app.grid.geo.as_ref().unwrap().screen_cell_rect(doc.wb.active().unwrap(), cell).center();
+        let css_pos = pos * ctx.zoom_factor();
+        let workbook = doc.wb.clone();
+        let before = entry.snapshot("first", Some(&ctx)).unwrap();
+        assert!(!entry.trusted_double_click(18.0, &ctx, css_pos, false));
+        assert!(!entry.trusted_double_click(f64::NAN, &ctx, css_pos, false));
+        assert!(!entry.trusted_double_click(17.0, &ctx, css_pos, true));
+        assert_eq!(entry.snapshot("first", Some(&ctx)).unwrap(), before);
+        assert!(entry.trusted_double_click(17.0, &ctx, css_pos, false));
+        assert_eq!(entry.app.editor.as_ref().unwrap().cell, cell);
+        assert_eq!(entry.app.session.mode, office_sheet_engine::Mode::Edit);
+        assert!(Arc::ptr_eq(&workbook, &entry.app.session.active().unwrap().wb));
+        assert!(!entry.dirty(), "opening the existing cell must not dirty its workbook");
     }
 
     #[test]

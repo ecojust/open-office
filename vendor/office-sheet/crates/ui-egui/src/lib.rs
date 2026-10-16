@@ -1205,6 +1205,7 @@ impl SheetApp {
 
     /// Lays out the whole window.
     pub fn ui(&mut self, ui: &mut egui::Ui) {
+        self.grid.interaction_surface = None;
         let ctx = ui.ctx().clone();
         embedding::reset_drawn(&ctx);
         if self.services.embedded_editor {

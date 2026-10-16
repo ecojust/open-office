@@ -6,8 +6,9 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
-const output = path.join(root, 'test-results/macos-editing-helper-browser');
-const report = { ok: false, runtime: 'Chromium trusted input; not native macOS acceptance', requests: [], errors: [], boots: [], limitations: ['CGEvent, macOS WebContent termination, native IME and macOS 26.5 are not covered.'] };
+const slow = process.env.OPEN_OFFICE_SLOW_EDITING === '1';
+const output = path.join(root, `test-results/macos-editing-helper-browser${slow ? '-slow' : ''}`);
+const report = { ok: false, runtime: 'Chromium trusted input; not native macOS acceptance', cpuThrottlingRate: slow ? 12 : 1, requests: [], errors: [], boots: [], limitations: ['CGEvent, macOS WebContent termination, native IME and macOS 26.5 are not covered.'] };
 fs.mkdirSync(output, { recursive: true });
 let server, browser, page;
 (async () => {
@@ -17,7 +18,7 @@ let server, browser, page;
     server = await createServer({ root, clearScreen: false, optimizeDeps: { entries: ['index.html'] }, cacheDir: path.join(output, 'vite-cache'), server: { host: '127.0.0.1', port: 5304, strictPort: true, hmr: false, watch: { ignored: ['**/vendor/**', '**/target/**', '**/test-results/**'] } } });
     await server.listen();
     browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || '/usr/bin/chromium', args: ['--no-sandbox', '--disable-dev-shm-usage', '--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-    const context = await browser.newContext({ viewport: { width: 1440, height: 1050 }, locale: 'zh-CN', deviceScaleFactor: 2 });
+    const context = await browser.newContext({ viewport: slow ? { width: 1024, height: 646 } : { width: 1440, height: 1050 }, locale: 'zh-CN', deviceScaleFactor: slow ? 1 : 2 });
     await context.exposeBinding('editingBoot', (_, boot) => report.boots.push(boot));
     await context.addInitScript(() => {
       window.__OPEN_OFFICE_DIAGNOSTIC_BOOT__ = Object.freeze({ bootId: crypto.randomUUID(), timeOrigin: performance.timeOrigin });
@@ -27,14 +28,31 @@ let server, browser, page;
       Object.defineProperty(performance, 'timeOrigin', { get: () => window.__OPEN_OFFICE_DIAGNOSTIC_BOOT__.timeOrigin + 1 });
     });
     page = await context.newPage();
+    const cdp = slow ? await context.newCDPSession(page) : null;
     page.on('pageerror', error => report.errors.push(error.message));
     await page.exposeBinding('editingInput', async (_, request) => {
       report.requests.push(request);
       if (request.kind === 'click') await page.mouse.click(request.clientX, request.clientY);
-      else if (request.kind === 'doubleClick') await page.mouse.dblclick(request.clientX, request.clientY, { delay: 80 });
+      else if (request.kind === 'doubleClick') {
+        if (slow) {
+          // Match the native injector's 25ms press and 100ms inter-click pause.
+          // Browser clickCount remains authoritative when slow Rust event handling
+          // pushes the renderer's release interval past egui's 300ms threshold.
+          await cdp.send('Emulation.setCPUThrottlingRate', { rate: 12 });
+          await page.mouse.move(request.clientX, request.clientY);
+          await page.mouse.down({ clickCount: 1 });
+          await new Promise(resolve => setTimeout(resolve, 25));
+          await page.mouse.up({ clickCount: 1 });
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await page.mouse.down({ clickCount: 2 });
+          await new Promise(resolve => setTimeout(resolve, 25));
+          await page.mouse.up({ clickCount: 2 });
+        } else await page.mouse.dblclick(request.clientX, request.clientY, { delay: 80 });
+      }
       else if (request.kind === 'type') await page.keyboard.type(request.text, { delay: 30 });
       else if (request.kind === 'key') await page.keyboard.press(request.key);
       else throw Error(`Unknown input kind ${request.kind}`);
+      if (slow && request.actionId === 'enter-d6') await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     });
     await page.goto('http://127.0.0.1:5304');
     await page.locator('.create-card.sheet').waitFor();
@@ -48,6 +66,9 @@ let server, browser, page;
       const value = await verifyMacosEditing(app.editingSmokeAdapter(), request => window.editingInput(request));
       return { ...value, nativeGuardRejected, requiredChecks: MACOS_EDITING_CHECKS };
     });
+    const releases = report.helper.actions.find(action => action.actionId === 'double-d6')?.events.filter(event => event.type === 'pointerup') ?? [];
+    report.doubleClickTiming = { releaseCount: releases.length,
+      receivedIntervalMs: releases.length === 2 ? releases[1].receivedAt - releases[0].receivedAt : null };
     assert.equal(report.helper.ok, true, report.helper.error || report.helper.closeError);
     assert.equal(report.helper.transport, 'local-wasm-in-browser');
     assert.equal(report.helper.nativeGuardRejected, true);

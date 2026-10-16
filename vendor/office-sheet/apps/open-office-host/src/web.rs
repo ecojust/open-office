@@ -241,6 +241,24 @@ impl OfficeSheetHost {
         json_string(&state.snapshot(id)?)
     }
 
+    /// Browser-recognized pointer gesture, delivered synchronously to its original tab.
+    /// Unlike commands this never flushes pending edits or queues work across activation.
+    #[wasm_bindgen(js_name = trustedDoubleClick)]
+    pub fn trusted_double_click(&self, id: &str, document_id: f64, x: f32, y: f32, modifiers: bool) -> Result<String, JsValue> {
+        let mut state = self.state.try_borrow_mut().map_err(js_error)?;
+        state.entry_mut(id)?;
+        let mut handled = false;
+        if state.started && state.enabled && state.active.as_deref() == Some(id) && state.waiters.is_empty() {
+            if let Some(ctx) = state.ctx.clone() {
+                handled = state.entry_mut(id)?.trusted_double_click(document_id, &ctx, egui::pos2(x, y), modifiers);
+            }
+        }
+        if handled {
+            state.repaint();
+        }
+        json_string(&json!({"handled":handled,"snapshot":state.snapshot(id)?}))
+    }
+
     /// Appearance belongs to the shell, including sessions that are not currently mounted.
     #[wasm_bindgen(js_name = setTheme)]
     pub fn set_theme(&self, mode: &str) -> Result<(), JsValue> {
