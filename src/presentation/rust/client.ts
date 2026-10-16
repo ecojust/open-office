@@ -1,7 +1,8 @@
 import type { NativeDocument } from '../../types'
 import type { Appearance } from '../../shared/appearance'
-import { base64ToBytes } from '../../shared/document'
+import { base64ToBytes, bytesToBase64 } from '../../shared/document'
 import { createId } from '../../shared/id'
+import documentFontUrl from '../../../assets/fonts/ui/WenQuanYiMicroHei-Regular.ttf?url'
 import type { OfficePresentationEvent, OfficePresentationFileAction, OfficePresentationSnapshot } from './office-presentation-types'
 
 interface OfficePresentationHost {
@@ -28,6 +29,7 @@ let textAgent: HTMLInputElement | undefined, disableTimer: ReturnType<typeof set
 let queue: Promise<void> = Promise.resolve()
 let interfaceTheme: Appearance = 'system'
 const sessions = new Map<string, RustPresentationSession>()
+const hostsWithDocumentFont = new WeakSet<OfficePresentationHost>()
 const fileActions = new Set<OfficePresentationFileAction>(['new', 'open', 'save', 'saveAs', 'exportPdf', 'print', 'close'])
 
 function serialize<T>(work: () => Promise<T> | T): Promise<T> {
@@ -63,6 +65,26 @@ async function loadHost(): Promise<OfficePresentationHost> {
   return host
 }
 function getHost() { return runtime ??= loadHost().catch(cause => { runtime = undefined; throw cause }) }
+
+async function loadDocumentFont(): Promise<string> {
+  const response = await fetch(documentFontUrl)
+  if (!response.ok) throw Error('演示文稿字体加载失败，请重试。')
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  // This is the application's existing TTF, not a font supplied by a document.
+  // Reject an HTML fallback/error response before handling the engine's duplicate result.
+  const tables = (bytes[4] << 8) | bytes[5]
+  if (bytes.length < 12 || bytes.length > 16 * 1024 * 1024 || bytes[0] !== 0 || bytes[1] !== 1 || bytes[2] !== 0 || bytes[3] !== 0 || tables < 1 || bytes.length < 12 + tables * 16) throw Error('演示文稿字体文件无效，请重试。')
+  return bytesToBase64(bytes)
+}
+function registerDocumentFont(api: OfficePresentationHost, id: string, data: string): void {
+  // font.add only updates the host's shared FontDb. It creates no document edit,
+  // save acknowledgement or undo step. Imported decks may already embed this face.
+  const result = JSON.parse(api.command(id, 'font.add', JSON.stringify({ data }))) as { ok?: boolean; result?: { faces?: number }; error?: string }
+  const faces = result.result?.faces
+  const added = result.ok === true && typeof faces === 'number' && Number.isSafeInteger(faces) && faces > 0
+  const alreadyAdded = result.ok === false && typeof result.error === 'string' && (result.error.startsWith('invalid parameters for `font.add`: ') || result.error.startsWith('无法执行“添加字体”：')) && result.error.endsWith('(or already added)')
+  if (!added && !alreadyAdded) throw Error(result.error || '演示文稿字体初始化失败，请重试。')
+}
 
 /** Appearance changes never flush an editor draft or mutate a workbook. */
 export function setRustPresentationTheme(theme: Appearance): Promise<void> {
@@ -310,9 +332,24 @@ export async function prepareRustPresentationDocument(source: Source): Promise<P
   if (bytes.length > 40 * 1024 * 1024) throw Error('请选择不超过 40 MB 的演示文稿。')
   const session = await serialize(async () => {
     const api = await getHost(), id = `presentation-${createId()}`
-    const next = new RustPresentationSession(snapshotOf(api.prepare(id, source.name, bytes), id))
-    sessions.set(id, next)
-    return next
+    // Fetch before preparing a document so a failed asset load leaves no Rust session.
+    const fontData = hostsWithDocumentFont.has(api) ? undefined : await loadDocumentFont()
+    const initial = snapshotOf(api.prepare(id, source.name, bytes), id)
+    try {
+      if (fontData !== undefined) registerDocumentFont(api, id, fontData)
+      const snapshot = snapshotOf(api.inspect(id), id)
+      if (snapshot.documentId !== initial.documentId || snapshot.revision !== initial.revision || snapshot.dirty !== initial.dirty || snapshot.canUndo !== initial.canUndo || snapshot.canRedo !== initial.canRedo) throw Error('演示文稿字体初始化改变了文稿状态，打开已取消。')
+      hostsWithDocumentFont.add(api)
+      const next = new RustPresentationSession(snapshot)
+      sessions.set(id, next)
+      return next
+    } catch (cause) {
+      // An unsuccessful initialization must neither consume a tab slot nor affect
+      // existing tabs. The host is only marked ready after a successful handoff.
+      const snapshot = snapshotOf(api.inspect(id), id)
+      api.close(id, snapshot.documentId, snapshot.revision, true)
+      throw cause
+    }
   })
   let pending: RustPresentationSession | undefined = session
   const id = source.id, base64 = source.base64

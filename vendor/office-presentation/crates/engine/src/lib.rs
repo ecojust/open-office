@@ -583,7 +583,7 @@ impl Session {
     fn execute_unguarded(&mut self, id: &str, params: &Value) -> Result<Value> {
         let spec = find_command(id).ok_or_else(|| EngineError::UnknownCommand(id.into()))?;
         // Any other edit (or a click, a key, undo) settles an input method's composition first.
-        if self.depth == 0 && (spec.journal || spec.undoable) && !matches!(id, "text.compose" | "text.commit") {
+        if self.depth == 0 && (spec.journal || spec.undoable) && !matches!(id, "text.compose" | "text.commit" | "template.applyBytes") {
             self.end_composition();
         }
         if let Err(e) = (spec.enabled)(self) {

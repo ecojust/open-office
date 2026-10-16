@@ -3,7 +3,7 @@ import { nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import type { NativeDocument } from '../types'
 import type { Appearance } from '../shared/appearance'
 import { bytesToBase64, type EditorExport, type Extension } from '../shared/document'
-import { prepareRustPdfDocument, setRustPdfTheme, type PreparedRustPdfDocument, type RustPdfSession } from '../pdf/rust/client'
+import { prepareRustPdfDocument, setRustPdfTheme, isPdfPendingDecisionCommand, type PreparedRustPdfDocument, type RustPdfSession } from '../pdf/rust/client'
 import type { OfficePdfFileAction, OfficePdfSnapshot } from '../pdf/rust/types'
 import { normalizePdfAuthor, pdfAuthorPreference } from '../pdf/author'
 import { useDialogFocus } from '../shared/dialog-focus'
@@ -98,6 +98,13 @@ async function markSaved(base64?: string, options: { background?: boolean } = {}
   try { await session!.markSaved(receipt.documentId, receipt.revision, options) }
   catch (cause) { emit('dirty', true); throw cause }
 }
+async function prepareDeactivate() {
+  const token = generation
+  await flush()
+  if (disposed || generation !== token || !session) throw Error('PDF 文档已切换，请重试。')
+  const { documentId, revision, dirty } = session.snapshot
+  return { documentId, revision, dirty }
+}
 async function discardChanges(options: { force?: boolean } = {}) {
   if (options.force) {
     // The shell activates the next tab before this component unmounts. Release
@@ -106,11 +113,7 @@ async function discardChanges(options: { force?: boolean } = {}) {
     await session?.close(true)
     return
   }
-  await flush()
-  const receipt = lastExport, current = await session!.inspect()
-  // App calls this after an in-memory tab snapshot as well as a saved file.
-  // Validate its receipt only; retain the live document and undo history.
-  if (!receipt || receipt.generation !== generation || receipt.documentId !== current.documentId || receipt.revision !== current.revision) throw Error('导出后 PDF 文档又有修改，请先保存当前内容，再切换 PDF 文档。')
+  if ((await prepareDeactivate()).dirty) throw Error('PDF 文档还有未保存的修改，请先保存或确认不保存后关闭。')
 }
 async function undo() { await flush(); await session!.command('edit.undo') }
 async function redo() { await flush(); await session!.command('edit.redo') }
@@ -122,7 +125,7 @@ async function canBackgroundExport() {
   return !disposed && !loading.value && !authorDialog.value && !!session && await session.canBackgroundExport()
 }
 async function command(id: string, params: Record<string, unknown> = {}) {
-  if (id === 'ui.delete.confirm' || id === 'ui.delete.cancel') {
+  if (isPdfPendingDecisionCommand(id)) {
     await opening
     if (!session) throw Error('请等待 PDF 文档打开。')
   } else await flush()
@@ -197,7 +200,7 @@ onBeforeUnmount(() => {
   void session?.close(true).catch(cause => console.error('PDF session cleanup failed', cause))
   printFrame?.remove(); if (printUrl) URL.revokeObjectURL(printUrl)
 })
-defineExpose({ exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, syncRevision, canBackgroundExport, command, query })
+defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, syncRevision, canBackgroundExport, command, query })
 </script>
 
 <template>

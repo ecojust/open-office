@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use js_sys::{Function, Promise, Uint8Array};
-use office_word_doc::{Document, StoryRef};
+use office_word_doc::StoryRef;
 use office_word_engine::Session;
 use office_word_ui_egui::{
     Services, WordApp,
@@ -11,6 +11,8 @@ use office_word_ui_egui::{
 };
 use serde_json::{Value, json};
 use wasm_bindgen::prelude::*;
+
+use crate::document_state::DocumentState;
 
 const MAX_SESSIONS: usize = 8;
 const MAX_INPUT_BYTES: usize = 64 * 1024 * 1024;
@@ -20,30 +22,20 @@ struct Entry {
     app: WordApp,
     name: String,
     document_id: u32,
-    revision: u32,
-    observed: Document,
-    saved: Document,
+    document: DocumentState,
     memory: Option<egui::Memory>,
     notified: String,
 }
 
 impl Entry {
-    /// Document equality includes every OfficeWord story, style, property, media and retained part.
-    /// Engine revision alone is not sufficient: properties can change outside Session::run.
     fn sync(&mut self) -> Result<(), String> {
-        if self.observed != self.app.session.doc {
-            self.revision = self
-                .revision
-                .checked_add(1)
-                .ok_or("document revision exhausted")?;
-            self.observed = self.app.session.doc.clone();
-        }
-        self.app.session.dirty = self.app.session.doc != self.saved;
+        self.document.sync(&self.app.session.doc)?;
+        self.app.session.dirty = self.document.dirty();
         Ok(())
     }
 
     fn matches(&self, document_id: f64, revision: f64) -> bool {
-        f64::from(self.document_id) == document_id && f64::from(self.revision) == revision
+        f64::from(self.document_id) == document_id && f64::from(self.document.revision()) == revision
     }
 
     fn snapshot(&mut self, id: &str, ctx: Option<&egui::Context>) -> Result<Value, String> {
@@ -73,7 +65,7 @@ impl Entry {
         }
         Ok(json!({
             "sessionId": id, "name": self.name, "documentId": self.document_id,
-            "revision": self.revision, "dirty": self.app.session.dirty,
+            "revision": self.document.revision(), "dirty": self.app.session.dirty,
             "canUndo": self.app.session.can_undo(), "canRedo": self.app.session.can_redo(),
             "pages": self.app.session.layout().pages.len(),
             "selection": self.app.session.sel,
@@ -321,9 +313,7 @@ impl OfficeWordHost {
             app,
             name: name.to_owned(),
             document_id,
-            revision: 1,
-            observed: doc.clone(),
-            saved: doc,
+            document: DocumentState::new(doc),
             memory: None,
             notified: String::new(),
         };
@@ -500,7 +490,7 @@ impl OfficeWordHost {
         if !entry.matches(document_id, revision) {
             return Ok(false);
         }
-        entry.saved = entry.app.session.doc.clone();
+        entry.document.mark_saved();
         entry.app.session.dirty = false;
         entry.app.mark_host_saved();
         state.repaint();
@@ -524,7 +514,7 @@ impl OfficeWordHost {
             return Ok(false);
         }
         let had_saved_copy = entry.app.has_saved_copy();
-        entry.app.session.set_document(entry.saved.clone());
+        entry.app.session.set_document(entry.document.saved().clone());
         if had_saved_copy {
             entry.app.mark_host_saved();
         }
@@ -668,7 +658,7 @@ impl eframe::App for HostApp {
                         entry.app.status(error);
                     }
                     let signature = json!([
-                        entry.revision,
+                        entry.document.revision(),
                         entry.app.session.dirty,
                         entry.app.session.can_undo(),
                         entry.app.session.can_redo(),
@@ -740,7 +730,7 @@ fn dispatch_actions(shared: &Rc<RefCell<State>>) {
             {
                 if let Some(entry) = state.entries.get_mut(&id) {
                     let _ = entry.sync();
-                    action["revision"] = json!(entry.revision);
+                    action["revision"] = json!(entry.document.revision());
                     action["documentId"] = json!(entry.document_id);
                     action["selection"] = json!(entry.app.session.sel);
                 }

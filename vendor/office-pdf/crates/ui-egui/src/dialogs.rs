@@ -14,6 +14,7 @@ pub fn show(app: &mut OfficePdfApp, ctx: &egui::Context) {
     // Last, so it sits above Document Properties when Security's Unlock… asked for it.
     unlock(app, ctx);
     crate::delete_confirmation::show(app, ctx);
+    crate::comment_drafts::show(app, ctx);
 }
 
 fn dialogs(app: &mut OfficePdfApp, ctx: &egui::Context) {

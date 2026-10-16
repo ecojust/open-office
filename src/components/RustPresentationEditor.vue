@@ -71,13 +71,16 @@ async function markSaved(base64?: string, options: { background?: boolean } = {}
   try { await session!.markSaved(receipt.documentId, receipt.revision, options) }
   catch (cause) { emit('dirty', true); throw cause }
 }
+async function prepareDeactivate() {
+  const token = generation
+  await flush()
+  if (disposed || generation !== token || !session) throw Error('演示文稿已切换，请重试。')
+  const { documentId, revision, dirty } = session.snapshot
+  return { documentId, revision, dirty }
+}
 async function discardChanges(options: { force?: boolean } = {}) {
   if (options.force) return
-  await flush()
-  const receipt = lastExport, current = await session!.inspect()
-  // App calls this after an in-memory tab snapshot as well as a saved file.
-  // Validate its receipt only; retain the live document and undo history.
-  if (!receipt || receipt.generation !== generation || receipt.documentId !== current.documentId || receipt.revision !== current.revision) throw Error('导出后演示文稿又有修改，请先保存当前内容，再切换演示文稿。')
+  if ((await prepareDeactivate()).dirty) throw Error('演示文稿还有未保存的修改，请先保存或确认不保存后关闭。')
 }
 async function undo() { await flush(); await session!.command('edit.undo') }
 async function redo() { await flush(); await session!.command('edit.redo') }
@@ -88,6 +91,12 @@ async function inspect() { await opening; if (!session) throw Error('请等待�
 async function syncRevision() { return inspect() }
 async function canBackgroundExport() { await opening; return !disposed && !loading.value && !mediaRequest && !!session && session.canBackgroundExport() }
 async function command(id: string, params: Record<string, unknown> = {}) { await flush(); return session!.command(id, params) }
+async function applyTemplate(base64: string) {
+  await flush()
+  const value = await session!.command('template.applyBytes', { data: base64 })
+  lastExport = undefined
+  return value
+}
 async function query(id: string, params: Record<string, unknown> = {}) { await opening; if (!session) throw Error('请等待演示文稿打开。'); return session.query(id, params) }
 function focus() { session?.focus() }
 function pickFile(event: Extract<OfficePresentationEvent, { type: 'pick-file' }>) {
@@ -195,7 +204,7 @@ onBeforeUnmount(() => {
   void session?.close(true).catch(cause => console.error('Presentation session cleanup failed', cause))
   printFrame?.remove(); if (printUrl) URL.revokeObjectURL(printUrl)
 })
-defineExpose({ exportFile, markSaved, discardChanges, undo, redo, search, print, focus, present, stopPresentation, inspect, syncRevision, canBackgroundExport, command, query })
+defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, present, stopPresentation, inspect, syncRevision, canBackgroundExport, command, query, applyTemplate })
 </script>
 
 <template>

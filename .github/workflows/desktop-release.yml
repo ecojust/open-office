@@ -137,6 +137,7 @@ jobs:
           CARGO_INCREMENTAL: '0'
         run: |
           regression_status=0
+          cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p open-office-word-host --lib document_state:: -- --test-threads=1 || regression_status=1
           cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p office-word-engine --lib delete_surrounding_ -- --test-threads=1 || regression_status=1
           cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p office-word-ui-egui --lib browser_clipboard_ -- --test-threads=1 || regression_status=1
           cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p office-word-ui-egui --lib input_method_ -- --test-threads=1 || regression_status=1
@@ -165,6 +166,8 @@ jobs:
           OPEN_OFFICE_DECK_FONTS_DIR: ${{ github.workspace }}/assets/fonts/deck
         run: |
           cargo test --locked --manifest-path vendor/office-presentation/Cargo.toml -p open-office-presentation-host --lib
+          cargo test --locked --manifest-path vendor/office-presentation/Cargo.toml -p office-presentation-engine --lib cmd::template:: -- --test-threads=1
+          cargo test --locked --manifest-path vendor/office-presentation/Cargo.toml -p office-presentation-ui-egui --lib textures:: -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-presentation/Cargo.toml -p office-presentation-ui-egui --lib embedding:: -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-presentation/Cargo.toml -p office-presentation-ui-egui --lib office_svg:: -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-presentation/Cargo.toml -p office-presentation-pptx --lib
@@ -181,6 +184,7 @@ jobs:
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-edit --lib tests::added_cjk_text_embeds_searchable_glyphs_wraps_and_survives_reopen -- --exact
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-annot --lib stamp -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p open-office-pdf-host --lib
+          cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib comment_drafts:: -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib embedding:: -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib embedded_toolbar:: -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib delete_confirmation:: -- --test-threads=1

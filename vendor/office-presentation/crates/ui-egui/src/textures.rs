@@ -1,5 +1,5 @@
-//! Rendered slides as GPU textures: the canvas slide and thumbnails, cached by the slide's and its
-//! master's `Arc` identity (an unchanged slide keeps its `Arc`, so it never re-renders).
+//! Rendered slides as GPU textures: a bounded recent-page canvas cache and thumbnails. Immutable
+//! document identities and render parameters keep reused pictures in step with their content.
 //!
 //! The canvas texture covers the slide plus whatever of the slide's drawing reaches off it and is
 //! in view (PowerPoint's Normal view shows off-slide objects; thumbnails clip to the slide).
@@ -14,14 +14,31 @@ use office_presentation_render::{Image, Region, RenderOpts};
 
 #[derive(Clone, PartialEq)]
 struct Key {
+    index: usize,
     slide: usize,
     master: usize,
     size: (u32, u32),
     edit: bool,
     extra: u64,
+    grayscale: bool,
+    animation: u64,
     /// The pasteboard region the slide's drawing calls for (canvas only).
     want: Region,
     editing_text: Option<ShapeId>,
+}
+
+impl Key {
+    fn same_picture(&self, other: &Self) -> bool {
+        self.index == other.index
+            && self.slide == other.slide
+            && self.master == other.master
+            && self.size == other.size
+            && self.edit == other.edit
+            && self.extra == other.extra
+            && self.grayscale == other.grayscale
+            && self.animation == other.animation
+            && self.editing_text == other.editing_text
+    }
 }
 
 struct Entry {
@@ -35,15 +52,26 @@ struct Entry {
     stamp: u64,
 }
 
+struct CanvasEntry {
+    entry: Entry,
+    estimate: Rect,
+    drawn: Rect,
+    bytes: u64,
+}
+
+const CANVAS_PAGE_LIMIT: usize = 4;
+const CANVAS_BYTE_LIMIT: u64 = 64 * 1024 * 1024;
+
 #[derive(Default)]
 pub struct Textures {
-    canvas: Option<Entry>,
-    /// How far the canvas slide's shapes reach (from their boxes), for the slide and master `Arc`s
-    /// held (kept alive so their addresses can't be reused).
-    estimate: Option<(Arc<Slide>, Option<Arc<Master>>, Rect)>,
-    /// How far the last canvas render of a slide (by index) actually drew: text spilling out of
-    /// its box shows there.
-    drawn: Option<(usize, Rect)>,
+    /// Least recently used first. At most four pages / 64 MiB of RGBA pixels; an active texture
+    /// larger than that budget is retained alone to preserve device-pixel clarity. In that case
+    /// the existing GPU maximum texture dimensions are the bound, and no other page is retained.
+    canvas: Vec<CanvasEntry>,
+    /// Keep the immutable document alive: its address cannot be reused under a cached picture.
+    /// A content, media, theme, ordering or page-size edit changes this Arc and drops old pages.
+    canvas_document: Option<Arc<Presentation>>,
+    font_faces: usize,
     /// Canvas renders so far (tests, performance checks).
     pub canvas_renders: u64,
     thumbs: HashMap<usize, Entry>,
@@ -224,14 +252,6 @@ fn master_of(p: &Presentation, slide: &Slide) -> Option<Arc<Master>> {
     p.masters.iter().find(|m| m.layout(slide.layout).is_some()).cloned()
 }
 
-fn same(a: &Option<Arc<Master>>, b: &Option<Arc<Master>>) -> bool {
-    match (a, b) {
-        (Some(a), Some(b)) => Arc::ptr_eq(a, b),
-        (None, None) => true,
-        _ => false,
-    }
-}
-
 /// Mix the preview playhead into the canvas cache key. Zero means "no preview", so a playhead of
 /// 0s still misses the at-rest texture (entrances start hidden).
 fn anim_key(anim: Option<(&office_presentation_anim::Timeline, f64)>) -> u64 {
@@ -253,7 +273,7 @@ impl Textures {
     pub fn slide(
         &mut self,
         ctx: &egui::Context,
-        p: &Presentation,
+        p: &Arc<Presentation>,
         index: usize,
         size: (u32, u32),
         visible: Region,
@@ -264,37 +284,54 @@ impl Textures {
         editing_text: Option<ShapeId>,
         anim: Option<(&office_presentation_anim::Timeline, f64)>,
     ) -> Option<(TextureHandle, Region)> {
+        self.sync_fonts();
+        let mut reusable = None;
+        if !self.canvas_document.as_ref().is_some_and(|doc| Arc::ptr_eq(doc, p)) {
+            // Reuse one allocation during typing/dragging, but never an old document's pixels.
+            reusable = self.canvas.pop().map(|e| e.entry.tex);
+            self.canvas.clear();
+            self.canvas_document = Some(p.clone());
+        }
         let slide = p.slides.get(index)?.clone();
         let master = master_of(p, &slide);
         let scale = size.0 as f64 / p.slide_size.width.max(1.0);
-        let estimate = match &self.estimate {
-            Some((s, m, r)) if Arc::ptr_eq(s, &slide) && same(m, &master) => *r,
-            _ => {
-                let r = office_presentation_render::slide_extent(p, index);
-                self.estimate = Some((slide.clone(), master.clone(), r));
-                r
-            }
-        };
-        let reach = match self.drawn {
-            Some((i, d)) if i == index => estimate.union(d),
-            _ => estimate,
-        };
-        // The GPU's (or software fallback's) texture limit: a larger canvas texture panics in egui.
-        let max_side = max_side(ctx);
-        let want = fit_texture(office_presentation_render::pasteboard_region(size, scale, reach, visible), visible, max_side);
-        let key = Key {
+        let mut key = Key {
+            index,
             slide: Arc::as_ptr(&slide) as usize,
             master: master.as_ref().map(|m| Arc::as_ptr(m) as usize).unwrap_or(0),
             size,
             edit,
-            extra: extra ^ grayscale as u64 ^ anim_key(anim),
-            want,
+            extra,
+            grayscale,
+            animation: anim_key(anim),
+            want: visible,
             editing_text,
         };
-        if let Some(e) = &self.canvas
-            && e.key == key
-        {
-            return Some((e.tex.clone(), e.region));
+        // The actual drawn extent belongs to this page and render state, including overflowing
+        // text. Restoring it with the texture avoids false misses on A → B → A.
+        let prior = self.canvas.iter().find(|e| e.entry.key.same_picture(&key));
+        let (estimate, reach) = match prior {
+            Some(e) => (e.estimate, e.estimate.union(e.drawn)),
+            None => {
+                let estimate = office_presentation_render::slide_extent(p, index);
+                (estimate, estimate)
+            }
+        };
+        // The GPU's (or software fallback's) texture limit: a larger canvas texture panics in egui.
+        let max_side = max_side(ctx);
+        let want = fit_texture(office_presentation_render::pasteboard_region(size, scale, reach, visible), visible, max_side);
+        key.want = want;
+        if let Some(at) = self.canvas.iter().position(|e| e.entry.key == key) {
+            let e = self.canvas.remove(at);
+            let result = (e.entry.tex.clone(), e.entry.region);
+            self.canvas.push(e);
+            self.last_render_ms = 0.0;
+            return Some(result);
+        }
+        // Keep only one variant of a page: zooming, GIF playback and text editing must not
+        // accumulate a full-size texture per frame or displace all the other visited pages.
+        if let Some(at) = self.canvas.iter().position(|e| e.entry.key.index == index) {
+            reusable = Some(self.canvas.remove(at).entry.tex);
         }
         let t0 = crate::now_ms();
         let render = |region: Region| {
@@ -329,18 +366,45 @@ impl Textures {
             img = render(region).0;
             self.canvas_renders += 1;
         }
-        self.drawn = Some((index, drawn));
         self.last_render_ms = crate::now_ms() - t0;
-        let ci = to_color_image(&img, grayscale);
-        let tex = match self.canvas.take() {
-            Some(mut e) => {
-                replace_editor(ctx, &mut e.tex, ci);
-                e.tex
+        let bytes = u64::from(img.width).saturating_mul(u64::from(img.height)).saturating_mul(4);
+        while !self.canvas.is_empty() && (self.canvas.len() >= CANVAS_PAGE_LIMIT || self.canvas_bytes().saturating_add(bytes) > CANVAS_BYTE_LIMIT) {
+            let old = self.canvas.remove(0);
+            if reusable.is_none() {
+                reusable = Some(old.entry.tex);
             }
-            None => upload_editor(ctx, "slide-canvas", ci),
+        }
+        let ci = to_color_image(&img, grayscale);
+        let tex = match reusable {
+            Some(mut tex) => {
+                replace_editor(ctx, &mut tex, ci);
+                tex
+            }
+            None => upload_editor(ctx, format!("slide-canvas-{index}"), ci),
         };
-        self.canvas = Some(Entry { key, tex: tex.clone(), region, _slide: slide, _master: master, stamp: 0 });
+        self.canvas.push(CanvasEntry {
+            entry: Entry { key, tex: tex.clone(), region, _slide: slide, _master: master, stamp: 0 },
+            estimate,
+            drawn,
+            bytes,
+        });
         Some((tex, region))
+    }
+
+    pub fn canvas_count(&self) -> usize {
+        self.canvas.len()
+    }
+
+    pub fn canvas_bytes(&self) -> u64 {
+        self.canvas.iter().fold(0u64, |total, e| total.saturating_add(e.bytes))
+    }
+
+    fn sync_fonts(&mut self) {
+        let faces = office_presentation_fonts::FontDb::global().loaded_face_count();
+        if faces != self.font_faces {
+            self.invalidate();
+            self.font_faces = faces;
+        }
     }
 
     /// Cached thumbnails (bounded; soak tests check it).
@@ -350,24 +414,28 @@ impl Textures {
 
     /// Force the canvas to re-render next time (fonts loaded, theme changed in place…).
     pub fn invalidate(&mut self) {
-        self.canvas = None;
-        self.estimate = None;
-        self.drawn = None;
+        self.canvas.clear();
+        self.canvas_document = None;
         self.thumbs.clear();
+        self.smartart.clear();
     }
 
     /// A thumbnail texture; renders at most `budget` new thumbnails per frame (returns None when
     /// it is over budget, so the caller draws a placeholder and asks for another frame).
     pub fn thumb(&mut self, ctx: &egui::Context, p: &Presentation, index: usize, width_px: u32, budget: &mut u32) -> Option<TextureHandle> {
+        self.sync_fonts();
         let slide = p.slides.get(index)?.clone();
         let master = master_of(p, &slide);
         let h = (width_px as f64 * p.slide_size.height / p.slide_size.width.max(1.0)).round().max(1.0) as u32;
         let key = Key {
+            index,
             slide: Arc::as_ptr(&slide) as usize,
             master: master.as_ref().map(|m| Arc::as_ptr(m) as usize).unwrap_or(0),
             size: (width_px, h),
             edit: false,
             extra: 0,
+            grayscale: false,
+            animation: 0,
             want: Region::slide(width_px, h),
             editing_text: None,
         };
@@ -432,6 +500,110 @@ mod tests {
         let r = Rect::from_min_size(pos2(3.0, 4.0), vec2(10.0, 12.0));
         assert_eq!(device_pixel_rect(r, 0.0), r);
         assert_eq!(device_pixel_rect(r, f32::NAN), r);
+    }
+}
+
+#[cfg(test)]
+mod canvas_cache_tests {
+    use super::*;
+
+    fn deck() -> Arc<Presentation> {
+        let mut session = office_presentation_engine::Session::with_new();
+        for _ in 0..5 {
+            session.execute("slide.new", &serde_json::json!({"layout": "blank"})).unwrap();
+        }
+        session.active().unwrap().doc.clone()
+    }
+
+    fn draw(cache: &mut Textures, ctx: &egui::Context, doc: &Arc<Presentation>, index: usize) -> TextureHandle {
+        cache.slide(ctx, doc, index, (160, 90), Region::slide(160, 90), true, 0, false, &[], None, None).unwrap().0
+    }
+
+    #[test]
+    fn revisiting_a_slide_reuses_its_texture_and_rendered_extent() {
+        let ctx = egui::Context::default();
+        let doc = deck();
+        let mut cache = Textures::default();
+        let first = draw(&mut cache, &ctx, &doc, 0);
+        draw(&mut cache, &ctx, &doc, 1);
+        let renders = cache.canvas_renders;
+        let again = draw(&mut cache, &ctx, &doc, 0);
+        assert_eq!(first.id(), again.id());
+        assert_eq!(cache.canvas_renders, renders);
+        assert_eq!(cache.canvas_count(), 2);
+    }
+
+    #[test]
+    fn least_recent_pages_are_evicted_without_discarding_recent_hits() {
+        let ctx = egui::Context::default();
+        let doc = deck();
+        let mut cache = Textures::default();
+        for index in 0..4 {
+            draw(&mut cache, &ctx, &doc, index);
+        }
+        draw(&mut cache, &ctx, &doc, 0);
+        draw(&mut cache, &ctx, &doc, 4);
+        assert_eq!(cache.canvas_count(), CANVAS_PAGE_LIMIT);
+        assert!(cache.canvas_bytes() <= CANVAS_BYTE_LIMIT);
+        let renders = cache.canvas_renders;
+        draw(&mut cache, &ctx, &doc, 0);
+        assert_eq!(cache.canvas_renders, renders);
+        draw(&mut cache, &ctx, &doc, 1);
+        assert!(cache.canvas_renders > renders, "the least recent page must render again");
+        assert_eq!(cache.canvas_count(), CANVAS_PAGE_LIMIT);
+    }
+
+    #[test]
+    fn document_and_interaction_changes_never_reuse_old_pixels() {
+        let ctx = egui::Context::default();
+        let doc = deck();
+        let mut cache = Textures::default();
+        draw(&mut cache, &ctx, &doc, 0);
+        draw(&mut cache, &ctx, &doc, 1);
+        let mut changed = doc.clone();
+        Arc::make_mut(&mut changed).first_slide_number = 10;
+        assert!(Arc::ptr_eq(&doc.slides[0], &changed.slides[0]));
+        let before = cache.canvas_renders;
+        draw(&mut cache, &ctx, &changed, 0);
+        assert!(cache.canvas_renders > before, "global properties affect fields even when slide Arcs are unchanged");
+        assert_eq!(cache.canvas_count(), 1);
+
+        let before = cache.canvas_renders;
+        cache.slide(&ctx, &changed, 0, (160, 90), Region::slide(160, 90), true, 0, true, &[], None, None).unwrap();
+        assert!(cache.canvas_renders > before);
+        assert_eq!(cache.canvas_count(), 1, "render variants must replace the same page's entry");
+        let before = cache.canvas_renders;
+        cache.slide(&ctx, &changed, 0, (320, 180), Region::slide(320, 180), true, 0, true, &[], None, None).unwrap();
+        assert!(cache.canvas_renders > before, "a DPI or zoom change must render at the new resolution");
+        let before = cache.canvas_renders;
+        cache.invalidate();
+        draw(&mut cache, &ctx, &changed, 0);
+        assert!(cache.canvas_renders > before);
+    }
+
+    #[test]
+    fn editing_and_undoing_a_visited_page_invalidate_its_old_picture() {
+        let ctx = egui::Context::default();
+        let mut session = office_presentation_engine::Session::with_new();
+        let original = session.active().unwrap().doc.clone();
+        let mut cache = Textures::default();
+        draw(&mut cache, &ctx, &original, 0);
+        session.execute("shape.insert", &serde_json::json!({"preset": "rect", "rect": [20, 20, 100, 80]})).unwrap();
+        let changed = session.active().unwrap().doc.clone();
+        let before = cache.canvas_renders;
+        draw(&mut cache, &ctx, &changed, 0);
+        assert!(cache.canvas_renders > before);
+        session.execute("edit.undo", &serde_json::json!({})).unwrap();
+        let restored = session.active().unwrap().doc.clone();
+        assert_eq!(*restored, *original);
+        let before = cache.canvas_renders;
+        draw(&mut cache, &ctx, &restored, 0);
+        assert!(cache.canvas_renders > before);
+        let other_document = Arc::new(Presentation::default());
+        let before = cache.canvas_renders;
+        draw(&mut cache, &ctx, &other_document, 0);
+        assert!(cache.canvas_renders > before, "a newly opened document cannot inherit a previous document's picture");
+        assert_eq!(cache.canvas_count(), 1);
     }
 }
 

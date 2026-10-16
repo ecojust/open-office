@@ -303,6 +303,7 @@ impl OfficePresentationHost {
             let entry = state.entry_mut(id)?;
             entry.sync().map_err(js_error)?;
             let result = match command_id {
+                "template.applyBytes" => entry.apply_template(params),
                 "host.cancelPicture" | "host.cancelFile" => cancel_file(picture, &params),
                 "host.deliverPicture" | "host.deliverFile" => deliver_file(&entry.app, picture, &params),
                 "ui.inspect" | "ui.text" | "ui.ime" | "ui.key" | "ui.click" | "ui.move" | "ui.drag" | "ui.pointer" | "ui.tool.select" | "ui.set"

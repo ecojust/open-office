@@ -3069,6 +3069,7 @@ dependencies = [
  "office-presentation-geom",
  "office-presentation-media",
  "office-presentation-model",
+ "office-presentation-pptx",
  "office-presentation-render",
  "office-presentation-text",
  "serde",

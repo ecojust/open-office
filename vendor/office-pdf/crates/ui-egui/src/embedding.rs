@@ -51,6 +51,16 @@ impl OfficePdfApp {
             object.insert("backgroundExportReady".into(), json!(self.background_export_ready()));
             object.insert("toolbar".into(), json!(self.ctx.as_ref().map(crate::embedded_toolbar::drawn).unwrap_or_default()));
             object.insert("deletePrompt".into(), json!(self.pending_removal.as_ref().map(|pending| &pending.label)));
+            object.insert(
+                "commentDraft".into(),
+                json!(self.unfinished_comment().map(|draft| json!({
+                    "kind":format!("{:?}", draft.kind), "page":draft.page + 1, "text":draft.text, "orphaned":draft.orphaned,
+                }))),
+            );
+            object.insert(
+                "commentDraftDialog".into(),
+                json!(self.comment_draft_dialog.as_ref().map(|dialog| json!({"confirmDiscard":dialog.confirm_discard,"error":dialog.error}))),
+            );
         }
         state
     }
@@ -60,6 +70,7 @@ impl OfficePdfApp {
     pub fn background_export_ready(&self) -> bool {
         !self.embedding_composing
             && self.pending_removal.is_none()
+            && self.comment_draft_dialog.is_none()
             && self.dialog.is_none()
             && !self.palette_open
             && self.password_prompt.is_none()
@@ -93,6 +104,22 @@ impl OfficePdfApp {
             }
             "ui.delete.cancel" => {
                 self.resolve_removal(false)?;
+                Ok(self.embedding_state())
+            }
+            "ui.commentDraft.open" => {
+                self.open_comment_drafts();
+                Ok(self.embedding_state())
+            }
+            "ui.commentDraft.submit" => {
+                self.submit_comment_draft()?;
+                Ok(self.embedding_state())
+            }
+            "ui.commentDraft.discard" => {
+                self.discard_comment_draft(params.get("confirmed").and_then(Value::as_bool).unwrap_or(false))?;
+                Ok(self.embedding_state())
+            }
+            "ui.commentDraft.return" => {
+                self.return_to_comment_draft();
                 Ok(self.embedding_state())
             }
             _ => Host::command(self, command),
@@ -138,11 +165,11 @@ impl OfficePdfApp {
                     "form": form.map(|focus| json!({"name": focus.name, "text": focus.text, "picked": focus.picked})),
                     "fill": view.fill_text.as_ref().filter(|text| !text.text.trim().is_empty())
                         .map(|text| json!({"page": text.page, "at": text.at, "text": text.text, "size": text.size})),
-                    "comment": view.comments.composer.as_ref().filter(|draft| !draft.text.is_empty())
+                    "comment": view.comments.composer.as_ref().filter(|_| self.session.get(view.id).is_some_and(|doc| crate::comment_drafts::composer_changed(&view.comments, &doc.info)))
                         .map(|draft| json!({"page": draft.page, "at": draft.at, "text": draft.text})),
-                    "commentReply": view.comments.reply,
-                    "commentEdit": view.comments.editing,
-                    "commentAdd": view.comments.add_box,
+                    "commentReply": (!view.comments.reply.trim().is_empty()).then_some(&view.comments.reply),
+                    "commentEdit": view.comments.editing.as_ref().filter(|_| self.session.get(view.id).is_some_and(|doc| crate::comment_drafts::editing_changed(&view.comments, &doc.info))),
+                    "commentAdd": (!view.comments.add_box.trim().is_empty()).then_some(&view.comments.add_box),
                 })
             })
             .collect();
@@ -162,10 +189,7 @@ impl OfficePdfApp {
                         .as_ref()
                         .is_some_and(|focus| self.session.get(view.id).is_some_and(|doc| crate::forms_ui::draft_edit(focus, &doc.form).is_some()))
                     || view.fill_text.as_ref().is_some_and(|text| !text.text.trim().is_empty())
-                    || view.comments.composer.as_ref().is_some_and(|draft| !draft.text.is_empty())
-                    || !view.comments.reply.is_empty()
-                    || view.comments.editing.is_some()
-                    || !view.comments.add_box.is_empty()
+                    || self.session.get(view.id).is_some_and(|doc| crate::comment_drafts::has_changes(view, &doc.info))
             })
     }
 
@@ -186,13 +210,9 @@ impl OfficePdfApp {
             return Err("请先确认输入法候选文字，再保存文稿".into());
         }
         let Some((index, id)) = self.active_ids() else { return Ok(()) };
-        if self.views.get(index).is_some_and(|view| {
-            view.comments.composer.as_ref().is_some_and(|draft| !draft.text.is_empty())
-                || !view.comments.reply.is_empty()
-                || view.comments.editing.is_some()
-                || !view.comments.add_box.is_empty()
-        }) {
-            return Err("请先提交或取消正在编辑的批注，再保存文稿".into());
+        if self.unfinished_comment().is_some() {
+            self.open_comment_drafts();
+            return Err("还有未提交的批注，已打开草稿处理窗口；提交或确认放弃后即可保存文稿".into());
         }
         if !self.process_pending_edits() || !self.commit_typing_in(id) {
             return Err(self.toast.as_ref().map(|notice| notice.0.clone()).unwrap_or_else(|| "当前输入未通过验证，请修正后再保存".into()));
@@ -224,6 +244,7 @@ impl OfficePdfApp {
     /// Called only after the containing window has confirmed discarding unsaved work.
     pub fn discard_pending(&mut self) {
         self.pending_removal = None;
+        self.comment_draft_dialog = None;
         self.embedding_composing = false;
         self.deferred_commands.clear();
         for view in &mut self.views {

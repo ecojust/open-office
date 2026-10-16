@@ -24,6 +24,8 @@ export function saveFileName(stem: string, extension: SaveExtension): string {
 }
 export type EditorExport = {base64:string; extension:Extension; name?:string; saveAs?:boolean; dirty?:boolean; revision?:string}
 export type EditorHandle = {
+ /** Commit queued input while retaining the live model and undo history; never export or acknowledge a save. */
+ prepareDeactivate():Promise<{documentId:number;revision:number;dirty:boolean}>;
  exportFile(options?:{format?:Extension;background?:boolean}):Promise<EditorExport>;
  markSaved?(base64?:string,options?:{background?:boolean}):void|Promise<void>;
  discardChanges?(options?:{force?:boolean}):void|Promise<void>;

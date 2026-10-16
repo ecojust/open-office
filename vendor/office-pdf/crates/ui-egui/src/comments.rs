@@ -1411,25 +1411,37 @@ pub(crate) fn composer(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, 
     if !post {
         return None;
     }
+    let edit = composer_edit(&view.comments, info, prefs)?;
     let c = view.comments.composer.take()?;
+    if c.kind == ComposerKind::Replace {
+        view.comments.replace = None;
+    }
+    view.comments.tool_done = !matches!(c.kind, ComposerKind::Edit(_));
+    Some(edit)
+}
+
+/// Build the same edit for the floating editor and the recoverable pending-input dialog.
+pub(crate) fn composer_edit(comments: &CommentView, info: &DocInfo, prefs: &CommentPrefs) -> Option<Edit> {
+    let c = comments.composer.as_ref()?;
+    let page = c.page;
+    info.pages.get(page)?;
     let text = c.text.trim_end().to_string();
+    let new =
+        |tool, shape, contents| Edit::AddAnnotation(NewAnnotation { page, shape, style: prefs.style(tool), contents, author: prefs.author.clone() });
     match c.kind {
-        ComposerKind::Edit(index) => Some(Edit::SetAnnotationContents { page, index, text }),
-        ComposerKind::Note => {
-            view.comments.tool_done = true;
-            Some(new_comment(&cx, CommentTool::Note, Shape::Note { at: c.at, icon: NoteIcon::Comment }, text))
+        ComposerKind::Edit(index) => {
+            // A deleted annotation leaves its typed draft available to the recovery dialog.
+            // Never consume that draft by posting an edit to a now-invalid array index.
+            info.annotations.iter().find(|item| item.page == page && item.index == index)?;
+            Some(Edit::SetAnnotationContents { page, index, text })
         }
-        ComposerKind::TextBox => {
-            view.comments.tool_done = true;
-            Some(new_comment(
-                &cx,
-                CommentTool::TextBox,
-                Shape::TextBox { rect: text_box_rect(c.at, &text, 12.0, page_rotation(info, page)), font_size: 12.0 },
-                text,
-            ))
-        }
+        ComposerKind::Note => Some(new(CommentTool::Note, Shape::Note { at: c.at, icon: NoteIcon::Comment }, text)),
+        ComposerKind::TextBox => Some(new(
+            CommentTool::TextBox,
+            Shape::TextBox { rect: text_box_rect(c.at, &text, 12.0, page_rotation(info, page)), font_size: 12.0 },
+            text,
+        )),
         ComposerKind::Callout { point } => {
-            view.comments.tool_done = true;
             // A callout's leader and box stay in user-space axes (its appearance isn't turned).
             let rect = text_box_rect(c.at, &text, 10.0, 0);
             let side = if point[0] < rect[0] {
@@ -1440,11 +1452,10 @@ pub(crate) fn composer(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, 
                 (rect[0] + rect[2]) / 2.0
             };
             let knee = [(point[0] + side) / 2.0, (rect[1] + rect[3]) / 2.0];
-            Some(new_comment(&cx, CommentTool::Callout, Shape::Callout { rect, knee, point, font_size: 10.0, ending: LineEnding::OpenArrow }, text))
+            Some(new(CommentTool::Callout, Shape::Callout { rect, knee, point, font_size: 10.0, ending: LineEnding::OpenArrow }, text))
         }
         ComposerKind::Replace => {
-            view.comments.tool_done = true;
-            let quads = view.comments.replace.take()?;
+            let quads = comments.replace.clone()?;
             Some(Edit::ReplaceText {
                 page,
                 quads,
@@ -1455,10 +1466,9 @@ pub(crate) fn composer(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, 
             })
         }
         ComposerKind::Caret { size } => {
-            view.comments.tool_done = true;
             let [x, y] = c.at;
             let half = size / 2.0;
-            Some(new_comment(&cx, CommentTool::Caret, Shape::Caret { rect: [x - half, y - size, x + half, y] }, text))
+            Some(new(CommentTool::Caret, Shape::Caret { rect: [x - half, y - size, x + half, y] }, text))
         }
     }
 }

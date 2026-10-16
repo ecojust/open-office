@@ -1,0 +1,92 @@
+[
+  {
+    "id": "blueprint",
+    "name": "蓝图商务",
+    "description": "蓝白分栏与建筑几何，适合项目汇报和商业方案。",
+    "accent": "#315FBE",
+    "slideCount": 3,
+    "file": "blueprint.pptx",
+    "preview": "blueprint.svg"
+  },
+  {
+    "id": "midnight-tech",
+    "name": "深空科技",
+    "description": "深色轨道与薄荷亮色，适合技术分享和产品研究。",
+    "accent": "#56E0C0",
+    "slideCount": 3,
+    "file": "midnight-tech.pptx",
+    "preview": "midnight-tech.svg"
+  },
+  {
+    "id": "ivory-study",
+    "name": "暖白学术",
+    "description": "纸感暖白与书卷气标题，适合课程、研究和观点分享。",
+    "accent": "#A28C60",
+    "slideCount": 3,
+    "file": "ivory-study.pptx",
+    "preview": "ivory-study.svg"
+  },
+  {
+    "id": "forest-notes",
+    "name": "森林随想",
+    "description": "森林绿与植物几何，适合自然、生活和长期规划。",
+    "accent": "#214D3E",
+    "slideCount": 3,
+    "file": "forest-notes.pptx",
+    "preview": "forest-notes.svg"
+  },
+  {
+    "id": "coral-studio",
+    "name": "珊瑚创意",
+    "description": "珊瑚橘与大胆拼贴，适合创意提案和作品展示。",
+    "accent": "#E96B57",
+    "slideCount": 3,
+    "file": "coral-studio.pptx",
+    "preview": "coral-studio.svg"
+  },
+  {
+    "id": "violet-dawn",
+    "name": "紫霞愿景",
+    "description": "柔和渐变与圆形构成，适合愿景、品牌和灵感分享。",
+    "accent": "#8461BA",
+    "slideCount": 3,
+    "file": "violet-dawn.pptx",
+    "preview": "violet-dawn.svg"
+  },
+  {
+    "id": "mono-editorial",
+    "name": "黑白编辑部",
+    "description": "黑白对比与报刊分栏，适合故事、评论和设计表达。",
+    "accent": "#20201E",
+    "slideCount": 3,
+    "file": "mono-editorial.pptx",
+    "preview": "mono-editorial.svg"
+  },
+  {
+    "id": "retro-warmth",
+    "name": "暖调复古",
+    "description": "陶土暖色与双线边框，适合文化、经历和故事讲述。",
+    "accent": "#BC6942",
+    "slideCount": 3,
+    "file": "retro-warmth.pptx",
+    "preview": "retro-warmth.svg"
+  },
+  {
+    "id": "electric-launch",
+    "name": "活力发布",
+    "description": "荧光黄与阶梯版式，适合产品发布和行动倡议。",
+    "accent": "#A9BE31",
+    "slideCount": 3,
+    "file": "electric-launch.pptx",
+    "preview": "electric-launch.svg"
+  },
+  {
+    "id": "clear-space",
+    "name": "清透留白",
+    "description": "清透蓝绿与充足留白，适合简洁汇报和专注表达。",
+    "accent": "#438B92",
+    "slideCount": 3,
+    "file": "clear-space.pptx",
+    "preview": "clear-space.svg"
+  }
+]

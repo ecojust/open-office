@@ -32,6 +32,9 @@ let queue: Promise<void> = Promise.resolve()
 let interfaceTheme: Appearance = 'system'
 const sessions = new Map<string, RustPdfSession>()
 const fileActions = new Set<OfficePdfFileAction>(['new', 'open', 'save', 'saveAs', 'print', 'close'])
+const pendingDecisionCommands = new Set(['ui.delete.confirm', 'ui.delete.cancel', 'ui.commentDraft.open', 'ui.commentDraft.submit', 'ui.commentDraft.discard', 'ui.commentDraft.return'])
+/** These decisions resolve the very draft that prevents an ordinary flush. */
+export function isPdfPendingDecisionCommand(command: string) { return pendingDecisionCommands.has(command) }
 
 function serialize<T>(work: () => Promise<T> | T): Promise<T> {
   const result = queue.then(work)
@@ -226,9 +229,8 @@ export class RustPdfSession {
     return serialize(async () => {
       this.assertOpen()
       const api = await getHost()
-      // The pending deletion itself blocks flush. Only its explicit decision
-      // commands may reach the host without committing unrelated drafts.
-      if (commandId !== 'ui.delete.confirm' && commandId !== 'ui.delete.cancel') await this.flushInput(api)
+      // Only explicit pending-input decisions may bypass the save barrier.
+      if (!isPdfPendingDecisionCommand(commandId)) await this.flushInput(api)
       const result = JSON.parse(api.command(this.id, commandId, JSON.stringify(params))) as { ok: boolean; snapshot?: OfficePdfSnapshot; error?: string }
       this.accept(snapshotOf(result.snapshot ? JSON.stringify(result.snapshot) : api.inspect(this.id), this.id))
       if (!result.ok) throw Error(result.error || 'PDF 文档操作失败。')

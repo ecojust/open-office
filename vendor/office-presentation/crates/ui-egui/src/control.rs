@@ -108,7 +108,12 @@ pub fn inspect(app: &SlideApp, ctx: &egui::Context) -> Value {
         "animPreview": app.anim_preview_report().map(|(slide, time, duration)| json!({"slide": slide, "time": time, "duration": duration})),
         "documents": app.session.documents().iter().map(|d| json!({"title": d.title(), "dirty": d.is_dirty(), "path": d.path})).collect::<Vec<_>>(),
         "status": app.status.as_ref().map(|s| s.0.clone()),
-        "perf": {"frameMs": app.perf.frame_ms, "renderMs": app.perf.render_ms, "fps": app.perf.fps},
+        "perf": {
+            "frameMs": app.perf.frame_ms, "renderMs": app.perf.render_ms, "fps": app.perf.fps,
+            "canvasRenders": app.textures.canvas_renders,
+            "canvasCachedPages": app.textures.canvas_count(), "canvasCachedBytes": app.textures.canvas_bytes(),
+            "thumbnailCachedPages": app.textures.thumb_count(),
+        },
     })
 }
 

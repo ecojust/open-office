@@ -49,6 +49,7 @@ impl OfficePdfApp {
     pub(crate) fn apply_edit_confirmed(&mut self, edit: Edit) -> bool {
         let Some((i, id)) = self.active_ids() else { return false };
         let label = edit.label();
+        let comment_targets = self.session.get(id).map(|doc| crate::comment_drafts::Targets::capture(&self.views[i].comments, &doc.info));
         let (form_before, page_count_before, had_xfa) = if let Some(d) = self.session.get(id) {
             (Some(std::sync::Arc::clone(&d.form)), d.info.pages.len(), d.xfa.is_some())
         } else {
@@ -59,6 +60,9 @@ impl OfficePdfApp {
                 let Some(doc) = self.session.get(id) else { return true };
                 let info = &doc.info;
                 let view = &mut self.views[i];
+                if let Some(targets) = &comment_targets {
+                    targets.restore(&mut view.comments, info);
+                }
                 if !matches!(edit, Edit::AddAnnotation(_)) {
                     // Only a new drawing waits on its raster; any other edit may remove or move it.
                     view.comments.settling.clear();
@@ -157,6 +161,10 @@ impl OfficePdfApp {
                     Edit::DeleteAnnotation { .. } => view.comments.selected = None,
                     _ => {}
                 }
+                if let Some(targets) = &comment_targets {
+                    targets.restore_reply(&mut view.comments, info);
+                }
+                crate::comment_drafts::reconcile(&mut view.comments, info);
                 if std::mem::take(&mut view.comments.tool_done) && !self.comment_prefs.pinned {
                     self.quick_tool = crate::QuickTool::Select;
                 }
@@ -203,13 +211,19 @@ impl OfficePdfApp {
 
     fn history_step(&mut self, undo: bool) {
         let Some((i, id)) = self.active_ids() else { return };
+        let comment_targets = self.session.get(id).map(|doc| crate::comment_drafts::Targets::capture(&self.views[i].comments, &doc.info));
         let result = if undo { self.session.undo(id) } else { self.session.redo(id) };
         match result {
             Ok(label) => {
                 if let Some(doc) = self.session.get(id) {
+                    if let Some(targets) = &comment_targets {
+                        targets.restore(&mut self.views[i].comments, &doc.info);
+                    }
                     self.views[i].document_changed(&doc.info);
                 }
-                self.views[i].comments.selected = None;
+                if self.views[i].comments.reply.trim().is_empty() {
+                    self.views[i].comments.selected = None;
+                }
                 let label = crate::i18n::edit_label(&label);
                 if undo {
                     self.notify_fmt("Undid {label}", &[("label", &label)]);

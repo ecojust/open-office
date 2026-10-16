@@ -42,6 +42,7 @@ pub mod docking;
 pub use combine_ui::{Columns as CombineColumns, CombineView, Lock as CombineLock, SortKey};
 mod camera_ui;
 mod commands;
+mod comment_drafts;
 mod comment_props;
 pub mod comments;
 mod comments_panel;
@@ -488,6 +489,7 @@ pub struct OfficePdfApp {
     /// The containing Open Office window owns files, tabs and appearance.
     pub embedded: bool,
     pub(crate) pending_removal: Option<delete_confirmation::Pending>,
+    pub(crate) comment_draft_dialog: Option<comment_drafts::DraftDialog>,
     /// Global file action requested by a document shortcut.
     pub host_action: Option<Box<dyn FnMut(&str)>>,
     /// Uncommitted input method composition must never be saved as completed text.
@@ -897,6 +899,7 @@ impl OfficePdfApp {
         Self {
             embedded: false,
             pending_removal: None,
+            comment_draft_dialog: None,
             host_action: None,
             embedding_composing: false,
             session: Session::new(),
@@ -1943,6 +1946,7 @@ impl OfficePdfApp {
     pub(crate) fn modal_open(&self) -> bool {
         self.dialog.is_some()
             || self.pending_removal.is_some()
+            || self.comment_draft_dialog.is_some()
             || self.close_request.is_some()
             || self.password_prompt.is_some()
             || self.unlock_prompt.is_some()

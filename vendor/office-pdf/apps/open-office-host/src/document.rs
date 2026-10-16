@@ -174,9 +174,17 @@ impl Entry {
         if matches!(command, "document.inspect" | "ui.state" | "ui.inspect") {
             return if command == "document.inspect" { self.inspect_document() } else { Ok(self.app.embedding_state()) };
         }
-        // Deciding an existing deletion prompt must not flush it first: pending user
-        // confirmation intentionally blocks save/export and ordinary editing commands.
-        if matches!(command, "ui.delete.confirm" | "ui.delete.cancel") {
+        // Resolving a deletion or unfinished comment must bypass the very pending input
+        // that intentionally blocks save/export and ordinary editing commands.
+        if matches!(
+            command,
+            "ui.delete.confirm"
+                | "ui.delete.cancel"
+                | "ui.commentDraft.open"
+                | "ui.commentDraft.submit"
+                | "ui.commentDraft.discard"
+                | "ui.commentDraft.return"
+        ) {
             let result = self.app.run_host_command(command, params.clone())?;
             self.sync()?;
             return Ok(result);
@@ -372,15 +380,14 @@ mod tests {
         let mut entry = blank();
         entry.command("ui.set", &json!({"key":"author", "value":"Ada"})).unwrap();
         let author = entry.app.comment_prefs.author.clone();
-        let shape = Shape::Stamp {
-            rect: [60.0, 60.0, 260.0, 102.0],
-            stamp: StampKind::DynApproved,
-            by: Some(entry.app.session.stamp_by_line(&author)),
-        };
+        let shape =
+            Shape::Stamp { rect: [60.0, 60.0, 260.0, 102.0], stamp: StampKind::DynApproved, by: Some(entry.app.session.stamp_by_line(&author)) };
         let id = entry.id().unwrap();
-        entry.app.session.apply(id, Edit::AddAnnotation(NewAnnotation {
-            page: 0, style: Style::default_for(&shape), shape, contents: String::new(), author,
-        })).unwrap();
+        entry
+            .app
+            .session
+            .apply(id, Edit::AddAnnotation(NewAnnotation { page: 0, style: Style::default_for(&shape), shape, contents: String::new(), author }))
+            .unwrap();
         entry.command("ui.set", &json!({"key":"author", "value":"陈江"})).unwrap();
         let saved = entry.export("pdf").unwrap();
         let reopened = Entry::new("Saved.pdf", &saved, 2).unwrap();

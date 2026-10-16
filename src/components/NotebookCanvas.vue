@@ -66,7 +66,7 @@ function renderBody(region: NoteRegion, force = false) {
 }
 function sync() {
  regions.value = structuredClone(props.page.regions)
- if (!regions.value.some(region => region.id === selected.value)) selected.value = regions.value[0]?.id ?? ''
+ if (!regions.value.some(region => region.id === selected.value)) selected.value = ''
  for (const region of regions.value) renderBody(region)
 }
 function refresh() {
@@ -129,6 +129,17 @@ function doubleClick(event: MouseEvent) {
  if (event.target !== surface.value) return
  const rect = surface.value.getBoundingClientRect()
  addText({ x: event.clientX - rect.left, y: event.clientY - rect.top })
+}
+function clearSelection() {
+ if (gesture || busy.value || composing.value) return
+ const region = elements.get(selected.value), active = document.activeElement
+ if (active instanceof HTMLElement && region?.contains(active)) active.blur()
+ const selection = window.getSelection()
+ if (selection?.anchorNode && region?.contains(selection.anchorNode)) selection.removeAllRanges()
+ selected.value = ''; savedRange = undefined
+}
+function clickCanvas(event: MouseEvent) {
+ if (event.target instanceof Element && !event.target.closest('.note-region')) clearSelection()
 }
 function format(command: string, value?: string) {
  if (!props.editable || busy.value || composing.value || !restoreSelection()) return
@@ -254,7 +265,11 @@ function controlKey(event: KeyboardEvent, region: NoteRegion, kind: 'move' | 're
  apply(regions.value.map(item => item.id === region.id ? updated : item))
 }
 function removeRegion(region: NoteRegion) { if (props.editable && !busy.value && !composing.value && flush()) emit('request-delete', region.id) }
-function globalKey(event: KeyboardEvent) { if (event.key === 'Escape' && gesture) { event.preventDefault(); finishGesture(true) } }
+function globalKey(event: KeyboardEvent) {
+ if (event.key !== 'Escape' || event.isComposing || composing.value) return
+ if (gesture) { event.preventDefault(); finishGesture(true) }
+ else if (selected.value) { event.preventDefault(); clearSelection() }
+}
 function revealMatch() {
  const viewport = surface.value?.parentElement
  if (!viewport || !props.query.trim()) return
@@ -273,7 +288,7 @@ function revealMatch() {
 }
 watch(() => props.page.id, () => {
  generation++; finishGesture(true); imageRequest = undefined; setBusy(false); composing.value = false; emit('composing', false)
- dirtyBodies.clear(); markPending(); rendered.clear(); savedRange = undefined; refresh()
+ dirtyBodies.clear(); markPending(); rendered.clear(); selected.value = ''; savedRange = undefined; refresh()
 }, { immediate: true })
 watch(() => props.page.regions, () => { if (!gesture && !dirtyBodies.size) refresh() })
 watch(() => props.query, highlight)
@@ -283,10 +298,10 @@ defineExpose({ format, todo, chooseImage, addText, rememberSelection, focus, flu
 </script>
 
 <template>
- <div class="note-canvas-container" @keydown="globalKey">
-  <p class="note-canvas-hint"><Icon name="info" :size="16" />双击空白处添加文字区域 · 拖动顶部移动 · 拖动右下角调整大小</p>
+ <div class="note-canvas-container" @keydown="globalKey" @click="clickCanvas">
+  <p class="note-canvas-hint"><Icon name="info" :size="16" />双击空白处添加文字区域 · 选中后可移动和缩放 · 点击空白处取消选择</p>
   <div ref="surface" class="note-canvas" data-testid="notebook-canvas" :style="{ minWidth: `${extent.width}px`, minHeight: `${extent.height}px` }" @dblclick="doubleClick" @pointermove="pointerMove" @pointerup="pointerEnd($event)" @pointercancel="pointerEnd($event, true)" @lostpointercapture="pointerEnd($event, true)">
-   <section v-for="(region, index) in regions" :key="region.id" :ref="element => bindRegion(region.id, element)" class="note-region" :class="{ selected: selected === region.id, 'image-region': !!imageOf(region) }" :style="{ left: `${region.x}px`, top: `${region.y}px`, width: `${region.width}px`, minHeight: region.height ? `${region.height}px` : '40px' }" :data-region-id="region.id" :data-region-kind="imageOf(region) ? 'image' : 'text'" @pointerdown="selected = region.id">
+   <section v-for="(region, index) in regions" :key="region.id" :ref="element => bindRegion(region.id, element)" class="note-region" :class="{ selected: selected === region.id, 'image-region': !!imageOf(region) }" :style="{ left: `${region.x}px`, top: `${region.y}px`, width: `${region.width}px`, minHeight: region.height ? `${region.height}px` : '40px' }" :data-region-id="region.id" :data-region-kind="imageOf(region) ? 'image' : 'text'" :tabindex="imageOf(region) ? 0 : undefined" @pointerdown="selected = region.id" @click="selected = region.id" @focusin="selected = region.id">
     <div class="note-region-controls">
      <button type="button" class="note-region-move" :aria-label="`移动${imageOf(region) ? '图片' : '文字'}区域 ${index + 1}`" title="拖动移动；方向键微调，Shift 加速" :disabled="!editable" @pointerdown="startGesture($event, region, 'move')" @keydown="controlKey($event, region, 'move')"><svg class="ui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01" /></svg><span>{{ imageOf(region) ? '图片' : '文字区域' }}</span></button>
      <button type="button" class="note-region-delete" :aria-label="imageOf(region) ? `删除图片${imageOf(region)!.alt ? `：${imageOf(region)!.alt}` : ''}` : `删除文字区域 ${index + 1}`" title="删除区域" :disabled="!editable || busy" @click="removeRegion(region)"><Icon name="trash" :size="16" /></button>
@@ -301,5 +316,5 @@ defineExpose({ format, todo, chooseImage, addText, rememberSelection, focus, flu
 </template>
 
 <style scoped>
-.note-canvas-container{position:relative;min-width:0;min-height:0;overflow:auto;flex:1}.note-canvas-hint{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--note-muted);padding:0 24px;margin:4px 0 24px;white-space:nowrap}.note-canvas{position:relative;box-sizing:border-box;background-image:radial-gradient(var(--note-line) .7px,transparent .7px);background-size:20px 20px}.note-region{position:absolute;box-sizing:border-box;border:1px solid transparent;border-radius:5px;background:var(--note-surface);outline:none}.note-region:hover,.note-region:focus-within,.note-region.selected{border-color:color-mix(in srgb,var(--note-accent) 36%,var(--note-line))}.note-region-controls{position:absolute;left:-1px;right:-1px;bottom:100%;height:25px;display:flex;justify-content:space-between;align-items:center;opacity:0;pointer-events:none;border:1px solid var(--note-line);border-radius:6px 6px 0 0;background:var(--note-surface)}.note-region:hover .note-region-controls,.note-region:focus-within .note-region-controls,.note-region.selected .note-region-controls{opacity:1;pointer-events:auto}.note-region-controls button,.note-region-resize{display:inline-flex;align-items:center;justify-content:center;gap:5px;font:11px var(--ui-font);color:var(--note-muted);padding:2px 6px;border:0;background:transparent;border-radius:4px;cursor:pointer;box-sizing:border-box}.note-region-controls button:focus-visible,.note-region-resize:focus-visible{outline:2px solid var(--note-accent);outline-offset:2px}.note-region-controls button:hover,.note-region-resize:hover{color:var(--note-accent);background:color-mix(in srgb,var(--note-accent) 10%,transparent)}.note-region-controls .note-region-move{cursor:grab;touch-action:none;flex:1;justify-content:flex-start;height:23px}.note-region-controls .note-region-move:active{cursor:grabbing}.note-region-delete{height:23px;width:28px}.note-region-resize{position:absolute;right:-8px;bottom:-8px;width:22px;height:22px;cursor:nwse-resize;touch-action:none;background:var(--note-surface);border:1px solid var(--note-line);color:var(--note-accent);opacity:0;pointer-events:none}.note-region:hover .note-region-resize,.note-region:focus-within .note-region-resize,.note-region.selected .note-region-resize{opacity:1;pointer-events:auto}.note-region-body{font-family:var(--document-font);font-synthesis:weight style;min-height:40px;box-sizing:border-box;padding:10px 12px;outline:none;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.85}.note-region-body :deep(div){min-height:1.85em}.note-region-body :deep(h1){font-size:27px;margin:14px 0 8px;line-height:1.4}.note-region-body :deep(h2){font-size:22px;margin:12px 0 6px}.note-region-body :deep(h3){font-size:18px;margin:10px 0 5px}.note-region-body :deep(ul),.note-region-body :deep(ol){padding-left:26px;margin:8px 0}.note-region-body :deep(code){background:color-mix(in srgb,var(--note-muted) 12%,transparent);padding:2px 5px;border-radius:4px;font:14px/1.6 ui-monospace,monospace}.note-region-body :deep(input[type=checkbox]){accent-color:var(--note-accent);margin:0 10px 0 0;vertical-align:middle;width:15px;height:15px}.note-region-body :deep([data-note-type=todo]:has(input:checked)){color:var(--note-muted);text-decoration:line-through}.note-region-image{display:block;width:100%;object-fit:contain;user-select:none;border-radius:4px}.note-image-caption{font:11px/1.5 var(--ui-font);padding:4px 6px;overflow-wrap:anywhere}.note-image-caption mark{background:#ffd761;color:#312408;border-radius:2px}.note-image-input{display:none}.note-region-controls button:disabled,.note-region-resize:disabled{cursor:default;opacity:.4}
+.note-canvas-container{position:relative;min-width:0;min-height:0;overflow:auto;flex:1}.note-canvas-hint{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--note-muted);padding:0 24px;margin:4px 0 24px;white-space:nowrap}.note-canvas{position:relative;box-sizing:border-box;background-image:radial-gradient(var(--note-line) .7px,transparent .7px);background-size:20px 20px}.note-region{position:absolute;box-sizing:border-box;border:1px solid transparent;border-radius:5px;background:transparent;outline:none}.note-region.selected{border-color:color-mix(in srgb,var(--note-accent) 36%,var(--note-line));background:var(--note-surface)}.note-region-controls{position:absolute;left:-1px;right:-1px;bottom:100%;height:25px;display:flex;justify-content:space-between;align-items:center;opacity:0;visibility:hidden;pointer-events:none;border:1px solid var(--note-line);border-radius:6px 6px 0 0;background:var(--note-surface)}.note-region.selected .note-region-controls{opacity:1;visibility:visible;pointer-events:auto}.note-region-controls button,.note-region-resize{display:inline-flex;align-items:center;justify-content:center;gap:5px;font:11px var(--ui-font);color:var(--note-muted);padding:2px 6px;border:0;background:transparent;border-radius:4px;cursor:pointer;box-sizing:border-box}.note-region-controls button:focus-visible,.note-region-resize:focus-visible{outline:2px solid var(--note-accent);outline-offset:2px}.note-region-controls button:hover,.note-region-resize:hover{color:var(--note-accent);background:color-mix(in srgb,var(--note-accent) 10%,transparent)}.note-region-controls .note-region-move{cursor:grab;touch-action:none;flex:1;justify-content:flex-start;height:23px}.note-region-controls .note-region-move:active{cursor:grabbing}.note-region-delete{height:23px;width:28px}.note-region-resize{position:absolute;right:-8px;bottom:-8px;width:22px;height:22px;cursor:nwse-resize;touch-action:none;background:var(--note-surface);border:1px solid var(--note-line);color:var(--note-accent);opacity:0;visibility:hidden;pointer-events:none}.note-region.selected .note-region-resize{opacity:1;visibility:visible;pointer-events:auto}.note-region-body{font-family:var(--document-font);font-synthesis:weight style;min-height:40px;box-sizing:border-box;padding:10px 12px;outline:none;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.85}.note-region-body :deep(div){min-height:1.85em}.note-region-body :deep(h1){font-size:27px;margin:14px 0 8px;line-height:1.4}.note-region-body :deep(h2){font-size:22px;margin:12px 0 6px}.note-region-body :deep(h3){font-size:18px;margin:10px 0 5px}.note-region-body :deep(ul),.note-region-body :deep(ol){padding-left:26px;margin:8px 0}.note-region-body :deep(code){background:color-mix(in srgb,var(--note-muted) 12%,transparent);padding:2px 5px;border-radius:4px;font:14px/1.6 ui-monospace,monospace}.note-region-body :deep(input[type=checkbox]){accent-color:var(--note-accent);margin:0 10px 0 0;vertical-align:middle;width:15px;height:15px}.note-region-body :deep([data-note-type=todo]:has(input:checked)){color:var(--note-muted);text-decoration:line-through}.note-region-image{display:block;width:100%;object-fit:contain;user-select:none;border-radius:4px}.note-image-caption{font:11px/1.5 var(--ui-font);padding:4px 6px;overflow-wrap:anywhere}.note-image-caption mark{background:#ffd761;color:#312408;border-radius:2px}.note-image-input{display:none}.note-region-controls button:disabled,.note-region-resize:disabled{cursor:default;opacity:.4}
 </style>

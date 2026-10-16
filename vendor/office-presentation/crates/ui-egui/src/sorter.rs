@@ -204,13 +204,15 @@ fn place_slides(app: &mut SlideApp, ui: &mut Ui, g: &Grid<'_>, budget: &mut u32,
                 let img = crate::textures::device_pixel_rect(Rect::from_min_size(cell.min + vec2(18.0, 8.0), vec2(g.tw, g.th)), ppp);
                 rects.push((i, cell));
                 let p = ui.painter();
-                match app.textures.thumb(ui.ctx(), g.doc, i, (img.width() * ppp).round() as u32, budget) {
-                    Some(tex) => {
-                        p.image(tex.id(), img, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
-                    }
-                    None => {
-                        p.rect_filled(img, CornerRadius::ZERO, Color32::WHITE);
-                        need_more = true;
+                if ui.is_rect_visible(img) {
+                    match app.textures.thumb(ui.ctx(), g.doc, i, (img.width() * ppp).round() as u32, budget) {
+                        Some(tex) => {
+                            p.image(tex.id(), img, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+                        }
+                        None => {
+                            p.rect_filled(img, CornerRadius::ZERO, Color32::WHITE);
+                            need_more = true;
+                        }
                     }
                 }
                 let id = g.doc.slides.get(i).map(|s| s.id);

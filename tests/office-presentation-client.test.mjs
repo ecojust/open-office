@@ -24,6 +24,9 @@ function evaluate(source, require, globals = {}) {
 function harness(kind = 'presentation') {
   const word = kind === 'word', format = word ? 'docx' : 'pptx'
   const state = new Map(), calls = [], document = { baseURI: 'http://localhost/', activeElement: null }
+  const font = { loadFailures: 0, registrationFailures: 0, alreadyAdded: false, chinese: true, htmlResponse: false, data: undefined }
+  const fontHeader = new Uint8Array(28)
+  fontHeader[1] = 1; fontHeader[5] = 1
   let receive, documentId = 0, pendingText, startGate
   class Element {
     children = []; parentElement; style = {}; dataset = {}; isConnected = true; listeners = new Map()
@@ -55,6 +58,12 @@ function harness(kind = 'presentation') {
     async flush(id) { calls.push(['flush', id]); if (pendingText?.id === id) { edit(id, pendingText.text); pendingText = undefined } },
     command(id, commandId, params) {
       calls.push(['command', id, commandId]); const value = JSON.parse(params), doc = state.get(id)
+      if (commandId === 'font.add') {
+        font.data = value.data
+        if (font.registrationFailures-- > 0) return JSON.stringify({ ok: false, error: 'font initialization temporarily failed', snapshot: JSON.parse(snapshot(id)) })
+        if (font.alreadyAdded) return JSON.stringify({ ok: false, error: `${font.chinese ? '无法执行“添加字体”：' : 'invalid parameters for `font.add`: '}not a font OfficePresentation can read (or already added)`, snapshot: JSON.parse(snapshot(id)) })
+        return JSON.stringify({ ok: true, result: { faces: 1 }, snapshot: JSON.parse(snapshot(id)) })
+      }
       if (commandId === 'text.set') edit(id, value.text)
       else if (commandId === 'edit.undo' && doc.undo.length) { doc.redo.push(doc.text); doc.text = doc.undo.pop(); doc.revision++; doc.dirty = true; doc.canRedo = true }
       else if (commandId === 'edit.redo' && doc.redo.length) { doc.undo.push(doc.text); doc.text = doc.redo.pop(); doc.revision++; doc.dirty = true }
@@ -67,10 +76,17 @@ function harness(kind = 'presentation') {
     setTheme(value) { calls.push(['theme', value]) },
     destroy() { calls.push(['destroy']) },
   }
-  const globals = { document, window: { dispatchEvent() {} }, HTMLElement: Element, HTMLInputElement: Input, Event: class { constructor(type) { this.type = type } }, FocusEvent: class { constructor(type) { this.type = type } } }
+  const globals = {
+    document, window: { dispatchEvent() {} }, HTMLElement: Element, HTMLInputElement: Input, Event: class { constructor(type) { this.type = type } }, FocusEvent: class { constructor(type) { this.type = type } },
+    async fetch(url) {
+      calls.push(['fetch', url])
+      return { ok: font.loadFailures-- <= 0, arrayBuffer: async () => font.htmlResponse ? new TextEncoder().encode('<html>Not found</html>').buffer : fontHeader.slice().buffer }
+    },
+  }
   const client = evaluate(word ? wordClientSource : clientSource, name => {
-    if (name === '../../shared/document') return { base64ToBytes }
+    if (name === '../../shared/document') return { base64ToBytes, bytesToBase64 }
     if (name === '../../shared/id') return { createId }
+    if (name === '../../../assets/fonts/ui/WenQuanYiMicroHei-Regular.ttf?url') return { default: '/assets/document-font.ttf' }
     if (name === `http://localhost/office-${kind}/office-${kind}.js`) return { default: async () => {}, createHost(callback) { receive = callback; return host } }
     throw Error(`Unexpected import ${name}`)
   }, globals)
@@ -89,8 +105,73 @@ function harness(kind = 'presentation') {
     }, { ...globals, defineProps: () => props, withDefaults: value => value, defineEmits: () => (...event) => events.push(event), defineExpose(value) { exposed = value } }))
     return { props, events, editor: exposed, dispose() { unmount.forEach(callback => callback()); scope.stop() } }
   }
-  return { client, open, source, state, calls, document, Element, component, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value } }
+  return { client, open, source, state, calls, document, Element, component, font, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value } }
 }
+
+test('Deck registers the bundled document font once for concurrent sessions without edits or save acknowledgements', async () => {
+  const h = harness(), sessions = await Promise.all([h.open(), h.open()])
+  assert.equal(h.calls.filter(call => call[0] === 'fetch').length, 1)
+  assert.equal(h.calls.filter(call => call[2] === 'font.add').length, 1)
+  assert.equal(base64ToBytes(h.font.data).length, 28, 'Font bytes are passed to the Rust font database')
+  assert.equal(h.calls.filter(call => call[0] === 'saved').length, 0)
+  for (const session of sessions) {
+    assert.equal(session.snapshot.dirty, false)
+    assert.equal(session.snapshot.revision, 0)
+    assert.deepEqual(h.state.get(session.id).undo, [])
+    await session.close(true)
+  }
+})
+
+test('Deck font download failures retry without creating orphan sessions', async () => {
+  const h = harness(); h.font.loadFailures = 1
+  await assert.rejects(h.open(), /字体加载失败/)
+  assert.equal(h.state.size, 0)
+  assert.equal(h.calls.filter(call => call[0] === 'prepare').length, 0)
+  const session = await h.open()
+  assert.equal(h.calls.filter(call => call[0] === 'fetch').length, 2)
+  assert.equal(h.state.size, 1)
+  assert.equal(session.snapshot.dirty, false)
+  await session.close(true)
+})
+
+test('Deck failed font registration closes the unpublished session and retries on the next open', async () => {
+  const h = harness(); h.font.registrationFailures = 1
+  await assert.rejects(h.open(), /font initialization temporarily failed/)
+  const preparedId = h.calls.find(call => call[0] === 'prepare')[1]
+  assert.equal(h.state.size, 0)
+  assert.ok(h.calls.some(call => call[0] === 'close' && call[1] === preparedId))
+  await assert.rejects(h.client.inspectOfficePresentationSession(preparedId), /尚未打开/)
+  const session = await h.open()
+  assert.equal(h.calls.filter(call => call[2] === 'font.add').length, 2)
+  assert.equal(session.snapshot.dirty, false)
+  assert.deepEqual(h.state.get(session.id).undo, [])
+  await session.close(true)
+})
+
+test('Deck accepts an already embedded document font and keeps undo limited to user edits', async () => {
+  for (const chinese of [false, true]) {
+    const h = harness(); h.font.alreadyAdded = true; h.font.chinese = chinese
+    const first = await h.open(), second = await h.open()
+    assert.equal(h.calls.filter(call => call[2] === 'font.add').length, 1)
+    assert.equal(first.snapshot.dirty, false)
+    await first.command('text.set', { text: '我的演示' })
+    assert.deepEqual(h.state.get(first.id).undo, [''])
+    await first.command('edit.undo')
+    assert.equal((await first.query('text.get')).text, '')
+    assert.equal(second.snapshot.dirty, false)
+    await first.close(true); await second.close(true)
+  }
+})
+
+test('Deck rejects a font asset HTML fallback before preparing a document and permits retry', async () => {
+  const h = harness(); h.font.htmlResponse = true
+  await assert.rejects(h.open(), /字体文件无效/)
+  assert.equal(h.calls.filter(call => call[0] === 'prepare').length, 0)
+  h.font.htmlResponse = false
+  const session = await h.open()
+  assert.equal(h.state.size, 1)
+  await session.close(true)
+})
 
 test('Deck media input accepts the Rust 32 MiB boundary and rejects one byte beyond for every media kind', () => {
   for (const [purpose, name] of [['picture', 'photo.PNG'], ['audio', 'track.mp3'], ['video', 'clip.mp4']]) {
@@ -337,3 +418,32 @@ test('Deck component failed direct replacement preserves the previous presentati
   assert.ok(mounted.events.some(event => event[0] === 'error' && /Invalid/.test(event[1])))
   mounted.dispose()
 })
+
+for (const kind of ['word', 'presentation']) {
+  test(`${kind} switching settles live input without exporting or acknowledging saved bytes`, async () => {
+    const h = harness(kind), mounted = h.component(), editor = mounted.editor
+    try {
+      const original = await editor.inspect()
+      await editor.discardChanges()
+      assert.equal(h.calls.filter(call => call[0] === 'export' || call[0] === 'saved').length, 0, 'An imported clean document needs no export receipt to close')
+      h.pending(original.sessionId, 'queued live content')
+      const settled = await editor.prepareDeactivate()
+      assert.equal(settled.documentId, original.documentId)
+      assert.equal(settled.revision, original.revision + 1)
+      assert.equal(settled.dirty, true)
+      assert.equal(h.state.get(original.sessionId).text, 'queued live content')
+      assert.equal(h.calls.filter(call => call[0] === 'export' || call[0] === 'saved').length, 0, 'Settling input is neither serialization nor a save')
+      await assert.rejects(editor.discardChanges(), /未保存/)
+      const receipt = await editor.exportFile()
+      await assert.rejects(editor.discardChanges(), /未保存/, 'An in-memory export must not authorize discarding unsaved content')
+      await editor.markSaved(receipt.base64)
+      await editor.discardChanges()
+      await editor.undo()
+      assert.equal(h.state.get(original.sessionId).text, '')
+      await editor.redo()
+      assert.equal(h.state.get(original.sessionId).text, 'queued live content', 'Switch preparation and save acknowledgment preserve undo history')
+      await assert.rejects(editor.markSaved(receipt.base64), /又有修改/)
+      await assert.rejects(editor.discardChanges(), /未保存/)
+    } finally { mounted.dispose() }
+  })
+}

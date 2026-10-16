@@ -59,13 +59,16 @@ async function markSaved(base64?: string, options: { background?: boolean } = {}
   try { await session!.markSaved(receipt.documentId, receipt.revision, options) }
   catch (cause) { emit('dirty', true); throw cause }
 }
+async function prepareDeactivate() {
+  const token = generation
+  await flush()
+  if (disposed || generation !== token || !session) throw Error('文稿已切换，请重试。')
+  const { documentId, revision, dirty } = session.snapshot
+  return { documentId, revision, dirty }
+}
 async function discardChanges(options: { force?: boolean } = {}) {
   if (options.force) return
-  await flush()
-  const receipt = lastExport, current = await session!.inspect()
-  // App calls this after an in-memory tab snapshot as well as a saved file.
-  // Validate its receipt only; retain the live document and undo history.
-  if (!receipt || receipt.generation !== generation || receipt.documentId !== current.documentId || receipt.revision !== current.revision) throw Error('导出后文稿又有修改，请先保存当前内容，再切换文稿。')
+  if ((await prepareDeactivate()).dirty) throw Error('文稿还有未保存的修改，请先保存或确认不保存后关闭。')
 }
 async function undo() { await flush(); await session!.command('edit.undo') }
 async function redo() { await flush(); await session!.command('edit.redo') }
@@ -165,7 +168,7 @@ onBeforeUnmount(() => {
   void session?.close(true).catch(cause => console.error('OfficeWord session cleanup failed', cause))
   printFrame?.remove(); if (printUrl) URL.revokeObjectURL(printUrl)
 })
-defineExpose({ exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, syncRevision, canBackgroundExport, command })
+defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, syncRevision, canBackgroundExport, command })
 </script>
 
 <template>

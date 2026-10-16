@@ -21,30 +21,7 @@ pub(crate) fn clean_error(error: impl std::fmt::Display) -> String {
 }
 
 fn validate_package(bytes: &[u8]) -> Result<(), String> {
-    let mut package = zip::ZipArchive::new(std::io::Cursor::new(bytes)).map_err(clean_error)?;
-    if package.len() > 10_000 {
-        return Err("演示文稿包含过多部件。".into());
-    }
-    let mut expanded = 0u64;
-    let mut presentation = false;
-    for index in 0..package.len() {
-        let file = package.by_index(index).map_err(clean_error)?;
-        expanded = expanded.checked_add(file.size()).ok_or("演示文稿解压大小超出限制。")?;
-        if expanded > 256 * 1024 * 1024 {
-            return Err("演示文稿解压后不能超过 256 MiB。".into());
-        }
-        let name = file.name().to_ascii_lowercase();
-        if name == "ppt/presentation.xml" {
-            presentation = true;
-        }
-        if name.ends_with("vbaproject.bin") || name.starts_with("ppt/activex/") {
-            return Err("暂不支持包含宏或 ActiveX 控件的演示文稿；原文件保持不变。".into());
-        }
-    }
-    if !presentation {
-        return Err("请选择有效的 PPTX 演示文稿。".into());
-    }
-    Ok(())
+    office_presentation_engine::cmd::template::validate_package(bytes).map_err(clean_error)
 }
 
 impl Entry {
@@ -90,6 +67,11 @@ impl Entry {
     pub fn commit_pending(&mut self) -> Result<(), String> {
         self.app.commit_pending()?;
         self.sync()
+    }
+    pub fn apply_template(&mut self, params: Value) -> Result<Value, String> {
+        let result = self.app.apply_host_template(params)?;
+        self.sync()?;
+        Ok(result)
     }
     pub fn matches(&self, document_id: f64, revision: f64) -> bool {
         f64::from(self.document_id) == document_id && f64::from(self.revision) == revision
@@ -254,5 +236,23 @@ mod tests {
         let pdf = entry.export("pdf").unwrap();
         assert!(pdf.starts_with(b"%PDF-"));
         assert!(entry.dirty());
+    }
+    #[test]
+    fn template_switch_preserves_host_identity_and_invalidates_previous_save_receipts() {
+        let mut entry = blank();
+        let original = entry.app.session.doc().unwrap().doc.clone();
+        let before = entry.snapshot("one", None).unwrap();
+        let bytes = office_presentation_pptx::export(&office_presentation_model::defaults::new_presentation(None)).unwrap();
+        entry.apply_template(json!({"data":office_presentation_engine::cmd::base64_encode(&bytes)})).unwrap();
+        let after = entry.snapshot("one", None).unwrap();
+        assert_eq!(after["documentId"], before["documentId"]);
+        assert_eq!(after["name"], before["name"]);
+        assert!(after["revision"].as_u64().unwrap() > before["revision"].as_u64().unwrap());
+        assert_eq!(after["dirty"], true);
+        assert_eq!(after["canUndo"], true);
+        assert!(!entry.mark_saved(1.0, before["revision"].as_f64().unwrap()).unwrap());
+        entry.app.run("edit.undo", json!({})).unwrap();
+        assert!(Arc::ptr_eq(&entry.app.session.doc().unwrap().doc, &original));
+        assert!(!entry.dirty());
     }
 }

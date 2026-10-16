@@ -2760,6 +2760,19 @@ mod tests {
         app.session.active().unwrap().selection.shapes.iter().map(|i| i.0 as u64).collect()
     }
 
+    #[test]
+    fn offscreen_slide_thumbnails_do_not_keep_rendering_in_idle_frames() {
+        let mut harness = canvas_harness();
+        for _ in 0..24 {
+            harness.state_mut().session.execute("slide.new", &json!({"layout": "blank"})).unwrap();
+        }
+        harness.run_steps(10);
+        let cached = harness.state().textures.thumb_count();
+        assert!(cached > 0 && cached < 24, "only the visible thumbnail rows should render: {cached}");
+        harness.run_steps(10);
+        assert_eq!(harness.state().textures.thumb_count(), cached);
+    }
+
     fn shape_x(app: &SlideApp, id: u64) -> f64 {
         let st = app.session.active().unwrap();
         st.shape(office_presentation_model::ShapeId(id as u32)).and_then(|s| s.xfrm).unwrap().x

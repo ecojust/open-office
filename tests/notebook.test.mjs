@@ -193,7 +193,7 @@ const componentSource=(await readFile(new URL('../src/components/NotebookEditor.
 async function component() {
  const emitted=[], unmount=[], exposed={}
  const props=vue.reactive({document:{id:'test-note',name:'测试.oonote',base64:'',extension:'oonote',kind:'note'},active:true,disabled:false,theme:'light'})
- const source=componentSource+'\nexports.controls={bodyComposing,titleComposing,pending,titlePending,titleChanged,canvasBusy,dialog,session:()=>session,change,confirmDialog,deletePage,deleteSection,currentSection,currentPage,model};'
+ const source=componentSource+'\nexports.controls={bodyComposing,titleComposing,pending,titlePending,titleDraft,titleChanged,canvasBusy,dialog,session:()=>session,change,confirmDialog,deletePage,deleteSection,currentSection,currentPage,model};'
  const module={exports:{}}
  const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
  vm.runInNewContext(output,{
@@ -239,10 +239,14 @@ test('actual note component deletion leaves document untouched until confirmatio
 test('invalid title can be corrected without discarding a separate invalid body draft',async()=>{
  const editor=await component();const {controls,exposed}=editor
  controls.titleChanged({target:{value:'x'.repeat(201)}});assert.equal(controls.titlePending.value,true);assert.equal(await exposed.canBackgroundExport(),false)
+ assert.equal(controls.titleDraft.value,'x'.repeat(201),'Rejected text remains an editable draft rather than being replaced by the prior model title')
+ editor.props.disabled=true;await vue.nextTick();editor.props.disabled=false;await vue.nextTick()
+ await assert.rejects(exposed.prepareDeactivate());assert.equal(controls.titleDraft.value,'x'.repeat(201))
  assert.equal(editor.emitted.some(event=>event[0]==='error'),false,'Recoverable title errors must not leave a shell-level load error')
  await assert.rejects(exposed.exportFile({background:true}))
  controls.pending.value=true
  controls.titleChanged({target:{value:'合法标题'}});assert.equal(controls.titlePending.value,false);assert.equal(controls.pending.value,true);assert.equal(await exposed.canBackgroundExport(),false)
+ assert.equal(controls.titleDraft.value,undefined,'Only a valid title commit clears the editable draft')
  controls.pending.value=false;assert.equal(await exposed.canBackgroundExport(),true)
  const result=await exposed.exportFile({background:true});assert.equal(model.decodeNotebook(documentHelpers.base64ToBytes(result.base64)).sections[0].pages[0].title,'合法标题')
  editor.dispose()
@@ -258,4 +262,33 @@ test('contenteditable block insertion inside active bold keeps todo structure, c
  const notebook=model.createNotebook();notebook.sections[0].pages[0].regions[0].blocks=blocks
  const reopened=model.decodeNotebook(model.encodeNotebook(notebook));assert.deepEqual(reopened.sections[0].pages[0].regions[0].blocks.find(block=>block.type==='todo'),task)
  assert.deepEqual(dom.blocksFromDom({childNodes:[wrapper]}).find(block=>block.type==='todo'),task)
+})
+
+test('note switching preserves live content and undo while only an exact save receipt allows clean close', async () => {
+ const mounted=await component(), {controls,exposed}=mounted
+ try {
+  const original=await exposed.inspect(), session=controls.session()
+  const exportFile=session.export.bind(session);let exports=0
+  session.export=(...args)=>{exports++;return exportFile(...args)}
+  await exposed.discardChanges()
+  assert.equal(exports,0,'An initially clean notebook does not need an export receipt to close')
+  controls.titleChanged({target:{value:'保留的笔记标题'}})
+  const settled=await exposed.prepareDeactivate()
+  assert.equal(settled.documentId,original.documentId);assert.equal(settled.revision,original.revision+1);assert.equal(settled.dirty,true)
+  assert.equal(exports,0,'Switching preserves the live notebook without encoding its file')
+  await assert.rejects(exposed.discardChanges(),/未保存/)
+  const receipt=await exposed.exportFile()
+  await assert.rejects(exposed.discardChanges(),/未保存/,'Exporting into memory is not a save')
+  await exposed.markSaved(receipt.base64);await exposed.discardChanges()
+  await exposed.undo();assert.notEqual(controls.model.value.sections[0].pages[0].title,'保留的笔记标题')
+  await exposed.redo();assert.equal(controls.model.value.sections[0].pages[0].title,'保留的笔记标题')
+  await assert.rejects(exposed.markSaved(receipt.base64),/又有修改/,'Undo/redo must not revive a stale save receipt')
+  for(const key of ['bodyComposing','titleComposing','pending','titlePending','canvasBusy','dialog']){
+   controls[key].value=key==='dialog'?{}:true
+   await assert.rejects(exposed.prepareDeactivate())
+   await assert.rejects(exposed.discardChanges())
+   assert.equal(controls.model.value.sections[0].pages[0].title,'保留的笔记标题')
+   controls[key].value=key==='dialog'?undefined:false
+  }
+ } finally {mounted.dispose()}
 })

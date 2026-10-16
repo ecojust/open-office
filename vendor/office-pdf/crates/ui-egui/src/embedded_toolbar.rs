@@ -12,7 +12,7 @@ pub(crate) fn drawn(ctx: &egui::Context) -> Vec<Value> {
     ctx.data(|data| data.get_temp(egui::Id::new(RECORD))).unwrap_or_default()
 }
 
-fn record(ui: &egui::Ui, id: &str, response: &egui::Response) {
+pub(crate) fn record(ui: &egui::Ui, id: &str, response: &egui::Response) {
     let r = response.rect;
     ui.ctx().data_mut(|data| {
         data.get_temp_mut_or_default::<Vec<Value>>(egui::Id::new(RECORD))
@@ -284,6 +284,11 @@ pub(crate) fn show(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
                     egui::Popup::menu(&view).show(|ui| view_menu(app, ui));
                     let more = button(ui, "advanced", "sliders-horizontal", "高级", false, false);
                     egui::Popup::menu(&more).show(|ui| advanced(app, ui));
+                    if app.unfinished_comment().is_some()
+                        && button(ui, "comment-draft", "message-square-text", "待完成批注", app.comment_draft_dialog.is_some(), false).clicked()
+                    {
+                        app.open_comment_drafts();
+                    }
                 });
             });
             if app.active.is_some() {

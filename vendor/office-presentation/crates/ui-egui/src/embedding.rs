@@ -24,6 +24,42 @@ impl SlideApp {
         self.notes_buf.2.edited
     }
 
+    /// Commit the old deck's notes only after its replacement has been parsed successfully.
+    /// The registered engine command retains one undo step for the entire template switch.
+    pub fn apply_host_template(&mut self, params: Value) -> Result<Value, String> {
+        if self.has_pending_input() || self.session.active().is_some_and(|doc| doc.interaction.is_some()) {
+            return Err("请先完成当前输入或拖动，再切换模板。".into());
+        }
+        // Preflight is intentionally separate: an invalid template must not consume a notes draft.
+        office_presentation_engine::cmd::template::parse(&params).map_err(|error| error.to_string())?;
+        let before = self.session.doc().map_err(|error| error.to_string())?.clone();
+        let notes = self.notes_buf.clone();
+        let journal_len = self.session.journal.len();
+        let applied = self.commit_pending().and_then(|()| self.run("template.applyBytes", params));
+        if applied.is_err() {
+            *self.session.doc_mut().map_err(|error| error.to_string())? = before;
+            self.notes_buf = notes;
+            self.session.journal.truncate(journal_len);
+            return applied;
+        }
+        self.discard_pending();
+        self.show = None;
+        self.anim_preview = None;
+        self.media.set_document(None);
+        self.textures = Default::default();
+        self.thumb_drag = None;
+        self.eyedropper = None;
+        self.selpane = Default::default();
+        self.sorter = Default::default();
+        self.ui.smartart_drafts = Default::default();
+        self.ui.smartart_focus = None;
+        self.ui.comment_focus = None;
+        self.ui.view = crate::ViewMode::Normal;
+        self.ui.zoom = None;
+        self.session.tool = Default::default();
+        applied
+    }
+
     pub fn commit_pending(&mut self) -> Result<(), String> {
         if self.has_pending_input() {
             return Err("请完成当前输入法输入后再保存。".into());
@@ -123,5 +159,57 @@ impl SlideApp {
         for command in commands {
             let _ = self.run(command, json!({}));
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod template_tests {
+    use super::*;
+    use crate::{Services, notes};
+    use office_presentation_engine::{DocState, Session, cmd::base64_encode};
+    use office_presentation_model::{TextBody, defaults};
+    use std::sync::Arc;
+
+    fn app_with_notes_draft() -> SlideApp {
+        let mut session = Session::new();
+        session.add_document(DocState::new(defaults::new_presentation(None), None, "当前文稿".into()));
+        let uid = session.doc().unwrap().uid;
+        let mut app = SlideApp::new(session, Services::default());
+        let body = TextBody::from_text("切换前尚未提交的备注");
+        let mut draft = notes::Draft::new(&body);
+        draft.edited = true;
+        app.notes_buf = (uid, 0, draft);
+        app
+    }
+
+    #[test]
+    fn host_template_failure_keeps_notes_draft_and_exact_document() {
+        let mut app = app_with_notes_draft();
+        let before = app.session.doc().unwrap().doc.clone();
+        let draft = app.embedding_draft();
+        assert!(app.apply_host_template(json!({"data":base64_encode(b"broken")})).is_err());
+        assert!(Arc::ptr_eq(&app.session.doc().unwrap().doc, &before));
+        assert_eq!(app.embedding_draft(), draft);
+        assert!(app.session.doc().unwrap().history.undo.is_empty());
+    }
+
+    #[test]
+    fn host_template_success_commits_old_notes_then_undo_restores_them() {
+        let mut app = app_with_notes_draft();
+        let mut source = defaults::new_presentation(None);
+        Arc::make_mut(&mut source.slides[0]).notes = TextBody::from_text("模板自己的备注");
+        let bytes = office_presentation_pptx::export(&source).unwrap();
+        let result = app.apply_host_template(json!({"data":base64_encode(&bytes)})).unwrap();
+        assert_eq!(result["slides"], 1);
+        assert_eq!(app.session.documents().len(), 1);
+        assert!(!app.has_notes_draft());
+        assert_eq!(app.session.doc().unwrap().doc.slides[0].notes_text(), "模板自己的备注");
+        app.commit_pending().unwrap();
+        assert_eq!(app.session.doc().unwrap().doc.slides[0].notes_text(), "模板自己的备注");
+        app.run("edit.undo", json!({})).unwrap();
+        assert_eq!(app.session.doc().unwrap().doc.slides[0].notes_text(), "切换前尚未提交的备注");
+        app.run("edit.redo", json!({})).unwrap();
+        assert_eq!(app.session.doc().unwrap().doc.slides[0].notes_text(), "模板自己的备注");
     }
 }

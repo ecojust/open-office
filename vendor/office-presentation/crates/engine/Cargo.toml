@@ -25,10 +25,10 @@ i_overlay = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
 image = { workspace = true }
+zip = { workspace = true }
 
 [dev-dependencies]
 office-presentation-anim = { workspace = true }
-zip = { workspace = true }
 
 # The browser clock for comment timestamps (wasm has no std::time::SystemTime).
 [target.'cfg(target_arch = "wasm32")'.dependencies]

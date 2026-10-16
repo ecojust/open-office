@@ -8,6 +8,9 @@ import { createAutosaveScheduler, type AutosaveTarget } from './shared/autosave'
 import RustWordEditor from './components/RustWordEditor.vue'
 import RustSheetEditor from './components/RustSheetEditor.vue'
 import RustPresentationEditor from './components/RustPresentationEditor.vue'
+import PresentationTemplates from './components/PresentationTemplates.vue'
+import { listPresentationTemplates, loadPresentationTemplate, savePresentationTemplate, deletePresentationTemplate, normalizePresentationTemplateName, type PresentationTemplate } from './presentation/templates'
+import type { OfficePresentationSnapshot } from './presentation/rust/office-presentation-types'
 import RustPdfEditor from './components/RustPdfEditor.vue'
 import * as native from './native'
 import { smokeAwait, smokeFailure, smokeFeatures, smokeRequested, smokeStage } from './smoke'
@@ -47,8 +50,11 @@ function revealActiveTab() {
   const bar = tabBar.value, tab = bar?.querySelector<HTMLElement>('.document-tab.active')
   if (home.value || !bar?.clientWidth || !tab) return
   const viewport = bar.getBoundingClientRect(), item = tab.getBoundingClientRect()
-  if (item.left < viewport.left) bar.scrollLeft += item.left - viewport.left
-  else if (item.right > viewport.right) bar.scrollLeft += item.right - viewport.right
+  const left = bar.scrollLeft + item.left - viewport.left
+  // Keep scrolling local to the tab list, and align oversized tabs by their start.
+  const right = left + Math.min(item.width, bar.clientWidth)
+  if (left < bar.scrollLeft - 1) bar.scrollLeft = left
+  else if (right > bar.scrollLeft + bar.clientWidth + 1) bar.scrollLeft = right - bar.clientWidth
 }
 watch([activeKey, home], revealActiveTab, { flush: 'post' })
 onMounted(() => {
@@ -91,7 +97,7 @@ function setRustSheetHandle(id:string,handle:unknown) {
   if(handle)rustSheetHandles.set(id,handle as EditorHandle)
   else rustSheetHandles.delete(id)
 }
-type PresentationEditorHandle = EditorHandle & { present(startPage?: number): Promise<void>; stopPresentation(): void | Promise<void> }
+type PresentationEditorHandle = Omit<EditorHandle, 'inspect'> & { present(startPage?: number): Promise<void>; stopPresentation(): void | Promise<void>; inspect(): Promise<OfficePresentationSnapshot>; applyTemplate(base64: string): Promise<OfficePresentationSnapshot> }
 const rustPresentationEntries = shallowRef<{document:NativeDocument;prepared?:PreparedRustPresentationDocument}[]>([])
 const rustPresentationHandles = new Map<string,PresentationEditorHandle>()
 function setRustPresentationDocument(document?:NativeDocument,prepared?:PreparedRustPresentationDocument) {
@@ -137,9 +143,16 @@ const help = ref(false), search = ref(''), closeTarget = ref<Tab | 'window' | 'a
 const recentList = ref<HTMLElement>()
 watch(search, () => { if(recentList.value) recentList.value.scrollTop = 0 }, { flush: 'post' })
 const saveAsDraft = ref<{ key:string; kind:Kind; format:SaveExtension; name:string; error:string } | null>(null)
+type TemplateDraft = { kind:'save'; key:string; name:string; error:string } | { kind:'apply'|'delete'; key:string; template:PresentationTemplate; error:string }
+const templateDraft = ref<TemplateDraft | null>(null), templateDialog = ref<HTMLElement>()
+const templatePanelOpen = ref(false), templateListLoading = ref(false), templateListError = ref('')
+const presentationTemplates = shallowRef<PresentationTemplate[]>([])
+let templateListRequest = 0
+useDialogFocus(templateDialog)
+watch([templatePanelOpen, activeRustPresentation, home], () => nextTick(() => window.dispatchEvent(new Event('resize'))))
 const composing = ref(false), backgroundSaving = ref(false)
-const globalActionsBlocked = computed(() => !!busy.value || !!saveAsDraft.value || !!closeTarget.value || help.value)
-const editorInputBlocked = computed(() => (!!busy.value && !backgroundSaving.value) || !!saveAsDraft.value || !!closeTarget.value || help.value)
+const globalActionsBlocked = computed(() => !!busy.value || !!saveAsDraft.value || !!templateDraft.value || !!closeTarget.value || help.value)
+const editorInputBlocked = computed(() => (!!busy.value && !backgroundSaving.value) || !!saveAsDraft.value || !!templateDraft.value || !!closeTarget.value || help.value)
 const currentDocument = computed(() => home.value ? undefined : active.value)
 const documentActionsDisabled = computed(() => globalActionsBlocked.value || !currentDocument.value?.ready)
 const newMenu = ref<HTMLDetailsElement>()
@@ -255,13 +268,13 @@ async function capture(tab:Tab) {
 async function stash() {
   const tab=active.value
   if(!tab || tab.loadError) return
-  // Dirty notifications arrive asynchronously. Always snapshot the actual loaded model.
-  // Export refuses pending PDF drafts; Rust editors verify this exact export revision.
-  const snapshot=await capture(tab)
-  await snapshot.handle.discardChanges?.()
-  // Import-only formats retain their conversion requirement across tab switches.
-  tab.requiresSaveAs=tab.requiresSaveAs||isImportOnly(tab.document.extension)
-  tab.document=snapshot.document
+  // Every open tab retains its live model and undo history. Settle queued input
+  // before hiding it, but leave file bytes, identity and save receipts untouched.
+  const handle=requireEditor(tab), snapshot=await handle.prepareDeactivate()
+  if(activeKey.value!==tab.key||handleFor(tab)!==handle)throw Error('文档已切换，本次切换已取消。')
+  // Notifications can lag behind the final input batch; a new unsaved document
+  // must also remain dirty even when its initial engine model is unchanged.
+  if(snapshot.dirty)tab.dirty=true
 }
 async function activate(tab:Tab) {
   if(activeKey.value!==tab.key) {
@@ -432,13 +445,74 @@ function previewSlides(startPage=0) {
     await handle.present(startPage)
   })
 }
+async function refreshPresentationTemplates() {
+  const request = ++templateListRequest
+  templateListLoading.value = true; templateListError.value = ''
+  try {
+    const items = await listPresentationTemplates()
+    if (!appDisposed && request === templateListRequest) presentationTemplates.value = items
+  } catch (cause) {
+    if (!appDisposed && request === templateListRequest) templateListError.value = message(cause)
+  } finally {
+    if (!appDisposed && request === templateListRequest) templateListLoading.value = false
+  }
+}
+function togglePresentationTemplates() {
+  if (documentActionsDisabled.value || !activeRustPresentation.value) return
+  templatePanelOpen.value = !templatePanelOpen.value
+  if (templatePanelOpen.value) void refreshPresentationTemplates()
+}
+function openPresentationTemplateDialog(kind:'save'|'apply'|'delete', template?:PresentationTemplate) {
+  const tab = currentDocument.value
+  if (documentActionsDisabled.value || tab?.document.kind !== 'presentation') return
+  if (kind === 'save') templateDraft.value = { kind, key:tab.key, name:Array.from(tab.document.name.replace(/\.[^.]+$/, '')).slice(0,60).join(''), error:'' }
+  else if (template && (kind !== 'delete' || template.source === 'custom')) templateDraft.value = { kind, key:tab.key, template, error:'' }
+}
+function cancelPresentationTemplateDialog() { if (!busy.value) templateDraft.value = null }
+async function confirmPresentationTemplate() {
+  const draft = templateDraft.value
+  if (!draft || busy.value) return
+  draft.error = ''
+  try {
+    const name = draft.kind === 'save' ? normalizePresentationTemplateName(draft.name) : ''
+    await editorTransaction(draft.kind === 'save' ? '正在保存模板' : draft.kind === 'apply' ? '正在切换模板' : '正在删除模板', async () => {
+      const tab = currentDocument.value, handle = rustPresentationHandles.get(draft.key)
+      if (!tab?.ready || tab.key !== draft.key || tab.document.kind !== 'presentation' || !handle) throw Error('当前演示文稿已切换，请重新选择模板操作。')
+      if (draft.kind === 'save') {
+        const exported = await handle.exportFile({format:'pptx'}), snapshot = await handle.inspect()
+        if (exported.extension !== 'pptx' || exported.revision !== `${snapshot.documentId}:${snapshot.revision}`) throw Error('演示内容已变化，请重新保存模板。')
+        await savePresentationTemplate({name,base64:exported.base64,slideCount:snapshot.slides.length})
+        status.value = `已将“${name}”保存到我的模板`
+      } else if (draft.kind === 'apply') {
+        const source = await loadPresentationTemplate(draft.template)
+        if (currentDocument.value?.key !== draft.key) throw Error('当前演示文稿已切换，模板切换已取消。')
+        const snapshot = await handle.applyTemplate(source.base64)
+        tab.dirty = snapshot.dirty; tab.autoSavedAt = undefined
+        tab.importWarnings = [...(snapshot.warnings ?? [])]
+        autosaveWaiting.value = undefined
+        status.value = `已切换为“${draft.template.name}”，可通过撤销恢复`
+      } else {
+        await deletePresentationTemplate(draft.template.id)
+        status.value = `已删除模板“${draft.template.name}”`
+      }
+      templateDraft.value = null
+      if (draft.kind !== 'apply') await refreshPresentationTemplates()
+    })
+  } catch (cause) {
+    if (templateDraft.value === draft) {
+      draft.error = message(cause)
+      await nextTick()
+      templateDialog.value?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled)')?.focus()
+    }
+  }
+}
 function changeTab(tab:Tab) {void task('正在切换文档',()=>activate(tab))}
 async function removeTab(tab:Tab, discardConfirmed=false) {
   if(tab.key===activeKey.value) {
     if(tab.ready)await editor()?.discardChanges?.({force:discardConfirmed})
     await rustPresentationHandles.get(tab.key)?.stopPresentation()
     const next=tabs.value.find(t=>t.key!==tab.key)
-    // Do not ask stash() to export a tab whose close was already checked/confirmed.
+    // Do not settle a tab whose close was already checked/confirmed.
     activeKey.value=''
     if(next) await activate(next)
     else home.value=true
@@ -503,6 +577,7 @@ async function closeAllTabs() {
 async function closeWindow() {
   if(busy.value) {pendingWindowClose=true;return}
   saveAsDraft.value=null
+  templateDraft.value=null
   await task('正在检查未保存修改',async()=>{
     // Stop the show inside the same input barrier as the unsaved-content check.
     await rustPresentationHandles.get(activeKey.value)?.stopPresentation()
@@ -531,6 +606,7 @@ async function resolveClose(action:'save'|'discard') {
 }
 function editCommand(command:'undo'|'redo'|'print') {void task('正在处理',async()=>{const fn=editor()?.[command];if(fn)await fn();else if(command==='print'&&await saveActive(true,'pdf'))status.value='已导出 PDF；请在系统 PDF 阅读器中打开并打印。'})}
 function rustEditorFileAction(action:string) {
+  if(globalActionsBlocked.value)return
   if(action==='save')save()
   else if(action==='saveAs')save(true)
   else if(action==='exportPdf')save(true,'pdf')
@@ -615,7 +691,7 @@ const autosave=createAutosaveScheduler({
   readState(){const tab=active.value;return {enabled:autosaveEnabled.value,native:native.isTauri(),key:tab?.key,fileId:tab?.fileId,
     dirty:!!tab?.dirty,ready:!!tab?.ready,requiresSaveAs:!!tab?.requiresSaveAs,
     canSaveDirectly:!!tab&&!!handleFor(tab)&&!isImportOnly(tab.document.extension)&&defaultSaveExtension(tab.document.extension)===tab.document.extension,
-    busy:!!busy.value,modal:!!saveAsDraft.value||!!closeTarget.value||help.value,
+    busy:!!busy.value,modal:!!saveAsDraft.value||!!templateDraft.value||!!closeTarget.value||help.value,
     composing:composing.value||Date.now()-lastInputAt.value<1200,remoteEditing:false}},
   async save(target){
     const tab=active.value
@@ -873,7 +949,7 @@ onMounted(async()=>{
               const tab=tabs.value.find(item=>item.key===key)
               if(!tab)throw Error('Native notebook tab closed unexpectedly')
               return {active:activeKey.value===key&&!home.value,ready:tab.ready,dirty:tab.dirty,busy:!!busy.value||autosave.running,fileId:tab.fileId,sha256:tab.document.sha256,
-                modal:!!saveAsDraft.value||!!closeTarget.value||help.value}
+                modal:!!saveAsDraft.value||!!templateDraft.value||!!closeTarget.value||help.value}
             },
             autosaveEnabled:()=>autosaveEnabled.value,
             setAutosave:async enabled=>{autosaveEnabled.value=enabled;await nextTick();autosave.notify()},
@@ -914,7 +990,7 @@ onMounted(async()=>{
               const tab=tabs.value.find(item=>item.key===key)
               if(!tab)throw Error('Native autosave tab closed unexpectedly')
               return {active:activeKey.value===key&&!home.value,dirty:tab.dirty,ready:tab.ready,saving:autosave.running||!!busy.value,fileId:tab.fileId,requiresSaveAs:!!tab.requiresSaveAs,sha256:tab.document.sha256,
-                modal:!!saveAsDraft.value||!!closeTarget.value||help.value}
+                modal:!!saveAsDraft.value||!!templateDraft.value||!!closeTarget.value||help.value}
             },
             autosaveEnabled:()=>autosaveEnabled.value,
             setAutosave:async enabled=>{autosaveEnabled.value=enabled;await nextTick();autosave.notify()},
@@ -967,6 +1043,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
           <span class="separator"/>
           <button :disabled="documentActionsDisabled" @click="globalFileAction('undo')" title="撤销" aria-label="撤销"><Icon name="undo" :size="18"/></button>
           <button :disabled="documentActionsDisabled" @click="globalFileAction('redo')" title="重做" aria-label="重做"><Icon name="redo" :size="18"/></button>
+          <button v-if="currentDocument?.document.kind==='presentation'" data-testid="shell-presentation-templates" :disabled="documentActionsDisabled" :aria-expanded="templatePanelOpen" :class="{'templates-active':templatePanelOpen}" @click="togglePresentationTemplates" title="演示模板" aria-label="演示模板"><Icon name="presentation" :size="18"/><span>模板</span></button>
         </div>
       </nav>
       <span class="titlebar-context" :title="currentDocument?.document.name">{{currentDocument?.document.name || '工作台'}}</span>
@@ -1004,14 +1081,24 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       </main>
     </div>
     <section v-show="!home" class="editor-workspace" :inert="editorInputBlocked">
-      <div class="tab-strip"><div ref="tabBar" class="tab-bar" :inert="globalActionsBlocked"><button class="home-tab" @click="home=true" aria-label="工作台"><Icon name="home" :size="18"/></button><div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div><button class="new-tab" @click="home=true" aria-label="新建文档"><Icon name="plus" :size="18"/></button></div><button class="close-all-tabs" data-testid="tabs-close-all" :disabled="globalActionsBlocked||!tabs.length" @click="closeAllTabs" title="批量关闭所有文档"><Icon name="close" :size="15"/><span>全部关闭</span></button></div>
+      <div class="tab-strip" :inert="globalActionsBlocked">
+        <button class="home-tab" @click="home=true" aria-label="工作台" title="工作台"><Icon name="home" :size="18"/></button>
+        <div ref="tabBar" class="tab-bar">
+          <div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" :title="tab.document.name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div>
+        </div>
+        <button class="new-tab" @click="home=true" aria-label="新建文档" title="新建文档"><Icon name="plus" :size="18"/></button>
+        <button class="close-all-tabs" data-testid="tabs-close-all" :disabled="globalActionsBlocked||!tabs.length" @click="closeAllTabs" title="批量关闭所有文档"><Icon name="close" :size="15"/><span>全部关闭</span></button>
+      </div>
       <div v-if="active?.importWarnings?.length" class="import-review-notice" role="note" data-testid="import-review-notice"><Icon name="info" :size="16"/><div><p v-for="warning in active.importWarnings" :key="warning">{{warning}}</p><strong>请核对文档内容与排版。</strong></div></div>
+      <div class="editor-stage">
       <div class="editor-content" :inert="editorInputBlocked">
         <RustWordEditor :theme="appearance" v-for="entry in rustWordEntries" :key="entry.document.id" v-show="activeRustWord&&activeKey===entry.document.id" :ref="handle=>setRustWordHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustWord&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <RustSheetEditor :theme="appearance" v-for="entry in rustSheetEntries" :key="entry.document.id" v-show="activeRustSheet&&activeKey===entry.document.id" :ref="handle=>setRustSheetHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustSheet&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <RustPresentationEditor :theme="appearance" v-for="entry in rustPresentationEntries" :key="entry.document.id" v-show="activeRustPresentation&&activeKey===entry.document.id" :ref="handle=>setRustPresentationHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPresentation&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <RustPdfEditor :theme="appearance" v-for="entry in rustPdfEntries" :key="entry.document.id" v-show="activeRustPdf&&activeKey===entry.document.id" :ref="handle=>setRustPdfHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPdf&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <NotebookEditor :theme="appearance" v-for="entry in noteEntries" :key="entry.document.id" v-show="activeNote&&activeKey===entry.document.id" :ref="handle=>setNoteHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeNote&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
+      </div>
+      <PresentationTemplates v-if="!home&&activeRustPresentation&&templatePanelOpen" class="template-panel" :templates="presentationTemplates" :loading="templateListLoading" :error="templateListError" :disabled="documentActionsDisabled" @select="openPresentationTemplateDialog('apply',$event)" @save="openPresentationTemplateDialog('save')" @delete="openPresentationTemplateDialog('delete',$event)" @retry="refreshPresentationTemplates" @close="templatePanelOpen=false"/>
       </div>
       <footer class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · {{activeRustWord?'文字编辑':activeRustSheet?'表格编辑':activeRustPresentation?'演示编辑':activeRustPdf?'PDF 编辑':'笔记编辑'}}</span></footer>
     </section>
@@ -1033,6 +1120,26 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <div class="modal-actions"><button type="button" :disabled="!!busy" data-testid="save-format-cancel" @click="cancelSaveAs">取消</button><button type="submit" :disabled="!!busy" class="primary" data-testid="save-format-confirm">{{native.isTauri()?'选择保存位置':'下载文件'}}</button></div>
       </form>
     </div>
+    <div v-if="templateDraft" class="modal-backdrop" @click.self="cancelPresentationTemplateDialog" @keydown.esc.stop.prevent="cancelPresentationTemplateDialog">
+      <form ref="templateDialog" class="modal template-dialog" role="dialog" aria-modal="true" aria-labelledby="presentation-template-title" data-testid="presentation-template-dialog" @submit.prevent="confirmPresentationTemplate">
+        <h2 id="presentation-template-title">{{templateDraft.kind==='save'?'存为模板':templateDraft.kind==='apply'?'切换为此模板？':'删除此模板？'}}</h2>
+        <template v-if="templateDraft.kind==='save'">
+          <p>保存当前全部幻灯片及内容，之后可在“我的模板”中重复使用。模板保存在本机。</p>
+          <label class="save-name-label">模板名称<span class="save-name-input"><input v-model="templateDraft.name" :disabled="!!busy" data-testid="presentation-template-name" aria-label="模板名称" autocomplete="off" spellcheck="false" /></span></label>
+        </template>
+        <template v-else>
+          <div class="template-dialog-summary"><img v-if="templateDraft.template.preview" :src="templateDraft.template.preview" alt=""/><div><strong>{{templateDraft.template.name}}</strong><span>{{templateDraft.template.slideCount}} 页 · {{templateDraft.template.source==='builtin'?'内置模板':'我的模板'}}</span></div></div>
+          <template v-if="templateDraft.kind==='apply'">
+            <p>将替换当前演示的全部幻灯片、布局和内容，文件名保持不变。可通过撤销恢复。</p>
+            <p v-if="active?.dirty" class="template-dialog-notice">当前未保存的修改也会被替换。</p>
+            <p v-if="native.isTauri()&&autosaveEnabled&&active?.fileId&&!active.requiresSaveAs" class="template-dialog-notice">自动保存已开启，切换后的内容将自动保存回当前文件。</p>
+          </template>
+          <p v-else>此操作将从模板库中永久删除该模板，不影响已打开的演示文稿。</p>
+        </template>
+        <p v-if="templateDraft.error" role="alert" class="template-dialog-error">{{templateDraft.error}}</p>
+        <div class="modal-actions"><button type="button" :disabled="!!busy" data-testid="presentation-template-cancel" @click="cancelPresentationTemplateDialog">取消</button><button type="submit" :disabled="!!busy" class="primary" data-testid="presentation-template-confirm">{{templateDraft.kind==='save'?'保存模板':templateDraft.kind==='apply'?'确认切换':'确认删除'}}</button></div>
+      </form>
+    </div>
     <div v-if="closeTarget" class="modal-backdrop" @keydown.esc.stop.prevent="!busy&&(closeTarget=null)">
       <section ref="closeDialog" class="modal close-documents-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="close-heading" data-testid="close-documents-dialog">
         <span class="modal-icon"><Icon name="save" :size="28"/></span><h2 id="close-heading">{{closeBatch?'保存这些文档的修改？':'保存你的修改？'}}</h2>
@@ -1046,8 +1153,22 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 </template>
 
 <style scoped>
-.tab-strip { display:flex; flex:none; min-width:0; background:var(--ui-surface-muted); border-bottom:1px solid var(--ui-line); }
-.tab-strip .tab-bar { flex:1; min-width:0; border-bottom:0; }
+.editor-stage { display:flex; flex:1; min-width:0; min-height:0; position:relative; }
+.template-panel { flex:none; border-left:1px solid var(--ui-line); }
+.global-file-actions .templates-active { color:var(--ui-accent); background:var(--ui-accent-soft); }
+.template-dialog { width:min(480px,100%); max-height:calc(100dvh - 40px); overflow:auto; }
+.template-dialog-summary { display:flex; align-items:center; gap:14px; margin:20px 0 15px; padding:12px; border:1px solid var(--ui-line); border-radius:var(--ui-radius); }
+.template-dialog-summary img { width:128px; aspect-ratio:16/9; object-fit:contain; border-radius:4px; border:1px solid var(--ui-line); }
+.template-dialog-summary > div { min-width:0; }
+.template-dialog-summary strong { display:block; overflow-wrap:anywhere; font-size:14px; }
+.template-dialog-summary span { display:block; margin-top:6px; color:var(--ui-muted); font-size:12px; }
+.template-dialog .template-dialog-notice { color:var(--ui-warning); }
+.template-dialog .template-dialog-error { color:var(--ui-danger); }
+@media(max-width:900px) { .template-panel { position:absolute; right:0; top:0; bottom:0; width:min(300px,100%); z-index:10; box-shadow:-5px 0 20px #18213618; } }
+.tab-strip { display:flex; flex:none; min-width:0; height:40px; overflow:hidden; background:var(--ui-surface-muted); border-bottom:1px solid var(--ui-line); }
+.tab-strip .home-tab { border-right:1px solid var(--ui-line); }
+.tab-strip .new-tab { border-left:1px solid var(--ui-line); }
+.tab-strip .tab-bar { flex:1; min-width:0; height:100%; overflow-y:hidden; overscroll-behavior-x:contain; overflow-anchor:none; scroll-behavior:auto; border-bottom:0; }
 .close-all-tabs { display:flex; align-items:center; gap:5px; flex:none; padding:0 12px; border-left:1px solid var(--ui-line); font-size:11px; color:var(--ui-muted); }
 .close-all-tabs:hover:not(:disabled) { color:var(--ui-text); background:var(--ui-surface); }
 .close-documents-dialog { width:min(560px,calc(100vw - 32px)); max-height:calc(100dvh - 40px); overflow:auto; }

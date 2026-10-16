@@ -425,17 +425,17 @@ test('a failed PDF input drain releases the closed session and can be retried be
   await second.close(true)
 })
 
-test('PDF deletion decisions alone bypass a blocked flush in the real serialized adapter', async () => {
+test('PDF pending deletion and comment decisions alone bypass a blocked flush in the real serialized adapter', async () => {
   const h = harness(), session = await h.open()
   h.setFlushError(Error('请确认删除'))
-  for (const command of ['ui.delete.confirm','ui.delete.cancel']) {
+  for (const command of ['ui.delete.confirm','ui.delete.cancel','ui.commentDraft.open','ui.commentDraft.submit','ui.commentDraft.discard','ui.commentDraft.return']) {
     const before = h.calls.length
     h.state.get(session.id).revision++
     const result = await session.command(command)
     assert.equal(result.revision,h.state.get(session.id).revision)
     assert.deepEqual(h.calls.slice(before),[['command',session.id,command]])
   }
-  for (const command of ['edit.undo','text.set','ui.delete.confirm.other']) {
+  for (const command of ['edit.undo','text.set','ui.delete.confirm.other','ui.commentDraft.submit.other','ui.commentDraft.unknown']) {
     const before=h.calls.length
     await assert.rejects(session.command(command),/请确认删除/)
     assert.deepEqual(h.calls.slice(before),[['flush',session.id]])
@@ -444,20 +444,51 @@ test('PDF deletion decisions alone bypass a blocked flush in the real serialized
   await session.close(true)
   await assert.rejects(session.command('ui.delete.confirm'),/关闭/)
 })
-test('PDF component forwards deletion decisions without its outer flush but protects ordinary commands', async () => {
+test('PDF component forwards pending decisions without its outer flush but protects ordinary commands', async () => {
   const h=harness(), mounted=h.component()
   await mounted.editor.inspect()
   const id=[...h.state.keys()][0]
   h.setFlushError(Error('等待删除确认'))
-  for (const command of ['ui.delete.confirm','ui.delete.cancel']) {
+  for (const command of ['ui.delete.confirm','ui.delete.cancel','ui.commentDraft.open','ui.commentDraft.submit','ui.commentDraft.discard','ui.commentDraft.return']) {
     const before=h.calls.length
     await mounted.editor.command(command)
     assert.deepEqual(h.calls.slice(before),[['command',id,command]])
   }
-  for (const command of ['edit.undo','ui.delete.cancel.other']) {
+  for (const command of ['edit.undo','ui.delete.cancel.other','ui.commentDraft.submit.other','ui.commentDraft.unknown']) {
     const before=h.calls.length
     await assert.rejects(mounted.editor.command(command),/等待删除确认/)
     assert.deepEqual(h.calls.slice(before),[['flush',id]])
   }
   mounted.dispose()
 })
+
+for (const kind of ['pdf', 'sheet']) {
+  test(`${kind} switching retains committed drafts and requires a real save before unconfirmed close`, async () => {
+    const h = harness(kind), mounted = h.component(), editor = mounted.editor
+    try {
+      const original = await editor.inspect()
+      await editor.discardChanges()
+      assert.equal(h.calls.filter(call => call[0] === 'export' || call[0] === 'saved').length, 0, 'A clean imported document can close without first exporting')
+      h.pending(original.sessionId, 'queued live content')
+      const settled = await editor.prepareDeactivate()
+      assert.equal(settled.documentId, original.documentId)
+      assert.equal(settled.revision, original.revision + 1)
+      assert.equal(settled.dirty, true)
+      assert.equal(h.state.get(original.sessionId).text, 'queued live content')
+      assert.equal(h.calls.filter(call => call[0] === 'export' || call[0] === 'saved').length, 0)
+      await assert.rejects(editor.discardChanges(), /未保存/)
+      const receipt = await editor.exportFile()
+      await assert.rejects(editor.discardChanges(), /未保存/, 'Exporting to memory cannot acknowledge filesystem persistence')
+      await editor.markSaved(receipt.base64)
+      await editor.discardChanges()
+      await editor.undo(); assert.equal(h.state.get(original.sessionId).text, '')
+      await editor.redo(); assert.equal(h.state.get(original.sessionId).text, 'queued live content')
+      await assert.rejects(editor.markSaved(receipt.base64), /又有修改/)
+      await assert.rejects(editor.discardChanges(), /未保存/)
+      h.setFlushError(Error('Unresolved editor draft'))
+      await assert.rejects(editor.prepareDeactivate(), /Unresolved editor draft/)
+      await assert.rejects(editor.discardChanges(), /Unresolved editor draft/)
+      assert.equal(h.state.get(original.sessionId).text, 'queued live content')
+    } finally { mounted.dispose() }
+  })
+}

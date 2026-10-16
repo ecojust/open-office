@@ -22,8 +22,16 @@ const names = 'tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,sav
   + ',autosaveEnabled,autosave,autosaveWaiting,saveStateLabel,saveStateTitle,backgroundSaving,editorInputBlocked,noteEntries,noteHandles,setNoteHandle,activeNote'
 
 
+// Every shell still receives a fresh VM context and fresh Vue state. Reuse only
+// the immutable transpiled source so large regression suites do not reparse the
+// same App setup hundreds of times while native builds compete for memory.
+const compiledSources = new Map()
 function compile(source, require, extra = {}) {
-  const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
+  let output = compiledSources.get(source)
+  if (output === undefined) {
+    output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
+    compiledSources.set(source, output)
+  }
   const module = { exports: {} }
   vm.runInNewContext(output, { module, exports: module.exports, require, console, URL, setTimeout, clearTimeout,
     crypto: { randomUUID }, btoa, atob, TextEncoder, TextDecoder, __BUILD_VERSION__: 'test', __APP_VERSION__: 'test', HTMLElement: class {}, document: { baseURI: 'http://127.0.0.1/' }, ...extra })
@@ -74,6 +82,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     setInterval(callback, milliseconds) { const timer={callback,milliseconds};intervals.set(timer,timer);return timer },
     clearInterval(timer) { intervals.delete(timer) },
     window: {
+      dispatchEvent() {},
       addEventListener(type, callback) { if (!windowListeners.has(type)) windowListeners.set(type, new Set()); windowListeners.get(type).add(callback) },
       removeEventListener(type, callback) { windowListeners.get(type)?.delete(callback) },
       matchMedia: () => media,
@@ -88,6 +97,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
       removeEventListener(type, callback) { documentListeners.get(type)?.delete(callback) },
       createElement(tag) { assert.equal(tag,'a');return {click(){calls.push(['download',this.download,this.href])}} },
     },
+    Event,
     Element,
     HTMLElement: class extends Element {},
     ResizeObserver: class {
@@ -128,6 +138,13 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     if (name === './shared/dialog-focus') return focus
     if (name === './shared/appearance') return appearance
     if (name === './shared/autosave') return sharedModule(name)
+    if (name === './presentation/templates') return {
+      listPresentationTemplates: async () => [],
+      loadPresentationTemplate: async () => assert.fail('Template loading is outside this shell-state harness'),
+      savePresentationTemplate: async () => assert.fail('Template persistence is outside this shell-state harness'),
+      deletePresentationTemplate: async () => assert.fail('Template removal is outside this shell-state harness'),
+      normalizePresentationTemplateName: value => value.trim(),
+    }
     if (name === './notes/model') return { decodeNotebook(bytes) { calls.push(['note-decode',Array.from(bytes)]);if(notebookDecodeError)throw Error(notebookDecodeError);return {testNotebook:true} } }
     // This double verifies shell routing, preparation ownership and transaction
     // ordering only. Real Rust parsing, layout and WASM are tested separately.
@@ -189,6 +206,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
   }, browser).state)
   const handle = {
     canBackgroundExport: async () => true,
+    prepareDeactivate: async () => ({ documentId: 1, revision: 0, dirty: !!state.active.value?.dirty }),
     exportFile: async () => ({ base64: 'TkVX', extension: helpers.defaultSaveExtension(state.active.value?.document.extension || 'docx'), dirty: false }),
     discardChanges: async options => { calls.push(['discard', options]) },
     markSaved: async () => { calls.push(['marked']) },
@@ -539,7 +557,8 @@ test('editor input and global file controls bind to separate barriers throughout
   const byClass=name=>elements.find(node=>attribute(node,'class')?.split(/\s+/).includes(name))
   assert.equal(binding(byClass('editor-workspace'),'inert'),'editorInputBlocked')
   assert.equal(binding(byClass('editor-content'),'inert'),'editorInputBlocked')
-  assert.equal(binding(byClass('tab-bar'),'inert'),'globalActionsBlocked')
+  assert.equal(binding(byClass('tab-strip'),'inert'),'globalActionsBlocked')
+  assert.equal(parents.get(byClass('tab-bar')),byClass('tab-strip'),'The scrolling list inherits the global file-control barrier')
   assert.equal(binding(elements.find(node=>attribute(node,'data-testid')==='global-toolbar'),'inert'),'globalActionsBlocked')
   for(const tag of ['RustWordEditor','RustSheetEditor','RustPresentationEditor','RustPdfEditor','NotebookEditor']) {
     const editor=elements.find(node=>node.tag===tag)
@@ -590,7 +609,7 @@ test('tab overflow follows the active tab and disconnects its observer on unmoun
     getBoundingClientRect: () => ({ left: 10, right: 310 }),
     querySelector(selector) {
       assert.equal(selector, '.document-tab.active')
-      return { getBoundingClientRect: () => bounds }
+      return { getBoundingClientRect: () => ({...bounds,width:bounds.right-bounds.left}) }
     },
   })
   h.state.tabBar.value = bar
@@ -726,20 +745,22 @@ test('not-ready and failed documents cannot export or overwrite the old loaded m
   assert.equal(h.state.activeKey.value, 'B', 'A failed tab must not trap the user')
 })
 
-test('switching snapshots authoritative dirty state even before a dirty event arrives', async () => {
+test('switching records authoritative dirty state without replacing file bytes or save identity', async () => {
   const h = shell(), a = h.tab('A',{}), b = h.tab('B',{}); h.active(a)
-  h.handle.exportFile = async () => ({ base64: 'RURJVA==', extension: 'docx', dirty: true })
+  const original = JSON.stringify(a.document), fileId = a.fileId
+  h.handle.prepareDeactivate = async () => ({ documentId: 1, revision: 3, dirty: true })
+  h.handle.exportFile = async () => assert.fail('Retained sessions must not serialize on tab switches')
+  h.handle.discardChanges = async () => assert.fail('Switching is not permission to discard or acknowledge a save')
   await h.state.activate(b)
-  assert.equal(a.document.base64, 'RURJVA=='); assert.equal(a.dirty, true)
+  assert.equal(JSON.stringify(a.document), original); assert.equal(a.fileId, fileId); assert.equal(a.dirty, true)
   assert.equal(h.state.activeKey.value, 'B'); assert.equal(b.ready, false)
-  assert.equal(h.calls[0][0], 'discard')
+  assert.equal(h.calls.length, 0)
 })
 
-test('revision mismatch or pending PDF edits reject switching without replacing snapshots', async () => {
+test('failed lifecycle checks or pending PDF edits reject switching without replacing snapshots', async () => {
   for (const pending of [false, true]) {
     const h = shell(), a = h.tab('A',{}), b = h.tab('B',{}); h.active(a)
-    if (pending) h.handle.exportFile = async () => { throw Error('Apply pending PDF edits') }
-    else h.handle.discardChanges = async () => { throw Error('Revision changed') }
+    h.handle.prepareDeactivate = async () => { throw Error(pending ? 'Apply pending PDF edits' : 'Revision changed') }
     await assert.rejects(h.state.activate(b), pending ? /pending PDF/ : /Revision/)
     assert.equal(h.state.activeKey.value, 'A'); assert.equal(a.document.base64, 'T0xE')
   }
@@ -939,7 +960,7 @@ test('native helper export uses the same guarded transaction and never swallows 
   assert.equal((await nativeEditor.exportFile()).revision,7)
   assert.equal(h.state.busy.value,'')
   const a=h.tab('A',{}),b=h.tab('B',{});h.active(a)
-  h.handle.discardChanges=async()=>{assert.equal(h.state.busy.value.length>0,true);throw Error('Revision changed')}
+  h.handle.prepareDeactivate=async()=>{assert.equal(h.state.busy.value.length>0,true);throw Error('Revision changed')}
   await assert.rejects(h.state.editorTransaction('switching',()=>h.state.activate(b)),/Revision changed/)
   assert.equal(h.state.activeKey.value,'A');assert.equal(a.document.base64,'T0xE')
   assert.equal(h.state.busy.value,'')
@@ -988,18 +1009,19 @@ function browserWordInput() {
   return {value:'Browser.docx',files:[{name:'Browser.docx',size:bytes.length,arrayBuffer:async()=>bytes.buffer}]}
 }
 
-test('successful Rust preparation precedes snapshot/discard/publication and captures immutable source bytes',async()=>{
+test('successful Rust preparation precedes input settlement and publication and captures immutable source bytes',async()=>{
   let finish
   const h=shell({rustPrepare:()=>new Promise(resolve=>{finish=resolve})}),tab=h.tab('live',{dirty:true});h.active(tab)
-  h.handle.exportFile=async()=>{h.calls.push(['export-current']);return{base64:'RURJVA==',extension:'docx',dirty:true}}
+  h.handle.prepareDeactivate=async()=>{h.calls.push(['settle-current']);return{documentId:1,revision:3,dirty:true}}
+  h.handle.exportFile=async()=>assert.fail('Opening a new tab must retain live content without exporting')
   const source=rustSource('incoming'),opening=h.state.addDocument(source,source.id)
   await Promise.resolve()
   assert.equal(h.state.activeKey.value,tab.key);assert.equal(h.state.tabs.value.length,1)
   assert.equal(h.calls.length,1);assert.equal(h.calls[0][0],'rust-preflight');assert.equal(tab.document.base64,'T0xE')
   source.base64='TkVX';finish({testRustSession:'incoming'});await opening
   const next=h.state.active.value
-  assert.deepEqual(h.calls.map(c=>c[0]),['rust-preflight','rust-prepared','export-current','discard'])
-  assert.equal(tab.document.base64,'RURJVA==');assert.equal(tab.dirty,true)
+  assert.deepEqual(h.calls.map(c=>c[0]),['rust-preflight','rust-prepared','settle-current'])
+  assert.equal(tab.document.base64,'T0xE');assert.equal(tab.dirty,true)
   assert.equal(next.document.base64,'T0xE');assert.notEqual(next.key,tab.key)
   assert.equal(h.state.rustWordEntries.value.length,2);assert.equal(h.state.rustWordEntries.value[1].prepared,h.rustPreparations[0].handoff)
   assert.equal(h.state.rustWordEntries.value.at(-1).prepared.take(next.document),h.rustPreparations[0].session)
@@ -1007,9 +1029,9 @@ test('successful Rust preparation precedes snapshot/discard/publication and capt
   h.unmount()
 })
 
-test('failed snapshot and disposal release an undelivered Rust preparation without publishing a tab',async()=>{
+test('failed input settlement and disposal release an undelivered Rust preparation without publishing a tab',async()=>{
   const h=shell(),tab=h.tab('typing',{dirty:true});h.active(tab)
-  h.handle.exportFile=async()=>{throw Error('Composition pending')}
+  h.handle.prepareDeactivate=async()=>{throw Error('Composition pending')}
   await assert.rejects(h.state.addDocument(rustSource('new'),'new'),/Composition pending/)
   assert.equal(h.state.tabs.value.length,1);assert.equal(h.state.activeKey.value,tab.key)
   assert.equal(tab.document.base64,'T0xE');assert.equal(tab.dirty,true)
@@ -1076,9 +1098,9 @@ test('OfficeWord PDF export routes through its editor and never saves or replace
 })
 
 test('Rust tab switches preserve each mounted entry and use the matching editor handle',async()=>{
-  const h=shell(),exported=[],discarded=[]
+  const h=shell(),settled=[],exported=[],discarded=[]
   const mountHandle=tab=>{
-    const handle={canBackgroundExport:async()=>true,exportFile:async()=>{exported.push(tab.key);return{base64:Buffer.from(tab.key).toString('base64'),extension:'docx',dirty:true}},discardChanges:async()=>{discarded.push(tab.key)}}
+    const handle={canBackgroundExport:async()=>true,prepareDeactivate:async()=>{settled.push(tab.key);return{documentId:1,revision:3,dirty:true}},exportFile:async()=>{exported.push(tab.key);return{base64:Buffer.from(tab.key).toString('base64'),extension:'docx',dirty:true}},discardChanges:async()=>{discarded.push(tab.key)}}
     h.state.setRustWordHandle(tab.key,handle);h.state.readyFor(tab.key);return handle
   }
   await h.state.addDocument(rustSource('first'),'first');const first=h.state.active.value;mountHandle(first)
@@ -1092,9 +1114,9 @@ test('Rust tab switches preserve each mounted entry and use the matching editor 
   assert.equal(h.state.rustWordEntries.value[0],firstEntry);assert.equal(h.state.rustWordEntries.value[1],secondEntry)
   assert.equal(firstEntry.document.base64,'T0xE','The mounted component input must not be replaced by snapshots')
   assert.equal(secondEntry.document.base64,'T0xE')
-  assert.deepEqual(exported,[first.key,second.key,first.key]);assert.deepEqual(discarded,exported)
-  assert.equal(first.document.base64,Buffer.from(first.key).toString('base64'))
-  assert.equal(second.document.base64,Buffer.from(second.key).toString('base64'))
+  assert.deepEqual(settled,[first.key,second.key,first.key]);assert.deepEqual(exported,[]);assert.deepEqual(discarded,[])
+  assert.equal(first.document.base64,'T0xE')
+  assert.equal(second.document.base64,'T0xE')
   assert.equal(h.rustPreparations.length,2);assert.ok(h.rustPreparations.every(p=>p.discarded===0))
   h.state.closeTarget.value=second;await h.state.resolveClose('discard')
   assert.equal(h.state.rustWordEntries.value.length,1);assert.equal(h.state.rustWordEntries.value[0],firstEntry)
@@ -1118,7 +1140,7 @@ function sheetSource(id='source',extension='xlsx') {
 }
 
 function mountSheetHandle(h,tab,overrides={}) {
-  const handle={canBackgroundExport:async()=>true,exportFile:async({format})=>({base64:'U0hFRVQ=',extension:format,dirty:true}),
+  const handle={canBackgroundExport:async()=>true,prepareDeactivate:async()=>({documentId:1,revision:0,dirty:tab.dirty}),exportFile:async({format})=>({base64:'U0hFRVQ=',extension:format,dirty:true}),
     discardChanges:async options=>{h.calls.push(['sheet-discard',tab.key,options])},
     markSaved:async bytes=>{h.calls.push(['sheet-marked',tab.key,bytes])},...overrides}
   h.state.setRustSheetHandle(tab.key,handle);h.state.readyFor(tab.key)
@@ -1284,7 +1306,7 @@ test('failed spreadsheet preparation leaves the active dirty document and engine
 
 test('unpublished spreadsheet candidates are discarded after blocked switching and app disposal',async()=>{
   const h=shell(),tab=h.tab('typing',{dirty:true});h.active(tab)
-  h.handle.exportFile=async()=>{throw Error('Composition pending')}
+  h.handle.prepareDeactivate=async()=>{throw Error('Composition pending')}
   await assert.rejects(h.state.addDocument(sheetSource('new'),'new'),/Composition pending/)
   assert.equal(h.state.tabs.value.length,1);assert.equal(h.state.activeKey.value,tab.key)
   assert.equal(h.sheetPreparations[0].discarded,1);assert.equal(h.state.rustSheetEntries.value.length,0)
@@ -1323,7 +1345,8 @@ for(const extension of ['csv','tsv'])test(`${extension} conversion retains its s
     assert.equal(source.requiresSaveAs,true)
     await h.state.activate(other);h.state.readyFor(other.key)
     await h.state.activate(source)
-    assert.equal(source.document.extension,'xlsx');assert.equal(source.requiresSaveAs,true)
+    assert.equal(source.document.extension,extension);assert.equal(source.requiresSaveAs,true)
+    assert.equal(source.document.base64,'T0xE');assert.equal(source.document.sha256,'source-hash');assert.equal(source.fileId,'source-data')
     assert.equal(await h.state.saveActive(),true)
     const request=h.calls.find(call=>call[0]==='save')[1]
     assert.equal(request.extension,'xlsx');assert.equal(request.saveAs,true)
@@ -1345,15 +1368,15 @@ for(const format of ['csv','tsv','pdf'])test(`${format} spreadsheet exports pres
 })
 
 test('retained spreadsheet tabs use their own handles and only a closed tab releases its preparation',async()=>{
-  const h=shell(),exports=[]
+  const h=shell(),settled=[],exports=[]
   await h.state.addDocument(sheetSource('first'),'first');const first=h.state.active.value
-  mountSheetHandle(h,first,{exportFile:async()=>{exports.push(first.key);return{base64:'RklSU1Q=',extension:'xlsx',dirty:true}}})
+  mountSheetHandle(h,first,{prepareDeactivate:async()=>{settled.push(first.key);return{documentId:1,revision:3,dirty:true}},exportFile:async()=>{exports.push(first.key);return{base64:'RklSU1Q=',extension:'xlsx',dirty:true}}})
   const firstEntry=h.state.rustSheetEntries.value[0]
   await h.state.addDocument(sheetSource('second'),'second');const second=h.state.active.value
-  mountSheetHandle(h,second,{exportFile:async()=>{exports.push(second.key);return{base64:'U0VDT05E',extension:'xlsx',dirty:true}}})
+  mountSheetHandle(h,second,{prepareDeactivate:async()=>{settled.push(second.key);return{documentId:1,revision:3,dirty:true}},exportFile:async()=>{exports.push(second.key);return{base64:'U0VDT05E',extension:'xlsx',dirty:true}}})
   const secondEntry=h.state.rustSheetEntries.value[1]
   await h.state.activate(first);await h.state.activate(second)
-  assert.deepEqual(exports,[first.key,second.key,first.key])
+  assert.deepEqual(settled,[first.key,second.key,first.key]);assert.deepEqual(exports,[])
   assert.equal(h.state.rustSheetEntries.value[0],firstEntry);assert.equal(h.state.rustSheetEntries.value[1],secondEntry)
   assert.equal(firstEntry.document.base64,'T0xE');assert.equal(secondEntry.document.base64,'T0xE')
   assert.equal(first.ready,true);assert.equal(second.ready,true);assert.equal(h.sheetPreparations.length,2)
@@ -1412,6 +1435,7 @@ function deckSource(id='deck',extension='pptx') {
 function mountDeckHandle(h,tab,overrides={}) {
   const handle={
     canBackgroundExport:async()=>true,
+    prepareDeactivate:async()=>({documentId:1,revision:0,dirty:tab.dirty}),
     exportFile:async({format})=>({base64:'REVDSw==',extension:format,dirty:true}),
     discardChanges:async options=>{h.calls.push(['deck-discard',tab.key,options])},
     markSaved:async bytes=>{h.calls.push(['deck-marked',tab.key,bytes])},
@@ -1495,9 +1519,9 @@ test('failed presentation preparation preserves the active document and never fa
   assert.deepEqual(h.calls.map(call=>call[0]),['deck-preflight']);h.unmount()
 })
 
-test('presentation preparations capture source bytes and are discarded if snapshot or disposal prevents publication',async()=>{
+test('presentation preparations capture source bytes and are discarded if input settlement or disposal prevents publication',async()=>{
   const h=shell(),tab=h.tab('live',{dirty:true});h.active(tab)
-  h.rustWordHandle.exportFile=async()=>{throw Error('Composition pending')}
+  h.rustWordHandle.prepareDeactivate=async()=>{throw Error('Composition pending')}
   await assert.rejects(h.state.addDocument(deckSource(),'deck'),/Composition pending/)
   assert.equal(h.deckPreparations[0].discarded,1);assert.equal(h.state.tabs.value.length,1);assert.equal(h.state.activeKey.value,tab.key)
   h.unmount()
@@ -1510,16 +1534,16 @@ test('presentation preparations capture source bytes and are discarded if snapsh
 })
 
 test('presentation tabs keep separate mounted models, undo handles and saved receipts across tab switches',async()=>{
-  const h=shell(),exports=[],undo=[]
+  const h=shell(),settled=[],exports=[],undo=[]
   await h.state.addDocument(deckSource('first'),'first');const first=h.state.active.value
-  mountDeckHandle(h,first,{exportFile:async()=>{exports.push(first.key);return{base64:'RklSU1Q=',extension:'pptx',dirty:true}},undo:async()=>{undo.push(first.key)}})
+  mountDeckHandle(h,first,{prepareDeactivate:async()=>{settled.push(first.key);return{documentId:1,revision:3,dirty:true}},exportFile:async()=>{exports.push(first.key);return{base64:'RklSU1Q=',extension:'pptx',dirty:true}},undo:async()=>{undo.push(first.key)}})
   const firstEntry=h.state.rustPresentationEntries.value[0]
   await h.state.addDocument(deckSource('second'),'second');const second=h.state.active.value
-  mountDeckHandle(h,second,{exportFile:async()=>{exports.push(second.key);return{base64:'U0VDT05E',extension:'pptx',dirty:true}},undo:async()=>{undo.push(second.key)}})
+  mountDeckHandle(h,second,{prepareDeactivate:async()=>{settled.push(second.key);return{documentId:1,revision:3,dirty:true}},exportFile:async()=>{exports.push(second.key);return{base64:'U0VDT05E',extension:'pptx',dirty:true}},undo:async()=>{undo.push(second.key)}})
   const secondEntry=h.state.rustPresentationEntries.value[1]
   await h.state.activate(first);await h.state.activate(second)
   h.state.globalFileAction('undo');await h.idle()
-  assert.deepEqual(undo,[second.key]);assert.deepEqual(exports,[first.key,second.key,first.key])
+  assert.deepEqual(undo,[second.key]);assert.deepEqual(settled,[first.key,second.key,first.key]);assert.deepEqual(exports,[])
   assert.equal(first.ready,true);assert.equal(second.ready,true)
   assert.equal(firstEntry,h.state.rustPresentationEntries.value[0]);assert.equal(secondEntry,h.state.rustPresentationEntries.value[1])
   assert.equal(firstEntry.document.base64,'T0xE');assert.equal(secondEntry.document.base64,'T0xE')
@@ -1547,7 +1571,7 @@ test('presentation save revision failures and pending edits preserve dirty state
   const h=shell(),deck=h.tab('deck',{kind:'presentation',dirty:true}),word=h.tab('word');h.active(deck)
   const handle=mountDeckHandle(h,deck,{markSaved:async()=>{throw Error('Saved revision is stale')}})
   await assert.rejects(h.state.saveActive(),/Saved revision/);assert.equal(deck.dirty,true)
-  handle.exportFile=async()=>{throw Error('Apply the pending slide text')}
+  handle.prepareDeactivate=async()=>{throw Error('Apply the pending slide text')}
   await assert.rejects(h.state.activate(word),/pending slide/)
   assert.equal(h.state.activeKey.value,deck.key);assert.equal(h.state.rustPresentationEntries.value.length,1)
   h.unmount()
@@ -1635,12 +1659,18 @@ for(const mode of ['report','throw'])test(`failed presentation ${mode} fails nat
 })
 
 
-test('a mismatched snapshot format cannot replace a live tab during switching',async()=>{
-  const h=shell(),first=h.tab('first',{dirty:true}),second=h.tab('second');h.active(first)
-  h.rustWordHandle.exportFile=async()=>({base64:'JVBERg==',extension:'pdf',dirty:true})
-  await assert.rejects(h.state.activate(second),/快照格式/)
+test('switching cannot adopt an export of another format and close validation rejects that export',async()=>{
+  const h=shell(),first=h.tab('first'),second=h.tab('second');h.active(first)
+  let exports=0
+  h.rustWordHandle.exportFile=async()=>{exports++;return {base64:'JVBERg==',extension:'pdf',dirty:true}}
+  await h.state.activate(second);h.state.readyFor(second.key);await h.state.activate(first)
+  assert.equal(exports,0,'Switching keeps the live model without requesting export bytes')
+  assert.equal(first.document.extension,'docx');assert.equal(first.document.base64,'T0xE')
+  h.state.closeTab(first);await h.idle()
+  assert.equal(exports,1);assert.match(h.state.error.value,/快照格式/)
   assert.equal(first.document.extension,'docx');assert.equal(first.document.base64,'T0xE');assert.equal(h.state.activeKey.value,first.key)
-  assert.ok(!h.calls.some(call=>call[0]==='discard'));h.unmount()
+  assert.equal(first.dirty,true);assert.equal(h.state.closeTarget.value,first,'Failed close validation still requires a user decision')
+  assert.ok(!h.calls.some(call=>call[0]==='discard'||call[0]==='save'||call[0]==='marked'));h.unmount()
 })
 
 test('presentation parser warnings accompany protected imports and F5 is blocked behind shell dialogs',async()=>{
@@ -1676,11 +1706,11 @@ test('failed PDF preflight leaves the active edited model and every tab intact',
   assert.deepEqual(h.calls.map(call=>call[0]),['pdf-preflight']);h.unmount()
 })
 test('PDF tab switches retain each live model, handle and original save destination',async()=>{
-  const h=shell(),exported=[],undone=[]
+  const h=shell(),settled=[],exported=[],undone=[]
   async function opened(id){
     await h.state.addDocument(pdfSource(id),id)
     const tab=h.state.active.value
-    h.state.setRustPdfHandle(tab.key,{exportFile:async()=>{exported.push(id);return{base64:btoa(id),extension:'pdf',dirty:true}},discardChanges:async()=>{},undo:async()=>undone.push(id)})
+    h.state.setRustPdfHandle(tab.key,{prepareDeactivate:async()=>{settled.push(id);return{documentId:1,revision:3,dirty:true}},exportFile:async()=>{exported.push(id);return{base64:btoa(id),extension:'pdf',dirty:true}},discardChanges:async()=>{},undo:async()=>undone.push(id)})
     h.state.readyFor(tab.key)
     return tab
   }
@@ -1688,7 +1718,7 @@ test('PDF tab switches retain each live model, handle and original save destinat
   const second=await opened('second'),secondEntry=h.state.rustPdfEntries.value[1]
   await h.state.activate(first);await h.state.activate(second)
   h.state.globalFileAction('undo');await h.idle()
-  assert.deepEqual(exported,['first','second','first']);assert.deepEqual(undone,['second'])
+  assert.deepEqual(settled,['first','second','first']);assert.deepEqual(exported,[]);assert.deepEqual(undone,['second'])
   assert.equal(first.ready,true);assert.equal(second.ready,true)
   assert.equal(first.requiresSaveAs,false);assert.equal(second.requiresSaveAs,false)
   assert.equal(h.state.rustPdfEntries.value[0],firstEntry);assert.equal(h.state.rustPdfEntries.value[1],secondEntry)
@@ -1774,16 +1804,17 @@ test('eight documents per kind reject a ninth before preparation while existing 
     for(let index=0;index<8;index++){const tab=h.tab(`capacity-${index}`,{kind,dirty:true});h.active(tab);opened.push(tab)}
     const active=opened.at(-1),extension=active.document.extension
     const before=JSON.stringify(h.state.tabs.value)
-    h.handle.exportFile=async()=>assert.fail('Capacity rejection must not snapshot the active document')
+    h.handle.prepareDeactivate=async()=>assert.fail('Capacity rejection must not settle the active document')
+    h.handle.exportFile=async()=>assert.fail('Neither rejected capacity nor ordinary switching should serialize the active document')
     try {
       await assert.rejects(h.state.addDocument({...active.document,id:'ninth',name:`Ninth.${extension}`},'ninth-file'),/最多同时打开 8 份/)
       assert.equal(h.calls.length,0,'Capacity must be checked before preflight, stash or disposal')
       assert.equal(JSON.stringify(h.state.tabs.value),before);assert.equal(h.state.activeKey.value,active.key)
-      let snapshots=0
-      h.handle.exportFile=async({format})=>{snapshots++;return {base64:'T0xE',extension:format,dirty:true}}
+      let settlements=0
+      h.handle.prepareDeactivate=async()=>{settlements++;return {documentId:1,revision:3,dirty:true}}
       assert.equal(await h.state.addDocument(opened[0].document,opened[0].fileId),opened[0])
       assert.equal(h.state.activeKey.value,opened[0].key);assert.equal(h.state.tabs.value.length,8)
-      assert.equal(snapshots,1);assert.equal(h.calls.some(call=>call[0].endsWith('-preflight')),false)
+      assert.equal(settlements,1);assert.equal(h.calls.some(call=>call[0].endsWith('-preflight')),false)
       const otherKind=kind==='word'?'sheet':'word',otherExtension=otherKind==='word'?'docx':'xlsx'
       const other=await h.state.addDocument({id:'other',kind:otherKind,extension:otherExtension,name:`Other.${otherExtension}`,base64:'T0xE',sha256:'',sizeBytes:3})
       assert.equal(other.document.kind,otherKind);assert.equal(h.state.activeKey.value,other.key)
@@ -1855,5 +1886,34 @@ test('invalid notebook input cannot replace the active document or publish a new
     assert.equal(h.state.tabs.value.length,1);assert.equal(h.state.activeKey.value,original.key)
     assert.equal(original.dirty,true);assert.equal(h.state.noteEntries.value.length,0)
     assert.equal(h.state.rustWordHandles.get(original.key),h.rustWordHandle)
+  } finally {h.unmount()}
+})
+
+test('switching keeps a new unsaved document dirty even when its untouched live engine is clean', async () => {
+  const h=shell(), first=h.tab('new',{dirty:true}), next=h.tab('next')
+  first.fileId=undefined;h.active(first)
+  h.handle.prepareDeactivate=async()=>({documentId:1,revision:0,dirty:false})
+  h.handle.exportFile=async()=>assert.fail('Switching must not generate a save receipt')
+  try {
+    await h.state.activate(next)
+    assert.equal(first.dirty,true)
+    h.state.closeTab(first)
+    assert.equal(h.state.closeTarget.value,first,'An unsaved new file still requires a close decision')
+    assert.equal(h.state.tabs.value.length,2)
+  } finally {h.unmount()}
+})
+
+for (const replaceHandle of [false,true]) test(`switching rejects a ${replaceHandle?'replaced editor handle':'changed active tab'} during input settlement`, async () => {
+  const h=shell(), first=h.tab('first'), next=h.tab('next');h.active(first)
+  let finish
+  h.handle.prepareDeactivate=()=>new Promise(resolve=>{finish=resolve})
+  const switching=h.state.activate(next)
+  if(replaceHandle)h.state.setRustWordHandle(first.key,{prepareDeactivate:async()=>({documentId:2,revision:0,dirty:false})})
+  else h.state.activeKey.value=next.key
+  finish({documentId:1,revision:1,dirty:true})
+  try {
+    await assert.rejects(switching,/文档已切换/)
+    assert.equal(first.dirty,false,'A late result from a retired lifecycle cannot be applied to the old tab')
+    assert.equal(first.document.base64,'T0xE');assert.equal(first.document.sha256,'old-hash')
   } finally {h.unmount()}
 })

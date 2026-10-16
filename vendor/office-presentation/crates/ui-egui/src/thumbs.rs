@@ -136,18 +136,22 @@ fn list(app: &mut SlideApp, ui: &mut Ui) {
             p.text(pos2(row.min.x + 14.0, img.min.y + 20.0), Align2::CENTER_TOP, "★", theme::font(10.0), t.text_faint);
         }
         let wpx = (img.width() * ppp).round() as u32;
-        match app.textures.thumb(ui.ctx(), &doc, i, wpx, &mut budget) {
-            Some(tex) => {
-                p.image(
-                    tex.id(),
-                    img,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    if hidden { Color32::from_white_alpha(140) } else { Color32::WHITE },
-                );
-            }
-            None => {
-                p.rect_filled(img, CornerRadius::ZERO, Color32::WHITE);
-                need_more = true;
+        // Keep every row's layout and drag target, but do not rasterize off-screen pages or
+        // request more frames on their behalf. Their pictures are prepared when scrolled in.
+        if ui.is_rect_visible(img) {
+            match app.textures.thumb(ui.ctx(), &doc, i, wpx, &mut budget) {
+                Some(tex) => {
+                    p.image(
+                        tex.id(),
+                        img,
+                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                        if hidden { Color32::from_white_alpha(140) } else { Color32::WHITE },
+                    );
+                }
+                None => {
+                    p.rect_filled(img, CornerRadius::ZERO, Color32::WHITE);
+                    need_more = true;
+                }
             }
         }
         if selected {

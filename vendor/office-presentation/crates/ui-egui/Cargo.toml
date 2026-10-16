@@ -27,6 +27,7 @@ log = { workspace = true }
 js-sys = "0.3"
 
 [dev-dependencies]
+office-presentation-pptx = { workspace = true }
 egui_kittest = { workspace = true, features = ["wgpu", "snapshot"] }
 
 [build-dependencies]

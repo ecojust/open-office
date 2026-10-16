@@ -727,6 +727,7 @@ impl DocView {
     /// The document's content or page list changed (an edit, undo or redo): drop caches and
     /// adopt the new page geometry, keeping the reader's place where possible.
     pub fn document_changed(&mut self, info: &DocInfo) {
+        crate::comment_drafts::reconcile(&mut self.comments, info);
         self.invalidate_content();
         self.page_count = info.pages.len();
         self.page_heights = info.pages.iter().map(|p| p.height).collect();

@@ -26,6 +26,7 @@ pub mod shape;
 pub mod slide;
 pub mod smartart;
 pub mod table;
+pub mod template;
 pub mod text;
 pub mod three_d;
 pub mod transition;
@@ -163,6 +164,7 @@ pub fn command_specs() -> &'static [CommandSpec] {
     SPECS.get_or_init(|| {
         let mut v = Vec::new();
         v.extend(file::specs());
+        v.extend(template::specs());
         v.extend(edit::specs());
         v.extend(slide::specs());
         v.extend(reuse::specs());

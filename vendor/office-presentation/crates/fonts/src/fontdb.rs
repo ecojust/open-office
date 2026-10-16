@@ -825,6 +825,12 @@ impl FontDb {
         self.faces.read().unwrap_or_else(|e| e.into_inner())
     }
 
+    /// Loaded faces only, without scanning or allocating. Faces are never removed, so render
+    /// caches can use this as a generation when a document or the user adds fonts.
+    pub fn loaded_face_count(&self) -> usize {
+        self.read_faces().len()
+    }
+
     /// The system font catalog, scanned first if it hasn't been yet.
     #[cfg(not(target_arch = "wasm32"))]
     fn read_catalog(&self) -> std::sync::RwLockReadGuard<'_, Vec<CatalogEntry>> {
