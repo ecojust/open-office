@@ -437,12 +437,23 @@ mod tests {
         let bytes = app.session.save_bytes(id).unwrap();
         app.session.mark_saved(id, bytes, None).unwrap();
         let receipt = app.embedding_draft();
-        app.views[0].comments.editing = Some((0, 0, "Saved note ".into()));
+        // Editors open the inspected model text, which normalizes PDF string whitespace.
+        // The raw insertion argument is not the text shown by an unchanged editor.
+        let saved_text = app.session.get(id).unwrap().info.annotations[0].contents.clone().unwrap();
+        assert_eq!(saved_text, "Saved note");
+        app.views[0].comments.editing = Some((0, 0, saved_text.clone()));
         app.views[0].comments.composer =
-            Some(Composer { page: 0, at: [80.0, 80.0], kind: ComposerKind::Edit(0), text: "Saved note ".into(), focus: true });
-        assert!(!app.host_dirty(), "even trailing whitespace in an unchanged note remains unchanged");
+            Some(Composer { page: 0, at: [80.0, 80.0], kind: ComposerKind::Edit(0), text: saved_text.clone(), focus: true });
+        assert!(!app.has_pending_input());
+        assert!(!app.host_dirty(), "opening the saved model text must not create a draft");
         assert_eq!(app.embedding_draft(), receipt);
         app.commit_pending().unwrap();
+
+        app.views[0].comments.editing = Some((0, 0, format!("{saved_text} ")));
+        assert!(app.has_pending_input(), "a newly typed trailing space is still a real edit");
+        assert!(app.host_dirty());
+        assert_ne!(app.embedding_draft(), receipt);
+        assert!(app.commit_pending().is_err());
     }
 
     #[test]
@@ -505,6 +516,7 @@ mod tests {
         for text in ["First", "Second", "Third"] {
             highlight(&mut app, text);
         }
+        let original = app.session.get(app.views[0].id).unwrap().info.annotations.clone();
         app.views[0].comments.editing = Some((0, 1, "Second with pending changes".into()));
         assert!(!app.apply_edit(Edit::DeleteAnnotation { page: 0, index: 0 }));
         app.resolve_removal(true).unwrap();
@@ -516,10 +528,22 @@ mod tests {
         assert!(app.unfinished_comment().unwrap().orphaned);
         app.submit_comment_draft().unwrap();
         let annotations = &app.session.get(app.views[0].id).unwrap().info.annotations;
-        assert_eq!(
-            annotations.iter().map(|item| item.contents.as_deref().unwrap_or("")).collect::<Vec<_>>(),
-            ["First", "Third", "Second with pending changes"]
-        );
+        // Inspection orders comments by page position; a recovered note is placed near
+        // the page top. Compare PDF annotation indexes, not that presentation order.
+        let mut contents = annotations.iter().map(|item| (item.index, item.contents.as_deref().unwrap_or(""))).collect::<Vec<_>>();
+        contents.sort_by_key(|(index, _)| *index);
+        assert_eq!(contents, [(0, "First"), (1, "Third"), (2, "Second with pending changes")]);
+        for old_index in [0, 2] {
+            let old = original.iter().find(|item| item.index == old_index).unwrap();
+            assert!(old.name.is_some());
+            let kept = annotations.iter().find(|item| item.name == old.name).unwrap();
+            assert_eq!(kept.contents, old.contents, "a neighbouring annotation must not be overwritten");
+        }
+        let removed = original.iter().find(|item| item.index == 1).unwrap();
+        assert!(removed.name.is_some());
+        assert!(annotations.iter().all(|item| item.name != removed.name), "recovery must create a new annotation identity");
+        assert!(!app.has_pending_input());
+        app.commit_pending().unwrap();
     }
 
     #[test]
