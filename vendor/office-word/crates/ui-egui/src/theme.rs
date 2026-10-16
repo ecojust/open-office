@@ -899,9 +899,13 @@ mod tests {
         }
     }
 
-    /// Symbols written as text in the interface code must exist in the interface fonts (Inter and
-    /// egui's emoji fallbacks); a missing glyph draws as an empty box, as the panes' "✕" close
-    /// button once did. Letters are the catalogs' business (see the i18n font tests).
+    // egui 0.36.2's has_glyph compares font-face keys with the replacement character's face,
+    // so it falsely rejects every real character supplied by that same fallback face. Query
+    // its public character map instead; this checks the fonts actually installed for the UI.
+    fn has_interface_glyph(fonts: &mut egui::epaint::text::FontsView<'_>, font: &egui::FontId, c: char) -> bool {
+        fonts.fonts.font(&font.family).characters().contains_key(&c)
+    }
+
     #[test]
     fn open_office_chinese_menus_share_the_document_font() {
         let defs = super::font_definitions(true, false);
@@ -917,11 +921,43 @@ mod tests {
         ctx.run_ui(egui::RawInput::default(), |_| {}).drop_without_applying_deltas();
         for font in [super::regular(13.0), super::medium(13.0), super::semibold(13.0)] {
             for c in "文件开始插入设计布局引用审阅视图保存打印页眉页脚简体中文😀🌍".chars() {
-                assert!(ctx.fonts_mut(|f| f.has_glyph(&font, c)), "missing Chinese menu glyph {c}");
+                assert!(ctx.fonts_mut(|f| has_interface_glyph(f, &font, c)), "missing Chinese menu glyph {c}");
             }
         }
     }
 
+    /// Check the atlas used by the renderer as well as coverage. Emoji must have real glyphs,
+    /// while an unassigned code point must remain absent and render the replacement square.
+    #[test]
+    fn interface_symbol_fallbacks_render_real_glyphs() {
+        let ctx = egui::Context::default();
+        ctx.set_fonts(super::font_definitions(true, false));
+        ctx.run_ui(egui::RawInput::default(), |_| {}).drop_without_applying_deltas();
+        for font in [super::regular(13.0), super::medium(13.0), super::semibold(13.0)] {
+            ctx.fonts_mut(|fonts| {
+                assert!(!has_interface_glyph(fonts, &font, '\u{0378}'), "unassigned character must not acquire a glyph");
+                let mut glyph = |text: &str| {
+                    let galley = fonts.layout_no_wrap(text.into(), font.clone(), egui::Color32::WHITE);
+                    assert_eq!(galley.rows.len(), 1);
+                    assert_eq!(galley.rows[0].row.glyphs.len(), 1);
+                    galley.rows[0].row.glyphs[0].uv_rect
+                };
+                let replacement = glyph("\u{0378}");
+                let square = glyph("◻");
+                assert!(!replacement.is_nothing());
+                assert_eq!((replacement.min, replacement.max), (square.min, square.max));
+                for c in ["😀", "🌍"] {
+                    let rendered = glyph(c);
+                    assert!(!rendered.is_nothing(), "empty interface glyph {c}");
+                    assert_ne!((rendered.min, rendered.max), (replacement.min, replacement.max), "replacement glyph rendered for {c}");
+                }
+            });
+        }
+    }
+
+    /// Symbols written as text in the interface code must exist in the interface fonts (Inter and
+    /// egui's emoji fallbacks); a missing glyph draws as an empty box, as the panes' close button
+    /// once did. Letters are the catalogs' business (see the i18n font tests).
     #[test]
     fn interface_symbols_have_glyphs() {
         let ctx = egui::Context::default();
@@ -959,7 +995,7 @@ mod tests {
         symbols.retain(|(c, file)| !exempt(*c, file));
         let font = super::regular(12.5);
         let missing: Vec<String> = ctx.fonts_mut(|f| {
-            symbols.iter().filter(|(c, _)| !f.has_glyph(&font, *c)).map(|(c, file)| format!("{c} U+{:04X} in {file}", *c as u32)).collect()
+            symbols.iter().filter(|(c, _)| !has_interface_glyph(f, &font, *c)).map(|(c, file)| format!("{c} U+{:04X} in {file}", *c as u32)).collect()
         });
         assert!(missing.is_empty(), "symbols without a glyph: {missing:#?}");
     }
