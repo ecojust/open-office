@@ -109,6 +109,8 @@ jobs:
           PY
       - name: Install frontend dependencies
         run: npm ci
+      - name: Verify native dependency lockfile before editor compilation
+        run: cargo metadata --locked --format-version 1 --filter-platform "${{ matrix.target }}" --manifest-path src-tauri/Cargo.toml > "$RUNNER_TEMP/open-office-native-metadata.json"
       - name: Install pinned editor WASM bridge
         run: cargo install --locked wasm-bindgen-cli --version 0.2.129
       - name: Install independent test-only PDF inspector
