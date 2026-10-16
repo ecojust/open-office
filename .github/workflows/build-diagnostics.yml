@@ -54,9 +54,10 @@ jobs:
 
           for job in jobs:
               log = subprocess.check_output([
-                  'gh', 'api', f"repos/{repo}/actions/jobs/{job['id']}/logs",
+                  'gh', 'api', '--allow-escape-sequences',
+                  f"repos/{repo}/actions/jobs/{job['id']}/logs",
               ], text=True)
-              lines = log.splitlines()
+              lines = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', log).splitlines()
               matches = set()
               for index, line in enumerate(lines):
                   if re.search(r'error\[|error:|panicked at|FAILED|^.*failures:|assertion .*failed', line):
