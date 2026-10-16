@@ -456,8 +456,8 @@ def summarize(read, files, run, artifact, expected_sha, context=None):
     native = read("native-diagnostics.json", 1024 * 1024) or report.get("nativeDiagnostics") or {}
     frontend = read("frontend-report.json", 12 * 1024 * 1024) or report.get("frontend") or {}
     editing = frontend.get("editing") or {}
-    # GitHub retains only ten notices per step. Spend five on compact summaries
-    # and at most five on filtered log excerpts; never emit a large JSON notice.
+    # GitHub retains only ten notices per step. Reserve one for failed editor
+    # input when available and reduce log excerpts accordingly.
     state = editing.get("lastState") or {}
     notice("status", {"runId": run["id"], "headSha": expected_sha, "conclusion": run.get("conclusion"), "artifactId": artifact["id"], "bytes": artifact["size_in_bytes"], "establishesFix": False,
         "report": {**pick(report, ["status", "ok", "blockedReason", "durationMs"]), "error": compact_text(report.get("error") or "", 500)},
@@ -468,6 +468,16 @@ def summarize(read, files, run, artifact, expected_sha, context=None):
         "sentCount": len(actions), "actions": [{"id": (action.get("request") or {}).get("actionId"), "kind": (action.get("request") or {}).get("kind"), **pick(action.get("result"), ["ok", "eventCount", "error"])} for action in actions[:16]],
         "preflight": {**pick(preflight, ["kind", "ok", "error"]), "permissions": pick(preflight.get("permissions"), ["postEventAccess", "accessibilityTrusted", "screenCaptureAccess", "inputSourceId", "osVersion"])}})
     notice("native", {**pick(native, ["generation", "terminations", "scope"]), "timeline": compact_timeline(native)})
+    editor = (editing.get("observations") or {}).get("doubleClickState")
+    if isinstance(editor, dict):
+        timing = editor.get("frameTiming") or {}
+        notice("editor-state", {
+            **pick(editor, ["uiMode", "editorCell", "revision", "selection", "activeElement", "activeTestId", "input", "point"]),
+            "events": [pick(event, ["type", "target", "detail", "clientX", "clientY", "timeStamp", "receivedAt"])
+                       for event in (editor.get("events") or [])[-8:]],
+            "frameTiming": {**pick(timing, ["startedAt", "frameCount", "maximumGapMs", "lastFrame"]),
+                            "firstFrames": (timing.get("firstFrames") or [])[:8]},
+        })
     process = report.get("process") or {}
     samples = process_rows((report.get("processSamples") or [])[-200:])
     recent = []
@@ -480,7 +490,8 @@ def summarize(read, files, run, artifact, expected_sha, context=None):
     log = read("system-webkit.ndjson", 8 * 1024 * 1024, False)
     summary = system_log_summary(log or b"", report, samples)
     notice("system-log", {"available": log is not None, **pick(report.get("systemLog"), ["bytes", "truncated", "mode", "totalBytes", "droppedBytes", "startsMidLine", "stderr"]), **pick(summary, ["parsedLines", "skippedLines", "matchingLines", "firstParsedTimestamp", "lastParsedTimestamp", "timeFilterAvailable", "limitation"])})
-    for offset in range(0, len(summary["lines"]), 4):
+    excerpt_limit = 16 if isinstance(editor, dict) else 20
+    for offset in range(0, min(len(summary["lines"]), excerpt_limit), 4):
         notice("related-system-log", {"part": offset // 4 + 1, "lines": summary["lines"][offset:offset + 4], "causalityEstablished": False})
 
 

@@ -34,7 +34,7 @@ export interface EditingInputRequest {
   viewportHeight: number
 }
 interface Boot { bootId: string; timeOrigin: number }
-interface RecordedEvent { type: string; isTrusted: boolean; target: string; key?: string; detail?: number; clientX?: number; clientY?: number }
+interface RecordedEvent { type: string; isTrusted: boolean; target: string; timeStamp: number; receivedAt: number; key?: string; detail?: number; clientX?: number; clientY?: number }
 interface Identity { key: string; kind: Kind; sessionId: string; documentId: number }
 interface Action { actionId: string; kind: string; target: string; events: RecordedEvent[]; before: unknown; after?: unknown; completed: boolean }
 export interface MacosEditingReport {
@@ -99,7 +99,7 @@ function readBoot(): Boot {
 function identity(mount: EditingSmokeMount, state: Snapshot): Identity { return { key: mount.key, kind: mount.kind, sessionId: state.sessionId, documentId: state.documentId } }
 type Cell = { value: unknown; input: string; style: { font: { bold: boolean } } }
 const cell = (mount: EditingSmokeMount, name: string) => bounded((mount.editor as OfficeSheetSmokeEditor).query('cell.get', { cell: name }), `read ${name}`) as Promise<Cell>
-type SheetUi = { visibleCells?: Array<{ cell: string; rect: number[] }>; drawnChrome?: Array<{ id: string; rect: number[] }>; editor?: { cell: string } | null }
+type SheetUi = { mode?: string; visibleCells?: Array<{ cell: string; rect: number[] }>; drawnChrome?: Array<{ id: string; rect: number[] }>; editor?: { cell: string } | null }
 function point(canvas: HTMLCanvasElement, rect: number[]) {
   assert(rect.length === 4 && rect.every(Number.isFinite), 'invalid canvas target bounds')
   const bounds = canvas.getBoundingClientRect()
@@ -139,7 +139,7 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
     const target = event.target instanceof Element ? event.target : undefined
     const button = target?.closest('button')
     const label = button?.getAttribute('aria-label')
-    const value: RecordedEvent = { type: event.type, isTrusted: event.isTrusted, target: label ? `button:${label}` : target?.getAttribute('data-testid') || target?.tagName || '' }
+    const value: RecordedEvent = { type: event.type, isTrusted: event.isTrusted, target: label ? `button:${label}` : target?.getAttribute('data-testid') || target?.tagName || '', timeStamp: event.timeStamp, receivedAt: performance.now() }
     if (event instanceof KeyboardEvent) value.key = event.key
     if (event instanceof MouseEvent) { value.detail = event.detail; value.clientX = event.clientX; value.clientY = event.clientY }
     currentEvents.push(value)
@@ -203,8 +203,43 @@ export async function verifyMacosEditing(adapter: EditingSmokeAdapter, requestIn
     report.observations.singleClickValue = (await until(() => cell(sheet, 'A1'), value => value.value === 42, 'single-click edit committed')).value
     assert((await cell(first, 'A1')).value === null, 'editing second workbook changed first workbook')
     report.checks.push(MACOS_EDITING_CHECKS[1])
-    await input('double-d6', 'sheet:D6', { kind: 'doubleClick', ...await sheetPoint(sheet, 'D6') })
-    await until(() => sheet.editor.inspect(), value => (value.ui as SheetUi)?.editor?.cell === 'D6' && document.activeElement === sheet.element.querySelector('[data-testid="office-sheet-input"]'), 'double-click editor and natural input focus')
+    const doublePoint = await sheetPoint(sheet, 'D6')
+    const frameTiming = { startedAt: performance.now(), firstFrames: [] as number[], frameCount: 0, maximumGapMs: 0, lastFrame: 0 }
+    let sampledFrame = 0
+    const sampleFrame = () => {
+      const now = performance.now()
+      frameTiming.maximumGapMs = Math.max(frameTiming.maximumGapMs, now - (frameTiming.lastFrame || frameTiming.startedAt))
+      frameTiming.lastFrame = now
+      frameTiming.frameCount++
+      if (frameTiming.firstFrames.length < 64) frameTiming.firstFrames.push(now)
+      sampledFrame = requestAnimationFrame(sampleFrame)
+    }
+    sampledFrame = requestAnimationFrame(sampleFrame)
+    let doubleState: Snapshot | undefined
+    try {
+      await input('double-d6', 'sheet:D6', { kind: 'doubleClick', ...doublePoint })
+      await until(async () => { doubleState = await sheet.editor.inspect(); return doubleState }, value => (value.ui as SheetUi)?.editor?.cell === 'D6' && document.activeElement === sheet.element.querySelector('[data-testid="office-sheet-input"]'), 'double-click editor and natural input focus')
+    } catch (cause) {
+      const ui = doubleState?.ui as SheetUi | undefined
+      const agent = sheet.element.querySelector<HTMLInputElement>('[data-testid="office-sheet-input"]')
+      const focused = document.activeElement
+      const rect = agent?.getBoundingClientRect()
+      const detail = {
+        uiMode: ui?.mode ?? null, editorCell: ui?.editor?.cell ?? null,
+        revision: doubleState?.revision ?? null,
+        selection: doubleState && 'selection' in doubleState ? doubleState.selection : null,
+        activeElement: focused?.tagName ?? null,
+        activeTestId: focused?.getAttribute('data-testid')?.slice(0, 80) ?? null,
+        input: agent ? { hidden: agent.hidden, disabled: agent.disabled, connected: agent.isConnected,
+          rect: rect ? [rect.x, rect.y, rect.width, rect.height] : null } : null,
+        point: doublePoint,
+        events: report.actions.find(action => action.actionId === 'double-d6')?.events.slice(-16) ?? [],
+        frameTiming,
+      }
+      report.observations.doubleClickState = detail
+      const message = cause instanceof Error ? cause.message : String(cause)
+      throw Error(`${message}; mode=${detail.uiMode}; editor=${detail.editorCell}; focus=${detail.activeTestId ?? detail.activeElement}`)
+    } finally { cancelAnimationFrame(sampledFrame) }
     await input('type-d6', 'sheet:D6', { kind: 'type', text: 'sheetnative' })
     await input('enter-d6', 'sheet:D6', { kind: 'key', key: 'Enter' })
     report.observations.doubleClickValue = (await until(() => cell(sheet, 'D6'), value => value.value === 'sheetnative', 'double-click edit committed')).value
