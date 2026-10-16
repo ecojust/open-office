@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { extensionOf, kindOf, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFileName } from '../src/shared/document.ts'
+import { extensionOf, kindOf, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFileName, saveFormats } from '../src/shared/document.ts'
 
 function ole(major=3) {
   const bytes=new Uint8Array(512),view=new DataView(bytes.buffer)
@@ -44,6 +44,21 @@ test('text spreadsheets default to a workbook copy and reject invalid UTF-8 or b
     assert.throws(()=>validateDocumentSignature(new Uint8Array([0xff,0xfe,0x41,0]),extension))
     assert.throws(()=>validateDocumentSignature(new Uint8Array(),extension),/文档为空/)
   }
+})
+
+test('local notebooks route to their own editable format and reject invalid headers',()=>{
+  assert.equal(extensionOf('会议记录.OONOTE'),'oonote')
+  assert.equal(kindOf('oonote'),'note')
+  assert.equal(defaultSaveExtension('oonote'),'oonote')
+  assert.equal(isImportOnly('oonote'),false)
+  assert.deepEqual(saveFormats('note').map(format=>format.extension),['oonote'])
+  const header={format:'open-office-notebook',version:1,sections:[]}
+  assert.doesNotThrow(()=>validateDocumentSignature(encode(JSON.stringify(header)),'oonote'))
+  for(const value of [null,[],{}, {...header,version:2},{...header,sections:{}},'<html>notes</html>']) {
+    assert.throws(()=>validateDocumentSignature(encode(JSON.stringify(value)),'oonote'))
+  }
+  assert.throws(()=>validateDocumentSignature(new Uint8Array([0xc3,0x28]),'oonote'))
+  assert.throws(()=>validateDocumentSignature(new Uint8Array(),'oonote'),/文档为空/)
 })
 
 test('supported OOXML signatures fail closed before a Rust parser reads the package',()=>{

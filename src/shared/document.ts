@@ -1,5 +1,5 @@
-export type Kind = 'word'|'sheet'|'presentation'|'pdf'
-export type Extension = 'docx'|'xlsx'|'csv'|'tsv'|'pptx'|'potx'|'ppsx'|'pdf'
+export type Kind = 'word'|'sheet'|'presentation'|'pdf'|'note'
+export type Extension = 'docx'|'xlsx'|'csv'|'tsv'|'pptx'|'potx'|'ppsx'|'pdf'|'oonote'
 export type SaveExtension = Exclude<Extension,'potx'|'ppsx'>
 export type SaveFormatOption = { extension: SaveExtension; title: string; description: string }
 /** Formats actually implemented by each active editor, not all import formats. */
@@ -10,6 +10,7 @@ export function saveFormats(kind: Kind): SaveFormatOption[] {
   sheet: [{ extension: 'xlsx', title: 'XLSX 工作簿', description: '保留工作表、公式和单元格格式' }, { extension: 'csv', title: 'CSV 数据副本', description: '仅导出当前工作表的显示值，不包含公式、格式和其他工作表' }, { extension: 'tsv', title: 'TSV 数据副本', description: '以制表符分隔当前工作表的显示值，不包含公式、格式和其他工作表' }, pdf],
   presentation: [{ extension: 'pptx', title: 'PPTX 演示文稿', description: '保留可编辑的幻灯片与对象' }, { ...pdf, description: '静态页面，不包含放映动画与音视频' }],
   pdf: [pdf],
+  note: [{ extension: 'oonote', title: 'Open Office 笔记本', description: '保留分区、页面、富文本、待办与图片' }],
  }
  return formats[kind]
 }
@@ -34,13 +35,13 @@ export type EditorHandle = {
  search?(value:string):void|Promise<void>;
  print?():void|Promise<void>;
 }
-const supportedExtensions = ['docx','xlsx','csv','tsv','pptx','potx','ppsx','pdf'] as const
+const supportedExtensions = ['docx','xlsx','csv','tsv','pptx','potx','ppsx','pdf','oonote'] as const
 export function extensionOf(name:string):Extension {
  const extension=name.split('.').at(-1)?.toLowerCase()
- if(!(supportedExtensions as readonly string[]).includes(extension || ''))throw new Error('请选择 DOCX、XLSX、CSV、TSV、PPTX、POTX、PPSX 或 PDF 文件。其他格式请先转换；宏与加密文件暂不支持。')
+ if(!(supportedExtensions as readonly string[]).includes(extension || ''))throw new Error('请选择 DOCX、XLSX、CSV、TSV、PPTX、POTX、PPSX、PDF 或 OONOTE 文件。其他格式请先转换；宏与加密文件暂不支持。')
  return extension as Extension
 }
-export function kindOf(extension:Extension):Kind{return extension==='pdf'?'pdf':['pptx','potx','ppsx'].includes(extension)?'presentation':['xlsx','csv','tsv'].includes(extension)?'sheet':'word'}
+export function kindOf(extension:Extension):Kind{return extension==='oonote'?'note':extension==='pdf'?'pdf':['pptx','potx','ppsx'].includes(extension)?'presentation':['xlsx','csv','tsv'].includes(extension)?'sheet':'word'}
 export function isImportOnly(extension:Extension):boolean{return extension==='potx'||extension==='ppsx'}
 export function defaultSaveExtension(extension:Extension):SaveExtension {
  if(extension==='csv'||extension==='tsv')return 'xlsx'
@@ -57,6 +58,11 @@ export function validateDocumentSignature(bytes:Uint8Array,extension:Extension):
  if(extension==='pdf') {
   // ISO 32000 permits readers to locate the header within the first 1024 bytes.
   valid=Array.from(bytes.subarray(0,1024),value=>String.fromCharCode(value)).join('').includes('%PDF-')
+ } else if(extension==='oonote') {
+  try {
+   const data:unknown=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))
+   valid=!!data&&typeof data==='object'&&'format' in data&&data.format==='open-office-notebook'&&'version' in data&&data.version===1&&'sections' in data&&Array.isArray(data.sections)
+  } catch {valid=false}
  } else if(extension==='csv'||extension==='tsv') {
   try { const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);valid=!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(text) } catch { valid=false }
  } else valid=bytes.length>=30&&starts([0x50,0x4b,0x03,0x04])

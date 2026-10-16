@@ -3,6 +3,10 @@
 
 use egui::{Color32, Painter, Rect};
 
+/// Shared Open Office toolbar sizes; smaller status indicators remain contextual.
+pub const TOOL_SIZE: f32 = 18.0;
+pub const LARGE_SIZE: f32 = 28.0;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Icon {
     Paste,

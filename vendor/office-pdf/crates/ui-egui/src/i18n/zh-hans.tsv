@@ -2083,6 +2083,11 @@
 	Your name	您的姓名
 
 # Additional UI labels, including newer workspace and security prompts.
+	Add {what}	添加{what}
+	Use {what}	使用{what}
+	Place saved {what}	放置已保存的{what}
+	Remove saved {what}	删除已保存的{what}
+signature pad	Type	输入
 	Change {what}	更改{what}
 	Cut and stack	裁切后堆叠
 	Default workspace mode	默认工作区模式

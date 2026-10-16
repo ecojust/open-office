@@ -40,6 +40,13 @@ pub enum SaveTarget {
 impl OfficePdfApp {
     /// Apply an edit to the active document. Returns `true` on success; failures are shown.
     pub fn apply_edit(&mut self, edit: Edit) -> bool {
+        if self.confirm_edit_removal(&edit) {
+            return false;
+        }
+        self.apply_edit_confirmed(edit)
+    }
+
+    pub(crate) fn apply_edit_confirmed(&mut self, edit: Edit) -> bool {
         let Some((i, id)) = self.active_ids() else { return false };
         let label = edit.label();
         let (form_before, page_count_before, had_xfa) = if let Some(d) = self.session.get(id) {
@@ -224,6 +231,7 @@ impl OfficePdfApp {
             self.deferred_commands.clear();
         }
         match self.views.get_mut(i).and_then(|v| v.pending_action.take()) {
+            Some(crate::canvas::ViewAction::DeleteContent { page, index }) => self.remove_selected_content(page, index),
             Some(crate::canvas::ViewAction::InsertFromFile) => self.insert_from_file_dialog(),
             Some(crate::canvas::ViewAction::InsertFromFileAt(at)) => self.insert_from_file_at(Some(at)),
             Some(crate::canvas::ViewAction::ReplacePages) => self.replace_pages_dialog(),

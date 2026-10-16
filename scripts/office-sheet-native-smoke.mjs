@@ -36,7 +36,7 @@ function positive(value, label, maximum = Number.MAX_SAFE_INTEGER) {
 
 /** Match the build script's path+NUL+bytes+NUL fingerprint without executing a build. */
 export function sheetSourceHash(root = ROOT) {
-  const files = ['scripts/build-office-sheet.mjs', 'scripts/build-office-icons.mjs'];
+  const files = ['scripts/build-office-sheet.mjs', 'scripts/build-office-icons.mjs', 'src/shared/office-ui-fonts.rs'];
   function collect(directory) {
     for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
       if (['target', '.git'].includes(entry.name)) continue;
@@ -45,7 +45,7 @@ export function sheetSourceHash(root = ROOT) {
       else if (entry.isFile()) files.push(path);
     }
   }
-  collect('vendor/office-sheet'); collect('assets/fonts/open-office'); collect('src/icons');
+  collect('vendor/office-sheet'); collect('assets/fonts/open-office'); collect('assets/fonts/ui'); collect('assets/fonts/deck'); collect('src/icons');
   check(files.some(name => name.startsWith('vendor/office-sheet/'))
     && files.some(name => name.startsWith('assets/fonts/open-office/')), 'source and licensed fonts are required');
   const hash = createHash('sha256');

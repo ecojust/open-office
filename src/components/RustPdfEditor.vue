@@ -86,7 +86,13 @@ async function canBackgroundExport() {
   await opening
   return !disposed && !loading.value && !!session && await session.canBackgroundExport()
 }
-async function command(id: string, params: Record<string, unknown> = {}) { await flush(); return session!.command(id, params) }
+async function command(id: string, params: Record<string, unknown> = {}) {
+  if (id === 'ui.delete.confirm' || id === 'ui.delete.cancel') {
+    await opening
+    if (!session) throw Error('请等待 PDF 文档打开。')
+  } else await flush()
+  return session!.command(id, params)
+}
 async function query(id: string, params: Record<string, unknown> = {}) { await opening; if (!session) throw Error('请等待 PDF 文档打开。'); return session.query(id, params) }
 function focus() { session?.focus() }
 async function print() {

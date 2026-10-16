@@ -31,9 +31,9 @@ fn japanese_ui_text_uses_craft_fonts() {
     for family in [FontFamily::Proportional, FontFamily::Monospace] {
         let stack = &defs.families[&family];
         let first_jp = stack.iter().position(|n| n.starts_with("BIZ UDPGothic")).expect("BIZ UDPGothic is a fallback");
-        let own = stack.iter().position(|n| n == "Inter" || n == "JetBrainsMono").expect("the app's own font");
+        let own = stack.iter().position(|n| n == "office-ui-regular" || n == "JetBrainsMono").expect("the interface's primary face");
         assert!(own < first_jp, "{family:?}: {stack:?}");
-        assert!(stack[first_jp..].iter().all(|n| office_pdf_fonts::CRAFT_FONTS.iter().any(|f| f.name() == *n)), "{stack:?}");
+        assert_eq!(stack.iter().filter(|n| *n == &stack[first_jp]).count(), 1, "Japanese fallback appears once: {stack:?}");
     }
     let mut fonts = Fonts::new(TextOptions::default(), defs);
     for id in families() {
@@ -62,7 +62,7 @@ fn chinese_ui_text_prefers_the_chinese_face() {
         let stack = &defs.families[&family];
         let first_zh = stack.iter().position(|n| hans.iter().any(|h| h == n)).expect("a Hans face is a fallback");
         let first_ja = stack.iter().position(|n| n.starts_with("BIZ UDPGothic")).expect("BIZ UDPGothic is a fallback");
-        let own = stack.iter().position(|n| n == "Inter" || n == "JetBrainsMono").expect("the app's own font");
+        let own = stack.iter().position(|n| n == "office-ui-regular" || n == "JetBrainsMono").expect("the interface's primary face");
         assert!(own < first_zh && first_zh < first_ja, "{family:?}: {stack:?}");
     }
     let mut fonts = Fonts::new(TextOptions::default(), defs);
@@ -87,7 +87,7 @@ fn arabic_ui_text_uses_craft_fonts() {
     for family in [FontFamily::Proportional, FontFamily::Monospace] {
         let stack = &defs.families[&family];
         let first_ar = stack.iter().position(|n| arabic.contains(n)).expect("an Arab face is a fallback");
-        let own = stack.iter().position(|n| n == "Inter" || n == "JetBrainsMono").expect("the app's own font");
+        let own = stack.iter().position(|n| n == "office-ui-regular" || n == "JetBrainsMono").expect("the interface's primary face");
         assert!(own < first_ar, "{family:?}: {stack:?}");
     }
     let mut fonts = Fonts::new(TextOptions::default(), defs);
@@ -110,7 +110,7 @@ fn telugu_ui_text_uses_craft_fonts() {
     for family in [FontFamily::Proportional, FontFamily::Monospace] {
         let stack = &defs.families[&family];
         let first_te = stack.iter().position(|n| telugu.contains(n)).expect("a Telu face is a fallback");
-        let own = stack.iter().position(|n| n == "Inter" || n == "JetBrainsMono").expect("the app's own font");
+        let own = stack.iter().position(|n| n == "office-ui-regular" || n == "JetBrainsMono").expect("the interface's primary face");
         assert!(own < first_te, "{family:?}: {stack:?}");
     }
     let mut fonts = Fonts::new(TextOptions::default(), defs);
@@ -254,7 +254,8 @@ fn chinese_ui_uses_an_installed_chinese_face() {
         for (family, stack) in &defs.families {
             let system = stack.iter().position(|n| n == theme::SYSTEM_FALLBACK).expect("in every family");
             assert_eq!(stack.iter().filter(|n| *n == theme::SYSTEM_FALLBACK).count(), 1, "{family:?}");
-            let own = stack.iter().position(|n| n.starts_with("Inter") || n == "JetBrainsMono").expect("the app's own font");
+            let own =
+                stack.iter().position(|n| n.starts_with("office-ui-") || n.starts_with("Inter") || n == "JetBrainsMono").expect("the app's own font");
             assert!(own < system, "{family:?}: {stack:?}");
             if let Some(first_ja) = stack.iter().position(|n| n.starts_with("BIZ UDPGothic")) {
                 assert!(system < first_ja, "{family:?}: {stack:?}");
@@ -275,14 +276,15 @@ fn chinese_ui_uses_an_installed_chinese_face() {
     }
 }
 
-/// Without craft-fonts the interface fonts still install and lay out any text (Japanese falls
-/// back to egui's replacement glyph) without panicking; Latin text is unaffected.
+/// The host's embedded interface/document fallbacks cover Chinese and Japanese even without
+/// optional font build inputs; Latin text is unaffected.
 #[test]
 fn ui_fonts_work_without_craft_fonts() {
     let mut fonts = Fonts::new(TextOptions::default(), theme::font_definitions());
     for id in families() {
         assert!(fonts.has_glyphs(&id, "Open Office"), "{id:?}");
-        assert_eq!(fonts.has_glyphs(&id, JAPANESE), !office_pdf_fonts::ui_japanese_fonts().is_empty(), "{id:?}");
+        assert!(fonts.has_glyphs(&id, JAPANESE), "{id:?} lacks {JAPANESE}");
+        assert!(fonts.has_glyphs(&id, CHINESE), "{id:?} lacks {CHINESE}");
     }
     assert!(layout_widths(&mut fonts, JAPANESE).iter().all(|w| w.is_finite() && *w > 0.0));
     assert!(layout_widths(&mut fonts, "Open Office").iter().all(|w| *w > 20.0));
@@ -325,7 +327,7 @@ fn primary_ui_fonts_cover_latin_and_cyrillic_catalogs() {
                 text.extend(translation.chars().filter(|c| !c.is_whitespace()));
             }
         }
-        for name in ["Inter", "Inter-Medium", "Inter-SemiBold", "JetBrainsMono"] {
+        for name in ["office-ui-regular", "office-ui-semibold", "JetBrainsMono"] {
             let data = &defs.font_data[name];
             let font = skrifa::FontRef::from_index(&data.font, data.index).unwrap();
             let charmap = font.charmap();

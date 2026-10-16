@@ -37,6 +37,9 @@ impl OfficePdfApp {
         self.update_source = None;
         self.window_controls = None;
         self.integrated_titlebar = false;
+        if self.left == crate::LeftPanel::AllTools {
+            self.left_open = false;
+        }
         crate::i18n::set_current(crate::i18n::Lang::from_pref(&self.language));
         ctx.request_repaint();
     }
@@ -45,6 +48,8 @@ impl OfficePdfApp {
         let mut state = Host::state(self);
         if let Some(object) = state.as_object_mut() {
             object.insert("backgroundExportReady".into(), json!(self.background_export_ready()));
+            object.insert("toolbar".into(), json!(self.ctx.as_ref().map(crate::embedded_toolbar::drawn).unwrap_or_default()));
+            object.insert("deletePrompt".into(), json!(self.pending_removal.as_ref().map(|pending| &pending.label)));
         }
         state
     }
@@ -53,6 +58,7 @@ impl OfficePdfApp {
     /// background export: committing it would end the user's editing session.
     pub fn background_export_ready(&self) -> bool {
         !self.embedding_composing
+            && self.pending_removal.is_none()
             && self.dialog.is_none()
             && !self.palette_open
             && self.password_prompt.is_none()
@@ -80,6 +86,14 @@ impl OfficePdfApp {
             "ui.commands" => Ok(Host::commands(self)),
             "ui.dock" => Host::dock(self, false, &params),
             "ui.dock.reset" => Host::dock(self, true, &params),
+            "ui.delete.confirm" => {
+                self.resolve_removal(true)?;
+                Ok(self.embedding_state())
+            }
+            "ui.delete.cancel" => {
+                self.resolve_removal(false)?;
+                Ok(self.embedding_state())
+            }
             _ => Host::command(self, command),
         }
     }
@@ -131,11 +145,12 @@ impl OfficePdfApp {
                 })
             })
             .collect();
-        json!({"composing": self.embedding_composing, "views": views})
+        json!({"composing": self.embedding_composing, "views": views, "deletePrompt": self.pending_removal.as_ref().map(|pending| &pending.label)})
     }
 
     pub fn has_pending_input(&self) -> bool {
         self.embedding_composing
+            || self.pending_removal.is_some()
             || self.views.iter().any(|view| {
                 view.pending_edit.is_some()
                     || content_draft_changed(view, self.session.get(view.id))
@@ -163,6 +178,9 @@ impl OfficePdfApp {
 
     /// Flush the live document editors before exporting. Rejected text stays available to fix.
     pub fn commit_pending(&mut self) -> Result<(), String> {
+        if self.pending_removal.is_some() {
+            return Err("请先确认或取消删除，再保存文稿".into());
+        }
         if self.embedding_composing {
             return Err("请先确认输入法候选文字，再保存文稿".into());
         }
@@ -204,6 +222,7 @@ impl OfficePdfApp {
 
     /// Called only after the containing window has confirmed discarding unsaved work.
     pub fn discard_pending(&mut self) {
+        self.pending_removal = None;
         self.embedding_composing = false;
         self.deferred_commands.clear();
         for view in &mut self.views {

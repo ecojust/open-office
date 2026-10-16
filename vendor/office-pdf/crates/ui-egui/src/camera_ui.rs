@@ -181,7 +181,7 @@ pub(crate) fn bar(ctx: &egui::Context, view: &mut DocView, area: Rect, t: &Token
                             }
                             ui.separator();
                             let icon = |ui: &mut egui::Ui, name: &str, tip: &str| {
-                                let r = ui.add_enabled(allowed, egui::Button::image(crate::icons::image(name, 18.0, t.text)).frame(false));
+                                let r = ui.add_enabled(allowed, egui::Button::image(crate::icons::image(ui, name, 18.0, t.text)).frame(false));
                                 // Named for screen readers (and tests), not only on hover.
                                 r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, allowed, tip));
                                 r.on_hover_text(tip).clicked()

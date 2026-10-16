@@ -171,6 +171,13 @@ impl Entry {
         if matches!(command, "document.inspect" | "ui.state" | "ui.inspect") {
             return if command == "document.inspect" { self.inspect_document() } else { Ok(self.app.embedding_state()) };
         }
+        // Deciding an existing deletion prompt must not flush it first: pending user
+        // confirmation intentionally blocks save/export and ordinary editing commands.
+        if matches!(command, "ui.delete.confirm" | "ui.delete.cancel") {
+            let result = self.app.run_host_command(command, params.clone())?;
+            self.sync()?;
+            return Ok(result);
+        }
         if command == "edit.find" {
             let query = params.get("query").and_then(Value::as_str).ok_or("请输入搜索内容。")?;
             if query.len() > 8192 {
@@ -366,6 +373,21 @@ mod tests {
         assert!(entry.discard(1.0, f64::from(entry.revision)).unwrap());
         assert_eq!(entry.inspect_document().unwrap()["texts"][0], "");
     }
+    #[test]
+    fn deletion_decisions_are_reachable_while_save_is_blocked() {
+        let mut entry = blank();
+        entry.command("page.insert_blank", &json!({})).unwrap();
+        assert_eq!(entry.inspect_document().unwrap()["pageCount"], 2);
+        entry.command("page.delete", &json!({})).unwrap();
+        assert!(entry.export("pdf").is_err());
+        entry.command("ui.delete.cancel", &json!({})).unwrap();
+        assert_eq!(entry.inspect_document().unwrap()["pageCount"], 2);
+        entry.command("page.delete", &json!({})).unwrap();
+        entry.command("ui.delete.confirm", &json!({})).unwrap();
+        assert_eq!(entry.inspect_document().unwrap()["pageCount"], 1);
+        assert!(entry.export("pdf").is_ok());
+    }
+
     #[test]
     fn added_text_remains_editable_after_saved_rebase_and_reopen() {
         let mut entry = blank();

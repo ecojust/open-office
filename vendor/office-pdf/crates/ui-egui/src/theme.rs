@@ -1,6 +1,9 @@
 //! Design tokens and egui style (plan/acrobat/02-ui-ux.md §1: neutral chrome, white panels,
 //! one blue accent; Dark Gray keeps pages white). Every custom widget reads `Tokens::get`.
 
+#[path = "../../../../../src/shared/office-ui-fonts.rs"]
+mod office_ui_fonts;
+
 use std::sync::Arc;
 
 use egui::epaint::text::{FontTweak, HintingTarget, SmoothHinting};
@@ -418,7 +421,20 @@ fn font_definitions_for_platform(prefer_hans: bool, platform: FontPolicyPlatform
         stack.extend(fallback.iter().cloned());
         fonts.families.insert(FontFamily::Name(fam.into()), stack);
     }
+    // Text boxes drawn over PDF pages have their own fallback metrics. Retain
+    // those faces before installing the shared interface fonts: changing the
+    // toolbar must not change the layout of text while a document is edited.
+    for (bold, source) in [(false, FontFamily::Proportional), (true, FontFamily::Name("semibold".into()))] {
+        let stack = fonts.families.get(&source).cloned().unwrap_or_default();
+        fonts.families.insert(document_font_family(bold), stack);
+    }
+    office_ui_fonts::install(&mut fonts, &[FontFamily::Proportional], &[FontFamily::Name("medium".into()), FontFamily::Name("semibold".into())]);
     fonts
+}
+
+/// The pre-existing document-overlay fallback, independent of interface typography.
+pub(crate) fn document_font_family(bold: bool) -> FontFamily {
+    FontFamily::Name(if bold { "office-pdf-document-semibold" } else { "office-pdf-document-regular" }.into())
 }
 
 pub fn regular(size: f32) -> FontId {
@@ -486,10 +502,7 @@ pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
         s.spacing.scroll.floating = true;
         s.spacing.scroll.floating_width = 3.0;
         s.spacing.scroll.foreground_color = true;
-        s.text_styles.insert(egui::TextStyle::Body, regular(13.0));
-        s.text_styles.insert(egui::TextStyle::Button, regular(13.0));
-        s.text_styles.insert(egui::TextStyle::Small, regular(11.0));
-        s.text_styles.insert(egui::TextStyle::Heading, semibold(17.0));
+        office_ui_fonts::apply_style(s);
         s.interaction.tooltip_delay = 0.35;
     });
     let style = ctx.global_style();
@@ -508,9 +521,9 @@ mod tests {
 
     fn primary_families() -> [(FontFamily, &'static str); 4] {
         [
-            (FontFamily::Proportional, "Inter"),
-            (FontFamily::Name("medium".into()), "Inter-Medium"),
-            (FontFamily::Name("semibold".into()), "Inter-SemiBold"),
+            (FontFamily::Proportional, "office-ui-regular"),
+            (FontFamily::Name("medium".into()), "office-ui-semibold"),
+            (FontFamily::Name("semibold".into()), "office-ui-semibold"),
             (FontFamily::Monospace, "JetBrainsMono"),
         ]
     }
@@ -645,6 +658,7 @@ mod tests {
         assert_eq!(baseline.families, windows.families);
         assert_eq!(baseline.font_data.keys().collect::<Vec<_>>(), windows.font_data.keys().collect::<Vec<_>>());
         for (family, name) in primary_families() {
+            assert_eq!(baseline.families[&family].first().map(String::as_str), Some(name), "primary face for {family:?}");
             let baseline_data = &baseline.font_data[name];
             let windows_data = &windows.font_data[name];
             assert_eq!(baseline_data.tweak, FontTweak::default(), "baseline {name}");
@@ -663,7 +677,7 @@ mod tests {
             assert_eq!(primary_font_tweak(FontPolicyPlatform::Other, name), baseline_data.tweak, "non-Windows policy for {family:?}");
         }
         for (name, data) in &baseline.font_data {
-            if !["Inter", "Inter-Medium", "Inter-SemiBold", "JetBrainsMono"].contains(&name.as_str()) {
+            if !["office-ui-regular", "office-ui-semibold", "JetBrainsMono"].contains(&name.as_str()) {
                 assert_eq!(windows.font_data[name].tweak, data.tweak, "Windows fallback {name}");
             }
         }

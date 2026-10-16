@@ -464,8 +464,8 @@ pub(crate) fn keys(ctx: &egui::Context, view: &mut DocView) {
         return;
     }
     let (del, esc) = ctx.input(|i| (i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace), i.key_pressed(egui::Key::Escape)));
-    if del && let Some((page, index)) = view.content.selected.take() {
-        view.pending_edit = Some(Edit::DeleteContent { page, index });
+    if del && let Some((page, index)) = view.content.selected {
+        view.pending_action = Some(crate::canvas::ViewAction::DeleteContent { page, index });
     } else if esc {
         view.content.selected = None;
     }

@@ -42,3 +42,11 @@ Generated-in-code art is original and has no file to list: the UI icon set (`cra
 | `docs/images/pivot.png` | GridCraft contributors | screenshot of GridCraft rendered offscreen (`crates/ui-egui/examples/snapshot.rs`) showing an original sample workbook | MIT OR Apache-2.0 | README screenshot; no third-party content |
 | `docs/images/format-chart.png` | GridCraft contributors | screenshot of GridCraft rendered offscreen (`crates/ui-egui/examples/snapshot.rs`) showing an original sample workbook | MIT OR Apache-2.0 | README screenshot; no third-party content |
 | `docs/images/page-break.png` | GridCraft contributors | screenshot of GridCraft rendered offscreen (`crates/ui-egui/examples/snapshot.rs`) showing an original sample workbook | MIT OR Apache-2.0 | README screenshot; no third-party content |
+
+## Open Office shared interface typography
+
+| Asset | Author | Source | Licence | Use |
+|---|---|---|---|---|
+| `../../assets/fonts/deck/Inter-Regular.ttf`, `Inter-SemiBold.ttf` | Rasmus Andersson / Inter Project Authors | https://github.com/rsms/inter; exact pinned bytes in the shared font manifest | OFL-1.1 (`../../assets/fonts/deck/OFL-Inter.txt`) | Shared Latin interface typography |
+
+| `../../assets/fonts/ui/WenQuanYiMicroHei-Regular.ttf` | WenQuanYi Project Contributors; Google Corporation; Wada Laboratory / Electronic Font Open Laboratory | https://sourceforge.net/projects/wqy/files/wqy-microhei/0.2.0-beta/; proportional TTC face extracted without outline changes, SHA-256 in shared font manifest | Apache-2.0 (`../../assets/fonts/ui/LICENSE-Apache-2.0.txt`) | Shared Chinese interface typography only; document font choices and exports unchanged |

@@ -1,5 +1,8 @@
 //! Design tokens (light, PowerPoint-like; and dark) and fonts for the UI.
 
+#[path = "../../../../../src/shared/office-ui-fonts.rs"]
+mod office_ui_fonts;
+
 use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, Stroke, Visuals};
 use serde::{Deserialize, Serialize};
 
@@ -146,10 +149,7 @@ pub fn apply(ctx: &egui::Context, t: &Tokens) {
         s.spacing.item_spacing = egui::vec2(6.0, 4.0);
         s.spacing.button_padding = egui::vec2(6.0, 3.0);
         s.spacing.interact_size.y = 22.0;
-        s.text_styles.insert(egui::TextStyle::Body, egui::FontId::proportional(13.0));
-        s.text_styles.insert(egui::TextStyle::Button, egui::FontId::proportional(13.0));
-        s.text_styles.insert(egui::TextStyle::Small, egui::FontId::proportional(11.0));
-        s.text_styles.insert(egui::TextStyle::Heading, egui::FontId::proportional(18.0));
+        office_ui_fonts::apply_style(s);
     });
 }
 
@@ -214,6 +214,7 @@ pub fn font_definitions(extra: &[std::sync::Arc<office_presentation_fonts::FontF
             *d = std::sync::Arc::new(data);
         }
     }
+    office_ui_fonts::install(&mut defs, &[FontFamily::Proportional], &[FontFamily::Name("bold".into())]);
     defs
 }
 

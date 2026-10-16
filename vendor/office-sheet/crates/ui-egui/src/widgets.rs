@@ -23,7 +23,7 @@ pub fn icon_button(ui: &mut Ui, icon: Icon, color: Color32, tip: &str, size: egu
     } else if resp.hovered() {
         ui.painter().rect_filled(rect, 4.0, t.hover);
     }
-    icons::paint(ui.painter(), Rect::from_center_size(rect.center(), vec2(16.0, 16.0)), icon, color);
+    icons::paint(ui.painter(), Rect::from_center_size(rect.center(), vec2(icons::TOOL_SIZE, icons::TOOL_SIZE)), icon, color);
     resp.on_hover_text(tr(ui, tip))
 }
 
@@ -37,11 +37,11 @@ pub fn toggle_button(ui: &mut Ui, icon: Icon, on: bool, tip: &str) -> Response {
     } else if resp.hovered() {
         ui.painter().rect_filled(rect, 4.0, t.hover);
     }
-    icons::paint(ui.painter(), Rect::from_center_size(rect.center(), vec2(16.0, 16.0)), icon, t.text);
+    icons::paint(ui.painter(), Rect::from_center_size(rect.center(), vec2(icons::TOOL_SIZE, icons::TOOL_SIZE)), icon, t.text);
     resp.on_hover_text(tr(ui, tip))
 }
 
-/// Large ribbon button: 32px icon over a one- or two-line label.
+/// Large ribbon button: 28px icon over a one- or two-line label.
 pub fn big_button(ui: &mut Ui, icon: Icon, label: &str, tip: &str, dropdown: bool) -> Response {
     let t = Tokens::get(ui.ctx());
     let font = theme::ui_font(11.5);
@@ -57,7 +57,12 @@ pub fn big_button(ui: &mut Ui, icon: Icon, label: &str, tip: &str, dropdown: boo
     } else if resp.hovered() {
         ui.painter().rect_filled(rect, 5.0, t.hover);
     }
-    icons::paint(ui.painter(), Rect::from_center_size(pos2(rect.center().x, rect.top() + 21.0), vec2(30.0, 30.0)), icon, t.text);
+    icons::paint(
+        ui.painter(),
+        Rect::from_center_size(pos2(rect.center().x, rect.top() + 21.0), vec2(icons::LARGE_SIZE, icons::LARGE_SIZE)),
+        icon,
+        t.text,
+    );
     for (i, line) in lines.iter().enumerate() {
         let has_arrow = dropdown && i + 1 == lines.len();
         let line_w = line.size().x + if has_arrow { arrow_space } else { 0.0 };
@@ -76,7 +81,7 @@ pub fn big_button(ui: &mut Ui, icon: Icon, label: &str, tip: &str, dropdown: boo
     resp.on_hover_text(tr(ui, tip))
 }
 
-/// Small ribbon button: 16px icon with optional label to the right.
+/// Small ribbon button: 18px icon with optional label to the right.
 pub fn small_button(ui: &mut Ui, icon: Icon, label: &str, tip: &str, dropdown: bool) -> Response {
     let t = Tokens::get(ui.ctx());
     let font = theme::ui_font(12.5);
@@ -89,7 +94,12 @@ pub fn small_button(ui: &mut Ui, icon: Icon, label: &str, tip: &str, dropdown: b
     } else if resp.hovered() {
         ui.painter().rect_filled(rect, 4.0, t.hover);
     }
-    icons::paint(ui.painter(), Rect::from_center_size(pos2(rect.left() + 12.0, rect.center().y), vec2(16.0, 16.0)), icon, t.text);
+    icons::paint(
+        ui.painter(),
+        Rect::from_center_size(pos2(rect.left() + 12.0, rect.center().y), vec2(icons::TOOL_SIZE, icons::TOOL_SIZE)),
+        icon,
+        t.text,
+    );
     if !label.is_empty() {
         ui.painter().text(pos2(rect.left() + 24.0, rect.center().y), Align2::LEFT_CENTER, label, font, t.text);
     }

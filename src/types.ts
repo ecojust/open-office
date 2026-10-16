@@ -1,5 +1,5 @@
-export type DocumentKind = 'word' | 'sheet' | 'presentation' | 'pdf'
-export type DocumentExtension = 'docx' | 'xlsx' | 'csv' | 'tsv' | 'pptx' | 'potx' | 'ppsx' | 'pdf'
+export type DocumentKind = 'word' | 'sheet' | 'presentation' | 'pdf' | 'note'
+export type DocumentExtension = 'docx' | 'xlsx' | 'csv' | 'tsv' | 'pptx' | 'potx' | 'ppsx' | 'pdf' | 'oonote'
 /** Kept only to display previous recent-file records; opening still validates supported formats. */
 export type HistoricalDocumentExtension = 'odt' | 'doc' | 'rtf' | 'ods' | 'xls' | 'odp' | 'ppt'
 
@@ -28,6 +28,7 @@ export interface SaveDocumentRequest {
   base64: string
   expectedSha256?: string
   saveAs?: boolean
+  protectedDocumentIds?: string[]
 }
 
 export type SaveResult =

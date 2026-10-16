@@ -76,3 +76,11 @@ Generated-in-code art is original and has no file to list: the UI icon set (`cra
 | `crates/ui-egui/src/i18n/bg.tsv` | Dimitar Klaturov (@bulgariamitko) with Claude Code | Original translation from the English interface labels in this repository; no other product localisation or other catalog used | MIT OR Apache-2.0 | Bulgarian interface catalog |
 | `crates/ui-egui/src/i18n/hu.tsv` | @Skaywalker | Original translation from the English interface labels in this repository; no other product localisation copied | MIT OR Apache-2.0 | Hungarian interface catalog |
 | `crates/ui-egui/src/i18n/fr.tsv` | @pechnikov2026-star | Original translation from the English interface labels in this repository; no other product localisation copied | MIT OR Apache-2.0 | French interface catalog |
+
+## Open Office shared interface typography
+
+| Asset | Author | Source | Licence | Use |
+|---|---|---|---|---|
+| `../../assets/fonts/deck/Inter-Regular.ttf`, `Inter-SemiBold.ttf` | Rasmus Andersson / Inter Project Authors | https://github.com/rsms/inter; exact pinned bytes in the shared font manifest | OFL-1.1 (`../../assets/fonts/deck/OFL-Inter.txt`) | Shared Latin interface typography |
+
+| `../../assets/fonts/ui/WenQuanYiMicroHei-Regular.ttf` | WenQuanYi Project Contributors; Google Corporation; Wada Laboratory / Electronic Font Open Laboratory | https://sourceforge.net/projects/wqy/files/wqy-microhei/0.2.0-beta/; proportional TTC face extracted without outline changes, SHA-256 in shared font manifest | Apache-2.0 (`../../assets/fonts/ui/LICENSE-Apache-2.0.txt`) | Shared Chinese interface typography only; document font choices and exports unchanged |

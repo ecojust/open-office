@@ -23,7 +23,7 @@ function evaluate(source, require, globals = {}) {
 function harness(kind = 'pdf') {
   const sheet = kind === 'sheet', format = sheet ? 'xlsx' : 'pdf'
   const state = new Map(), calls = [], document = { baseURI: 'http://localhost/', activeElement: null }
-  let receive, documentId = 0, pendingText, startGate, drainGate, discardPending = false, activeHostId
+  let receive, documentId = 0, pendingText, startGate, drainGate, flushError, discardPending = false, activeHostId
   class Element {
     children = []; parentElement; style = {}; dataset = {}; isConnected = true; listeners = new Map()
     append(child) { child.remove(); this.children.push(child); child.parentElement = this }
@@ -51,7 +51,7 @@ function harness(kind = 'pdf') {
     async start(canvas) { calls.push(['start']); canvas.parentElement.append(new Input()); if (startGate) await startGate },
     activate(id) { calls.push(['activate', id]); activeHostId = id; return snapshot(id) },
     inspect: snapshot,
-    async flush(id) { calls.push(['flush', id]); if (pendingText?.id === id) { edit(id, pendingText.text); pendingText = undefined } },
+    async flush(id) { calls.push(['flush', id]); if (flushError) throw flushError; if (pendingText?.id === id) { edit(id, pendingText.text); pendingText = undefined } },
     command(id, commandId, params) {
       calls.push(['command', id, commandId]); const value = JSON.parse(params), doc = state.get(id)
       if (commandId === 'text.set') edit(id, value.text)
@@ -88,7 +88,7 @@ function harness(kind = 'pdf') {
     }, { ...globals, defineProps: () => props, withDefaults: value => value, defineEmits: () => (...event) => events.push(event), defineExpose(value) { exposed = value } }))
     return { props, events, editor: exposed, dispose() { unmount.forEach(callback => callback()); scope.stop() } }
   }
-  return { client, open, source, state, calls, document, Element, component, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value }, setDrainGate(value) { drainGate = value } }
+  return { client, open, source, state, calls, document, Element, component, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value }, setDrainGate(value) { drainGate = value }, setFlushError(value) { flushError = value } }
 }
 
 test('PDF failed import keeps the edited session, selection and undo history', async () => {
@@ -374,4 +374,41 @@ test('a failed PDF input drain releases the closed session and can be retried be
   await second.attach(nextContainer, true)
   assert.equal(nextContainer.children.length, 2)
   await second.close(true)
+})
+
+test('PDF deletion decisions alone bypass a blocked flush in the real serialized adapter', async () => {
+  const h = harness(), session = await h.open()
+  h.setFlushError(Error('请确认删除'))
+  for (const command of ['ui.delete.confirm','ui.delete.cancel']) {
+    const before = h.calls.length
+    h.state.get(session.id).revision++
+    const result = await session.command(command)
+    assert.equal(result.revision,h.state.get(session.id).revision)
+    assert.deepEqual(h.calls.slice(before),[['command',session.id,command]])
+  }
+  for (const command of ['edit.undo','text.set','ui.delete.confirm.other']) {
+    const before=h.calls.length
+    await assert.rejects(session.command(command),/请确认删除/)
+    assert.deepEqual(h.calls.slice(before),[['flush',session.id]])
+  }
+  await session.command('ui.delete.cancel')
+  await session.close(true)
+  await assert.rejects(session.command('ui.delete.confirm'),/关闭/)
+})
+test('PDF component forwards deletion decisions without its outer flush but protects ordinary commands', async () => {
+  const h=harness(), mounted=h.component()
+  await mounted.editor.inspect()
+  const id=[...h.state.keys()][0]
+  h.setFlushError(Error('等待删除确认'))
+  for (const command of ['ui.delete.confirm','ui.delete.cancel']) {
+    const before=h.calls.length
+    await mounted.editor.command(command)
+    assert.deepEqual(h.calls.slice(before),[['command',id,command]])
+  }
+  for (const command of ['edit.undo','ui.delete.cancel.other']) {
+    const before=h.calls.length
+    await assert.rejects(mounted.editor.command(command),/等待删除确认/)
+    assert.deepEqual(h.calls.slice(before),[['flush',id]])
+  }
+  mounted.dispose()
 })

@@ -1135,7 +1135,7 @@ pub(crate) fn panel(
     if sigs.is_empty() {
         ui.add_space(24.0);
         ui.vertical_centered(|ui| {
-            ui.add(icons::image("signature", 32.0, t.text_faint));
+            ui.add(icons::image(ui, "signature", 32.0, t.text_faint));
             ui.add_space(6.0);
             ui.label(egui::RichText::new(tl!("This document has no signatures.")).color(t.text_muted));
         });
@@ -1158,7 +1158,7 @@ pub(crate) fn panel(
             .horizontal(|ui| {
                 let chevron = if open { "chevron-down" } else { "chevron-right" };
                 let toggle = icons::button(ui, chevron, 20.0, false, if open { "Collapse" } else { "Expand" }).clicked();
-                ui.add(icons::image(icon, 16.0, color));
+                ui.add(icons::image(ui, icon, 16.0, color));
                 let l = ui.add(egui::Label::new(egui::RichText::new(&head).font(theme::semibold(12.5)).color(t.text)).sense(egui::Sense::click()));
                 toggle || l.clicked()
             })

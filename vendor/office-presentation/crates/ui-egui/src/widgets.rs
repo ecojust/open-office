@@ -27,7 +27,7 @@ fn bg(ui: &Ui, r: &Response, selected: bool, t: &Tokens) -> Option<Color32> {
     }
 }
 
-/// A large ribbon button: 32 px icon over a one- or two-line label.
+/// A large ribbon button: 28 px icon over a one- or two-line label.
 pub fn big_button(ui: &mut Ui, icon: Icon, label: &str, enabled: bool) -> Response {
     big_button_ex(ui, icon, label, enabled, false, false).0
 }
@@ -61,7 +61,7 @@ pub fn big_button_ex(ui: &mut Ui, icon: Icon, label: &str, enabled: bool, split:
     {
         painter.rect_filled(ar, CornerRadius::same(4), c);
     }
-    let icon_rect = Rect::from_center_size(pos2(rect.center().x, rect.min.y + 19.0), vec2(30.0, 30.0));
+    let icon_rect = Rect::from_center_size(pos2(rect.center().x, rect.min.y + 19.0), vec2(icons::LARGE_SIZE, icons::LARGE_SIZE));
     icons::paint(&painter, icon_rect, icon, t.text, !enabled);
     let col = if enabled { t.text } else { t.text_faint };
     let mut y = rect.min.y + 39.0;
@@ -106,11 +106,11 @@ fn wrap_label(label: &str) -> Vec<&str> {
 }
 
 pub fn chevron(p: &egui::Painter, c: egui::Pos2, s: f32, col: Color32) {
-    p.line_segment([pos2(c.x - s, c.y - s * 0.5), pos2(c.x, c.y + s * 0.5)], Stroke::new(1.2, col));
-    p.line_segment([pos2(c.x, c.y + s * 0.5), pos2(c.x + s, c.y - s * 0.5)], Stroke::new(1.2, col));
+    // Keep the existing marker footprint while sharing the shell's arrow art.
+    icons::paint(p, Rect::from_center_size(c, Vec2::splat(s * 4.0)), Icon::ChevronDown, col, false);
 }
 
-/// A small ribbon button: 16 px icon + label in one row (label may be empty).
+/// A small ribbon button: 18 px icon + label in one row (label may be empty).
 pub fn small_button(ui: &mut Ui, icon: Icon, label: &str, enabled: bool, selected: bool) -> Response {
     small_button_ex(ui, icon, label, enabled, selected, false).0
 }
@@ -145,7 +145,13 @@ pub fn small_button_ex(ui: &mut Ui, icon: Icon, label: &str, enabled: bool, sele
     {
         painter.rect_filled(Rect::from_min_max(pos2(rect.max.x - arrow_w, rect.min.y), rect.max), CornerRadius::same(4), c);
     }
-    icons::paint(&painter, Rect::from_center_size(pos2(rect.min.x + 12.0, rect.center().y), vec2(17.0, 17.0)), icon, t.text, !enabled);
+    icons::paint(
+        &painter,
+        Rect::from_center_size(pos2(rect.min.x + 12.0, rect.center().y), vec2(icons::TOOL_SIZE, icons::TOOL_SIZE)),
+        icon,
+        t.text,
+        !enabled,
+    );
     if !label.is_empty() {
         painter.text(pos2(rect.min.x + 24.0, rect.center().y), Align2::LEFT_CENTER, label, font, if enabled { t.text } else { t.text_faint });
     }
@@ -164,7 +170,7 @@ pub fn icon_toggle(ui: &mut Ui, icon: Icon, tip: &str, enabled: bool, on: bool) 
     if let Some(c) = bg(ui, &resp, on, &t) {
         painter.rect_filled(rect, CornerRadius::same(4), c);
     }
-    icons::paint(&painter, rect.shrink(3.0), icon, t.text, !enabled);
+    icons::paint(&painter, Rect::from_center_size(rect.center(), vec2(icons::TOOL_SIZE, icons::TOOL_SIZE)), icon, t.text, !enabled);
     // Named for screen readers (and tests) by its tooltip.
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, tip));
     resp.on_hover_text(tip)

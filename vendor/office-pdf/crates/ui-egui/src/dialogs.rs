@@ -13,6 +13,7 @@ pub fn show(app: &mut OfficePdfApp, ctx: &egui::Context) {
     dialogs(app, ctx);
     // Last, so it sits above Document Properties when Security's Unlock… asked for it.
     unlock(app, ctx);
+    crate::delete_confirmation::show(app, ctx);
 }
 
 fn dialogs(app: &mut OfficePdfApp, ctx: &egui::Context) {
@@ -85,6 +86,7 @@ fn dialogs(app: &mut OfficePdfApp, ctx: &egui::Context) {
             Dialog::Print => 820.0,
             Dialog::FieldProps | Dialog::BulkFieldProps => 600.0,
             Dialog::About => 780.0,
+            Dialog::Signature => (ctx.content_rect().width() - 64.0).clamp(220.0, 520.0),
             _ => 520.0,
         });
         match dialog {
@@ -1060,7 +1062,7 @@ fn dialogs(app: &mut OfficePdfApp, ctx: &egui::Context) {
             }
             Dialog::Recovery => {
                 ui.horizontal(|ui| {
-                    ui.add(crate::icons::image("clock-3", 22.0, t.accent));
+                    ui.add(crate::icons::image(ui, "clock-3", 22.0, t.accent));
                     ui.label(egui::RichText::new(tl!("Recover unsaved documents?")).font(theme::semibold(18.0)));
                 });
                 ui.add_space(6.0);
@@ -1476,7 +1478,7 @@ fn save_prompt(app: &mut OfficePdfApp, ctx: &egui::Context) {
     let modal = widgets::show_modal(ctx, "save_prompt", |ui| {
         ui.set_width(420.0);
         ui.horizontal(|ui| {
-            ui.add(crate::icons::image("save", 22.0, t.accent));
+            ui.add(crate::icons::image(ui, "save", 22.0, t.accent));
             let title = ui.add(
                 egui::Label::new(
                     egui::RichText::new(crate::i18n::fmt(tl!("Save changes to “{name}” before closing?"), &[("name", &shown)]))
@@ -1537,7 +1539,7 @@ fn link_prompt(app: &mut OfficePdfApp, ctx: &egui::Context) {
     let modal = widgets::show_modal(ctx, "link_prompt", |ui| {
         ui.set_width(460.0);
         ui.horizontal(|ui| {
-            ui.add(crate::icons::image("external-link", 22.0, t.accent));
+            ui.add(crate::icons::image(ui, "external-link", 22.0, t.accent));
             ui.label(egui::RichText::new(title).font(theme::semibold(16.0)));
         });
         ui.add_space(6.0);
@@ -1604,7 +1606,7 @@ fn full_screen_prompt(app: &mut OfficePdfApp, ctx: &egui::Context) {
     let modal = widgets::show_modal(ctx, "full_screen_prompt", |ui| {
         ui.set_width(460.0);
         ui.horizontal(|ui| {
-            ui.add(crate::icons::image("maximize", 22.0, t.accent));
+            ui.add(crate::icons::image(ui, "maximize", 22.0, t.accent));
             ui.label(egui::RichText::new(tl!("Open in Full Screen mode?")).font(theme::semibold(16.0)));
         });
         ui.add_space(6.0);
@@ -1689,7 +1691,7 @@ fn password_modal(
     let modal = widgets::show_modal(ctx, id, |ui| {
         ui.set_width(400.0);
         ui.horizontal(|ui| {
-            ui.add(crate::icons::image("lock", 22.0, t.accent));
+            ui.add(crate::icons::image(ui, "lock", 22.0, t.accent));
             ui.label(egui::RichText::new(title).font(theme::semibold(17.0)));
         });
         ui.add_space(6.0);

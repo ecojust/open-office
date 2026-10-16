@@ -535,6 +535,11 @@ fn thumbnail_scale(width: f32, height: f32, density: f32) -> f32 {
 /// Organize-toolbar actions that need the app (file pickers, new tabs, dialogs).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ViewAction {
+    /// Explicit Delete on selected added text/image, distinct from ordinary text editing.
+    DeleteContent {
+        page: usize,
+        index: usize,
+    },
     InsertFromFile,
     /// Insert files at a gap of the page grid (0 = before the first page).
     InsertFromFileAt(usize),
@@ -3767,7 +3772,9 @@ pub fn document_area(app: &mut OfficePdfApp, index: usize, ui: &mut egui::Ui) {
     if copy_selected {
         app.execute("edit.copy");
     }
-    quick_bar(app, avail, ui);
+    if !app.embedded {
+        quick_bar(app, avail, ui);
+    }
     if let Some((source, file, destination)) = remote_open {
         app.open_remote_link(source, file, destination);
     }
@@ -4012,7 +4019,7 @@ fn find_bar(view: &mut DocView, pages: usize, area: Rect, ui: &mut egui::Ui, t: 
                 .inner_margin(egui::Margin::symmetric(10, 6))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.add(icons::image("search", 16.0, t.text_muted));
+                        ui.add(icons::image(ui, "search", 16.0, t.text_muted));
                         let edit = egui::TextEdit::singleline(&mut find.query)
                             .id(egui::Id::new("find-input"))
                             .hint_text(tl!("Find text"))
@@ -4125,7 +4132,7 @@ fn notices(
         let mut reload = false;
         egui::Frame::NONE.fill(t.accent_soft).inner_margin(egui::Margin::symmetric(14, 7)).show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.add(icons::image("rotate-cw", 16.0, t.accent_text));
+                ui.add(icons::image(ui, "rotate-cw", 16.0, t.accent_text));
                 ui.label(
                     egui::RichText::new(tl!(
                         "This file changed on disk. Reload shows the new version and drops your unsaved changes; Save replaces it with this version."

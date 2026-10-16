@@ -1,0 +1,9 @@
+{
+  "bold": "word/bold",
+  "italic": "word/italic",
+  "underline": "word/underline",
+  "strike": "word/strike",
+  "bullets": "word/bullets",
+  "numbering": "word/numbering",
+  "todo": "sheet/checkbox"
+}

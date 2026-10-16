@@ -7,51 +7,35 @@ import { validateNativeWorkspaceReport, WORKSPACE_NATIVE_CHECKS, WORKSPACE_NATIV
 import { workspaceDocx, workspaceReport } from './helpers/workspace-smoke-report.mjs';
 import { wordDocx } from './helpers/office-word-smoke-fixture.mjs';
 
-test('native Server/autosave evidence requires actual four-format bytes and independent file readback', () => {
+test('native autosave evidence requires approved initial bytes and independent saved-file readback', () => {
   assert.deepEqual(validateNativeWorkspaceReport(workspaceReport()), {
-    workspaceNativeServer: true, workspaceFourFormats: true, workspaceHttpConflictProtection: true,
-    workspaceLocalAutosave: true, workspaceSavedFileReadback: true, workspaceStopRevocation: true,
+    workspaceLocalAutosave: true, workspaceSavedFileReadback: true, workspaceSessionCleanup: true,
   });
 });
 
 test('missing, browser-only, or shortened workspace acceptance cannot pass publication', () => {
   for (const invalid of [undefined, null, [], {}, { ok: true }]) assert.throws(() => validateNativeWorkspaceReport(invalid), /Native workspace/);
   for (const mutate of [
-    r => { r.ok = false; }, r => { r.schemaVersion = 0; }, r => { r.transport = 'browser-fetch'; },
+    r => { r.ok = false; }, r => { r.schemaVersion = 0; }, r => { r.schemaVersion = 1; }, r => { r.transport = 'browser-fetch'; },
     r => { r.native.tauri = false; }, r => { r.native.origin = 'http://example.com:31415'; },
     r => { r.native.origin += '/token'; }, r => { r.checks.pop(); }, r => { r.checks.reverse(); },
     r => { r.limitations.pop(); }, r => { r.error = 'failed'; }, r => { r.cleanupError = 'failed'; },
-    r => { delete r.server; }, r => { delete r.autosave; }, r => { delete r.cleanup; },
+    r => { delete r.autosave; }, r => { delete r.cleanup; },
   ]) {
     const report = workspaceReport(); mutate(report);
     assert.throws(() => validateNativeWorkspaceReport(report), /Native workspace/);
   }
 });
 
-test('native HTTP acceptance binds IPC bytes, version advancement, real status codes and revocation', () => {
-  const mutations = [
-    r => { r.server.before.running = true; }, r => { r.server.started.running = false; },
-    r => { r.server.status.revision = 1; }, r => { r.server.started.localUrl = 'http://127.0.0.1:1/token/'; },
-    r => { r.server.formats.pop(); }, r => { r.server.formats.reverse(); },
-    r => { r.server.formats[1].version = 2; }, r => { r.server.formats[1].sha256 = '0'.repeat(64); },
-    r => { r.server.formats[2].base64 += '\n'; }, r => { r.server.formats[3].sizeBytes++; },
-    r => { r.server.http.execution = 'mock'; }, r => { r.server.http.documentId = 'another-document'; },
-    r => { r.server.http.acceptedVersion = r.server.http.initialVersion; },
-    r => { r.server.http.acceptedSha256 = r.server.http.initialSha256; },
-    r => { r.server.http.initialSha256 = 'a'.repeat(64); },
-    r => { r.server.http.rangeBytes = 7; }, r => { delete r.server.http.indexSha256; },
-    r => { r.server.httpReadback.sha256 = 'a'.repeat(64); }, r => { r.server.httpReadback.version = 1; },
-    r => { r.server.stopped.running = true; }, r => { r.server.stoppedStatus.lanUrlsCount = 1; },
-    r => { r.server.stoppedStatus.revision = 6; }, r => { r.cleanup.oldLinkRevoked = false; },
+test('native autosave acceptance binds initial file bytes and requires temporary-file and editor cleanup', () => {
+  for (const mutate of [
+    r => { delete r.autosave.initialBase64; }, r => { r.autosave.initialBase64 += '\n'; },
+    r => { r.autosave.initialBase64 = r.autosave.readbackBase64; },
+    r => { r.autosave.initialSha256 = '0'.repeat(64); }, r => { r.autosave.initialSizeBytes++; },
+    r => { r.autosave.readbackBase64 += '\n'; },
     r => { r.cleanup.temporaryFilesRemoved = false; }, r => { r.cleanup.closedDocuments = 1; },
-  ];
-  for (const field of ['assetIndex', 'wasmRange', 'stateRead', 'documentRead', 'writeAccepted', 'staleWriteRejected', 'readback', 'wrongOriginRejected']) {
-    mutations.push(r => { r.server.http[field] = false; });
-  }
-  for (const field of ['indexStatus', 'rangeStatus', 'stateStatus', 'documentStatus', 'writeStatus', 'staleWriteStatus', 'readbackStatus', 'wrongOriginStatus']) {
-    mutations.push(r => { r.server.http[field] = 201; });
-  }
-  for (const mutate of mutations) {
+    r => { r.cleanup.closedDocuments = 3; },
+  ]) {
     const report = workspaceReport(); mutate(report);
     assert.throws(() => validateNativeWorkspaceReport(report), /Native workspace/);
   }
@@ -90,6 +74,14 @@ test('independent saved DOCX inspection rejects wrong or hidden text despite con
     Object.assign(report.autosave.saves[0], { savedSha256: report.autosave.finalSha256, savedSizeBytes: bytes.length });
     assert.throws(() => validateNativeWorkspaceReport(report), /independent DOCX/);
   }
+});
+
+test('independent initial DOCX inspection rejects a forged baseline despite internally consistent save receipts', () => {
+  const report = workspaceReport(), base64 = workspaceDocx('Not the approved baseline');
+  const bytes = Buffer.from(base64, 'base64'), sha256 = createHash('sha256').update(bytes).digest('hex');
+  Object.assign(report.autosave, { initialBase64: base64, initialSha256: sha256, initialSizeBytes: bytes.length });
+  report.autosave.saves[0].expectedSha256 = sha256;
+  assert.throws(() => validateNativeWorkspaceReport(report), /initial independent DOCX text differs/);
 });
 
 test('frontend and publication agree on ordered checks and honest native smoke limitations', () => {

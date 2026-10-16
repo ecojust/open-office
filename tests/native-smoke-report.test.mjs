@@ -57,23 +57,23 @@ test('missing or malformed successful-run diagnostics stay observational outside
   assert.equal(report.ok, true);
 });
 
-test('release evidence requires four Rust canvases, PDF text replacement, and native Server/autosave', () => {
+test('release evidence requires four Rust canvases, PDF text replacement, and native autosave', () => {
   const checks = validateFrontendReport(completeReport());
   for (const required of [
     'wordDefaultCanvas', 'wordDomInput', 'wordDocxReadback', 'wordFailureAtomicity', 'wordSessionCleanup',
     'sheetDefaultCanvas', 'sheetDomInput', 'sheetXlsxReadback', 'sheetFormulaRoundTrip', 'sheetFailureAtomicity', 'sheetSessionCleanup',
     'presentationDefaultCanvas', 'presentationDomInput', 'presentationPptxReadback', 'presentationPdfReadback', 'presentationFailureAtomicity', 'presentationSessionCleanup',
     'pdfOriginalTextReplacementRoundTrip', 'pdfDefaultCanvas', 'pdfUndoRedo', 'pdfFailureAtomicity', 'pdfSessionCleanup', 'crossOriginIsolated',
-    'workspaceNativeServer', 'workspaceFourFormats', 'workspaceHttpConflictProtection', 'workspaceLocalAutosave', 'workspaceSavedFileReadback', 'workspaceStopRevocation',
+    'workspaceLocalAutosave', 'workspaceSavedFileReadback', 'workspaceSessionCleanup',
   ]) assert.equal(checks[required], true);
   assert.equal(Object.hasOwn(checks, 'sharedArrayBuffer'), false);
 });
 
-test('editor evidence cannot substitute for missing native Server/autosave or different workspace bytes', () => {
+test('editor evidence cannot substitute for missing native autosave or different saved-file bytes', () => {
   for (const mutate of [
     report => { delete report.workspace; },
     report => { report.workspace = { ok: true, transport: 'browser' }; },
-    report => { report.sheet.reopenedXlsxBase64 = report.sheet.xlsxBase64; report.workspace.server.formats[1].base64 += '\n'; },
+    report => { report.workspace.autosave.readbackBase64 = report.word.reopenedDocxBase64; },
   ]) {
     const report = completeReport(); mutate(report);
     assert.throws(() => validateFrontendReport(report), /workspace/i);

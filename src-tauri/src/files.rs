@@ -24,10 +24,13 @@ use tempfile::NamedTempFile;
 
 const DOCUMENT_LIMIT: u64 = 100 * 1024 * 1024;
 const IMAGE_LIMIT: u64 = 20 * 1024 * 1024;
+const NOTEBOOK_LIMIT: usize = 16 * 1024 * 1024;
 const ENCODED_LIMIT: usize = ((DOCUMENT_LIMIT as usize + 2) / 3) * 4;
 const HISTORY_LIMIT: u64 = 2 * 1024 * 1024;
 const MAX_RECENT: usize = 100;
-const EXTENSIONS: &[&str] = &["docx", "xlsx", "csv", "tsv", "pptx", "potx", "ppsx", "pdf"];
+const EXTENSIONS: &[&str] = &[
+    "docx", "xlsx", "csv", "tsv", "pptx", "potx", "ppsx", "pdf", "oonote",
+];
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -50,6 +53,7 @@ pub enum DocExt {
     Odp,
     Ppt,
     Pdf,
+    Oonote,
 }
 
 impl DocExt {
@@ -70,6 +74,7 @@ impl DocExt {
             Self::Odp => "odp",
             Self::Ppt => "ppt",
             Self::Pdf => "pdf",
+            Self::Oonote => "oonote",
         }
     }
 
@@ -87,7 +92,8 @@ impl DocExt {
             "potx" => Ok(Self::Potx),
             "ppsx" => Ok(Self::Ppsx),
             "pdf" => Ok(Self::Pdf),
-            _ => Err("请选择 DOCX、XLSX、CSV、TSV、PPTX、POTX、PPSX 或 PDF 文件；其他格式请先转换为受支持的格式。".into()),
+            "oonote" => Ok(Self::Oonote),
+            _ => Err("请选择 DOCX、XLSX、CSV、TSV、PPTX、POTX、PPSX、PDF 或 OONOTE 文件；其他格式请先转换为受支持的格式。".into()),
         }
     }
 
@@ -99,13 +105,14 @@ impl DocExt {
                 DocumentKind::Presentation
             }
             Self::Pdf => DocumentKind::Pdf,
+            Self::Oonote => DocumentKind::Note,
         }
     }
 
     fn ensure_exportable(self) -> Result<(), String> {
         if !matches!(
             self,
-            Self::Docx | Self::Xlsx | Self::Csv | Self::Tsv | Self::Pptx | Self::Pdf
+            Self::Docx | Self::Xlsx | Self::Csv | Self::Tsv | Self::Pptx | Self::Pdf | Self::Oonote
         ) {
             return Err(
                 "此格式不能直接保存。演示模板和放映文件请另存为 PPTX 副本，原文件将保留。".into(),
@@ -122,6 +129,7 @@ pub enum DocumentKind {
     Sheet,
     Presentation,
     Pdf,
+    Note,
 }
 
 #[derive(Debug, Serialize)]
@@ -164,6 +172,9 @@ pub struct SaveDocumentRequest {
     pub expected_sha256: Option<String>,
     #[serde(default)]
     pub save_as: bool,
+    /// Other currently open tabs, supplied by the shell before showing Save As.
+    #[serde(default)]
+    pub protected_document_ids: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -377,7 +388,7 @@ impl DocumentStore {
         let _operation = self.begin_operation()?;
         if !matches!(
             extension,
-            DocExt::Docx | DocExt::Xlsx | DocExt::Pptx | DocExt::Pdf
+            DocExt::Docx | DocExt::Xlsx | DocExt::Pptx | DocExt::Pdf | DocExt::Oonote
         ) {
             return Err("Native smoke requires an editable document format.".into());
         }
@@ -394,6 +405,65 @@ impl DocumentStore {
             .map_err(|error| format!("Unable to write isolated native smoke document: {error}"))?;
         drop(file);
         self.register_open(path)
+    }
+
+    /// Saving an opened document always targets its approved original path. The
+    /// displayed filename is not a new capability and never changes that path.
+    /// Callers hold the operation guard through validation and atomic replacement.
+    fn save_existing(
+        &self,
+        record: &StoredDocument,
+        extension: DocExt,
+        expected_sha256: Option<&str>,
+        bytes: Vec<u8>,
+    ) -> Result<SaveResult, String> {
+        if extension != record.extension {
+            return Err("变更文档格式时必须使用另存为。".into());
+        }
+        let Some(expected) = expected_sha256 else {
+            return Ok(SaveResult::Conflict {
+                message: "缺少原文档版本信息，请重新打开文档或另存为。".into(),
+            });
+        };
+        if !valid_hash(expected) || !expected.eq_ignore_ascii_case(&record.sha256) {
+            return Ok(SaveResult::Conflict {
+                message: "当前编辑版本已过期，请重新打开文档或另存为，以免覆盖更新。".into(),
+            });
+        }
+        if let Err(message) = verify_record_path(record) {
+            return Ok(SaveResult::Conflict { message });
+        }
+        let snapshot = TargetSnapshot::capture(record.path.clone())?;
+        if snapshot.sha256.as_deref() != Some(record.sha256.as_str()) {
+            return Ok(SaveResult::Conflict {
+                message: "磁盘文件已被其他应用修改，请重新打开文档，或将当前编辑内容另存为。"
+                    .into(),
+            });
+        }
+        self.save_to_target(snapshot, extension, bytes)
+    }
+
+    fn ensure_target_not_open(
+        &self,
+        target: &TargetSnapshot,
+        protected_document_ids: &[String],
+    ) -> Result<(), String> {
+        validate_protected_document_ids(protected_document_ids)?;
+        // Existing filenames can differ in case on case-insensitive volumes.
+        // Resolve them just as open does before comparing approved identities.
+        let path = if target.sha256.is_some() {
+            fs::canonicalize(&target.path).map_err(|error| format!("无法复核保存位置：{error}"))?
+        } else {
+            target.path.clone()
+        };
+        if self
+            .records()?
+            .iter()
+            .any(|record| protected_document_ids.contains(&record.id) && record.path == path)
+        {
+            return Err("该文件已在其他标签中打开，请切换到该标签或选择其他保存位置。".into());
+        }
+        Ok(())
     }
 
     fn save_to_target(
@@ -445,6 +515,13 @@ fn valid_id(value: &str) -> bool {
 
 fn valid_hash(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn validate_protected_document_ids(ids: &[String]) -> Result<(), String> {
+    if ids.len() > MAX_RECENT || ids.iter().any(|id| !valid_id(id)) {
+        return Err("已打开文档列表无效，请关闭保存窗口后重试。".into());
+    }
+    Ok(())
 }
 
 fn new_id() -> Result<String, String> {
@@ -528,9 +605,94 @@ fn validate_file_name(name: &str, extension: DocExt) -> Result<(), String> {
     Ok(())
 }
 
-/// Screen the container header before passing local bytes to the active engine.
-/// This is not a full ZIP parser: each Rust editor must still parse and validate
-/// its document package and refuse encrypted or damaged payloads.
+/// Bound the versioned notebook envelope before exposing it to the editor. The
+/// editor additionally validates block content, inline marks and image payloads.
+fn valid_notebook(bytes: &[u8]) -> bool {
+    if bytes.len() > NOTEBOOK_LIMIT {
+        return false;
+    }
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    let Ok(notebook) =
+        serde_json::from_str::<serde_json::Value>(text.trim_start_matches('\u{feff}'))
+    else {
+        return false;
+    };
+    if notebook.get("format").and_then(|value| value.as_str()) != Some("open-office-notebook")
+        || notebook.get("version").and_then(|value| value.as_u64()) != Some(1)
+    {
+        return false;
+    }
+    let mut ids = std::collections::HashSet::new();
+    let valid_node =
+        |node: &serde_json::Value, titled: bool, ids: &mut std::collections::HashSet<String>| {
+            let Some(id) = node.get("id").and_then(|value| value.as_str()) else {
+                return false;
+            };
+            !id.is_empty()
+                && id.len() <= 100
+                && id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+                && ids.insert(id.to_owned())
+                && (!titled
+                    || node
+                        .get("title")
+                        .and_then(|value| value.as_str())
+                        .is_some_and(|title| title.chars().count() <= 200))
+        };
+    if !valid_node(&notebook, true, &mut ids) {
+        return false;
+    }
+    let Some(sections) = notebook.get("sections").and_then(|value| value.as_array()) else {
+        return false;
+    };
+    if sections.is_empty() || sections.len() > 100 {
+        return false;
+    }
+    let mut page_count = 0;
+    let mut block_count = 0;
+    for section in sections {
+        if !valid_node(section, true, &mut ids) {
+            return false;
+        }
+        let Some(pages) = section.get("pages").and_then(|value| value.as_array()) else {
+            return false;
+        };
+        page_count += pages.len();
+        if pages.is_empty() || page_count > 2000 {
+            return false;
+        }
+        for page in pages {
+            if !valid_node(page, true, &mut ids) {
+                return false;
+            }
+            let Some(blocks) = page.get("blocks").and_then(|value| value.as_array()) else {
+                return false;
+            };
+            block_count += blocks.len();
+            if blocks.is_empty() || block_count > 20000 {
+                return false;
+            }
+            for block in blocks {
+                if !valid_node(block, false, &mut ids)
+                    || !matches!(
+                        block.get("type").and_then(|value| value.as_str()),
+                        Some("paragraph" | "heading" | "bullet" | "numbered" | "todo" | "image")
+                    )
+                {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
+/// Screen the container header or notebook envelope before passing local bytes
+/// to the active editor. Each editor must still fully validate its document and
+/// refuse encrypted or damaged payloads.
 fn validate_document_signature(bytes: &[u8], extension: DocExt) -> Result<(), String> {
     if bytes.is_empty() {
         return Err("文档为空，无法打开。".into());
@@ -547,6 +709,7 @@ fn validate_document_signature(bytes: &[u8], extension: DocExt) -> Result<(), St
         DocExt::Pdf => bytes[..bytes.len().min(1024)]
             .windows(5)
             .any(|window| window == b"%PDF-"),
+        DocExt::Oonote => valid_notebook(bytes),
         DocExt::Odt
         | DocExt::Doc
         | DocExt::Rtf
@@ -862,6 +1025,7 @@ pub async fn save_document(
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = store.begin_operation()?;
         validate_file_name(&request.name, request.extension)?;
+        validate_protected_document_ids(&request.protected_document_ids)?;
         request.extension.ensure_exportable()?;
         let bytes = decode_document(&request.base64)?;
         validate_document_signature(&bytes, request.extension)?;
@@ -870,32 +1034,15 @@ pub async fn save_document(
             .as_deref()
             .map(|id| store.record(id))
             .transpose()?;
-        let target = if let Some(record) = existing.as_ref().filter(|_| !request.save_as) {
-            if request.extension != record.extension {
-                return Err("变更文档格式时必须使用另存为。".into());
-            }
-            let Some(expected) = request.expected_sha256.as_deref() else {
-                return Ok(SaveResult::Conflict {
-                    message: "缺少原文档版本信息，请重新打开文档或另存为。".into(),
-                });
-            };
-            if !valid_hash(expected) || !expected.eq_ignore_ascii_case(&record.sha256) {
-                return Ok(SaveResult::Conflict {
-                    message: "当前编辑版本已过期，请重新打开文档或另存为，以免覆盖更新。".into(),
-                });
-            }
-            if let Err(message) = verify_record_path(record) {
-                return Ok(SaveResult::Conflict { message });
-            }
-            let snapshot = TargetSnapshot::capture(record.path.clone())?;
-            if snapshot.sha256.as_deref() != Some(record.sha256.as_str()) {
-                return Ok(SaveResult::Conflict {
-                    message: "磁盘文件已被其他应用修改，请重新打开文档，或将当前编辑内容另存为。"
-                        .into(),
-                });
-            }
-            snapshot
-        } else {
+        if let Some(record) = existing.as_ref().filter(|_| !request.save_as) {
+            return store.save_existing(
+                record,
+                request.extension,
+                request.expected_sha256.as_deref(),
+                bytes,
+            );
+        }
+        let target = {
             let mut dialog = app
                 .dialog()
                 .file()
@@ -916,6 +1063,7 @@ pub async fn save_document(
             validate_file_name(&file_name(&path)?, request.extension)?;
             TargetSnapshot::capture(path)?
         };
+        store.ensure_target_not_open(&target, &request.protected_document_ids)?;
         store.save_to_target(target, request.extension, bytes)
     })
     .await
@@ -942,6 +1090,271 @@ mod tests {
             bytes[position..position + 2].copy_from_slice(&value.to_le_bytes());
         }
         bytes
+    }
+
+    fn notebook_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "format": "open-office-notebook", "version": 1, "id": "notebook-1", "title": "工作笔记",
+            "sections": [{ "id": "section-1", "title": "项目", "pages": [{
+                "id": "page-1", "title": "会议记录", "blocks": [{
+                    "id": "block-1", "type": "paragraph", "content": [{"text": "开始记录"}]
+                }]
+            }] }]
+        })
+    }
+
+    #[test]
+    fn reopening_and_saving_an_existing_file_keeps_its_identity_and_original_path() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let path = directory.path().join("original.docx");
+        fs::write(&path, zip_header_fixture(b"original")).unwrap();
+        let store = DocumentStore::new(data.clone()).unwrap();
+        let first = store.register_open(path.clone()).unwrap();
+        let second = store
+            .register_open(directory.path().join(".").join("original.docx"))
+            .unwrap();
+        assert_eq!(first.id, second.id);
+        assert_eq!(store.records().unwrap().len(), 1);
+        let updated = zip_header_fixture(b"edited in place");
+        let result = store
+            .save_existing(
+                &store.record(&first.id).unwrap(),
+                DocExt::Docx,
+                Some(&first.sha256),
+                updated.clone(),
+            )
+            .unwrap();
+        let SaveResult::Saved { document } = result else {
+            panic!("expected original-file save")
+        };
+        assert_eq!(document.id, first.id);
+        assert_eq!(document.name, "original.docx");
+        assert_eq!(document.sha256, hash_bytes(&updated));
+        assert_eq!(fs::read(&path).unwrap(), updated);
+        let files: Vec<_> = fs::read_dir(directory.path())
+            .unwrap()
+            .map(Result::unwrap)
+            .filter(|entry| entry.file_type().unwrap().is_file())
+            .collect();
+        assert_eq!(
+            files.len(),
+            1,
+            "normal save must not create a copy or leave staged files"
+        );
+        let restored = DocumentStore::new(data).unwrap();
+        let reopened = restored
+            .register_open(restored.approved_document_path(&first.id).unwrap())
+            .unwrap();
+        assert_eq!(reopened.id, first.id);
+        assert_eq!(reopened.sha256, document.sha256);
+        assert_eq!(STANDARD.decode(reopened.base64).unwrap(), updated);
+    }
+
+    #[test]
+    fn direct_save_refuses_stale_or_missing_revisions_and_format_conversion() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("original.docx");
+        let original = zip_header_fixture(b"original");
+        fs::write(&path, &original).unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let opened = store.register_open(path.clone()).unwrap();
+        let record = store.record(&opened.id).unwrap();
+        let update = zip_header_fixture(b"my edits");
+        for expected in [None, Some("invalid"), Some("0".repeat(64).as_str())] {
+            assert!(matches!(
+                store
+                    .save_existing(&record, DocExt::Docx, expected, update.clone())
+                    .unwrap(),
+                SaveResult::Conflict { .. }
+            ));
+        }
+        assert!(store
+            .save_existing(&record, DocExt::Xlsx, Some(&opened.sha256), update.clone())
+            .is_err());
+        assert_eq!(fs::read(&path).unwrap(), original);
+        let external = zip_header_fixture(b"external edits");
+        fs::write(&path, &external).unwrap();
+        assert!(matches!(
+            store
+                .save_existing(&record, DocExt::Docx, Some(&opened.sha256), update.clone())
+                .unwrap(),
+            SaveResult::Conflict { .. }
+        ));
+        let reopened = store.register_open(path.clone()).unwrap();
+        assert_eq!(reopened.id, opened.id);
+        assert!(matches!(
+            store
+                .save_existing(
+                    &store.record(&opened.id).unwrap(),
+                    DocExt::Docx,
+                    Some(&opened.sha256),
+                    update
+                )
+                .unwrap(),
+            SaveResult::Conflict { .. }
+        ));
+        assert_eq!(fs::read(&path).unwrap(), external);
+    }
+
+    #[test]
+    fn explicit_same_format_save_as_creates_a_distinct_identity_and_preserves_source() {
+        let directory = tempfile::tempdir().unwrap();
+        let original_path = directory.path().join("original.docx");
+        let saved_path = directory.path().join("chosen-name.docx");
+        let original = zip_header_fixture(b"original");
+        let edited = zip_header_fixture(b"edited");
+        fs::write(&original_path, &original).unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let opened = store.register_open(original_path.clone()).unwrap();
+        let result = store
+            .save_to_target(
+                TargetSnapshot::capture(saved_path.clone()).unwrap(),
+                DocExt::Docx,
+                edited.clone(),
+            )
+            .unwrap();
+        let SaveResult::Saved { document } = result else {
+            panic!("expected explicit save as")
+        };
+        assert_ne!(opened.id, document.id);
+        assert_eq!(
+            store.register_open(saved_path.clone()).unwrap().id,
+            document.id
+        );
+        assert_eq!(
+            store.register_open(original_path.clone()).unwrap().id,
+            opened.id
+        );
+        assert_eq!(fs::read(original_path).unwrap(), original);
+        assert_eq!(fs::read(saved_path).unwrap(), edited);
+    }
+
+    #[test]
+    fn save_as_cannot_overwrite_another_open_tab_but_can_reuse_its_own_path() {
+        let directory = tempfile::tempdir().unwrap();
+        let own_path = directory.path().join("own.docx");
+        let other_path = directory.path().join("other.docx");
+        let original = zip_header_fixture(b"other tab contents");
+        fs::write(&own_path, zip_header_fixture(b"own contents")).unwrap();
+        fs::write(&other_path, &original).unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let own = store.register_open(own_path.clone()).unwrap();
+        let other = store.register_open(other_path.clone()).unwrap();
+        let protected = vec![other.id.clone()];
+        let target =
+            TargetSnapshot::capture(directory.path().join(".").join("other.docx")).unwrap();
+        let message = store
+            .ensure_target_not_open(&target, &protected)
+            .unwrap_err();
+        assert!(message.contains("其他标签"));
+        assert_eq!(fs::read(&other_path).unwrap(), original);
+        assert_eq!(store.record(&other.id).unwrap().sha256, other.sha256);
+        assert_eq!(store.records().unwrap().len(), 2);
+        store
+            .ensure_target_not_open(&TargetSnapshot::capture(own_path).unwrap(), &protected)
+            .unwrap();
+        store
+            .ensure_target_not_open(
+                &TargetSnapshot::capture(directory.path().join("new.docx")).unwrap(),
+                &protected,
+            )
+            .unwrap();
+        store
+            .ensure_target_not_open(&TargetSnapshot::capture(other_path).unwrap(), &[])
+            .unwrap();
+        assert!(validate_protected_document_ids(&vec![own.id; MAX_RECENT + 1]).is_err());
+        assert!(validate_protected_document_ids(&["../other.docx".into()]).is_err());
+        let request: SaveDocumentRequest = serde_json::from_value(serde_json::json!({
+            "name": "own.docx", "extension": "docx", "base64": "aGVsbG8=", "saveAs": false
+        }))
+        .unwrap();
+        assert!(
+            request.protected_document_ids.is_empty(),
+            "existing native callers remain compatible"
+        );
+    }
+
+    #[test]
+    fn notebook_format_round_trips_through_the_original_file_capability() {
+        assert!(EXTENSIONS.contains(&"oonote"));
+        assert_eq!(
+            DocExt::from_path(Path::new("笔记.OONOTE")).unwrap(),
+            DocExt::Oonote
+        );
+        assert_eq!(serde_json::to_value(DocExt::Oonote).unwrap(), "oonote");
+        assert_eq!(serde_json::to_value(DocumentKind::Note).unwrap(), "note");
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("工作笔记.oonote");
+        let mut notebook = notebook_fixture();
+        fs::write(&path, serde_json::to_vec(&notebook).unwrap()).unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let opened = store.register_open(path.clone()).unwrap();
+        assert_eq!(opened.kind, DocumentKind::Note);
+        notebook["sections"][0]["pages"][0]["blocks"][0]["content"][0]["text"] = "已经更新".into();
+        let edited = serde_json::to_vec(&notebook).unwrap();
+        validate_document_signature(&edited, DocExt::Oonote).unwrap();
+        let result = store
+            .save_existing(
+                &store.record(&opened.id).unwrap(),
+                DocExt::Oonote,
+                Some(&opened.sha256),
+                edited.clone(),
+            )
+            .unwrap();
+        let SaveResult::Saved { document } = result else {
+            panic!("expected notebook save")
+        };
+        assert_eq!(document.id, opened.id);
+        assert_eq!(document.kind, DocumentKind::Note);
+        assert_eq!(fs::read(&path).unwrap(), edited);
+        assert_eq!(store.register_open(path).unwrap().sha256, document.sha256);
+    }
+
+    #[test]
+    fn notebook_envelope_rejects_unknown_versions_binary_and_invalid_structure() {
+        let valid = notebook_fixture();
+        let encoded = serde_json::to_vec(&valid).unwrap();
+        validate_document_signature(&encoded, DocExt::Oonote).unwrap();
+        let mut bom = vec![0xef, 0xbb, 0xbf];
+        bom.extend_from_slice(&encoded);
+        validate_document_signature(&bom, DocExt::Oonote).unwrap();
+        for invalid in [
+            b"{}".as_slice(),
+            b"[]",
+            b"null",
+            b"\xff\xfe",
+            b"PK\x03\x04",
+            b"%PDF-1.7",
+        ] {
+            assert!(validate_document_signature(invalid, DocExt::Oonote).is_err());
+        }
+        for (pointer, value) in [
+            ("/format", serde_json::json!("unknown")),
+            ("/version", serde_json::json!(2)),
+            ("/id", serde_json::json!("not valid")),
+            ("/title", serde_json::json!("字".repeat(201))),
+            ("/sections", serde_json::json!([])),
+            ("/sections/0/pages", serde_json::json!([])),
+            ("/sections/0/pages/0/blocks", serde_json::json!([])),
+            (
+                "/sections/0/pages/0/blocks/0/id",
+                serde_json::json!("notebook-1"),
+            ),
+            (
+                "/sections/0/pages/0/blocks/0/type",
+                serde_json::json!("script"),
+            ),
+        ] {
+            let mut invalid = valid.clone();
+            *invalid.pointer_mut(pointer).unwrap() = value;
+            assert!(
+                validate_document_signature(&serde_json::to_vec(&invalid).unwrap(), DocExt::Oonote)
+                    .is_err(),
+                "{pointer}"
+            );
+        }
+        assert!(!valid_notebook(&vec![b' '; NOTEBOOK_LIMIT + 1]));
     }
 
     #[test]

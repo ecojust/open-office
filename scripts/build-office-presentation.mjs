@@ -10,7 +10,7 @@ const source = join(root, 'vendor/office-presentation')
 const output = join(root, 'public/office-presentation')
 const digest = value => createHash('sha256').update(value).digest('hex')
 await buildOfficeIcons({ root, families: ['deck'], check: process.argv.includes('--check') })
-const sources = ['scripts/build-office-presentation.mjs', 'scripts/build-office-icons.mjs']
+const sources = ['scripts/build-office-presentation.mjs', 'scripts/build-office-icons.mjs', 'src/shared/office-ui-fonts.rs']
 async function collect(relative) {
   for (const entry of (await readdir(join(root, relative), { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
     if (['target', '.git'].includes(entry.name)) continue
@@ -23,6 +23,7 @@ await collect('vendor/office-presentation')
 await collect('src/icons')
 // The host embeds these locally bundled, licensed fonts for Chinese UI and documents.
 await collect('assets/fonts/open-office')
+await collect('assets/fonts/ui')
 await collect('assets/fonts/deck')
 const hash = createHash('sha256')
 for (const path of sources.sort()) hash.update(path).update('\0').update(await readFile(join(root, path))).update('\0')

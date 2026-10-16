@@ -112,7 +112,7 @@ export function emitFailureDiagnostics(report, env, reportPath) {
   }
 }
 
-/** Require the actual four mounted Rust editors plus native Server/autosave. */
+/** Require the actual four mounted Rust editors plus native scheduled autosave. */
 export function validateFrontendReport(report) {
   requireCheck(report && typeof report === 'object' && !Array.isArray(report), 'Missing native frontend report');
   requireCheck(report.ok === true, 'The native GUI reported a failed smoke test');
@@ -129,10 +129,6 @@ export function validateFrontendReport(report) {
 
   validatePdfNativeReport(report.pdf);
   const workspaceChecks = validateNativeWorkspaceReport(report.workspace);
-  for (const [extension, expected] of [
-    ['xlsx', report.sheet.reopenedXlsxBase64], ['pptx', report.presentation.reopenedPptxBase64], ['pdf', report.pdf.reopenedPdfBase64],
-  ]) requireCheck(report.workspace.server.formats.find(document => document.extension === extension)?.base64 === expected,
-    `Native workspace ${extension} bytes differ from the independently verified editor round trip`);
 
   return {
     wordDefaultCanvas: true, wordDomInput: true, wordDocxReadback: true,

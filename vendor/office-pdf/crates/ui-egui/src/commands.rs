@@ -80,6 +80,9 @@ impl OfficePdfApp {
     /// Whether a registered command can run now. The engine judges the document (security,
     /// contents, undo history); view state it can't see is checked here.
     pub(crate) fn command_enabled(&self, spec: &CommandSpec) -> bool {
+        if self.pending_removal.is_some() {
+            return false;
+        }
         if self.embedded && self.embedding_command_blocked(spec.id) {
             return false;
         }
@@ -611,8 +614,8 @@ impl OfficePdfApp {
                     &[("tool", &crate::i18n::in_sentence(tl!(tool.label())))],
                 );
             }
-            "sign.fill.signature.remove" => self.signature = None,
-            "sign.fill.initials.remove" => self.initials = None,
+            "sign.fill.signature.remove" => self.remove_saved_signature(false),
+            "sign.fill.initials.remove" => self.remove_saved_signature(true),
             "sign.fill.signature.change" | "sign.fill.initials.change" => {
                 let initials = id == "sign.fill.initials.change";
                 let saved = if initials { self.initials.as_ref() } else { self.signature.as_ref() };
@@ -628,6 +631,7 @@ impl OfficePdfApp {
                 let initials = tool == crate::fill_sign::FillTool::Initials;
                 if (tool == crate::fill_sign::FillTool::Signature && self.signature.is_none()) || (initials && self.initials.is_none()) {
                     self.signature_draft = crate::fill_sign::SigDraft::new(initials, &self.comment_prefs.author);
+                    self.signature_draft.drawing = self.embedded;
                     self.dialog = Some(Dialog::Signature);
                 }
             }

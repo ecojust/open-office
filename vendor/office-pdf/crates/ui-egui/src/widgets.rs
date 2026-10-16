@@ -506,7 +506,7 @@ pub fn open_office_logo(ui: &mut egui::Ui, height: f32) -> Response {
 
 /// Original host document icon, without third-party trademark artwork.
 pub fn open_office_mark(ui: &mut egui::Ui, size: f32) -> Response {
-    ui.add(crate::icons::image("file-text", size, crate::theme::Tokens::get(ui.ctx()).accent))
+    ui.add(crate::icons::image(ui, "file-text", size, crate::theme::Tokens::get(ui.ctx()).accent))
 }
 
 /// Buttons for every community link (`office_pdf_engine::links`), The primary project link first and prominent.

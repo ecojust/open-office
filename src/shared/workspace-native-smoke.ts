@@ -3,68 +3,26 @@ import * as native from '../native'
 import type { NativeDocument, SaveDocumentRequest, SaveResult } from '../types'
 import { focusOfficeWordCanvas, type OfficeWordSmokeEditor } from '../word/rust/office-word-native-smoke'
 import { AUTOSAVE_INTERVAL_MS } from './autosave'
-import { createWorkspaceTransport, type BrowserServerStatus, type WorkspaceExtension } from './browser-workspace'
 
 export const WORKSPACE_NATIVE_CHECKS = [
-  'native-server-start-status-ipc',
-  'four-format-workspace-dispatch-roundtrip',
-  'native-http-assets-document-cas',
   'real-autosave-timer-writes-approved-temporary-file',
   'saved-file-readback-reopened-in-rust',
-  'native-server-stop-revokes-old-link',
+  'native-temporary-file-and-session-cleanup',
 ] as const
 
-type StatusEvidence = { running: boolean; revision: number; lanUrlsCount: number }
-export interface WorkspaceHttpEvidence {
-  schemaVersion: 1
-  execution: 'native-tcp'
-  documentId: string
-  initialVersion: number
-  acceptedVersion: number
-  initialSha256: string
-  acceptedSha256: string
-  indexStatus: number
-  rangeStatus: number
-  stateStatus: number
-  documentStatus: number
-  writeStatus: number
-  staleWriteStatus: number
-  readbackStatus: number
-  wrongOriginStatus: number
-  indexBytes: number
-  indexSha256: string
-  rangeBytes: number
-  assetIndex: boolean
-  wasmRange: boolean
-  stateRead: boolean
-  documentRead: boolean
-  writeAccepted: boolean
-  staleWriteRejected: boolean
-  readback: boolean
-  wrongOriginRejected: boolean
-}
 export interface WorkspaceNativeSmokeReport {
-  schemaVersion: 1
+  schemaVersion: 2
   kind: 'workspace-native'
-  transport: 'native-webview-ipc-and-loopback-http'
+  transport: 'native-webview-ipc'
   ok: boolean
   native: { tauri: true; origin: string }
   checks: string[]
   limitations: string[]
-  server?: {
-    before: StatusEvidence
-    started: StatusEvidence
-    status: StatusEvidence
-    formats: Array<{ id: string; kind: string; extension: WorkspaceExtension; version: number; sha256: string; sizeBytes: number; base64: string }>
-    http?: WorkspaceHttpEvidence
-    httpReadback?: { id: string; version: number; sha256: string; sizeBytes: number }
-    stopped?: StatusEvidence
-    stoppedStatus?: StatusEvidence
-  }
   autosave?: {
     intervalMs: number
     elapsedMs: number
     targetId: string
+    initialBase64: string
     initialSha256: string
     initialSizeBytes: number
     finalSha256: string
@@ -90,7 +48,7 @@ export interface WorkspaceNativeSmokeReport {
       savedSizeBytes?: number
     }>
   }
-  cleanup?: { serverStopped: boolean; oldLinkRevoked: boolean; temporaryFilesRemoved: boolean; closedDocuments: number }
+  cleanup?: { temporaryFilesRemoved: boolean; closedDocuments: number }
   error?: string
   cleanupError?: string
 }
@@ -108,7 +66,6 @@ export interface WorkspaceNativeSmokeAdapter {
 function assert(value: unknown, message: string): asserts value {
   if (!value) throw Error(`Workspace native: ${message}`)
 }
-const statusEvidence = (value: BrowserServerStatus): StatusEvidence => ({ running: value.running, revision: value.revision, lanUrlsCount: value.lanUrls.length })
 async function digest(base64: string) {
   const bytes = native.base64ToBytes(base64)
   const hash = await crypto.subtle.digest('SHA-256', bytes.buffer as ArrayBuffer)
@@ -122,18 +79,14 @@ async function bounded<T>(work: Promise<T>, label: string, milliseconds = 20000)
 }
 
 /** Runs only inside an installed native WebView; no browser success substitute. */
-export async function runWorkspaceNativeSmoke(
-  adapter: WorkspaceNativeSmokeAdapter,
-  fixtures: { xlsx: string; pptx: string; pdf: string },
-): Promise<WorkspaceNativeSmokeReport> {
+export async function runWorkspaceNativeSmoke(adapter: WorkspaceNativeSmokeAdapter): Promise<WorkspaceNativeSmokeReport> {
   if (!isTauri()) throw Error('A real native WebView is required for workspace verification')
   const report: WorkspaceNativeSmokeReport = {
-    schemaVersion: 1, kind: 'workspace-native', transport: 'native-webview-ipc-and-loopback-http', ok: false,
+    schemaVersion: 2, kind: 'workspace-native', transport: 'native-webview-ipc', ok: false,
     native: { tauri: true, origin: location.origin }, checks: [],
     limitations: [
       'The temporary file capability is provisioned by a smoke-only native command; native file chooser interaction is not covered.',
       'Text edits use the real Rust command interface; physical keyboard input and operating-system IME are not covered.',
-      'HTTP uses a native TCP probe against the actual Server listener; an external browser or LAN device is not exercised here.',
     ],
   }
   const keys: string[] = [], preference = adapter.autosaveEnabled()
@@ -141,17 +94,6 @@ export async function runWorkspaceNativeSmoke(
   let closedDocuments = 0
   try {
     await adapter.setAutosave(false)
-    const before = await bounded(native.statusBrowserServer(), 'initial server status')
-    assert(!before.running, 'isolated server must start stopped')
-    const started = await bounded(native.startBrowserServer(), 'start server')
-    assert(started.running && started.localUrl, 'start IPC did not return a listener')
-    const local = new URL(started.localUrl)
-    assert(local.protocol === 'http:' && local.hostname === '127.0.0.1' && local.searchParams.get('workspace') === 'shared', 'start IPC returned an invalid loopback capability')
-    const status = await bounded(native.statusBrowserServer(), 'running server status')
-    assert(status.running && status.localUrl === started.localUrl, 'status IPC does not identify the started listener')
-    report.server = { before: statusEvidence(before), started: statusEvidence(started), status: statusEvidence(status), formats: [] }
-    report.checks.push(WORKSPACE_NATIVE_CHECKS[0])
-
     const mounted = await bounded(adapter.openWord({ id: '', kind: 'word', extension: 'docx', name: 'native-workspace.docx', base64: '', sha256: '', sizeBytes: 0 }), 'new autosave document')
     keys.push(mounted.key)
     const editor = mounted.editor
@@ -166,36 +108,9 @@ export async function runWorkspaceNativeSmoke(
     await adapter.bindTemporaryFile(mounted.key, temporary)
     await editor.markSaved?.(baseline.base64, { background: true })
 
-    const transport = createWorkspaceTransport(native.dispatchBrowserWorkspace)
-    const payloads: Record<WorkspaceExtension, string> = { docx: baseline.base64, ...fixtures }
-    for (const extension of ['docx', 'xlsx', 'pptx', 'pdf'] as const) {
-      const id = `native-smoke-${extension}`, base64 = payloads[extension]
-      const hash = await digest(base64)
-      const published = await bounded(transport.publish({ id, expectedVersion: 0, clientId: 'native-smoke-desktop', name: `native-workspace.${extension}`, extension, base64 }), `${extension} dispatch publish`)
-      assert(published.status === 'accepted', `${extension} initial publish conflicted`)
-      const readback = await bounded(transport.document(id), `${extension} dispatch readback`)
-      assert(readback.base64 === base64 && readback.sha256 === hash.sha256 && readback.sizeBytes === hash.sizeBytes, `${extension} dispatch readback mismatch`)
-      report.server.formats.push({ id, kind: readback.kind, extension, version: readback.version, ...hash, base64 })
-    }
-    report.checks.push(WORKSPACE_NATIVE_CHECKS[1])
-
     await editor.command('caret.docEnd')
     const modified = await editor.command('text.insert', { text: ' NATIVE_AUTOSAVE_EDIT 已保存' })
     assert(modified.dirty && modified.text === expectedText, 'real Word edit did not become dirty')
-    const edited = await editor.exportFile({ format: 'docx', background: true })
-    const replacement = await digest(edited.base64)
-    assert(replacement.sha256 !== initial.sha256, 'HTTP replacement must contain a different document')
-    const http = await bounded(invoke<WorkspaceHttpEvidence>('smoke_probe_browser_workspace', { documentId: 'native-smoke-docx', replacementBase64: edited.base64 }), 'native HTTP read/write/CAS probe')
-    assert(http.execution === 'native-tcp' && http.initialSha256 === initial.sha256 && http.acceptedSha256 === replacement.sha256 && http.acceptedVersion > http.initialVersion, 'native HTTP probe did not replace the expected DOCX')
-    assert(http.indexStatus === 200 && http.rangeStatus === 206 && http.stateStatus === 200 && http.documentStatus === 200 && http.writeStatus === 200 && http.staleWriteStatus === 409 && http.readbackStatus === 200 && http.wrongOriginStatus === 403, 'native HTTP status evidence is incomplete')
-    assert(http.assetIndex && http.wasmRange && http.stateRead && http.documentRead && http.writeAccepted && http.staleWriteRejected && http.readback && http.wrongOriginRejected, 'native HTTP probe failed')
-    assert(http.indexBytes > 0 && /^[a-f0-9]{64}$/.test(http.indexSha256) && http.rangeBytes === 8, 'native HTTP asset byte evidence is missing')
-    report.server.http = http
-    const remote = await bounded(transport.document('native-smoke-docx'), 'IPC read after HTTP update')
-    assert(remote.sha256 === replacement.sha256 && remote.version === http.acceptedVersion && remote.base64 === edited.base64, 'IPC did not observe the HTTP update')
-    report.server.httpReadback = { id: remote.id, version: remote.version, sha256: remote.sha256, sizeBytes: remote.sizeBytes }
-    report.checks.push(WORKSPACE_NATIVE_CHECKS[2])
-
     const saves: NonNullable<WorkspaceNativeSmokeReport['autosave']>['saves'] = []
     unobserve = adapter.observeNativeSaves((request, result) => {
       saves.push({ documentId: request.documentId, extension: request.extension, expectedSha256: request.expectedSha256, saveAs: request.saveAs === true, status: result.status,
@@ -238,14 +153,15 @@ export async function runWorkspaceNativeSmoke(
     const final = await digest(saved.base64)
     assert(elapsedMs >= AUTOSAVE_INTERVAL_MS && saved.id === temporary.id && saved.sha256 === final.sha256 && saved.sizeBytes === final.sizeBytes && final.sha256 !== initial.sha256, 'autosave did not write and read back the approved file after the normal interval')
     assert(saves.length === 1 && saves[0]!.status === 'saved' && saves[0]!.documentId === temporary.id && saves[0]!.savedId === temporary.id && saves[0]!.expectedSha256 === initial.sha256 && saves[0]!.savedSha256 === final.sha256 && saves[0]!.saveAs === false, 'autosave bypassed the normal direct save request')
-    report.autosave = { intervalMs: AUTOSAVE_INTERVAL_MS, elapsedMs, targetId: temporary.id, initialSha256: initial.sha256, initialSizeBytes: initial.sizeBytes, finalSha256: final.sha256, finalSizeBytes: final.sizeBytes,
+    report.autosave = { intervalMs: AUTOSAVE_INTERVAL_MS, elapsedMs, targetId: temporary.id, initialBase64: temporary.base64, initialSha256: initial.sha256, initialSizeBytes: initial.sizeBytes, finalSha256: final.sha256, finalSizeBytes: final.sizeBytes,
       readbackBase64: saved.base64, beforeRevision: beforeSave.revision, afterRevision: afterSave.revision, beforeDirty: beforeSave.dirty, afterDirty: afterSave.dirty,
       focusRetained: document.activeElement === focus, blurEvents, dialogObserved, expectedText, reopenedText: '', saves }
     assert(!afterSave.dirty, 'autosave left the Rust document dirty after its saved receipt')
+    assert(afterSave.revision === beforeSave.revision, 'autosave acknowledged a different edited revision')
     assert(!dialogObserved, 'autosave displayed a document dialog')
     assert(document.activeElement === focus, 'autosave changed the focused editor element')
     assert(blurEvents === 0, 'autosave blurred the focused editor element')
-    report.checks.push(WORKSPACE_NATIVE_CHECKS[3])
+    report.checks.push(WORKSPACE_NATIVE_CHECKS[0])
     removeBlurListener(); removeBlurListener = undefined
     unobserve(); unobserve = undefined
     const reopened = await bounded(adapter.openWord(saved), 'saved file reopened in Rust')
@@ -253,7 +169,7 @@ export async function runWorkspaceNativeSmoke(
     const reopenedState = await reopened.editor.inspect()
     assert(reopenedState.text === expectedText, 'file readback lost the autosaved text')
     report.autosave.reopenedText = reopenedState.text
-    report.checks.push(WORKSPACE_NATIVE_CHECKS[4])
+    report.checks.push(WORKSPACE_NATIVE_CHECKS[1])
   } catch (cause) {
     report.error = cause instanceof Error ? cause.message : String(cause)
   } finally {
@@ -261,14 +177,10 @@ export async function runWorkspaceNativeSmoke(
     try {
       await adapter.setAutosave(false)
       for (const key of keys.reverse()) { await bounded(adapter.close(key), 'close smoke document'); closedDocuments++ }
-      const stopped = await bounded(native.stopBrowserServer(), 'stop server')
-      const stoppedStatus = await bounded(native.statusBrowserServer(), 'stopped server status')
-      assert(!stopped.running && !stopped.localUrl && !stoppedStatus.running && !stoppedStatus.localUrl, 'stop IPC left the listener running')
-      if (report.server) { report.server.stopped = statusEvidence(stopped); report.server.stoppedStatus = statusEvidence(stoppedStatus) }
-      const cleanup = await bounded(invoke<{ serverStopped: boolean; oldLinkRevoked: boolean; temporaryFilesRemoved: boolean }>('smoke_cleanup_workspace'), 'native smoke cleanup')
-      assert(cleanup.serverStopped && cleanup.oldLinkRevoked && cleanup.temporaryFilesRemoved, 'native smoke cleanup is incomplete')
+      const cleanup = await bounded(invoke<{ temporaryFilesRemoved: boolean }>('smoke_cleanup_autosave'), 'native smoke cleanup')
+      assert(cleanup.temporaryFilesRemoved, 'native smoke cleanup is incomplete')
       report.cleanup = { ...cleanup, closedDocuments }
-      report.checks.push(WORKSPACE_NATIVE_CHECKS[5])
+      report.checks.push(WORKSPACE_NATIVE_CHECKS[2])
     } catch (cause) { report.cleanupError = cause instanceof Error ? cause.message : String(cause) }
     await adapter.setAutosave(preference)
   }

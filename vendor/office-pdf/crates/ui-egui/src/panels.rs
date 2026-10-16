@@ -402,7 +402,7 @@ fn stamp_palette(app: &mut OfficePdfApp, ui: &mut egui::Ui, t: &Tokens) {
 
 /// Edit a PDF ▸ Format text: for the selected added text (one undoable change), or the style
 /// new text gets.
-fn format_section(app: &mut OfficePdfApp, ui: &mut egui::Ui, t: &Tokens) {
+pub(crate) fn format_section(app: &mut OfficePdfApp, ui: &mut egui::Ui, t: &Tokens) {
     // Editing a paragraph of existing text: its formatting, applied as it changes.
     if let Some((i, _)) = app.active_ids()
         && let Some(ed) = app.views[i].line_editor.clone()
@@ -747,7 +747,7 @@ pub fn right_panel(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
                         for (ai, a) in info.attachments.iter().enumerate() {
                             egui::Frame::NONE.inner_margin(egui::Margin::symmetric(4, 6)).show(ui, |ui| {
                                 ui.horizontal(|ui| {
-                                    ui.add(icons::image("paperclip", 16.0, t.icon));
+                                    ui.add(icons::image(ui, "paperclip", 16.0, t.icon));
                                     ui.vertical(|ui| {
                                         ui.set_width(ui.available_width() - 70.0);
                                         ui.add(egui::Label::new(egui::RichText::new(&a.name).font(theme::medium(13.0))).truncate());
@@ -855,7 +855,7 @@ pub fn right_panel(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
 fn empty(ui: &mut egui::Ui, t: &Tokens, icon: &str, text: &str) {
     ui.add_space(40.0);
     ui.vertical_centered(|ui| {
-        ui.add(icons::image(icon, 36.0, t.text_faint));
+        ui.add(icons::image(ui, icon, 36.0, t.text_faint));
         ui.add_space(8.0);
         // Every empty-panel message goes through here.
         ui.label(egui::RichText::new(tl!(text)).color(t.text_muted));

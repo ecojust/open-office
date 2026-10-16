@@ -180,6 +180,9 @@ jobs:
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-edit --lib tests::added_cjk_text_embeds_searchable_glyphs_wraps_and_survives_reopen -- --exact
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p open-office-pdf-host --lib
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib embedding:: -- --test-threads=1
+          cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib embedded_toolbar:: -- --test-threads=1
+          cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib delete_confirmation:: -- --test-threads=1
+          cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib fill_sign::tests::a_typed_signature_never_silently_omits_unsupported_name_characters -- --exact
       - name: Build native installation package
         run: npm run desktop:build -- --bundles ${{ matrix.bundles }}
       - name: Install Windows package to verify the delivered resource layout
@@ -199,7 +202,7 @@ jobs:
           if ($process.ExitCode -notin @(0, 3010)) { throw "NSIS installation failed: $($process.ExitCode)" }
           if (-not (Test-Path (Join-Path $installDirectory 'open-office.exe'))) { throw 'Installed desktop executable is missing' }
           "OPEN_OFFICE_INSTALLED_APP=$installDirectory" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Verify final desktop GUI, four editors, Server, and local autosave
+      - name: Verify final desktop GUI, four editors, and local autosave
         if: matrix.id != 'macos-x64'
         timeout-minutes: 8
         run: node scripts/native-smoke.mjs
@@ -310,7 +313,7 @@ jobs:
           path: artifacts
       - name: Verify original Intel DMG and copy its unchanged App with signatures intact
         run: node scripts/macos-intel-transfer.mjs verify-and-copy
-      - name: Run the actual Intel App under Rosetta for four editors, Server, and autosave
+      - name: Run the actual Intel App under Rosetta for four editors and autosave
         timeout-minutes: 8
         run: node scripts/native-smoke.mjs --app "$OPEN_OFFICE_VERIFIED_APP"
       - name: Check matching package, signatures, architecture, and successful real edits
@@ -405,7 +408,7 @@ jobs:
         with:
           name: open-office-native-macos-arm64
           path: native-package
-      - name: Verify real OS input, four editors, Server, and autosave against the installed ARM DMG
+      - name: Verify real OS input, four editors, and autosave against the installed ARM DMG
         timeout-minutes: 10
         run: |
           node --input-type=module <<'NODE'

@@ -311,8 +311,7 @@ fn look_of(b: &office_pdf_engine::TextBlock) -> office_pdf_engine::AddedText {
 pub(crate) fn editor_font(look: &office_pdf_engine::AddedText, size: f32) -> FontId {
     let family = match (look.family, look.bold) {
         (office_pdf_engine::FontFamily::Courier, _) => FontFamily::Monospace,
-        (_, true) => FontFamily::Name("semibold".into()),
-        (_, false) => FontFamily::Proportional,
+        (_, bold) => crate::theme::document_font_family(bold),
     };
     FontId::new(size, family)
 }
@@ -1143,7 +1142,7 @@ pub(crate) fn install_source_fonts(ctx: &egui::Context, doc: &office_pdf_engine:
                 })
                 .filter_map(|p| families.get(&p.resource).cloned()),
         );
-        if let Some(fallback) = definitions.families.get(&FontFamily::Proportional) {
+        if let Some(fallback) = definitions.families.get(&crate::theme::document_font_family(false)) {
             stack.extend(fallback.iter().cloned());
         }
         definitions.families.insert(FontFamily::Name(name.clone().into()), stack);
@@ -1445,6 +1444,22 @@ pub(crate) fn caret_color_on(fill: Color32) -> Color32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn document_text_fallbacks_remain_independent_of_interface_fonts() {
+        let fonts = crate::theme::font_definitions_for(true);
+        for bold in [false, true] {
+            let look = office_pdf_engine::AddedText { bold, ..Default::default() };
+            let family = editor_font(&look, 13.0).family;
+            let stack = &fonts.families[&family];
+            assert_eq!(stack.first().map(String::as_str), Some(if bold { "Inter-SemiBold" } else { "Inter" }));
+            assert!(stack.iter().any(|name| name == "OfficeChinese"));
+            assert!(stack.iter().all(|name| !name.starts_with("office-ui-")), "UI fonts entered the PDF editing fallback");
+        }
+        assert!(fonts.families[&FontFamily::Proportional].iter().any(|name| name == "office-ui-cjk"));
+        let courier = office_pdf_engine::AddedText { family: office_pdf_engine::FontFamily::Courier, ..Default::default() };
+        assert_eq!(editor_font(&courier, 13.0).family, FontFamily::Monospace);
+    }
 
     /// An app with one text document open, and an editor on its first paragraph.
     fn preview_app() -> (crate::OfficePdfApp, LineEditor) {

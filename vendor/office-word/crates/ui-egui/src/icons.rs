@@ -3,6 +3,10 @@
 
 use egui::{Color32, Painter, Pos2, Rect, Shape, Stroke, pos2, vec2};
 
+/// Shared Open Office toolbar sizes; smaller status indicators remain contextual.
+pub const TOOL_SIZE: f32 = 18.0;
+pub const LARGE_SIZE: f32 = 28.0;
+
 /// Paint a shell-owned interface SVG with the current enabled/disabled theme colors.
 pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
     crate::office_svg::paint(p, r, name, c, accent);

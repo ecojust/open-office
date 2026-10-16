@@ -157,7 +157,7 @@ pub fn show(app: &mut OfficePdfApp, ctx: &egui::Context) {
             egui::Frame::popup(ui.style()).corner_radius(CornerRadius::same(12)).inner_margin(egui::Margin::same(10)).show(ui, |ui| {
                 ui.set_width(560.0);
                 ui.horizontal(|ui| {
-                    ui.add(icons::image("search", 18.0, t.text_muted));
+                    ui.add(icons::image(ui, "search", 18.0, t.text_muted));
                     let r = ui.add(
                         egui::TextEdit::singleline(&mut app.palette_query)
                             .hint_text(tl!("Search tools and commands…"))

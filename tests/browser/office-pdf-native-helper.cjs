@@ -108,15 +108,31 @@ const waitForAsync = async (predicate, arg) => {
         const app = document.querySelector('#app').__vue_app__._instance.setupState;
         const editor = app.rustPdfHandles.get(app.activeKey);
         await editor.command('edit.text');
+        const beforeFrame = await editor.query('ui.state');
+        // Tool commands may open their settings sidebar. Page rectangles describe the
+        // last rendered frame, so wait for the actual layout before clicking the page.
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         const ui = await editor.query('ui.state');
         const rect = ui.active.pages_on_screen.find(page => page.page === 1)?.rect;
         const canvas = document.querySelector('[data-testid="pdf-canvas"]');
         if (!rect || !canvas) throw Error('Visible PDF page geometry unavailable');
         const box = canvas.getBoundingClientRect();
-        return { x: box.x + rect[0] + (rect[2] - rect[0]) * 0.2, y: box.y + rect[1] + (rect[3] - rect[1]) * 0.35 };
+        return { x: box.x + rect[0] + (rect[2] - rect[0]) * 0.2, y: box.y + rect[1] + (rect[3] - rect[1]) * 0.35,
+          layoutBeforeFrame: beforeFrame.active.pages_on_screen, layoutAfterFrame: ui.active.pages_on_screen };
       });
+      report.inputTarget = target;
+      persist();
       await page.mouse.click(target.x, target.y);
-      await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'pdf-input');
+      try {
+        await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'pdf-input');
+      } catch (error) {
+        report.inputFocusFailure = await page.evaluate(async () => {
+          const app = document.querySelector('#app').__vue_app__._instance.setupState;
+          return { state: await app.rustPdfHandles.get(app.activeKey).query('ui.state'), focused: document.activeElement?.outerHTML?.slice(0, 800) };
+        });
+        persist();
+        throw error;
+      }
       await page.keyboard.type('CANVAS_INPUT_PROOF');
       await page.keyboard.insertText(' 中文输入');
       const typed = await page.evaluate(async () => {
@@ -273,6 +289,7 @@ const waitForAsync = async (predicate, arg) => {
       const { inspectOfficePdfSession } = await import('/src/pdf/rust/client.ts');
       const { runOfficePdfNativeSmoke, verifyMountedOfficePdfEditor } = await import('/src/pdf/rust/native-smoke.ts');
       let captured = false, discardedCompositionPreservesSurvivor = false, survivorBefore;
+      const operationTrace = [];
       const adapter = {
         async open(base64, name) {
           await app.editorTransaction('Browser pdf smoke', () => app.addDocument({ id: '', kind: 'pdf', extension: 'pdf', name, base64, sha256: '', sizeBytes: Math.floor(base64.length * .75) }));
@@ -282,7 +299,19 @@ const waitForAsync = async (predicate, arg) => {
           const handle = app.rustPdfHandles.get(tab.key), snapshot = await handle.inspect();
           const element = [...document.querySelectorAll('[data-testid="rust-pdf-editor"]')].find(node => node.dataset.sessionId === snapshot.sessionId);
           if (!element) throw Error('Actual pdf component missing');
-          return { key: tab.key, element, editor: app.nativeTransactionalEditor(handle) };
+          const editor = app.nativeTransactionalEditor(handle);
+          const tracedEditor = new Proxy(editor, { get(target, key) {
+            const value = target[key];
+            if (!['command', 'exportFile', 'markSaved'].includes(key) || typeof value !== 'function') return value;
+            return async (...args) => {
+              const trace = { operation: key, command: key === 'command' ? args[0] : undefined, startedAt: performance.now() };
+              operationTrace.push(trace);
+              try { const result = await value.apply(target, args); trace.ok = true; return result; }
+              catch (error) { trace.error = String(error); trace.state = await handle.query('ui.state').catch(() => null); throw error; }
+              finally { trace.elapsedMs = performance.now() - trace.startedAt; }
+            };
+          } });
+          return { key: tab.key, element, editor: tracedEditor };
         },
         activeKey: () => app.activeKey,
         async verifyMounted() {
@@ -328,7 +357,7 @@ const waitForAsync = async (predicate, arg) => {
       catch (error) { nativeGuardRejected = String(error).includes('real native WebView is required'); }
       if (!nativeGuardRejected) throw Error('Native entry point accepted browser evidence');
       const result = await verifyMountedOfficePdfEditor(adapter);
-      return { ...result, nativeGuardRejected, discardedCompositionPreservesSurvivor };
+      return { ...result, nativeGuardRejected, discardedCompositionPreservesSurvivor, operationTrace };
     });
     persist();
     assert.equal(report.helper.ok, true, report.helper.error || report.helper.closeError);

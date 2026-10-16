@@ -1,5 +1,8 @@
 //! Design tokens (light and dark), UI fonts and the egui style.
 
+#[path = "../../../../../src/shared/office-ui-fonts.rs"]
+mod office_ui_fonts;
+
 use std::sync::Arc;
 
 use egui::{Align2, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Rect, Stroke, Visuals};
@@ -494,6 +497,7 @@ pub fn font_definitions(prefer_hans: bool, system_cjk: bool) -> FontDefinitions 
     }
     #[cfg(target_arch = "wasm32")]
     let _ = system_cjk;
+    office_ui_fonts::install(&mut fonts, &[FontFamily::Proportional], &[FontFamily::Name("medium".into()), FontFamily::Name("semibold".into())]);
     // Symbols and emoji fall back to egui's defaults (kept in the families).
     fonts
 }
@@ -549,9 +553,9 @@ impl TypeRung {
     /// Font size in points.
     pub fn size(self) -> f32 {
         match self {
-            TypeRung::Chrome => 12.5,
-            TypeRung::Control => 11.5,
-            TypeRung::Caption => 11.0,
+            TypeRung::Chrome => office_ui_fonts::BODY_SIZE,
+            TypeRung::Control => office_ui_fonts::BODY_SIZE,
+            TypeRung::Caption => office_ui_fonts::SMALL_SIZE,
         }
     }
     /// Extra letter-spacing in points (em-relative, so it scales with the size).
@@ -626,10 +630,7 @@ pub fn apply(ctx: &egui::Context, appearance: Appearance) {
         s.spacing.button_padding = egui::vec2(8.0, 3.0);
         s.spacing.interact_size = egui::vec2(24.0, 22.0);
         s.spacing.menu_margin = egui::Margin::same(6);
-        s.text_styles.insert(egui::TextStyle::Body, regular(12.5));
-        s.text_styles.insert(egui::TextStyle::Button, regular(12.5));
-        s.text_styles.insert(egui::TextStyle::Small, regular(10.5));
-        s.text_styles.insert(egui::TextStyle::Heading, semibold(17.0));
+        office_ui_fonts::apply_style(s);
         s.interaction.tooltip_delay = 0.45;
     });
     ctx.options_mut(|o| {

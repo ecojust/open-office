@@ -1,0 +1,41 @@
+{
+  "family": "WenQuanYi Micro Hei",
+  "style": "Regular",
+  "version": "0.2.0-beta",
+  "source": "https://sourceforge.net/projects/wqy/files/wqy-microhei/0.2.0-beta/",
+  "archive": "https://deb.debian.org/debian/pool/main/f/fonts-wqy-microhei/fonts-wqy-microhei_0.2.0-beta.orig.tar.gz",
+  "archiveSha256": "2802ac8023aa36a66ea6e7445854e3a078d377ffff42169341bd237871f7213e",
+  "collectionSha256": "e4bca8df123ce01b104780f576ea1a58b9a5ff1662a91124b6d3180cb6c88212",
+  "collectionFace": 0,
+  "license": "Apache-2.0",
+  "licenseChoice": "Upstream offers Apache-2.0 OR GPL-3.0 with font embedding exception; distributed under Apache-2.0.",
+  "authors": "WenQuanYi Project Contributors; Google Corporation; Wada Laboratory and Electronic Font Open Laboratory (punctuation)",
+  "changes": "Extracted the proportional face from TTC to standalone TTF using fontTools 4.61.1; outlines, glyph coverage and original font notices are unchanged.",
+  "files": [
+    {
+      "file": "WenQuanYiMicroHei-Regular.ttf",
+      "sha256": "e4760af5478c868e6b863bc52eff8efc7141a9aebc45da680127f6b4d7d209e1",
+      "bytes": 4625912
+    },
+    {
+      "file": "LICENSE-Apache-2.0.txt",
+      "sha256": "1c19d8eb506a0e9d501d882fc9fe94eca99bc7b2f69f5e64fa79b7ec48cee54d",
+      "bytes": 10319
+    },
+    {
+      "file": "LICENSE-GPL-3.0.txt",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "bytes": 35147
+    },
+    {
+      "file": "UPSTREAM-README.txt",
+      "sha256": "9b1f9a3d90f88041387700498296fc89d6d600d0ebc9b6258c119dd192eaf6b9",
+      "bytes": 20027
+    },
+    {
+      "file": "AUTHORS.txt",
+      "sha256": "e980452a04c9e9dd7d6f0d8f72dd4c960f312207d64b849b73347beb02b9c3fa",
+      "bytes": 363560
+    }
+  ]
+}

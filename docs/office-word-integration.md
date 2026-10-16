@@ -13,7 +13,7 @@ DOCX 字节
   → egui WordApp 功能区与本地 canvas
 
 Vue/Tauri 外壳 ↔ open-office-host WASM 桥 ↔ WordApp
-  文件对话框、标签页、首次另存、冲突检测与关闭确认
+  文件对话框、标签页、保存与另存、冲突检测与关闭确认
 ```
 
 `vendor/office-word/` 保留固定上游代码；`apps/open-office-host` 是 Open Office 的适配层。`office-word-doc`、`office-word-docx`、`office-word-layout`、`office-word-render`、`office-word-engine` 与 `office-word-ui-egui` 分别承担文档、格式、排版、绘制、命令和界面。功能区和正文画布一起复用，Vue 不另外维护一份正文模型。
@@ -32,7 +32,7 @@ Vue/Tauri 外壳 ↔ open-office-host WASM 桥 ↔ WordApp
 
 OfficeWord 上游仍标记为 **Alpha**。复杂 DOCX、图表／SmartArt、域与浮动对象、字体替换和与 Microsoft Word 的分页一致性，均不能假定完整兼容。本项目尚未给出相对旧引擎的性能提升结论，也未证明可替代整个 Microsoft Office。上游 README 的功能比例与速度数字不作为本集成的指标。
 
-导入的 DOCX 首次保存生成副本，原文件不会直接覆盖。失败打开应保留当前标签、未保存内容和撤销历史，不会静默切到兼容引擎。此保护不能弥补未知内容的导入损失；复杂原件仍需与导出副本核对。
+从 0.12.0 起，桌面版打开已有 DOCX 后，“保存”直接写回该文件；需要保留原件时使用“另存为”。保存前仍检查原文件身份和外部修改，失败打开保留当前标签、未保存内容和撤销历史，不会静默切到兼容引擎。这些保护不能弥补未知内容的导入损失；复杂文件仍需核对保存结果。浏览器版通过下载交付文件。
 
 字体包含 OfficeWord 随附的 Inter、JetBrains Mono、Source Sans 3 和 Source Serif 4，并使用本项目已有 Noto Sans CJK SC Regular、Bold 补充中文界面与正文，DejaVu Sans Regular 与 Noto Sans Symbols2 Regular 提供部分单色 emoji／符号回退，不支持完整或彩色 emoji。字体替换可能改变版式。可选 `storytold/craft-fonts` 仓库不在此集成内。
 

@@ -75,3 +75,17 @@ is copied into this repository. The licence text is in `licenses/pdf-writer/LICE
 | `krilla 0.8.2 / icc/sGrey-v4.icc` | Clinton Ingram (Compact ICC Profiles) | https://github.com/LaurenzV/krilla/blob/3ffdf0588cf98050aad6edba51ca70162e1fb5b5/crates/krilla/icc/sGrey-v4.icc | CC0-1.0 | `00c0f94e09127520a17dc0e1d9264b5702081d96dbdb1549ee88e3631ce42a9d` | PDF export colour profiles |
 | `krilla 0.8.2 / icc/sRGB-v2-magic.icc` | Clinton Ingram (Compact ICC Profiles) | https://github.com/LaurenzV/krilla/blob/3ffdf0588cf98050aad6edba51ca70162e1fb5b5/crates/krilla/icc/sRGB-v2-magic.icc | CC0-1.0 | `af4efe28f6d311799865f325ba39184a2e978b113ca74124d60af7de22b105f4` | PDF export colour profiles |
 | `krilla 0.8.2 / icc/sRGB-v4.icc` | Clinton Ingram (Compact ICC Profiles) | https://github.com/LaurenzV/krilla/blob/3ffdf0588cf98050aad6edba51ca70162e1fb5b5/crates/krilla/icc/sRGB-v4.icc | CC0-1.0 | `c56e1685d888f5edb92fe07f2750f387f8fe8e91b32ff8fb0b56bfbbb9458353` | PDF export colour profiles |
+
+## Open Office integration additions
+
+The standalone upstream brand images listed above are excluded from this modified source tree. The original attribution is preserved in `public/legal/deckcraft/ATTRIBUTION.md`.
+
+| Asset | Author | Source | Licence | Used for |
+|---|---|---|---|---|
+| Generated `crates/ui-egui/src/office_icons.rs` geometry and `office_svg.rs` renderer | Open Office contributors | Open Office `src/icons`, exact source revision in build manifest | MIT | Original interface icons (245 semantic entries; document Insert Icons library unchanged) |
+| `../../assets/fonts/deck/Inter-Regular.ttf`, `Inter-SemiBold.ttf` | Rasmus Andersson / Inter Project Authors | https://github.com/rsms/inter; exact pinned bytes from Open Office Word font inventory | OFL-1.1, `OFL-Inter.txt` | Interface and Latin document/PDF text |
+| `../../assets/fonts/deck/LXGWWenKai-Regular.ttf` | LXGW; Fontworks Klee Project Authors | https://github.com/lxgw/LxgwWenKai/releases/tag/v1.522; exact bytes in font manifest | OFL-1.1, `LICENSE-LXGW-WenKai.txt` | Chinese interface and document/PDF fallback |
+| `../../assets/fonts/open-office/DejaVuSans*.ttf` | DejaVu contributors / Bitstream | Open Office shared font manifest, original source hashes | DejaVu / Bitstream Vera (`LICENSE-DejaVu.txt`) | Latin and monochrome emoji glyph fallback |
+| `../../assets/fonts/open-office/NotoSansSymbols2-Regular.ttf` | Google / Noto Project Authors | Open Office shared font manifest | OFL-1.1 (`LICENSE-Noto-Core.txt`) | Symbol glyph fallback |
+
+| `../../assets/fonts/ui/WenQuanYiMicroHei-Regular.ttf` | WenQuanYi Project Contributors; Google Corporation; Wada Laboratory / Electronic Font Open Laboratory | https://sourceforge.net/projects/wqy/files/wqy-microhei/0.2.0-beta/; proportional TTC face extracted without outline changes, SHA-256 in shared font manifest | Apache-2.0 (`../../assets/fonts/ui/LICENSE-Apache-2.0.txt`) | Shared Chinese interface typography only; document font choices and exports unchanged |

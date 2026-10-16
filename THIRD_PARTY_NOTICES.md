@@ -21,7 +21,7 @@ Vue 和 Tauri 的原始许可保留在 `public/legal/npm`、`public/legal/rust`�
 
 `craft-ui` 等真实共享依赖保持原始包名、固定提交和许可。其 git 来源不是可以随产品改名而伪造的 URL。各编辑器的依赖索引记录这些提交及对应声明。
 
-共用字体来源、逐文件摘要和原始许可在 `assets/fonts/open-office`、`assets/fonts/deck` 及各编辑器法律说明中。文字/表格保留既有字体配置；演示/PDF 使用 LXGW WenKai 中文字体。egui 默认字体另有 OFL、Ubuntu Font Licence、MIT/Bitstream Vera 等许可。PDF 技术 CMaps、标准字体及颜色配置保持各自原始许可。原创应用 SVG 图标采用项目 MIT 许可；用户文档中的内容不属于应用图标替换范围。
+共用字体来源、逐文件摘要和原始许可在 `assets/fonts/open-office`、`assets/fonts/deck`、`assets/fonts/ui` 及各编辑器法律说明中。全部界面使用 Inter（OFL-1.1）与文泉驿微米黑（选择 Apache-2.0 许可）；文档字体配置保留原样。微米黑由上游 TTC 提取等比例字形面为 TTF，原始作者、发行说明和许可保存在 `public/legal/ui-fonts`。egui 默认字体另有 OFL、Ubuntu Font Licence、MIT/Bitstream Vera 等许可。PDF 技术 CMaps、标准字体及颜色配置保持各自原始许可。原创应用 SVG 图标采用项目 MIT 许可；用户文档中的内容不属于应用图标替换范围。
 
 ## 源码和发行材料
 

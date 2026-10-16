@@ -3,6 +3,10 @@
 
 use egui::{Color32, Painter, Rect};
 
+/// Shared Open Office toolbar sizes; smaller status indicators remain contextual.
+pub const TOOL_SIZE: f32 = 18.0;
+pub const LARGE_SIZE: f32 = 28.0;
+
 macro_rules! icons {
     ($($(#[$m:meta])* $v:ident => $n:literal,)*) => {
         /// Every presentation interface icon.

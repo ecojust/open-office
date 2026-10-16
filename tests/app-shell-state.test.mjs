@@ -18,10 +18,8 @@ const utilities = await readFile(new URL('../src/shared/document.ts', import.met
 const dialogFocus = await readFile(new URL('../src/shared/dialog-focus.ts', import.meta.url), 'utf8')
 const appearanceSource = await readFile(new URL('../src/shared/appearance.ts', import.meta.url), 'utf8')
 const autosaveSource = await readFile(new URL('../src/shared/autosave.ts', import.meta.url), 'utf8')
-const browserWorkspaceSource = await readFile(new URL('../src/shared/browser-workspace.ts', import.meta.url), 'utf8')
-const workspaceSyncSource = await readFile(new URL('../src/shared/workspace-sync.ts', import.meta.url), 'utf8')
-const names = 'tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,rustPdfEntries,rustPdfHandles,setRustPdfHandle,rustWordEntries,rustWordHandles,setRustWordHandle,rustSheetEntries,rustSheetHandles,setRustSheetHandle,rustPresentationEntries,rustPresentationHandles,setRustPresentationHandle,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,browserFile,saveActive,closeTab,closeWindow,resolveClose,removeTab,task,editorTransaction,nativeTransactionalEditor,appearance,currentDocument,globalActionsBlocked,documentActionsDisabled,globalFileAction,globalNewDocument,keydown,rustEditorFileAction,previewSlides'
-  + ',autosaveEnabled,autosave,backgroundSaving,editorInputBlocked,adoptShared,sharedSnapshot,sharedRevision,stagedTab,syncApplying,enableWorkspaceSync,pollWorkspace,serverStatus,serverError,sharedState,serverNotice,serverPanel,startServer,stopServer,openSharedDocument'
+const names = 'tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,rustPdfEntries,rustPdfHandles,setRustPdfHandle,rustWordEntries,rustWordHandles,setRustWordHandle,rustSheetEntries,rustSheetHandles,setRustSheetHandle,rustPresentationEntries,rustPresentationHandles,setRustPresentationHandle,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,browserFile,saveActive,closeTab,closeAllTabs,closeWindow,resolveClose,removeTab,removeTabs,task,editorTransaction,nativeTransactionalEditor,appearance,currentDocument,globalActionsBlocked,documentActionsDisabled,globalFileAction,globalNewDocument,keydown,rustEditorFileAction,previewSlides'
+  + ',autosaveEnabled,autosave,backgroundSaving,editorInputBlocked,noteEntries,noteHandles,setNoteHandle,activeNote'
 
 
 function compile(source, require, extra = {}) {
@@ -33,7 +31,7 @@ function compile(source, require, extra = {}) {
 }
 
 
-function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], deckPrepareError, deckPrepare, deckWarnings = [], presentationSmokeError, presentationSmokeReport, presentationSmokeRun, sheetSmokeError, sheetSmokeReport, sheetSmokeRun, pdfPrepareError, pdfPrepare, pdfWarnings = [], pdfSmokeError, pdfSmokeReport, workspaceSmokeError, workspaceSmokeReport, storedAppearance, storedAutosave, systemDark = false, storageUnavailable = false, browserUrl = 'http://127.0.0.1/', browserFetch, workspaceDispatch} = {}) {
+function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], deckPrepareError, deckPrepare, deckWarnings = [], presentationSmokeError, presentationSmokeReport, presentationSmokeRun, sheetSmokeError, sheetSmokeReport, sheetSmokeRun, pdfPrepareError, pdfPrepare, pdfWarnings = [], pdfSmokeError, pdfSmokeReport, workspaceSmokeError, workspaceSmokeReport, storedAppearance, storedAutosave, systemDark = false, storageUnavailable = false, browserUrl = 'http://127.0.0.1/', browserFetch, notebookDecodeError} = {}) {
   const rustPreparations = [], sheetPreparations = [], deckPreparations = [], pdfPreparations = []
   const calls = [], mounted = [], beforeUnmount = [], observers = [], native = {
     isTauri: () => nativeEnabled,
@@ -41,8 +39,6 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     bootstrap: async () => ({smokeMode:false}),
     listRecentDocuments: async () => [],
     openDocument: async () => null,
-    statusBrowserServer: async () => ({running:false,localUrl:null,lanUrls:[],revision:0}),
-    dispatchBrowserWorkspace: async (...args) => workspaceDispatch ? workspaceDispatch(...args) : {statusCode:200,body:{running:false,revision:0,documents:[]}},
     confirmClose: async () => { calls.push(['close']) },
     saveDocument: async request => {
       calls.push(['save', request])
@@ -71,7 +67,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
       timer.unref();timers.set(timer,{callback,milliseconds,args});return timer
     },
     clearTimeout(timer) { clearTimeout(timer);timers.delete(timer) },
-    // The scheduler and synchronization code are real. Their clock/DOM hosts are
+    // The autosave scheduler is real. Their clock/DOM hosts are
     // controlled so a mounted shell cannot start background work in another test.
     setInterval(callback, milliseconds) { const timer={callback,milliseconds};intervals.set(timer,timer);return timer },
     clearInterval(timer) { intervals.delete(timer) },
@@ -116,7 +112,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
   const modules = new Map()
   function sharedModule(name) {
     if (modules.has(name)) return modules.get(name)
-    const source = {'./shared/autosave':autosaveSource,'./shared/browser-workspace':browserWorkspaceSource,'./shared/workspace-sync':workspaceSyncSource}[name]
+    const source = {'./shared/autosave':autosaveSource}[name]
     if (!source) throw Error(`Unexpected shared module import ${name}`)
     const result=compile(source, dependency => sharedModule(dependency.replace(/^\.\//,'./shared/')), browser)
     modules.set(name,result);return result
@@ -129,7 +125,8 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     if (name === './shared/id') return { createId }
     if (name === './shared/dialog-focus') return focus
     if (name === './shared/appearance') return appearance
-    if (['./shared/autosave','./shared/browser-workspace','./shared/workspace-sync'].includes(name)) return sharedModule(name)
+    if (name === './shared/autosave') return sharedModule(name)
+    if (name === './notes/model') return { decodeNotebook(bytes) { calls.push(['note-decode',Array.from(bytes)]);if(notebookDecodeError)throw Error(notebookDecodeError);return {testNotebook:true} } }
     // This double verifies shell routing, preparation ownership and transaction
     // ordering only. Real Rust parsing, layout and WASM are tested separately.
     if (name === './word/rust/client') return { async prepareRustWordDocument(source) {
@@ -182,7 +179,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     if (name === './pdf/rust/native-smoke') return {async runOfficePdfNativeSmoke(){calls.push(['pdf-native-smoke']);if(pdfSmokeError)throw Error(pdfSmokeError);return pdfSmokeReport??{schemaVersion:1,ok:true,engine:'office-pdf-wasm',reopened:true,removedOldText:true,newTextPresent:true,reopenedPdfBase64:'native-pdf-reopened'}}}
     if (name === './word/rust/office-word-native-smoke') return {async runOfficeWordNativeSmoke(adapter){calls.push(['office-word-native-smoke']);if(wordSmokeError)throw Error(wordSmokeError);if(wordSmokeRun)return wordSmokeRun(adapter);return wordSmokeReport??{schemaVersion:1,ok:true,engine:'office-word-wasm'}}}
     if (name === './sheet/rust/office-sheet-native-smoke') return {async runOfficeSheetNativeSmoke(adapter){calls.push(['office-sheet-native-smoke']);if(sheetSmokeError)throw Error(sheetSmokeError);if(sheetSmokeRun)return sheetSmokeRun(adapter);return sheetSmokeReport??{schemaVersion:1,ok:true,engine:'office-sheet-wasm',reopenedXlsxBase64:'native-sheet-reopened'}}}
-    if (name === './shared/workspace-native-smoke') return {async runWorkspaceNativeSmoke(adapter,fixtures){calls.push(['workspace-native-smoke',fixtures]);assert.equal(typeof adapter.observeNativeSaves,'function');if(workspaceSmokeError)throw Error(workspaceSmokeError);return workspaceSmokeReport??{schemaVersion:1,kind:'workspace-native',ok:true}}}
+    if (name === './shared/workspace-native-smoke') return {async runWorkspaceNativeSmoke(...args){assert.equal(args.length,1);const [adapter]=args;calls.push(['workspace-native-smoke']);assert.equal(typeof adapter.observeNativeSaves,'function');if(workspaceSmokeError)throw Error(workspaceSmokeError);return workspaceSmokeReport??{schemaVersion:1,kind:'workspace-native',ok:true}}}
     if (name === '@tauri-apps/api/core') return { invoke: async (command,args) => { calls.push(['invoke',command,args]) } }
     if (name.endsWith('.vue')) return {}
     throw Error(`Unexpected setup import ${name}`)
@@ -199,21 +196,22 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     stopPresentation: async () => { calls.push(['stop-presentation']) },
   })
   function attachHandles() {
+    for(const entry of state.noteEntries.value)if(!state.noteHandles.has(entry.document.id))state.setNoteHandle(entry.document.id,Object.create(handle))
     for(const entry of state.rustPdfEntries.value)if(!state.rustPdfHandles.has(entry.document.id))state.setRustPdfHandle(entry.document.id,Object.create(handle))
     for(const entry of state.rustWordEntries.value)if(!state.rustWordHandles.has(entry.document.id))state.setRustWordHandle(entry.document.id,rustWordHandle)
     for(const entry of state.rustSheetEntries.value)if(!state.rustSheetHandles.has(entry.document.id))state.setRustSheetHandle(entry.document.id,Object.create(handle))
     for(const entry of state.rustPresentationEntries.value)if(!state.rustPresentationHandles.has(entry.document.id))state.setRustPresentationHandle(entry.document.id,presentationHandle)
   }
-  scope.run(()=>vue.watch([state.rustWordEntries,state.rustSheetEntries,state.rustPresentationEntries,state.rustPdfEntries],attachHandles,{flush:'sync'}))
+  scope.run(()=>vue.watch([state.rustWordEntries,state.rustSheetEntries,state.rustPresentationEntries,state.rustPdfEntries,state.noteEntries],attachHandles,{flush:'sync'}))
   function tab(id, { ready = true, dirty = false, fileId = id, kind = 'word' } = {}) {
-    const extension = {word:'docx',sheet:'xlsx',presentation:'pptx',pdf:'pdf'}[kind]
+    const extension = {word:'docx',sheet:'xlsx',presentation:'pptx',pdf:'pdf',note:'oonote'}[kind]
     state.tabs.value.push({ key: id, ready, dirty, fileId, document: { id, kind, extension,
       name: `${id}.${extension}`, base64: 'T0xE', sha256: 'old-hash', sizeBytes: 3 } })
     return state.tabs.value.at(-1)
   }
   function active(tab) {
     state.activeKey.value = tab.key
-    const entries={word:state.rustWordEntries,sheet:state.rustSheetEntries,presentation:state.rustPresentationEntries,pdf:state.rustPdfEntries}[tab.document.kind]
+    const entries={word:state.rustWordEntries,sheet:state.rustSheetEntries,presentation:state.rustPresentationEntries,pdf:state.rustPdfEntries,note:state.noteEntries}[tab.document.kind]
     if(entries&&!entries.value.some(entry=>entry.document.id===tab.key))entries.value=[...entries.value,{document:tab.document}]
   }
   async function idle() {
@@ -273,7 +271,7 @@ test('autosave rechecks the selected native destination and protected state afte
     let release
     h.handle.exportFile=()=>new Promise(resolve=>{release=resolve})
     const saving=h.state.saveActive(false,undefined,undefined,target)
-    await settleWorkspaceShell()
+    await settleShell()
     assert.equal(typeof release,'function')
     if(mutation==='changed-file')tab.fileId='different-approved-file'
     if(mutation==='lost-file')tab.fileId=undefined
@@ -345,107 +343,27 @@ test('mounted shell runs the real autosave scheduler and releases input listener
 
 function backgroundHandle(h,tab) {
   const handles={word:h.state.rustWordHandles,sheet:h.state.rustSheetHandles,
-    presentation:h.state.rustPresentationHandles,pdf:h.state.rustPdfHandles}
+    presentation:h.state.rustPresentationHandles,pdf:h.state.rustPdfHandles,note:h.state.noteHandles}
   return handles[tab.document.kind].get(tab.key)
 }
 
 test('background operations fail closed for pending input and editors without a readiness method',async()=>{
   for(const kind of ['word','sheet','presentation','pdf'])for(const mode of ['pending','missing']) {
     const h=shell(),tab=h.tab(`background-${kind}`,{kind,dirty:true});h.active(tab)
-    h.state.serverStatus.value.running=true
     const handle=backgroundHandle(h,tab)
     handle.canBackgroundExport=mode==='pending'?async()=>false:undefined
     let revisions=0,exports=0
     handle.syncRevision=async()=>{revisions++;throw Error('Pending input must not be flushed by a revision probe')}
     handle.exportFile=async()=>{exports++;throw Error('Pending input must not be committed by a snapshot')}
     try {
-      assert.equal(await h.state.sharedRevision(tab.key),undefined,`${kind}/${mode}`)
-      await assert.rejects(h.state.sharedSnapshot(tab.key),/确认当前输入/)
-      assert.equal(await h.state.adoptShared(tab.key,{...sharedWordSnapshot(),kind,extension:tab.document.extension},'unchanged',()=>true),false)
       assert.equal(await h.state.saveActive(false,undefined,undefined,{key:tab.key,fileId:tab.fileId}),false)
       assert.equal(revisions,0);assert.equal(exports,0)
       assert.equal(h.calls.length,0,'No parse, file write, receipt, download or editor operation may start')
       assert.equal(h.state.tabs.value[0],tab);assert.equal(tab.dirty,true)
-      assert.equal(h.state.syncApplying.value,false);assert.equal(h.state.stagedTab.value,undefined)
     } finally {h.unmount()}
   }
 })
 
-test('shared snapshots request atomic background export for every editor without blurring focused input',async()=>{
-  for(const kind of ['word','sheet','presentation','pdf']) {
-    const h=shell(),tab=h.tab(`snapshot-${kind}`,{kind,dirty:true});h.active(tab)
-    const handle=backgroundHandle(h,tab)
-    let blurCount=0,revisions=0,exports=0
-    h.browser.document.activeElement=Object.assign(new h.browser.HTMLElement(),{blur(){blurCount++}})
-    handle.syncRevision=async()=>{revisions++;return {documentId:7,revision:11}}
-    handle.exportFile=async options=>{
-      exports++;assert.equal(options.background,true);assert.equal(options.format,tab.document.extension)
-      return {base64:'TkVX',extension:tab.document.extension,revision:'7:11',dirty:true}
-    }
-    try {
-      const revision=await h.state.sharedRevision(tab.key)
-      const snapshot=await h.state.sharedSnapshot(tab.key)
-      assert.equal(snapshot.revision,revision);assert.equal(snapshot.base64,'TkVX')
-      assert.equal(revisions,1);assert.equal(exports,1);assert.equal(blurCount,0)
-      assert.equal(h.calls.length,0);assert.equal(tab.dirty,true)
-    } finally {h.unmount()}
-  }
-})
-
-test('a draft started during remote preparation prevents mounting or exporting the replacement',async()=>{
-  let release,pending=false,exports=0
-  const preparation=new Promise(resolve=>{release=resolve})
-  const h=shell({rustPrepare:async()=>{await preparation;return {prepared:true}}})
-  const original=h.tab('draft-during-prepare',{dirty:true});h.active(original);h.state.serverStatus.value.running=true
-  h.rustWordHandle.canBackgroundExport=async()=>!pending
-  h.rustWordHandle.syncRevision=async()=>({documentId:1,revision:1})
-  h.rustWordHandle.exportFile=async()=>{exports++;throw Error('A pending draft must not be exported')}
-  const expectedRevision=await h.state.sharedRevision(original.key)
-  try {
-    const replacing=h.state.adoptShared(original.key,sharedWordSnapshot(),expectedRevision,()=>true)
-    await settleWorkspaceShell()
-    assert.equal(h.calls.filter(call=>call[0]==='rust-preflight').length,1)
-    pending=true;release()
-    assert.equal(await replacing,false)
-    assert.equal(exports,0);assert.equal(h.rustPreparations[0].discarded,1)
-    assert.equal(h.state.tabs.value[0],original);assert.equal(h.state.activeKey.value,original.key)
-    assert.equal(h.state.rustWordEntries.value.length,1);assert.equal(h.state.rustWordHandles.get(original.key),h.rustWordHandle)
-    assert.equal(h.state.stagedTab.value,undefined);assert.equal(h.state.syncApplying.value,false)
-  } finally {release();h.unmount()}
-})
-
-test('a draft started while a shared candidate initializes is rejected by the final atomic background export',async()=>{
-  let release,pending=false,exports=0,candidateKey
-  const inspection=new Promise(resolve=>{release=resolve})
-  const h=shell(),original=h.tab('draft-during-mount',{dirty:true});h.active(original);h.state.serverStatus.value.running=true
-  h.rustWordHandle.canBackgroundExport=async()=>!pending
-  h.rustWordHandle.syncRevision=async()=>({documentId:1,revision:1})
-  h.rustWordHandle.exportFile=async options=>{
-    exports++;assert.equal(options.background,true)
-    if(pending)throw Error('Background export cannot commit the pending draft')
-    return {base64:'T0xE',extension:'docx',revision:'1:1',dirty:true}
-  }
-  const expectedRevision=await h.state.sharedRevision(original.key)
-  const stop=vue.watch(h.state.rustWordEntries,entries=>{
-    const candidate=entries.find(entry=>entry.document.id!==original.key)
-    if(!candidate||candidate.document.id===candidateKey)return
-    candidateKey=candidate.document.id
-    h.state.setRustWordHandle(candidateKey,{canBackgroundExport:async()=>true,
-      inspect:async()=>{await inspection;return {documentId:2,revision:0}}})
-    h.state.readyFor(candidateKey)
-  },{flush:'sync'})
-  try {
-    const replacing=h.state.adoptShared(original.key,sharedWordSnapshot(),expectedRevision,()=>true)
-    const rejected=assert.rejects(replacing,/cannot commit the pending draft/)
-    await settleWorkspaceShell();assert.ok(candidateKey);assert.equal(exports,1)
-    pending=true;release();await rejected
-    assert.equal(exports,2);assert.equal(h.state.tabs.value[0],original);assert.equal(original.dirty,true)
-    assert.equal(h.state.activeKey.value,original.key);assert.equal(h.state.rustWordEntries.value.length,1)
-    assert.equal(h.state.rustWordHandles.get(original.key),h.rustWordHandle)
-    assert.equal(h.state.rustWordHandles.has(candidateKey),false)
-    assert.equal(h.state.syncApplying.value,false);assert.equal(h.state.stagedTab.value,undefined)
-  } finally {release();stop();h.unmount()}
-})
 
 test('autosave leaves unfinished input focused and retries only after explicit editor readiness',async()=>{
   for(const kind of ['word','sheet','presentation','pdf']) {
@@ -495,7 +413,7 @@ test('autosave input guards survive drafts arriving after eligibility or before 
     const save=h.native.saveDocument
     h.native.saveDocument=async request=>{const result=await save(request);pending=true;return result}
     try {
-      await h.mount();await h.fireTimeout(30000);await h.idle();await settleWorkspaceShell()
+      await h.mount();await h.fireTimeout(30000);await h.idle();await settleShell()
       assert.equal(pending,true);assert.equal(blurCount,0);assert.equal(tab.dirty,true)
       assert.equal(exports,phase==='before-export'?0:1)
       assert.equal(receipts,phase==='receipt'?1:0)
@@ -527,13 +445,13 @@ test('autosave keeps the editor interactive during a native write and rejects a 
     assert.ok(h.state.busy.value);assert.equal(h.state.globalActionsBlocked.value,true)
     assert.equal(h.state.documentActionsDisabled.value,true);assert.equal(h.state.editorInputBlocked.value,false)
     assert.equal(h.browser.document.activeElement,focused);assert.equal(blurCount,0)
-    for(const [name,value] of [['help',true],['serverPanel',true],['syncApplying',true],['closeTarget',tab],['saveAsDraft',{key:tab.key}]]) {
+    for(const [name,value] of [['help',true],['closeTarget',tab],['saveAsDraft',{key:tab.key}]]) {
       const previous=h.state[name].value
       h.state[name].value=value;assert.equal(h.state.editorInputBlocked.value,true,`${name} must still block editor input`)
       h.state[name].value=previous;assert.equal(h.state.editorInputBlocked.value,false)
     }
     revision++;h.state.dirtyFor(tab.key,true)
-    release();await settleWorkspaceShell();await h.idle();await settleWorkspaceShell()
+    release();await settleShell();await h.idle();await settleShell()
     assert.equal(h.calls.filter(call=>call[0]==='save').length,1);assert.equal(receiptAttempts,1)
     assert.equal(tab.dirty,true,'Writing an older snapshot must not erase newly typed changes')
     assert.equal(h.state.backgroundSaving.value,false);assert.equal(h.state.busy.value,'')
@@ -557,7 +475,7 @@ test('editor input and global file controls bind to separate barriers throughout
   assert.equal(binding(byClass('editor-content'),'inert'),'editorInputBlocked')
   assert.equal(binding(byClass('tab-bar'),'inert'),'globalActionsBlocked')
   assert.equal(binding(elements.find(node=>attribute(node,'data-testid')==='global-toolbar'),'inert'),'globalActionsBlocked')
-  for(const tag of ['RustWordEditor','RustSheetEditor','RustPresentationEditor','RustPdfEditor']) {
+  for(const tag of ['RustWordEditor','RustSheetEditor','RustPresentationEditor','RustPdfEditor','NotebookEditor']) {
     const editor=elements.find(node=>node.tag===tag)
     assert.equal(binding(editor,'disabled'),'editorInputBlocked',tag)
     for(let ancestor=parents.get(editor);ancestor;ancestor=parents.get(ancestor)) {
@@ -771,10 +689,51 @@ test('cancelled save and external conflict preserve dirty state and original ide
   }
 })
 
+test('saving or exporting passes every other open file capability to the native overwrite guard',async()=>{
+  const h=shell(),current=h.tab('current-view',{dirty:true,fileId:'current-file'}),other=h.tab('other-view',{kind:'pdf',fileId:'other-file'}),unsaved=h.tab('new-view',{fileId:undefined})
+  unsaved.fileId=undefined
+  h.active(current)
+  h.rustWordHandle.exportFile=async({format})=>({base64:'RURJVA==',extension:format,dirty:true})
+  try {
+    assert.equal(await h.state.saveActive(),true)
+    assert.equal(await h.state.saveActive(true,'pdf'),true)
+    const requests=h.calls.filter(call=>call[0]==='save').map(call=>call[1])
+    assert.equal(requests.length,2)
+    for(const request of requests)assert.deepEqual(Array.from(request.protectedDocumentIds),[other.fileId])
+    assert.equal(requests[0].documentId,'current-file');assert.equal(requests[1].documentId,undefined)
+    assert.equal(h.state.tabs.value.length,3);assert.equal(other.fileId,'other-file')
+  } finally {h.unmount()}
+})
+
 test('reopening an already-open file retains its in-memory edits', async () => {
   const h = shell(), a = h.tab('A', { dirty: true }); h.active(a)
   await h.state.addDocument({ ...a.document, base64: 'disk-version' }, 'A')
   assert.equal(h.state.tabs.value.length, 1); assert.equal(a.document.base64, 'T0xE'); assert.equal(a.dirty, true)
+})
+
+for(const [kind,extension] of [['word','docx'],['sheet','xlsx'],['presentation','pptx'],['pdf','pdf']])test(`${extension} opens once and subsequent saves update the original file without a copy`,async()=>{
+  const h=shell(),source={id:`local-${kind}`,kind,extension,name:`Existing.${extension}`,base64:'T0xE',sha256:'source-hash',sizeBytes:3}
+  h.native.openDocument=async()=>source
+  h.native.openRecent=async id=>{assert.equal(id,source.id);return {...source,base64:'RElTSw=='}}
+  try {
+    h.state.openFile();await h.idle()
+    const tab=h.state.active.value,handle=backgroundHandle(h,tab)
+    h.state.readyFor(tab.key);tab.dirty=true
+    handle.exportFile=async options=>{assert.equal(options.format,extension);return {base64:'RURJVA==',extension,dirty:true}}
+    const key=tab.key,entryCount=h.state.tabs.value.length,preflights=h.calls.filter(call=>call[0].endsWith('-preflight')).length
+    h.state.openRecent({id:source.id});await h.idle()
+    assert.equal(h.state.tabs.value.length,entryCount);assert.equal(h.state.activeKey.value,key)
+    assert.equal(h.state.active.value,tab);assert.equal(tab.dirty,true);assert.equal(backgroundHandle(h,tab),handle)
+    assert.equal(h.calls.filter(call=>call[0].endsWith('-preflight')).length,preflights,'Reopening the same file must retain its live model and undo history')
+    assert.equal(await h.state.saveActive(),true)
+    const first=h.calls.find(call=>call[0]==='save')[1]
+    assert.equal(first.documentId,source.id);assert.equal(first.expectedSha256,'source-hash')
+    assert.equal(first.name,source.name);assert.equal(first.saveAs,false);assert.equal(first.base64,'RURJVA==')
+    assert.equal(tab.fileId,source.id);assert.equal(tab.document.id,key);assert.equal(tab.requiresSaveAs,false)
+    tab.dirty=true;assert.equal(await h.state.saveActive(),true)
+    const second=h.calls.filter(call=>call[0]==='save')[1][1]
+    assert.equal(second.documentId,source.id);assert.equal(second.expectedSha256,'new-hash');assert.equal(second.saveAs,false)
+  } finally {h.unmount()}
 })
 
 test('a nominally clean tab with un-applied draft requires close confirmation', async () => {
@@ -805,6 +764,80 @@ test('cancel during save-all keeps the window and unsaved tabs open', async () =
   h.state.closeTarget.value = 'window'; await h.state.resolveClose('save')
   assert.equal(h.state.closeTarget.value, 'window'); assert.equal(a.dirty, true)
   assert.ok(!h.calls.some(call => call[0] === 'close'))
+})
+
+for(const target of ['all','window'])test(`${target} closes unsaved documents with one confirmation and without exporting invalid drafts`,async()=>{
+  const h=shell(),opened=[]
+  for(const kind of ['word','sheet','presentation','pdf','note']) {
+    const tab=h.tab(`discard-${kind}`,{kind,dirty:true});h.active(tab);opened.push(tab)
+    const handle=backgroundHandle(h,tab)
+    handle.exportFile=async()=>{throw Error(`Invalid unfinished ${kind} draft`)}
+    handle.discardChanges=async options=>{assert.equal(options.force,true);h.calls.push(['forced-discard',kind])}
+    handle.markSaved=async()=>assert.fail('Discard must not acknowledge unsaved bytes')
+  }
+  const last=opened.at(-1),activated=[]
+  h.state.home.value=false
+  const stop=vue.watch(h.state.activeKey,key=>{activated.push(key)},{flush:'sync'})
+  try {
+    if(target==='all')h.state.closeAllTabs()
+    else await h.state.closeWindow()
+    await h.idle()
+    assert.equal(h.state.closeTarget.value,target);assert.equal(h.state.tabs.value.length,5)
+    assert.equal(h.state.activeKey.value,last.key)
+    h.calls.length=0
+    h.handle.exportFile=async()=>assert.fail('Confirmed batch discard must never export or commit editor drafts')
+    for(const tab of opened)backgroundHandle(h,tab).exportFile=h.handle.exportFile
+    await h.state.resolveClose('discard')
+    assert.equal(h.state.closeTarget.value,null)
+    if(target==='all') {
+      assert.equal(h.state.tabs.value.length,0);assert.equal(h.state.activeKey.value,'');assert.equal(h.state.home.value,true)
+      assert.deepEqual(h.calls.filter(call=>call[0]==='forced-discard').map(call=>call[1]).sort(),['note','pdf','presentation','sheet','word'])
+      for(const entries of [h.state.rustWordEntries,h.state.rustSheetEntries,h.state.rustPresentationEntries,h.state.rustPdfEntries,h.state.noteEntries])assert.equal(entries.value.length,0)
+      for(const handles of [h.state.rustWordHandles,h.state.rustSheetHandles,h.state.rustPresentationHandles,h.state.rustPdfHandles,h.state.noteHandles])assert.equal(handles.size,0)
+    } else {
+      // The native host destroys the window. Keep its models intact until that
+      // operation succeeds rather than serializing drafts to close them.
+      assert.equal(h.state.tabs.value.length,5);assert.equal(h.state.activeKey.value,last.key)
+    }
+    assert.ok(activated.every(key=>key===''),'Batch close must not activate intervening documents')
+    assert.ok(!h.calls.some(call=>['save','download','marked'].includes(call[0])))
+    assert.equal(h.calls.filter(call=>call[0]==='close').length,target==='window'?1:0)
+  } finally {stop();h.unmount()}
+})
+
+test('close-all discovers an unreported active draft and cancellation preserves every editor',async()=>{
+  const h=shell(),first=h.tab('clean-word'),pending=h.tab('pending-pdf',{kind:'pdf'})
+  h.active(first);h.active(pending)
+  h.handle.exportFile=async()=>{throw Error('Unapplied text draft')}
+  try {
+    h.state.closeAllTabs();await h.idle()
+    assert.equal(h.state.closeTarget.value,'all');assert.equal(pending.dirty,true)
+    assert.equal(h.state.tabs.value.length,2);assert.equal(h.state.activeKey.value,pending.key)
+    h.state.closeTarget.value=null
+    assert.equal(h.state.rustWordEntries.value.length,1);assert.equal(h.state.rustPdfEntries.value.length,1)
+    assert.ok(!h.calls.some(call=>['discard','save','close'].includes(call[0])))
+  } finally {h.unmount()}
+})
+
+for(const target of ['all','window'])test(`cancelled ${target} save keeps all tabs after earlier documents were saved`,async()=>{
+  const h=shell(),first=h.tab('save-first',{dirty:true}),second=h.tab('cancel-second',{kind:'sheet',dirty:true})
+  h.active(first);h.active(second);h.active(first)
+  for(const tab of [first,second]) {
+    let engineDirty=true
+    const handle=backgroundHandle(h,tab)
+    handle.exportFile=async()=>({base64:'RURJVA==',extension:tab.document.extension,dirty:engineDirty})
+    handle.markSaved=async()=>{engineDirty=false}
+  }
+  const save=h.native.saveDocument
+  h.native.saveDocument=async request=>request.documentId===second.fileId?{status:'cancelled'}:save(request)
+  try {
+    h.state.closeTarget.value=target;await h.state.resolveClose('save')
+    assert.equal(h.state.closeTarget.value,target);assert.equal(h.state.tabs.value.length,2)
+    assert.equal(first.dirty,false);assert.equal(second.dirty,true)
+    assert.equal(h.state.rustWordEntries.value.length,1);assert.equal(h.state.rustSheetEntries.value.length,1)
+    assert.equal(h.calls.filter(call=>call[0]==='save').length,1)
+    assert.ok(!h.calls.some(call=>call[0]==='close'))
+  } finally {h.unmount()}
 })
 
 test('window close during a task is deferred once, without recursive checks', async () => {
@@ -926,7 +959,7 @@ test('failed snapshot and disposal release an undelivered Rust preparation witho
   assert.equal(disposed.rustPreparations[0].handoff.take(disposed.rustPreparations[0].source),undefined)
 })
 
-test('OfficeWord offers DOCX and PDF and protects imported identity until a DOCX copy succeeds',async()=>{
+test('Word retains its original DOCX destination and hash through cancelled and successful saves',async()=>{
   const h=shell();await h.state.addDocument(rustSource('original'),'original')
   const tab=h.state.active.value;h.state.readyFor(tab.key);tab.dirty=true
   let exports=0
@@ -938,14 +971,14 @@ test('OfficeWord offers DOCX and PDF and protects imported identity until a DOCX
   const save=h.native.saveDocument
   h.native.saveDocument=async request=>{h.calls.push(['cancelled-rust-save',request]);return{status:'cancelled'}}
   assert.equal(await h.state.saveActive(),false)
-  assert.equal(tab.dirty,true);assert.equal(tab.requiresSaveAs,true);assert.equal(tab.fileId,'original');assert.equal(tab.document.sha256,'source-hash')
+  assert.equal(tab.dirty,true);assert.equal(tab.requiresSaveAs,false);assert.equal(tab.fileId,'original');assert.equal(tab.document.sha256,'source-hash')
   assert.ok(!h.calls.some(c=>c[0]==='marked'))
   h.native.saveDocument=save;assert.equal(await h.state.saveActive(),true)
   for(const request of h.calls.filter(c=>['save','cancelled-rust-save'].includes(c[0])).map(c=>c[1])){
-    assert.equal(request.documentId,undefined);assert.equal(request.expectedSha256,undefined);assert.equal(request.saveAs,true)
-    assert.equal(request.name,'original - 副本.docx')
+    assert.equal(request.documentId,'original');assert.equal(request.expectedSha256,'source-hash');assert.equal(request.saveAs,false)
+    assert.equal(request.name,'original.docx')
   }
-  assert.notEqual(tab.fileId,'original');assert.equal(tab.requiresSaveAs,false);assert.equal(tab.dirty,false)
+  assert.equal(tab.fileId,'original');assert.equal(tab.requiresSaveAs,false);assert.equal(tab.dirty,false)
   assert.ok(h.calls.some(c=>c[0]==='marked'))
   h.unmount()
 })
@@ -970,7 +1003,7 @@ test('OfficeWord PDF export routes through its editor and never saves or replace
   assert.equal(saves.length,2)
   for(const [,request] of saves){
     assert.equal(request.documentId,undefined);assert.equal(request.expectedSha256,undefined);assert.equal(request.saveAs,true)
-    assert.equal(request.extension,'pdf');assert.equal(request.name,'original - 副本.pdf');assert.equal(request.base64,'JVBERi0xLjc=')
+    assert.equal(request.extension,'pdf');assert.equal(request.name,'original.pdf');assert.equal(request.base64,'JVBERi0xLjc=')
   }
   assert.ok(!h.calls.some(c=>c[0]==='marked'))
   h.unmount()
@@ -1154,7 +1187,7 @@ test('default spreadsheet new/save uses its own prepared Rust session and editor
   h.unmount()
 })
 
-for(const route of ['native','recent','browser'])test(`generic ${route} XLSX opening uses Rust warnings and requires a protected first save`,async()=>{
+for(const route of ['native','recent','browser'])test(`generic ${route} XLSX opening retains parser warnings without forcing a copy`,async()=>{
   const warning='Controlled parser warning: unsupported chart detail'
   const h=shell({nativeEnabled:route!=='browser',sheetWarnings:[warning]}),source=sheetSource(route)
   if(route==='native'){h.native.openDocument=async()=>source;h.state.openFile();await h.idle()}
@@ -1164,7 +1197,7 @@ for(const route of ['native','recent','browser'])test(`generic ${route} XLSX ope
     await h.state.browserFile({target:input});assert.equal(input.value,'')
   }
   const tab=h.state.active.value
-  assert.equal(tab.requiresSaveAs,true)
+  assert.equal(tab.requiresSaveAs,false)
   assert.equal(h.sheetPreparations.length,1);assert.equal(h.sheetPreparations[0].source.id,tab.key)
   assert.equal(h.sheetPreparations[0].source.base64,tab.document.base64)
   assert.equal(tab.importWarnings.at(-1),warning)
@@ -1198,22 +1231,39 @@ test('unpublished spreadsheet candidates are discarded after blocked switching a
   assert.equal(disposed.sheetPreparations[0].discarded,1)
 })
 
-test('spreadsheet imports protect their original identity until XLSX save succeeds',async()=>{
+test('spreadsheet saves update the original XLSX destination with conflict protection',async()=>{
   const h=shell();await h.state.addDocument(sheetSource('original'),'original')
   const tab=h.state.active.value;mountSheetHandle(h,tab);tab.dirty=true
   const save=h.native.saveDocument
   h.native.saveDocument=async request=>{h.calls.push(['cancelled-sheet-save',request]);return{status:'cancelled'}}
   assert.equal(await h.state.saveActive(),false)
-  assert.equal(tab.dirty,true);assert.equal(tab.requiresSaveAs,true);assert.equal(tab.fileId,'original')
+  assert.equal(tab.dirty,true);assert.equal(tab.requiresSaveAs,false);assert.equal(tab.fileId,'original')
   assert.ok(!h.calls.some(c=>c[0]==='sheet-marked'))
   h.native.saveDocument=save;assert.equal(await h.state.saveActive(),true)
   for(const [,request] of h.calls.filter(c=>['save','cancelled-sheet-save'].includes(c[0]))) {
-    assert.equal(request.saveAs,true);assert.equal(request.documentId,undefined);assert.equal(request.expectedSha256,undefined)
-    assert.equal(request.name,'original - 副本.xlsx')
+    assert.equal(request.saveAs,false);assert.equal(request.documentId,'original');assert.equal(request.expectedSha256,'source-hash')
+    assert.equal(request.name,'original.xlsx')
   }
-  assert.notEqual(tab.fileId,'original');assert.equal(tab.requiresSaveAs,false);assert.equal(tab.dirty,false)
+  assert.equal(tab.fileId,'original');assert.equal(tab.requiresSaveAs,false);assert.equal(tab.dirty,false)
   assert.equal(h.calls.filter(c=>c[0]==='sheet-marked').length,1)
   h.unmount()
+})
+
+for(const extension of ['csv','tsv'])test(`${extension} conversion retains its separate-save requirement after switching documents`,async()=>{
+  const h=shell();await h.state.addDocument(sheetSource('source-data',extension),'source-data')
+  const source=h.state.active.value;mountSheetHandle(h,source)
+  const other=h.tab('other-document')
+  try {
+    assert.equal(source.requiresSaveAs,true)
+    await h.state.activate(other);h.state.readyFor(other.key)
+    await h.state.activate(source)
+    assert.equal(source.document.extension,'xlsx');assert.equal(source.requiresSaveAs,true)
+    assert.equal(await h.state.saveActive(),true)
+    const request=h.calls.find(call=>call[0]==='save')[1]
+    assert.equal(request.extension,'xlsx');assert.equal(request.saveAs,true)
+    assert.equal(request.documentId,undefined);assert.equal(request.expectedSha256,undefined)
+    assert.notEqual(source.fileId,'source-data');assert.equal(source.requiresSaveAs,false)
+  } finally {h.unmount()}
 })
 
 for(const format of ['csv','tsv','pdf'])test(`${format} spreadsheet exports preserve editable workbook identity, warnings and unsaved changes`,async()=>{
@@ -1321,7 +1371,7 @@ test('default Word and presentation creation prepare their own empty Rust sessio
   }
 })
 
-for(const extension of ['pptx','potx','ppsx'])for(const route of ['native','recent','browser'])test(`${route} ${extension} imports prepare a presentation session and protect the source`,async()=>{
+for(const extension of ['pptx','potx','ppsx'])for(const route of ['native','recent','browser'])test(`${route} ${extension} uses direct saving except when template conversion is required`,async()=>{
   const h=shell({nativeEnabled:route!=='browser'}),source=deckSource('Original',extension)
   if(route==='native'){h.native.openDocument=async()=>source;h.state.openFile();await h.idle()}
   else if(route==='recent'){h.native.openRecent=async()=>source;h.state.openRecent({id:'recent'});await h.idle()}
@@ -1332,7 +1382,8 @@ for(const extension of ['pptx','potx','ppsx'])for(const route of ['native','rece
   }
   const tab=h.state.active.value,entry=h.state.rustPresentationEntries.value[0]
   assert.equal(tab.document.kind,'presentation');assert.equal(tab.document.extension,extension)
-  assert.equal(tab.requiresSaveAs,true);assert.equal(h.deckPreparations.length,1)
+  const conversion=extension!=='pptx'
+  assert.equal(tab.requiresSaveAs,conversion);assert.equal(h.deckPreparations.length,1)
   assert.equal(entry.prepared,h.deckPreparations[0].handoff)
   assert.equal(h.deckPreparations[0].source.id,tab.key);assert.equal(h.deckPreparations[0].source.base64,tab.document.base64)
   assert.equal(h.rustPreparations.length,0);assert.equal(h.sheetPreparations.length,0)
@@ -1340,11 +1391,12 @@ for(const extension of ['pptx','potx','ppsx'])for(const route of ['native','rece
   assert.deepEqual(Array.from(h.state.saveAsOptions.value,option=>option.extension),['pptx','pdf'])
   assert.equal(h.state.saveAsDraft.value.format,'pptx')
   h.state.cancelSaveAs();assert.equal(await h.state.saveActive(),true)
-  if(route==='browser')assert.equal(h.calls.find(call=>call[0]==='download')[1],'Original - 副本.pptx')
+  const expectedName=conversion?'Original - 副本.pptx':'Original.pptx'
+  if(route==='browser')assert.equal(h.calls.find(call=>call[0]==='download')[1],expectedName)
   else {
     const request=h.calls.find(call=>call[0]==='save')[1]
-    assert.equal(request.name,'Original - 副本.pptx');assert.equal(request.extension,'pptx')
-    assert.equal(request.documentId,undefined);assert.equal(request.expectedSha256,undefined);assert.equal(request.saveAs,true)
+    assert.equal(request.name,expectedName);assert.equal(request.extension,'pptx')
+    assert.equal(request.documentId,conversion?undefined:source.id);assert.equal(request.expectedSha256,conversion?undefined:source.sha256);assert.equal(request.saveAs,conversion)
   }
   assert.equal(tab.document.extension,'pptx');assert.equal(tab.dirty,false);assert.equal(tab.requiresSaveAs,false)
   h.unmount()
@@ -1452,8 +1504,7 @@ test('full native smoke requires all four mounted Rust editors and actual worksp
   assert.equal(report.ok,true);assert.equal(report.word.ok,true);assert.equal(report.sheet.ok,true);assert.equal(report.presentation.ok,true)
   assert.equal(report.pdf.reopened,true);assert.equal(report.pdf.removedOldText,true);assert.equal(report.pdf.newTextPresent,true);assert.equal(report.workspace.ok,true)
   assert.deepEqual(h.calls.filter(call=>call[0].endsWith('-native-smoke')).map(call=>call[0]),['office-word-native-smoke','office-sheet-native-smoke','office-presentation-native-smoke','pdf-native-smoke','workspace-native-smoke'])
-  const fixtures=h.calls.find(call=>call[0]==='workspace-native-smoke')[1]
-  assert.deepEqual({...fixtures},{xlsx:report.sheet.reopenedXlsxBase64,pptx:report.presentation.reopenedPptxBase64,pdf:report.pdf.reopenedPdfBase64})
+  assert.equal(h.calls.filter(call=>call[0]==='workspace-native-smoke').length,1)
   assert.equal(report.pdf.engine,'office-pdf-wasm')
   for(const old of ['office','independentWordPackage','rustWordEngine','wordWorkbench','sheetWorkbench','presentationWorkbench'])assert.equal(Object.hasOwn(report,old),false)
   h.unmount()
@@ -1470,12 +1521,12 @@ for(const mode of ['report','throw'])test(`failed workspace ${mode} prevents a f
   h.unmount()
 })
 
-test('full native smoke refuses to run workspace verification without the actual reopened editor fixtures',async()=>{
+test('native file persistence verification does not depend on removed browser workspace fixtures',async()=>{
   const h=shell({smoke:true,sheetSmokeReport:{ok:true,engine:'office-sheet-wasm'}})
   h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'});await h.mount()
   const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
-  assert.equal(report.ok,false);assert.match(report.error,/workspace fixtures are missing/)
-  assert.equal(report.workspace,undefined);assert.ok(!h.calls.some(call=>call[0]==='workspace-native-smoke'))
+  assert.equal(report.ok,true);assert.equal(report.workspace.ok,true)
+  assert.equal(h.calls.filter(call=>call[0]==='workspace-native-smoke').length,1)
   h.unmount()
 })
 
@@ -1528,7 +1579,7 @@ test('failed PDF preflight leaves the active edited model and every tab intact',
   assert.equal(h.state.rustWordEntries.value[0],entry);assert.equal(h.state.rustPdfEntries.value.length,0)
   assert.deepEqual(h.calls.map(call=>call[0]),['pdf-preflight']);h.unmount()
 })
-test('PDF tab switches retain each live model, handle and save protection',async()=>{
+test('PDF tab switches retain each live model, handle and original save destination',async()=>{
   const h=shell(),exported=[],undone=[]
   async function opened(id){
     await h.state.addDocument(pdfSource(id),id)
@@ -1543,7 +1594,7 @@ test('PDF tab switches retain each live model, handle and save protection',async
   h.state.globalFileAction('undo');await h.idle()
   assert.deepEqual(exported,['first','second','first']);assert.deepEqual(undone,['second'])
   assert.equal(first.ready,true);assert.equal(second.ready,true)
-  assert.equal(first.requiresSaveAs,true);assert.equal(second.requiresSaveAs,true)
+  assert.equal(first.requiresSaveAs,false);assert.equal(second.requiresSaveAs,false)
   assert.equal(h.state.rustPdfEntries.value[0],firstEntry);assert.equal(h.state.rustPdfEntries.value[1],secondEntry)
   await h.state.removeTab(first,true)
   assert.equal(h.state.activeKey.value,second.key);assert.equal(h.state.rustPdfEntries.value[0],secondEntry)
@@ -1585,123 +1636,12 @@ test('confirmed PDF close waits for draft release before activating the survivin
   stop();h.unmount()
 })
 
-const sharedWordSnapshot = () => ({id:'shared-word',name:'Shared.docx',extension:'docx',kind:'word',
-  base64:'TkVX',sha256:'a'.repeat(64),sizeBytes:3,version:2,updatedBy:'remote-client'})
-async function settleWorkspaceShell() {
+async function settleShell() {
   for(let n=0;n<20;n++){await Promise.resolve();await vue.nextTick()}
 }
 
-test('shared candidate errors raised during mount release the barrier immediately and retain the original editor',async()=>{
-  const h=shell(),original=h.tab('original',{dirty:true});h.active(original);h.state.serverStatus.value.running=true
-  h.rustWordHandle.syncRevision=async()=>({documentId:1,revision:1})
-  const expectedRevision=await h.state.sharedRevision(original.key)
-  const originalEntry=h.state.rustWordEntries.value[0]
-  h.rustWordHandle.exportFile=async()=>({base64:'T0xE',extension:'docx',revision:'1:1',dirty:true})
-  const stop=vue.watch(h.state.rustWordEntries,entries=>{
-    const candidate=entries.find(entry=>entry.document.id!==original.key)
-    if(candidate)h.state.editorError(candidate.document.id,'Candidate renderer could not start')
-  },{flush:'sync'})
-  try {
-    await assert.rejects(h.state.adoptShared(original.key,sharedWordSnapshot(),expectedRevision,()=>true),/Candidate renderer/)
-    assert.equal(h.state.syncApplying.value,false)
-    assert.equal(h.state.stagedTab.value,undefined)
-    assert.equal(h.state.tabs.value[0],original)
-    assert.equal(h.state.activeKey.value,original.key)
-    assert.equal(h.state.rustWordEntries.value.length,1)
-    assert.equal(h.state.rustWordEntries.value[0],originalEntry)
-    assert.equal(h.state.rustWordHandles.get(original.key),h.rustWordHandle)
-    assert.equal(h.rustPreparations[0].discarded,1)
-    assert.equal([...h.timers.values()].some(timer=>timer.milliseconds===120000),false)
-  } finally {stop();h.unmount()}
-})
 
-test('shared replacement keeps the original model until the candidate has mounted and passed inspection',async()=>{
-  const h=shell(),original=h.tab('original',{dirty:true});h.active(original);h.state.serverStatus.value.running=true
-  h.rustWordHandle.syncRevision=async()=>({documentId:1,revision:1})
-  const expectedRevision=await h.state.sharedRevision(original.key)
-  original.sync={id:'shared-word',version:1,revision:expectedRevision}
-  h.rustWordHandle.exportFile=async()=>({base64:'T0xE',extension:'docx',revision:'1:1',dirty:true})
-  let release,inspections=0,candidateKey
-  const barrier=new Promise(resolve=>{release=resolve})
-  const stop=vue.watch(h.state.rustWordEntries,entries=>{
-    const candidate=entries.find(entry=>entry.document.id!==original.key)
-    if(!candidate||candidate.document.id===candidateKey)return
-    candidateKey=candidate.document.id
-    h.state.setRustWordHandle(candidateKey,{inspect:async()=>{
-      if(++inspections===1)await barrier
-      return {documentId:2,revision:0}
-    }})
-    h.state.readyFor(candidateKey)
-  },{flush:'sync'})
-  try {
-    const replacing=h.state.adoptShared(original.key,sharedWordSnapshot(),expectedRevision,()=>true)
-    await settleWorkspaceShell()
-    assert.equal(inspections,1)
-    assert.equal(h.state.tabs.value[0],original)
-    assert.equal(h.state.activeKey.value,original.key)
-    assert.equal(h.state.rustWordHandles.has(original.key),true)
-    assert.equal(h.state.rustWordEntries.value.length,2)
-    release();assert.equal(await replacing,true)
-    assert.equal(h.state.tabs.value.length,1)
-    assert.equal(h.state.activeKey.value,candidateKey)
-    assert.equal(h.state.tabs.value[0].document.base64,'TkVX')
-    assert.equal(h.state.tabs.value[0].dirty,true)
-    assert.ok(h.state.tabs.value[0].sync.revision.includes('2:0'))
-    assert.equal(h.state.rustWordHandles.has(original.key),false)
-    assert.equal(h.state.rustWordEntries.value.length,1)
-    assert.equal(h.state.syncApplying.value,false)
-  } finally {release();stop();h.unmount()}
-})
-
-test('a local edit arriving while a shared candidate initializes cancels replacement without losing undo ownership',async()=>{
-  const h=shell(),original=h.tab('original',{dirty:true});h.active(original);h.state.serverStatus.value.running=true
-  h.rustWordHandle.syncRevision=async()=>({documentId:1,revision:1})
-  const expectedRevision=await h.state.sharedRevision(original.key)
-  original.sync={id:'shared-word',version:1,revision:expectedRevision}
-  const originalEntry=h.state.rustWordEntries.value[0]
-  let revision='1:1',release,candidateKey
-  h.rustWordHandle.exportFile=async()=>({base64:'T0xE',extension:'docx',revision,dirty:true})
-  const barrier=new Promise(resolve=>{release=resolve})
-  const stop=vue.watch(h.state.rustWordEntries,entries=>{
-    const candidate=entries.find(entry=>entry.document.id!==original.key)
-    if(!candidate||candidate.document.id===candidateKey)return
-    candidateKey=candidate.document.id
-    h.state.setRustWordHandle(candidateKey,{inspect:async()=>{await barrier;return {documentId:2,revision:0}}})
-    h.state.readyFor(candidateKey)
-  },{flush:'sync'})
-  try {
-    const replacing=h.state.adoptShared(original.key,sharedWordSnapshot(),expectedRevision,()=>true)
-    await settleWorkspaceShell()
-    revision='1:2';release()
-    assert.equal(await replacing,false)
-    assert.equal(h.state.tabs.value[0],original)
-    assert.equal(h.state.activeKey.value,original.key)
-    assert.equal(h.state.rustWordHandles.get(original.key),h.rustWordHandle)
-    assert.equal(h.state.rustWordHandles.has(candidateKey),false)
-    assert.equal(h.state.rustWordEntries.value[0],originalEntry)
-    assert.equal(original.sync.version,1)
-    assert.equal(original.dirty,true)
-    assert.equal(h.state.syncApplying.value,false)
-  } finally {release();stop();h.unmount()}
-})
-
-test('uncommitted input blocks shared adoption and releases only the isolated preparation',async()=>{
-  const h=shell(),original=h.tab('original',{dirty:true});h.active(original);h.state.serverStatus.value.running=true
-  h.rustWordHandle.syncRevision=async()=>({documentId:1,revision:1})
-  const expectedRevision=await h.state.sharedRevision(original.key)
-  h.rustWordHandle.exportFile=async()=>{throw Error('Apply the pending draft first')}
-  try {
-    await assert.rejects(h.state.adoptShared(original.key,sharedWordSnapshot(),expectedRevision,()=>true),/pending draft/)
-    assert.equal(h.state.tabs.value[0],original)
-    assert.equal(h.state.activeKey.value,original.key)
-    assert.equal(h.state.rustWordHandles.get(original.key),h.rustWordHandle)
-    assert.equal(h.state.rustWordEntries.value.length,1)
-    assert.equal(h.rustPreparations[0].discarded,1)
-    assert.equal(h.state.syncApplying.value,false)
-  } finally {h.unmount()}
-})
-
-test('manual save waits for a background snapshot before creating its own exact save receipt',async()=>{
+test('manual save cannot overlap autosave and later acknowledges its own exact exported bytes',async()=>{
   const h=shell(),original=h.tab('original',{dirty:true});h.active(original)
   let release,exports=0,savedReceipt
   const barrier=new Promise(resolve=>{release=resolve})
@@ -1712,300 +1652,112 @@ test('manual save waits for a background snapshot before creating its own exact 
     return {base64:savedReceipt,extension:'docx',revision:`1:${order}`,dirty:true}
   }
   h.rustWordHandle.markSaved=async bytes=>{
-    assert.equal(bytes,'U0FWRUQ=')
     assert.equal(bytes,savedReceipt)
     h.calls.push(['marked',bytes])
   }
   try {
-    const background=h.state.sharedSnapshot(original.key)
-    const saving=h.state.editorTransaction('Manual save',()=>h.state.saveActive())
-    await settleWorkspaceShell()
+    const background=h.state.editorTransaction('Autosave',()=>h.state.saveActive(false,undefined,undefined,{key:original.key,fileId:original.fileId}),true)
+    await settleShell()
+    await assert.rejects(h.state.editorTransaction('Manual save',()=>h.state.saveActive()),/另一项/)
     assert.equal(exports,1)
     assert.equal(h.calls.some(call=>call[0]==='save'),false)
     release();await background
-    assert.equal(await saving,true)
+    original.dirty=true
+    assert.equal(await h.state.editorTransaction('Manual save',()=>h.state.saveActive()),true)
     assert.equal(exports,2)
-    assert.equal(h.calls.find(call=>call[0]==='save')[1].base64,'U0FWRUQ=')
+    assert.deepEqual(h.calls.filter(call=>call[0]==='save').map(call=>call[1].base64),['QkdST1VORA==','U0FWRUQ='])
     assert.equal(original.dirty,false)
-    assert.equal(h.calls.filter(call=>call[0]==='marked').length,1)
+    assert.deepEqual(h.calls.filter(call=>call[0]==='marked').map(call=>call[1]),['QkdST1VORA==','U0FWRUQ='])
   } finally {release();h.unmount()}
 })
 
-test('revoking a shared adoption while the candidate loads preserves the original tab and receipt',async()=>{
-  const h=shell(),original=h.tab('original',{dirty:true});h.active(original);h.state.serverStatus.value.running=true
-  h.rustWordHandle.syncRevision=async()=>({documentId:1,revision:1})
-  h.rustWordHandle.exportFile=async()=>({base64:'T0xE',extension:'docx',revision:'1:1',dirty:true})
-  const expectedRevision=await h.state.sharedRevision(original.key)
-  original.sync={id:'shared-word',version:1,revision:expectedRevision}
-  let permitted=true,release,candidateKey
-  const barrier=new Promise(resolve=>{release=resolve})
-  const stop=vue.watch(h.state.rustWordEntries,entries=>{
-    const candidate=entries.find(entry=>entry.document.id!==original.key)
-    if(!candidate||candidate.document.id===candidateKey)return
-    candidateKey=candidate.document.id
-    h.state.setRustWordHandle(candidateKey,{inspect:async()=>{await barrier;return {documentId:2,revision:0}}})
-    h.state.readyFor(candidateKey)
-  },{flush:'sync'})
-  try {
-    const replacing=h.state.adoptShared(original.key,sharedWordSnapshot(),expectedRevision,()=>permitted)
-    await settleWorkspaceShell()
-    assert.ok(candidateKey)
-    permitted=false;release()
-    assert.equal(await replacing,false)
-    assert.equal(h.state.tabs.value[0],original)
-    assert.equal(h.state.activeKey.value,original.key)
-    assert.equal(original.sync.version,1)
-    assert.equal(h.state.rustWordHandles.has(candidateKey),false)
-    assert.equal(h.state.rustWordHandles.get(original.key),h.rustWordHandle)
-  } finally {release();stop();h.unmount()}
-})
 
-test('native close requested during shared replacement waits for its barrier before checking unsaved content',async()=>{
-  const h=shell(),original=h.tab('original',{dirty:true});h.active(original);h.state.serverStatus.value.running=true
-  h.rustWordHandle.syncRevision=async()=>({documentId:1,revision:1})
-  h.rustWordHandle.exportFile=async()=>({base64:'T0xE',extension:'docx',revision:'1:1',dirty:true})
-  const expectedRevision=await h.state.sharedRevision(original.key)
-  let release,candidateKey,inspections=0,candidateExports=0
-  const barrier=new Promise(resolve=>{release=resolve})
-  const stop=vue.watch(h.state.rustWordEntries,entries=>{
-    const candidate=entries.find(entry=>entry.document.id!==original.key)
-    if(!candidate||candidate.document.id===candidateKey)return
-    candidateKey=candidate.document.id
-    h.state.setRustWordHandle(candidateKey,{
-      inspect:async()=>{if(++inspections===1)await barrier;return {documentId:2,revision:0}},
-      exportFile:async()=>{candidateExports++;return {base64:'TkVX',extension:'docx',revision:'2:0',dirty:true}},
-    })
-    h.state.readyFor(candidateKey)
-  },{flush:'sync'})
-  try {
-    const replacing=h.state.adoptShared(original.key,sharedWordSnapshot(),expectedRevision,()=>true)
-    await settleWorkspaceShell()
-    assert.equal(h.state.syncApplying.value,true)
-    await h.state.closeWindow()
-    assert.equal(h.state.busy.value,'')
-    assert.equal(h.state.closeTarget.value,null)
-    assert.equal(h.calls.some(call=>call[0]==='close'),false)
-    release();assert.equal(await replacing,true)
-    await settleWorkspaceShell()
-    assert.equal(h.state.closeTarget.value,'window')
-    assert.equal(h.state.activeKey.value,candidateKey)
-    assert.equal(candidateExports,1)
-    assert.equal(h.calls.some(call=>call[0]==='close'),false)
-  } finally {release();stop();h.unmount()}
-})
-
-test('pending editor drafts retain the browser connection while actual connection failures and recovery update it',async()=>{
-  let response='okay'
-  const h=shell({nativeEnabled:false,browserUrl:`http://127.0.0.1:8750/${'a1'.repeat(32)}/?workspace=shared`,
-    browserFetch:async()=>{
-      if(response==='offline')throw Error('Network is unavailable')
-      return new Response(JSON.stringify(response==='revoked'?{error:'old link'}:{running:true,revision:0,documents:[]}),
-        {status:response==='revoked'?404:200,headers:{'Content-Type':'application/json'}})
-    }})
-  const original=h.tab('original',{dirty:true});h.active(original)
-  h.rustWordHandle.syncRevision=async()=>{throw Error('Apply the pending draft first')}
-  try {
-    h.state.enableWorkspaceSync()
-    await h.state.pollWorkspace()
-    assert.equal(h.state.serverStatus.value.running,true)
-    assert.match(h.state.serverError.value,/pending draft/)
-    assert.equal(h.state.tabs.value[0],original)
-    response='offline';await h.state.pollWorkspace()
-    assert.equal(h.state.serverStatus.value.running,false)
-    response='okay';h.rustWordHandle.syncRevision=async()=>undefined
-    await h.state.pollWorkspace()
-    assert.equal(h.state.serverStatus.value.running,true)
-    assert.equal(h.state.serverError.value,'')
-    response='revoked';await h.state.pollWorkspace()
-    assert.equal(h.state.serverStatus.value.running,false)
-    assert.equal(h.state.tabs.value[0],original)
-    assert.equal(original.dirty,true)
-    assert.equal(h.calls.some(call=>call[0]==='save'||call[0]==='download'||call[0]==='marked'),false)
-  } finally {h.unmount()}
-})
-
-test('stopping the server during candidate activation rolls back the staged switch before retiring the old model',async()=>{
-  const h=shell(),original=h.tab('original',{dirty:true});h.active(original);h.state.serverStatus.value.running=true
-  h.native.stopBrowserServer=async()=>({running:false,localUrl:null,lanUrls:[],revision:2})
-  h.state.enableWorkspaceSync()
-  h.rustWordHandle.syncRevision=async()=>({documentId:1,revision:1})
-  h.rustWordHandle.exportFile=async()=>({base64:'T0xE',extension:'docx',revision:'1:1',dirty:true})
-  const expectedRevision=await h.state.sharedRevision(original.key)
-  let release,candidateKey,inspections=0
-  const barrier=new Promise(resolve=>{release=resolve})
-  const stop=vue.watch(h.state.rustWordEntries,entries=>{
-    const candidate=entries.find(entry=>entry.document.id!==original.key)
-    if(!candidate||candidate.document.id===candidateKey)return
-    candidateKey=candidate.document.id
-    h.state.setRustWordHandle(candidateKey,{inspect:async()=>{
-      if(++inspections===2)await barrier
-      return {documentId:2,revision:0}
-    }})
-    h.state.readyFor(candidateKey)
-  },{flush:'sync'})
-  try {
-    const replacing=h.state.adoptShared(original.key,sharedWordSnapshot(),expectedRevision,()=>true)
-    await settleWorkspaceShell()
-    assert.equal(inspections,2)
-    assert.equal(h.state.activeKey.value,candidateKey)
-    assert.equal(h.state.rustWordHandles.has(original.key),true)
-    await h.state.stopServer()
-    release();assert.equal(await replacing,false)
-    assert.equal(h.state.serverStatus.value.running,false)
-    assert.equal(h.state.tabs.value[0],original)
-    assert.equal(h.state.activeKey.value,original.key)
-    assert.equal(h.state.rustWordHandles.get(original.key),h.rustWordHandle)
-    assert.equal(h.state.rustWordHandles.has(candidateKey),false)
-  } finally {release();stop();h.unmount()}
-})
-
-test('a missing shared document leaves the connected workspace and local editor usable',async()=>{
-  const remote=sharedWordSnapshot()
-  const {base64,...summary}=remote
-  const h=shell({nativeEnabled:false,browserUrl:`http://127.0.0.1:8750/${'b2'.repeat(32)}/?workspace=shared`,
-    browserFetch:async url=>new Response(JSON.stringify(url.endsWith('/_sync/state')
-      ?{running:true,revision:2,documents:[summary]}:{error:'Document was removed'}),
-      {status:url.endsWith('/_sync/state')?200:404,headers:{'Content-Type':'application/json'}})})
-  const original=h.tab('original',{dirty:true});h.active(original)
-  h.rustWordHandle.syncRevision=async()=>({documentId:1,revision:1})
-  original.sync={id:remote.id,version:1,revision:await h.state.sharedRevision(original.key)}
-  try {
-    h.state.enableWorkspaceSync();await h.state.pollWorkspace()
-    assert.equal(h.state.serverStatus.value.running,true)
-    assert.match(h.state.serverError.value,/不存在/)
-    assert.equal(h.state.tabs.value[0],original)
-    assert.equal(h.state.activeKey.value,original.key)
-    assert.equal(h.state.syncApplying.value,false)
-    assert.equal(h.calls.some(call=>call[0]==='save'||call[0]==='download'||call[0]==='marked'),false)
-  } finally {h.unmount()}
-})
-
-test('a revoked old preparation cannot clear the replacement controller candidate or input barrier',async()=>{
-  let releaseOld,releaseCurrent,preparations=0,oldPermitted=true
-  const oldPreparation=new Promise(resolve=>{releaseOld=resolve})
-  const currentInspection=new Promise(resolve=>{releaseCurrent=resolve})
-  const h=shell({rustPrepare:async()=>{if(++preparations===1)await oldPreparation;return {prepared:true}}})
-  const original=h.tab('original',{dirty:true});h.active(original);h.state.serverStatus.value.running=true
-  h.rustWordHandle.syncRevision=async()=>({documentId:1,revision:1})
-  h.rustWordHandle.exportFile=async()=>({base64:'T0xE',extension:'docx',revision:'1:1',dirty:true})
-  const expectedRevision=await h.state.sharedRevision(original.key)
-  let candidateKey
-  const stop=vue.watch(h.state.rustWordEntries,entries=>{
-    const candidate=entries.find(entry=>entry.document.id!==original.key)
-    if(!candidate||candidate.document.id===candidateKey)return
-    candidateKey=candidate.document.id
-    h.state.setRustWordHandle(candidateKey,{inspect:async()=>{await currentInspection;return {documentId:2,revision:0}}})
-    h.state.readyFor(candidateKey)
-  },{flush:'sync'})
-  try {
-    const old=h.state.adoptShared(original.key,sharedWordSnapshot(),expectedRevision,()=>oldPermitted)
-    await settleWorkspaceShell()
-    assert.equal(preparations,1)
-    oldPermitted=false
-    const current=h.state.adoptShared(original.key,{...sharedWordSnapshot(),version:3},expectedRevision,()=>true)
-    await settleWorkspaceShell()
-    assert.ok(candidateKey)
-    assert.equal(h.state.syncApplying.value,true)
-    assert.equal(h.state.stagedTab.value.key,candidateKey)
-    releaseOld();assert.equal(await old,false)
-    assert.equal(h.state.syncApplying.value,true)
-    assert.equal(h.state.stagedTab.value.key,candidateKey)
-    assert.equal(h.state.rustWordHandles.has(candidateKey),true)
-    releaseCurrent();assert.equal(await current,true)
-    assert.equal(h.state.activeKey.value,candidateKey)
-    assert.equal(h.state.tabs.value[0].sync.version,3)
-    assert.equal(h.state.syncApplying.value,false)
-  } finally {releaseOld();releaseCurrent();stop();h.unmount()}
-})
-
-test('a stopped controller late network failure cannot overwrite the restarted workspace connection state',async()=>{
-  let rejectOld,requests=0
-  const stale=new Promise((_resolve,reject)=>{rejectOld=reject})
-  const h=shell({workspaceDispatch:async()=>{
-    if(++requests===1)return stale
-    return {statusCode:200,body:{running:true,revision:2,documents:[]}}
-  }})
-  h.native.stopBrowserServer=async()=>({running:false,localUrl:null,lanUrls:[],revision:1})
-  h.native.startBrowserServer=async()=>({running:true,localUrl:null,lanUrls:[],revision:2})
-  try {
-    h.state.enableWorkspaceSync()
-    const obsoletePoll=h.state.pollWorkspace()
-    await settleWorkspaceShell()
-    await h.state.stopServer()
-    await h.state.startServer()
-    assert.equal(h.state.serverStatus.value.running,true)
-    assert.equal(h.state.sharedState.value.revision,2)
-    assert.equal(h.state.serverError.value,'')
-    const notice=h.state.serverNotice.value
-    rejectOld(Error('Old controller network failure'));await obsoletePoll
-    assert.equal(h.state.serverStatus.value.running,true)
-    assert.equal(h.state.sharedState.value.revision,2)
-    assert.equal(h.state.serverError.value,'')
-    assert.equal(h.state.serverNotice.value,notice)
-  } finally {h.unmount()}
-})
-
-test('seven documents per kind reject an eighth before preparation while existing files and other kinds remain usable',async()=>{
+test('eight documents per kind reject a ninth before preparation while existing files and other kinds remain usable',async()=>{
   for(const kind of ['word','sheet','presentation','pdf']) {
     const h=shell(),opened=[]
-    for(let index=0;index<7;index++){const tab=h.tab(`capacity-${index}`,{kind,dirty:true});h.active(tab);opened.push(tab)}
+    for(let index=0;index<8;index++){const tab=h.tab(`capacity-${index}`,{kind,dirty:true});h.active(tab);opened.push(tab)}
     const active=opened.at(-1),extension=active.document.extension
     const before=JSON.stringify(h.state.tabs.value)
     h.handle.exportFile=async()=>assert.fail('Capacity rejection must not snapshot the active document')
     try {
-      await assert.rejects(h.state.addDocument({...active.document,id:'eighth',name:`Eighth.${extension}`},'eighth-file'),/最多同时打开 7 份/)
+      await assert.rejects(h.state.addDocument({...active.document,id:'ninth',name:`Ninth.${extension}`},'ninth-file'),/最多同时打开 8 份/)
       assert.equal(h.calls.length,0,'Capacity must be checked before preflight, stash or disposal')
       assert.equal(JSON.stringify(h.state.tabs.value),before);assert.equal(h.state.activeKey.value,active.key)
       let snapshots=0
       h.handle.exportFile=async({format})=>{snapshots++;return {base64:'T0xE',extension:format,dirty:true}}
       assert.equal(await h.state.addDocument(opened[0].document,opened[0].fileId),opened[0])
-      assert.equal(h.state.activeKey.value,opened[0].key);assert.equal(h.state.tabs.value.length,7)
+      assert.equal(h.state.activeKey.value,opened[0].key);assert.equal(h.state.tabs.value.length,8)
       assert.equal(snapshots,1);assert.equal(h.calls.some(call=>call[0].endsWith('-preflight')),false)
       const otherKind=kind==='word'?'sheet':'word',otherExtension=otherKind==='word'?'docx':'xlsx'
       const other=await h.state.addDocument({id:'other',kind:otherKind,extension:otherExtension,name:`Other.${otherExtension}`,base64:'T0xE',sha256:'',sizeBytes:3})
       assert.equal(other.document.kind,otherKind);assert.equal(h.state.activeKey.value,other.key)
-      assert.equal(h.state.tabs.value.length,8);assert.equal(h.state.tabs.value.filter(tab=>tab.document.kind===kind).length,7)
+      assert.equal(h.state.tabs.value.length,9);assert.equal(h.state.tabs.value.filter(tab=>tab.document.kind===kind).length,8)
       assert.equal(h.calls.filter(call=>call[0].endsWith('-preflight')).length,1)
     } finally {h.unmount()}
   }
 })
 
-test('seven documents of the same kind leave an eighth model available for a validated shared replacement',async()=>{
-  for(const [kind,entriesName,setterName,preparationsName] of [
-    ['word','rustWordEntries','setRustWordHandle','rustPreparations'],
-    ['sheet','rustSheetEntries','setRustSheetHandle','sheetPreparations'],
-    ['presentation','rustPresentationEntries','setRustPresentationHandle','deckPreparations'],
-    ['pdf','rustPdfEntries','setRustPdfHandle','pdfPreparations'],
-  ]) {
-    const h=shell(),opened=[]
-    for(let index=0;index<7;index++){const tab=h.tab(`reserved-${index}`,{kind,dirty:true});h.active(tab);opened.push(tab)}
-    const original=opened.at(-1),originalKeys=new Set(opened.map(tab=>tab.key)),handle=backgroundHandle(h,original)
-    const entries=h.state[entriesName]
-    h.state.serverStatus.value.running=true
-    handle.syncRevision=async()=>({documentId:7,revision:1})
-    handle.exportFile=async options=>{assert.equal(options.background,true);return {base64:'T0xE',extension:original.document.extension,revision:'7:1',dirty:true}}
-    const expectedRevision=await h.state.sharedRevision(original.key)
-    let release,candidateKey
-    const inspection=new Promise(resolve=>{release=resolve})
-    const stop=vue.watch(entries,values=>{
-      const candidate=values.find(entry=>!originalKeys.has(entry.document.id))
-      if(!candidate||candidate.document.id===candidateKey)return
-      candidateKey=candidate.document.id
-      h.state[setterName](candidateKey,{canBackgroundExport:async()=>true,inspect:async()=>{await inspection;return {documentId:8,revision:0}}})
-      h.state.readyFor(candidateKey)
-    },{flush:'sync'})
-    try {
-      const replacing=h.state.adoptShared(original.key,{...sharedWordSnapshot(),kind,extension:original.document.extension,name:`Shared.${original.document.extension}`},expectedRevision,()=>true)
-      await settleWorkspaceShell()
-      assert.ok(candidateKey);assert.equal(entries.value.length,8,'The old seven models must remain alive while the candidate is validated')
-      assert.equal(h.state.tabs.value.length,7);assert.equal(h.state.activeKey.value,original.key)
-      assert.equal(h[preparationsName].length,1);assert.equal(h[preparationsName][0].discarded,0)
-      release();assert.equal(await replacing,true)
-      assert.equal(entries.value.length,7);assert.equal(h.state.tabs.value.length,7)
-      assert.equal(h.state.activeKey.value,candidateKey);assert.equal(h.state.active.value.document.base64,'TkVX')
-      assert.equal(entries.value.some(entry=>entry.document.id===original.key),false)
-      for(const retained of opened.slice(0,6))assert.equal(h.state.tabs.value.find(tab=>tab.key===retained.key),retained)
-      assert.equal(h.state.syncApplying.value,false)
-    } finally {release();stop();h.unmount()}
-  }
+test('new notebook uses its own editor and the shared save and undo controls',async()=>{
+  const h=shell()
+  try {
+    h.state.globalNewDocument('note');await h.idle()
+    const tab=h.state.active.value,handle=backgroundHandle(h,tab)
+    assert.equal(tab.document.kind,'note');assert.equal(tab.document.extension,'oonote')
+    assert.equal(h.state.activeNote.value,true);assert.equal(h.state.noteEntries.value.length,1)
+    assert.equal(tab.dirty,true);assert.equal(tab.ready,false);assert.equal(tab.fileId,undefined)
+    assert.ok(!h.calls.some(call=>call[0].endsWith('-preflight')||call[0]==='note-decode'),'Blank notebooks require neither a Rust model nor imported bytes')
+    h.state.readyFor(tab.key)
+    handle.exportFile=async({format})=>{assert.equal(format,'oonote');return {base64:'Tk9URQ==',extension:'oonote',dirty:true}}
+    handle.undo=async()=>h.calls.push(['note-undo',tab.key])
+    handle.markSaved=async bytes=>{assert.equal(bytes,'Tk9URQ==');h.calls.push(['note-marked',bytes])}
+    h.state.globalFileAction('undo');await h.idle()
+    h.state.openSaveAs()
+    assert.deepEqual(Array.from(h.state.saveAsOptions.value,option=>option.extension),['oonote'])
+    h.state.cancelSaveAs()
+    let prevented=0;h.state.keydown({key:'s',ctrlKey:true,preventDefault(){prevented++}});await h.idle()
+    assert.equal(prevented,1);assert.deepEqual(h.calls.filter(call=>call[0]==='note-undo'),[['note-undo',tab.key]])
+    const request=h.calls.find(call=>call[0]==='save')[1]
+    assert.equal(request.extension,'oonote');assert.equal(request.saveAs,true);assert.equal(request.documentId,undefined)
+    assert.equal(tab.document.kind,'note');assert.equal(tab.dirty,false)
+    assert.equal(h.calls.filter(call=>call[0]==='note-marked').length,1)
+    assert.equal(h.state.rustWordEntries.value.length,0);assert.equal(h.state.rustSheetEntries.value.length,0)
+  } finally {h.unmount()}
+  assert.equal(h.state.noteEntries.value.length,0);assert.equal(h.state.noteHandles.size,0)
+})
+
+for(const route of ['native','recent','browser'])test(`${route} notebook opening validates before mounting and saves through the notebook editor`,async()=>{
+  const bytes=new TextEncoder().encode(JSON.stringify({format:'open-office-notebook',version:1,sections:[]}))
+  const source={id:'local-notebook',kind:'note',extension:'oonote',name:'Research.oonote',base64:Buffer.from(bytes).toString('base64'),sha256:'note-hash',sizeBytes:bytes.length}
+  const h=shell({nativeEnabled:route!=='browser'})
+  try {
+    if(route==='native') {h.native.openDocument=async()=>source;h.state.openFile();await h.idle()}
+    else if(route==='recent') {h.native.openRecent=async()=>source;h.state.openRecent({id:source.id});await h.idle()}
+    else await h.state.browserFile({target:{value:source.name,files:[{name:source.name,size:bytes.length,arrayBuffer:async()=>bytes.buffer}]}})
+    const tab=h.state.active.value,handle=backgroundHandle(h,tab)
+    assert.equal(tab.document.kind,'note');assert.equal(tab.requiresSaveAs,false)
+    assert.equal(h.state.noteEntries.value[0].document.id,tab.key)
+    assert.equal(h.calls.filter(call=>call[0]==='note-decode').length,1)
+    assert.ok(!h.calls.some(call=>call[0].endsWith('-preflight')))
+    h.state.readyFor(tab.key);tab.dirty=true
+    handle.exportFile=async({format})=>{assert.equal(format,'oonote');return {base64:source.base64,extension:'oonote',dirty:true}}
+    assert.equal(await h.state.saveActive(),true)
+    if(route==='browser')assert.equal(h.calls.find(call=>call[0]==='download')[1],source.name)
+    else {
+      const request=h.calls.find(call=>call[0]==='save')[1]
+      assert.equal(request.documentId,source.id);assert.equal(request.expectedSha256,source.sha256)
+      assert.equal(request.name,source.name);assert.equal(request.saveAs,false)
+    }
+    assert.equal(tab.dirty,false)
+  } finally {h.unmount()}
+})
+
+test('invalid notebook input cannot replace the active document or publish a new tab',async()=>{
+  const h=shell({notebookDecodeError:'Invalid notebook structure'}),original=h.tab('unsaved-word',{dirty:true})
+  h.active(original);h.rustWordHandle.exportFile=async()=>assert.fail('Rejected notebook must not touch the active draft')
+  try {
+    await assert.rejects(h.state.addDocument({id:'broken-note',kind:'note',extension:'oonote',name:'Broken.oonote',base64:'e30=',sha256:'',sizeBytes:2},'broken-note'),/Invalid notebook structure/)
+    assert.equal(h.state.tabs.value.length,1);assert.equal(h.state.activeKey.value,original.key)
+    assert.equal(original.dirty,true);assert.equal(h.state.noteEntries.value.length,0)
+    assert.equal(h.state.rustWordHandles.get(original.key),h.rustWordHandle)
+  } finally {h.unmount()}
 })

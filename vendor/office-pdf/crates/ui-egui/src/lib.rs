@@ -52,7 +52,9 @@ mod create_multiple_ui;
 mod create_ui;
 mod credits;
 mod crop;
+mod delete_confirmation;
 mod drag_pointer;
+mod embedded_toolbar;
 mod export_ui;
 mod js_ui;
 mod marks_ui;
@@ -485,6 +487,7 @@ pub struct RecentFile {
 pub struct OfficePdfApp {
     /// The containing Open Office window owns files, tabs and appearance.
     pub embedded: bool,
+    pub(crate) pending_removal: Option<delete_confirmation::Pending>,
     /// Global file action requested by a document shortcut.
     pub host_action: Option<Box<dyn FnMut(&str)>>,
     /// Uncommitted input method composition must never be saved as completed text.
@@ -893,6 +896,7 @@ impl OfficePdfApp {
     pub fn new() -> Self {
         Self {
             embedded: false,
+            pending_removal: None,
             host_action: None,
             embedding_composing: false,
             session: Session::new(),
@@ -1938,6 +1942,7 @@ impl OfficePdfApp {
     /// on the document underneath it.
     pub(crate) fn modal_open(&self) -> bool {
         self.dialog.is_some()
+            || self.pending_removal.is_some()
             || self.close_request.is_some()
             || self.password_prompt.is_some()
             || self.unlock_prompt.is_some()
@@ -3148,9 +3153,15 @@ impl eframe::App for OfficePdfApp {
             }
             chrome::tab_strip(self, ui);
         }
-        chrome::mode_bar(self, ui);
+        if self.embedded {
+            embedded_toolbar::show(self, ui);
+        } else {
+            chrome::mode_bar(self, ui);
+        }
         if self.active.is_some() {
-            chrome::right_rail(self, ui);
+            if !self.embedded {
+                chrome::right_rail(self, ui);
+            }
             // Read mode hides the tools, not the navigation panes: the rail stays visible
             // there, so its buttons (Bookmarks, Page thumbnails, ...) must open their panels.
             // Outside Read mode the docking workspace draws the inspector.

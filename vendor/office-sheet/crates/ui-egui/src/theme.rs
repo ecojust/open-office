@@ -5,6 +5,9 @@
 //! build time for browser rendering. Cells use the best available match for the workbook font,
 //! with egui's built-in fonts as the last resort.
 
+#[path = "../../../../../src/shared/office-ui-fonts.rs"]
+mod office_ui_fonts;
+
 use std::sync::Arc;
 
 use egui::{Color32, FontData, FontDefinitions, FontFamily, FontId, Stroke, Visuals};
@@ -435,6 +438,7 @@ pub fn font_definitions_with(language: crate::i18n::Language, used: &[String]) -
         fonts.families.insert(FontFamily::Proportional, ui);
     }
     bind_embedded_fonts(&mut fonts);
+    office_ui_fonts::install(&mut fonts, &[FontFamily::Proportional, FontFamily::Name(UI.into())], &[FontFamily::Name(UI_BOLD.into())]);
     drop_unparseable_fonts(&mut fonts);
     // Only families egui still has data for count as bound (a dropped face can empty a chain).
     bound.retain(|f| fonts.families.get(&FontFamily::Name(f.as_str().into())).is_some_and(|c| !c.is_empty()));
@@ -740,10 +744,7 @@ pub fn apply(ctx: &egui::Context, dark: bool) {
         s.spacing.item_spacing = egui::vec2(6.0, 4.0);
         s.spacing.button_padding = egui::vec2(6.0, 3.0);
         s.spacing.interact_size.y = 22.0;
-        s.text_styles.insert(egui::TextStyle::Body, ui_font(13.0));
-        s.text_styles.insert(egui::TextStyle::Button, ui_font(13.0));
-        s.text_styles.insert(egui::TextStyle::Small, ui_font(11.0));
-        s.text_styles.insert(egui::TextStyle::Heading, ui_bold(18.0));
+        office_ui_fonts::apply_style(s);
         s.text_styles.insert(egui::TextStyle::Monospace, FontId::new(12.0, FontFamily::Name(MONO.into())));
     });
 }

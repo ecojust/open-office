@@ -2,9 +2,9 @@
 
 <!-- Generated from ATTRIBUTION.toml by `cargo xtask assets --write`. Do not edit by hand. -->
 
-Every asset PdfCraft includes, bundles or uses to build its published material, with its author, source and licence. The policy is in [AGENTS.md](AGENTS.md) §1. The machine-readable list, with SHA-256 hashes, is [ATTRIBUTION.toml](ATTRIBUTION.toml). Licence texts are kept beside the assets and summarised in [NOTICE](NOTICE).
+Every asset OfficePdf includes, bundles or uses to build its published material, with its author, source and licence. The policy is in [AGENTS.md](AGENTS.md) §1. The machine-readable list, with SHA-256 hashes, is [ATTRIBUTION.toml](ATTRIBUTION.toml). Licence texts are kept beside the assets and summarised in [NOTICE](NOTICE).
 
-## In this repository (266)
+## In this repository (269)
 
 | Asset | Title | Author | Licence | Source | Used for |
 |---|---|---|---|---|---|
@@ -274,6 +274,9 @@ Every asset PdfCraft includes, bundles or uses to build its published material, 
 | `../../assets/fonts/deck/LXGWWenKai-Regular.ttf` | LXGW WenKai Regular v1.522 | LXGW; Klee Project Authors (Fontworks) | OFL-1.1 | https://github.com/lxgw/LxgwWenKai/releases/tag/v1.522 | Chinese interface fallback and embedded PDF text outlines |
 | `../../assets/fonts/open-office/DejaVuSans.ttf` | DejaVu Sans v2.37 | Bitstream, Inc.; DejaVu fonts team | Bitstream-Vera | https://github.com/dejavu-fonts/dejavu-fonts/releases/tag/version_2_37 | Interface mathematical and navigation symbols |
 | `../../assets/fonts/open-office/NotoSansSymbols2-Regular.ttf` | Noto Sans Symbols 2 v2.003 | The Noto Project Authors | OFL-1.1 | https://github.com/notofonts/symbols/tree/NotoSansSymbols2-v2.003 | Interface symbols; this is the Symbols 2 family, not CJK |
+| `../../assets/fonts/ui/WenQuanYiMicroHei-Regular.ttf` | WenQuanYi Micro Hei Regular 0.2.0-beta | WenQuanYi Project Contributors; Google Corporation; Wada Laboratory and Electronic Font Open Laboratory (punctuation) | Apache-2.0 | https://sourceforge.net/projects/wqy/files/wqy-microhei/0.2.0-beta/ | Shared Chinese interface typography only; proportional TTC face extracted without outline changes; document font choices and exports unchanged |
+| `../../assets/fonts/deck/Inter-Regular.ttf` | Inter Regular | Rasmus Andersson / Inter Project Authors | OFL-1.1 | https://github.com/rsms/inter | Shared regular Latin interface typography |
+| `../../assets/fonts/deck/Inter-SemiBold.ttf` | Inter SemiBold | Rasmus Andersson / Inter Project Authors | OFL-1.1 | https://github.com/rsms/inter | Shared semibold Latin interface typography |
 
 ## Compiled in through dependencies (6)
 

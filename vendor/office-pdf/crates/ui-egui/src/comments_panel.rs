@@ -144,7 +144,7 @@ pub(crate) fn show(
     if info.annotations.is_empty() {
         ui.add_space(30.0);
         ui.vertical_centered(|ui| {
-            ui.add(icons::image("message-square-text", 36.0, t.text_faint));
+            ui.add(icons::image(ui, "message-square-text", 36.0, t.text_faint));
             ui.add_space(8.0);
             ui.label(egui::RichText::new(tl!("No comments yet.")).color(t.text_muted));
             if allowed {
@@ -311,10 +311,10 @@ fn card(
                             edit = Some(Edit::MarkAnnotation { page: a.page, index: a.index, marked: !marked, author: prefs.author.clone() });
                         }
                     } else if marked {
-                        ui.add(icons::image("circle-check", 14.0, t.accent)).on_hover_text(tl!("Marked"));
+                        ui.add(icons::image(ui, "circle-check", 14.0, t.accent)).on_hover_text(tl!("Marked"));
                     }
                     if a.locked {
-                        ui.add(icons::image("lock", 13.0, t.text_faint)).on_hover_text(tl!("Locked"));
+                        ui.add(icons::image(ui, "lock", 13.0, t.text_faint)).on_hover_text(tl!("Locked"));
                     }
                     buttons_left = ui.min_rect().left();
                 });
@@ -356,7 +356,7 @@ fn card(
                 if let Some((icon, label, c)) = status.and_then(status_badge) {
                     ui.add_space(4.0);
                     ui.horizontal(|ui| {
-                        ui.add(icons::image(icon, 13.0, c));
+                        ui.add(icons::image(ui, icon, 13.0, c));
                         ui.label(egui::RichText::new(tl!(label)).font(theme::medium(11.5)).color(c));
                     });
                 }

@@ -122,8 +122,7 @@ pub(crate) fn palette_section(app: &mut OfficePdfApp, ui: &mut egui::Ui, t: &Tok
         }
     }
     if let Some(i) = remove {
-        app.custom_stamps.remove(i);
-        app.quick_tool = QuickTool::Select;
+        app.remove_saved_stamp(i);
     }
     ui.add_space(4.0);
     if !app.embedded && widgets::pill_button(ui, tl!("Create custom stamp…"), false).on_hover_text(tl!("From a PDF page or an image")).clicked() {

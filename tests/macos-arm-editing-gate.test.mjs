@@ -73,7 +73,8 @@ function installation(t) {
   write(join(root, 'package.json'), JSON.stringify({ version: '0.10.1' }));
   for (const path of ['scripts/build-office-word.mjs', 'scripts/build-office-sheet.mjs', 'scripts/build-office-presentation.mjs', 'scripts/build-office-icons.mjs',
     'vendor/office-word/src/lib.rs', 'vendor/office-sheet/src/lib.rs', 'vendor/office-presentation/src/lib.rs',
-    'assets/fonts/open-office/license.txt', 'assets/fonts/deck/license.txt', 'src/icons/test.svg']) write(join(root, path), `fixture: ${path}`);
+    'assets/fonts/open-office/license.txt', 'assets/fonts/deck/license.txt', 'assets/fonts/ui/license.txt',
+    'src/shared/office-ui-fonts.rs', 'src/icons/test.svg']) write(join(root, path), `fixture: ${path}`);
   const app = join(root, 'Open Office.app'), resourceRoot = join(app, 'Contents/Resources');
   write(join(app, 'Contents/MacOS/open-office'), 'ARM application fixture');
   installPdfFixture(root, resourceRoot);

@@ -7,7 +7,8 @@ const digest = value => createHash('sha256').update(value).digest('hex');
 const write = (path, bytes) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, bytes); };
 export function installPdfFixture(root, resourceRoot) {
   for (const path of ['scripts/build-office-pdf.mjs', 'scripts/build-office-icons.mjs', 'vendor/office-pdf/src/lib.rs',
-    'assets/fonts/open-office/license.txt', 'assets/fonts/deck/license.txt', 'src/icons/test.svg']) {
+    'assets/fonts/open-office/license.txt', 'assets/fonts/deck/license.txt', 'assets/fonts/ui/license.txt',
+    'src/shared/office-ui-fonts.rs', 'src/icons/test.svg']) {
     // Shared fixture files may already be used by the other editor manifests.
     write(join(root, path), `fixture: ${path}`);
   }

@@ -415,8 +415,8 @@
   "pdf/text-select": "word/select",
   "pdf/thumbs-down": "word/reject",
   "pdf/thumbs-up": "word/accept",
-  "pdf/trash": "sheet/delete",
-  "pdf/trash-2": "sheet/delete",
+  "pdf/trash": "shell/trash",
+  "pdf/trash-2": "shell/trash",
   "pdf/triangle-alert": "deck/warning",
   "pdf/type": "word/fonts",
   "pdf/underline": "word/underline",
@@ -426,5 +426,12 @@
   "pdf/wrench": "sheet/settings",
   "pdf/x": "word/close",
   "pdf/zoom-in": "deck/zoom-in",
-  "pdf/zoom-out": "deck/zoom-out"
+  "pdf/zoom-out": "deck/zoom-out",
+  "sheet/chart": "word/chart",
+  "sheet/merge": "word/merge",
+  "sheet/minus": "word/minus",
+  "sheet/pen": "word/pen",
+  "sheet/share": "word/share",
+  "sheet/gridlines": "word/gridlines",
+  "sheet/sheet": "shell/sheet"
 }

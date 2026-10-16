@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, writeFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { buildOfficeIcons, compileSvg, parsePath, triangulate, verifySharedIcons } from '../scripts/build-office-icons.mjs'
+import { buildOfficeIcons, compileSvg, parsePath, triangulate, verifySharedIcons, verifyShellIconAliases } from '../scripts/build-office-icons.mjs'
 
 const svg = paths => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`
 const signedArea = points => points.reduce((sum, a, i) => { const b = points[(i + 1) % points.length]; return sum + a[0] * b[1] - a[1] * b[0] }, 0) / 2
@@ -126,6 +126,33 @@ test('Shared icon contracts reject cross-workspace drift and unsafe references w
     assert.equal(await readFile(target, 'utf8'), `${source}\n`)
     await writeFile(manifest, JSON.stringify({ 'word/save': '../../secret' }))
     await assert.rejects(verifySharedIcons(root), /invalid shared icon mapping/)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('Shell aliases import canonical editor SVGs and reject shadowing or indirect paths', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'office-shell-icon-aliases-'))
+  try {
+    const directory = join(root, 'src/icons/svg/word'), shell = join(root, 'src/icons/svg/shell')
+    await mkdir(directory, { recursive: true }); await mkdir(shell, { recursive: true })
+    await writeFile(join(root, 'src/icons/shared.json'), '{}')
+    await writeFile(join(directory, 'names.json'), '["bold"]')
+    await writeFile(join(directory, 'bold.svg'), svg('<path d="M6 4V20H13Q19 20 19 16Q19 12 13 12H6"/>'))
+    const manifest = join(root, 'src/icons/shell-aliases.json')
+    await writeFile(manifest, JSON.stringify({ bold: 'word/bold' }))
+    await buildOfficeIcons({ root, families: ['word'] })
+    const generated = join(root, 'src/icons/shell-aliases.ts')
+    const source = await readFile(generated, 'utf8')
+    assert.match(source, /import icon0 from '\.\/svg\/word\/bold\.svg\?raw'/)
+    assert.match(source, /"bold": icon0/)
+    await buildOfficeIcons({ root, families: ['word'], check: true })
+    await writeFile(generated, `${source}\n`)
+    await assert.rejects(buildOfficeIcons({ root, families: ['word'], check: true }), /shell icon aliases are missing or stale/)
+    await writeFile(join(shell, 'bold.svg'), svg('<path d="M6 4V20"/>'))
+    await assert.rejects(verifyShellIconAliases(root), /shadows an authored SVG/)
+    await writeFile(manifest, JSON.stringify({ bold: 'shell/italic' }))
+    await assert.rejects(verifyShellIconAliases(root), /invalid shell icon alias/)
+    await writeFile(manifest, JSON.stringify({ bold: '../word/bold' }))
+    await assert.rejects(verifyShellIconAliases(root), /invalid shell icon alias/)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 

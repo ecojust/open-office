@@ -130,6 +130,8 @@ impl SigDraft {
         } else {
             !self.text.trim().is_empty()
                 && self.text.chars().take(office_pdf_engine::MAX_SIGNATURE_CHARS + 1).count() <= office_pdf_engine::MAX_SIGNATURE_CHARS
+                && office_pdf_fonts::script_missing(&self.text).is_none()
+                && office_pdf_engine::typed_signature_graphic(&self.text).is_some()
         }
     }
 
@@ -716,7 +718,7 @@ pub(crate) fn type_box(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, 
         ui.set_min_width(width);
         let r = ui.add(
             egui::TextEdit::singleline(&mut t.text)
-                .font(egui::FontId::proportional((t.size as f32 * zoom).max(8.0)))
+                .font(egui::FontId::new((t.size as f32 * zoom).max(8.0), crate::theme::document_font_family(false)))
                 .desired_width(width)
                 .background_color(Color32::from_rgba_unmultiplied(255, 255, 255, 230))
                 .text_color(Color32::BLACK)
@@ -756,6 +758,7 @@ pub(crate) fn signature_pad(
     photo_texture: &mut Option<(u64, egui::TextureHandle)>,
 ) -> (bool, bool, bool) {
     let what = if d.initials { tl!("initials") } else { tl!("signature") };
+    let pad_width = ui.available_width().clamp(180.0, 460.0);
     let title = if d.editing { tl!("Change {what}") } else { tl!("Create {what}") };
     ui.label(egui::RichText::new(crate::i18n::fmt(title, &[("what", what)])).font(crate::theme::semibold(18.0)));
     ui.horizontal(|ui| {
@@ -791,7 +794,7 @@ pub(crate) fn signature_pad(
     if d.image_mode {
         ui.label(egui::RichText::new(tl!("Choose a PNG or JPEG image (up to 4 MiB). Transparency is preserved.")).color(t.text_muted));
         let browse = crate::widgets::ghost_button(ui, "folder", tl!("Browse…")).clicked();
-        let (rect, _) = ui.allocate_exact_size(vec2(460.0, 150.0), Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(vec2(pad_width, 150.0), Sense::hover());
         ui.painter().rect_filled(rect, CornerRadius::same(6), Color32::WHITE);
         ui.painter().rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
         if let Some(image) = &d.image {
@@ -803,7 +806,7 @@ pub(crate) fn signature_pad(
     if !d.drawing {
         let l = ui.label(egui::RichText::new(crate::i18n::fmt(tl!("Type your {what}."), &[("what", what)])).color(t.text_muted));
         ui.add(
-            egui::TextEdit::singleline(&mut d.text).char_limit(office_pdf_engine::MAX_SIGNATURE_CHARS).desired_width(460.0).hint_text(tl!(if d
+            egui::TextEdit::singleline(&mut d.text).char_limit(office_pdf_engine::MAX_SIGNATURE_CHARS).desired_width(pad_width).hint_text(tl!(if d
                 .initials
             {
                 "Initials"
@@ -812,7 +815,10 @@ pub(crate) fn signature_pad(
             })),
         )
         .labelled_by(l.id);
-        let (rect, _) = ui.allocate_exact_size(vec2(460.0, 150.0), Sense::hover());
+        if let Some(character) = office_pdf_fonts::script_missing(&d.text) {
+            ui.label(egui::RichText::new(format!("签名字体无法显示“{character}”，请改用手绘或图片，避免遗漏姓名。")).color(t.text_muted));
+        }
+        let (rect, _) = ui.allocate_exact_size(vec2(pad_width, 150.0), Sense::hover());
         let painter = ui.painter_at(rect);
         painter.rect_filled(rect, CornerRadius::same(6), Color32::WHITE);
         painter.rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
@@ -834,7 +840,7 @@ pub(crate) fn signature_pad(
         d.undo_stroke();
     }
     let strokes = &mut d.strokes;
-    let (rect, resp) = ui.allocate_exact_size(vec2(460.0, 150.0), Sense::drag());
+    let (rect, resp) = ui.allocate_exact_size(vec2(pad_width, 150.0), Sense::drag());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, CornerRadius::same(6), Color32::WHITE);
     painter.rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
@@ -1257,6 +1263,17 @@ mod tests {
         assert!(d.undo_stroke());
         assert!(d.strokes.is_empty());
         assert!(!d.undo_stroke());
+    }
+
+    #[test]
+    fn a_typed_signature_never_silently_omits_unsupported_name_characters() {
+        let mut draft = super::SigDraft { text: "Ada".into(), ..Default::default() };
+        assert!(draft.ready());
+        draft.text = "Ada陈".into();
+        assert!(!draft.ready());
+        draft.drawing = true;
+        draft.strokes = vec![vec![[0.0, 0.0], [0.4, 0.2]]];
+        assert!(draft.ready(), "handwriting remains available for any name");
     }
 
     #[test]

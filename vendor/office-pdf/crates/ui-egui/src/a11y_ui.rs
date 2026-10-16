@@ -165,7 +165,7 @@ pub(crate) fn panel(ui: &mut egui::Ui, t: &Tokens, state: &mut A11yState, doc: D
     let Some((_, report)) = state.report.as_ref().filter(|(d, _)| *d == doc) else {
         ui.add_space(24.0);
         ui.vertical_centered(|ui| {
-            ui.add(icons::image("accessibility", 32.0, t.text_faint));
+            ui.add(icons::image(ui, "accessibility", 32.0, t.text_faint));
             ui.add_space(6.0);
             ui.label(egui::RichText::new(tl!("This document hasn't been checked yet.")).color(t.text_muted));
             ui.add_space(6.0);
@@ -267,7 +267,7 @@ pub(crate) fn panel(ui: &mut egui::Ui, t: &Tokens, state: &mut A11yState, doc: D
             let row = ui
                 .horizontal(|ui| {
                     ui.add_space(24.0);
-                    ui.add(icons::image(icon, 15.0, color));
+                    ui.add(icons::image(ui, icon, 15.0, color));
                     ui.add(
                         egui::Label::new(
                             egui::RichText::new(crate::i18n::fmt(

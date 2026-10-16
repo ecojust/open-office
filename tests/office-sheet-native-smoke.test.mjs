@@ -14,7 +14,7 @@ const sha = value => createHash('sha256').update(value).digest('hex');
 function installation() {
   const directory = mkdtempSync(join(tmpdir(), 'office-sheet-native-contract-'));
   const root = join(directory, 'checkout'), resourceRoot = join(directory, 'installed');
-  for (const path of ['scripts', 'vendor/office-sheet/src', 'assets/fonts/open-office', 'src/icons/svg/sheet']) mkdirSync(join(root, path), { recursive: true });
+  for (const path of ['scripts', 'src/shared', 'assets/fonts/ui', 'assets/fonts/deck', 'vendor/office-sheet/src', 'assets/fonts/open-office', 'src/icons/svg/sheet']) mkdirSync(join(root, path), { recursive: true });
   writeFileSync(join(root, 'scripts/build-office-sheet.mjs'), '// independently controlled fixture');
   writeFileSync(join(root, 'scripts/build-office-icons.mjs'), '// offline geometry compiler fixture');
   writeFileSync(join(root, 'src/icons/shared.json'), '{}');
@@ -22,6 +22,9 @@ function installation() {
   writeFileSync(join(root, 'src/icons/svg/sheet/test.svg'), '<svg/>');
   writeFileSync(join(root, 'vendor/office-sheet/src/lib.rs'), '// source fixture');
   writeFileSync(join(root, 'assets/fonts/open-office/license.txt'), 'font fixture');
+  writeFileSync(join(root, 'assets/fonts/ui/license.txt'), 'interface font fixture');
+  writeFileSync(join(root, 'assets/fonts/deck/license.txt'), 'shared Latin font fixture');
+  writeFileSync(join(root, 'src/shared/office-ui-fonts.rs'), '// shared interface typography');
   const assets = join(resourceRoot, 'frontend/office-sheet'); mkdirSync(assets, { recursive: true });
   const bytes = { 'office-sheet.js': Buffer.from('export const engine = "Open Office";'), 'office-sheet.d.ts': Buffer.from('export const engine: string;'),
     'office-sheet_bg.wasm': Buffer.from('0061736d01000000', 'hex'), 'office-sheet_bg.wasm.d.ts': Buffer.from('export const memory: WebAssembly.Memory;') };
@@ -126,7 +129,7 @@ test('installed assets bind exact manifest bytes, WASM/JS sizes and hashes to th
       const mutated = structuredClone(report); mutate(mutated);
       assert.throws(() => validateNativeOfficeSheetEvidence(mutated, { root: fixture.root }), /OfficeSheet/);
     }
-    for (const path of ['scripts/build-office-icons.mjs', 'src/icons/shared.json', 'src/icons/svg/sheet/test.svg', 'src/icons/svg/sheet/names.json']) {
+    for (const path of ['src/shared/office-ui-fonts.rs', 'assets/fonts/ui/license.txt', 'scripts/build-office-icons.mjs', 'src/icons/shared.json', 'src/icons/svg/sheet/test.svg', 'src/icons/svg/sheet/names.json']) {
       const source = readFileSync(join(fixture.root, path));
       writeFileSync(join(fixture.root, path), Buffer.concat([source, Buffer.from(' ')]));
       assert.throws(() => validateNativeOfficeSheetEvidence(report, { root: fixture.root }), /current checkout source/);

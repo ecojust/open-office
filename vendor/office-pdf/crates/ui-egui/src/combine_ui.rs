@@ -924,7 +924,7 @@ fn skip_prompt(app: &mut OfficePdfApp, ctx: &egui::Context) {
     let modal = egui::Modal::new(egui::Id::new("combine-skip")).show(ctx, |ui| {
         ui.set_width(460.0);
         ui.horizontal(|ui| {
-            ui.add(icons::image("triangle-alert", 22.0, ERROR));
+            ui.add(icons::image(ui, "triangle-alert", 22.0, ERROR));
             ui.add(egui::Label::new(egui::RichText::new(tl!("Leave out files that can't be read?")).font(theme::semibold(16.0))).wrap());
         });
         ui.add_space(6.0);
@@ -982,7 +982,7 @@ fn unlock_prompt(app: &mut OfficePdfApp, ctx: &egui::Context) {
         egui::Frame::popup(ui.style()).inner_margin(egui::Margin::same(14)).show(ui, |ui| {
             ui.set_width(340.0);
             ui.horizontal(|ui| {
-                ui.add(icons::image("lock", 16.0, t.icon));
+                ui.add(icons::image(ui, "lock", 16.0, t.icon));
                 ui.add(egui::Label::new(egui::RichText::new(&title).font(theme::semibold(14.0))).truncate());
             });
             ui.add_space(4.0);
@@ -1212,7 +1212,7 @@ fn zoom_controls(app: &mut OfficePdfApp, ui: &mut egui::Ui, t: &Tokens, edge: f3
 fn empty_state(app: &mut OfficePdfApp, ui: &mut egui::Ui, t: &Tokens, files_hovering: bool) {
     ui.vertical_centered(|ui| {
         ui.add_space((ui.available_height() / 2.0 - 70.0).max(16.0));
-        ui.add(icons::image("files", 40.0, if files_hovering { t.accent } else { t.text_faint }));
+        ui.add(icons::image(ui, "files", 40.0, if files_hovering { t.accent } else { t.text_faint }));
         ui.add_space(10.0);
         ui.label(egui::RichText::new(tl!("Add the files to combine")).font(theme::medium(15.0)));
         ui.add_space(4.0);
@@ -1251,7 +1251,7 @@ fn add_menu(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
     egui::Popup::menu(&more).show(|ui| {
         ui.set_min_width(220.0);
         let item = |ui: &mut egui::Ui, icon: &str, label: &str| {
-            ui.add(egui::Button::image_and_text(icons::image(icon, 15.0, ui.visuals().text_color()), label))
+            ui.add(egui::Button::image_and_text(icons::image(ui, icon, 15.0, ui.visuals().text_color()), label))
         };
         if item(ui, "file-plus", tl!("Add files…")).clicked() {
             app.combine_dialog();
@@ -1466,7 +1466,7 @@ fn table_body(
                     for kind in order {
                         row.col(|ui| match kind {
                             SortKey::Name => {
-                                ui.add(icons::image("file-text", 16.0, t.icon));
+                                ui.add(icons::image(ui, "file-text", 16.0, t.icon));
                                 ui.add(egui::Label::new(crate::bidi::visual(&f.name).as_ref()).truncate().selectable(false));
                             }
                             // The range field and how many pages it takes.
@@ -1539,7 +1539,7 @@ fn table_body(
                                     (None, None) => return,
                                 };
                                 let all = errors.iter().chain(&warnings).cloned().collect::<Vec<_>>().join("\n");
-                                ui.add(icons::image(icon, 15.0, colour));
+                                ui.add(icons::image(ui, icon, 15.0, colour));
                                 if f.lock.is_some() {
                                     let link =
                                         ui.add(egui::Link::new(egui::RichText::new(tl!("Unlock…")).color(t.accent))).on_hover_text(match f.lock {
@@ -1564,7 +1564,7 @@ fn table_body(
                         let at = response.rect.left_bottom();
                         response.context_menu(|ui| {
                             if ui
-                                .add(egui::Button::image_and_text(icons::image("lock-open", 15.0, ui.visuals().text_color()), tl!("Unlock…")))
+                                .add(egui::Button::image_and_text(icons::image(ui, "lock-open", 15.0, ui.visuals().text_color()), tl!("Unlock…")))
                                 .clicked()
                             {
                                 events.action = Some(RowAction::Unlock(Some(i), at));
