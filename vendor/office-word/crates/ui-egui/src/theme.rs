@@ -8,8 +8,8 @@ use std::sync::Arc;
 use egui::{Align2, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Rect, Stroke, Visuals};
 
 /// OfficeWord's app colour (and its darker ink for text on light backgrounds).
-pub const APP_COLOR: Color32 = Color32::from_rgb(0x3B, 0x5B, 0xDB);
-pub const APP_INK: Color32 = Color32::from_rgb(0x2B, 0x47, 0xB5);
+pub const APP_COLOR: Color32 = Color32::from_rgb(0x31, 0x5F, 0xD6);
+pub const APP_INK: Color32 = Color32::from_rgb(0x31, 0x5F, 0xD6);
 
 /// The interface theme setting (File › Options › General, View › Interface Theme): a fixed light or
 /// dark palette, or `System`, which follows the OS light/dark appearance live (#115). Dark page
@@ -232,7 +232,8 @@ impl From<Animations> for String {
     }
 }
 
-/// Every colour the UI uses; widgets never hard-code colours.
+/// Interface colours follow the shell tokens in `src/style.css`. Document previews and
+/// page-specific colours stay separate from interface surfaces.
 #[derive(Clone, Copy, Debug)]
 pub struct Tokens {
     pub dark: bool,
@@ -285,31 +286,31 @@ impl Tokens {
     pub fn light() -> Self {
         Tokens {
             dark: false,
-            title_bar: Color32::from_rgb(0xF0, 0xF0, 0xF0),
-            ribbon: Color32::from_rgb(0xF9, 0xF9, 0xF9),
-            tab_strip: Color32::from_rgb(0xF0, 0xF0, 0xF0),
-            canvas: Color32::from_rgb(0xE6, 0xE6, 0xE6),
-            panel: Color32::from_rgb(0xFA, 0xFA, 0xFA),
-            border: Color32::from_rgb(0xE1, 0xE1, 0xE1),
-            border_strong: Color32::from_rgb(0xC8, 0xC8, 0xC8),
-            text: Color32::from_rgb(0x24, 0x24, 0x24),
-            text_dim: Color32::from_rgb(0x61, 0x61, 0x61),
-            text_disabled: Color32::from_rgb(0xA8, 0xA8, 0xA8),
-            icon: Color32::from_rgb(0x42, 0x42, 0x42),
-            hover: Color32::from_rgb(0xE6, 0xE6, 0xE6),
-            pressed: Color32::from_rgb(0xD6, 0xD6, 0xD6),
-            checked: Color32::from_rgb(0xDD, 0xE3, 0xF8),
+            title_bar: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+            ribbon: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+            tab_strip: Color32::from_rgb(0xF7, 0xF8, 0xFA),
+            canvas: Color32::from_rgb(0xF5, 0xF6, 0xF8),
+            panel: Color32::from_rgb(0xF7, 0xF8, 0xFA),
+            border: Color32::from_rgb(0xE3, 0xE6, 0xEB),
+            border_strong: Color32::from_rgb(0xCB, 0xD2, 0xDC),
+            text: Color32::from_rgb(0x20, 0x2B, 0x3B),
+            text_dim: Color32::from_rgb(0x64, 0x72, 0x87),
+            text_disabled: Color32::from_rgb(0x83, 0x90, 0xA1),
+            icon: Color32::from_rgb(0x64, 0x72, 0x87),
+            hover: Color32::from_rgb(0xED, 0xF2, 0xFD),
+            pressed: Color32::from_rgb(0xED, 0xF2, 0xFD),
+            checked: Color32::from_rgb(0xED, 0xF2, 0xFD),
             accent: APP_COLOR,
             accent_text: APP_INK,
             on_accent: Color32::WHITE,
-            input: Color32::WHITE,
-            input_border: Color32::from_rgb(0x8A, 0x8A, 0x8A),
-            group_label: Color32::from_rgb(0x70, 0x70, 0x70),
+            input: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+            input_border: Color32::from_rgb(0x83, 0x90, 0xA1),
+            group_label: Color32::from_rgb(0x64, 0x72, 0x87),
             ruler: Color32::from_rgb(0xFF, 0xFF, 0xFF),
             ruler_margin: Color32::from_rgb(0xD4, 0xD4, 0xD4),
             ruler_tick: Color32::from_rgb(0x70, 0x70, 0x70),
-            status_bar: Color32::from_rgb(0xF0, 0xF0, 0xF0),
-            selection: Color32::from_rgba_unmultiplied(0x3B, 0x5B, 0xDB, 0x48),
+            status_bar: Color32::from_rgb(0xF7, 0xF8, 0xFA),
+            selection: Color32::from_rgba_unmultiplied(0x31, 0x5F, 0xD6, 0x48),
             find_highlight: Color32::from_rgba_unmultiplied(0xFF, 0xE0, 0x3D, 0x90),
             page_shadow: Color32::from_rgba_unmultiplied(0, 0, 0, 0x22),
             handle: Color32::WHITE,
@@ -317,43 +318,43 @@ impl Tokens {
             guide: Color32::from_rgb(0xC0, 0x28, 0x8C),
             crop_handle: Color32::BLACK,
             crop_dim: Color32::from_rgba_unmultiplied(0x30, 0x30, 0x30, 0xE0),
-            menu: Color32::WHITE,
-            blue: Color32::from_rgb(0x2F, 0x6F, 0xD0),
-            red: Color32::from_rgb(0xD1, 0x3B, 0x3B),
-            green: Color32::from_rgb(0x2E, 0x8B, 0x57),
-            orange: Color32::from_rgb(0xE0, 0x7B, 0x1F),
+            menu: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+            blue: Color32::from_rgb(0x31, 0x5F, 0xD6),
+            red: Color32::from_rgb(0xB5, 0x47, 0x46),
+            green: Color32::from_rgb(0x25, 0x83, 0x5D),
+            orange: Color32::from_rgb(0x90, 0x63, 0x13),
         }
     }
     pub fn dark() -> Self {
         Tokens {
             dark: true,
-            title_bar: Color32::from_rgb(0x1F, 0x1F, 0x1F),
-            ribbon: Color32::from_rgb(0x29, 0x29, 0x29),
-            tab_strip: Color32::from_rgb(0x1F, 0x1F, 0x1F),
-            canvas: Color32::from_rgb(0x14, 0x14, 0x14),
-            panel: Color32::from_rgb(0x26, 0x26, 0x26),
-            border: Color32::from_rgb(0x3A, 0x3A, 0x3A),
-            border_strong: Color32::from_rgb(0x55, 0x55, 0x55),
-            text: Color32::from_rgb(0xEE, 0xEE, 0xEE),
-            text_dim: Color32::from_rgb(0xC8, 0xC8, 0xC8),
-            text_disabled: Color32::from_rgb(0x6A, 0x6A, 0x6A),
-            icon: Color32::from_rgb(0xDD, 0xDD, 0xDD),
-            hover: Color32::from_rgb(0x3D, 0x3D, 0x3D),
-            pressed: Color32::from_rgb(0x4A, 0x4A, 0x4A),
-            checked: Color32::from_rgb(0x2E, 0x3A, 0x66),
-            accent: Color32::from_rgb(0x7A, 0x93, 0xF0),
-            accent_text: Color32::from_rgb(0x9C, 0xB0, 0xF5),
-            // Dark text on the light dark-theme accent: white on #7a93f0 is only 2.9:1 (#655).
-            on_accent: Color32::from_rgb(0x11, 0x16, 0x2E),
-            input: Color32::from_rgb(0x1E, 0x1E, 0x1E),
-            input_border: Color32::from_rgb(0x7A, 0x7A, 0x7A),
-            group_label: Color32::from_rgb(0xA0, 0xA0, 0xA0),
+            title_bar: Color32::from_rgb(0x20, 0x26, 0x30),
+            ribbon: Color32::from_rgb(0x20, 0x26, 0x30),
+            tab_strip: Color32::from_rgb(0x27, 0x2F, 0x3B),
+            canvas: Color32::from_rgb(0x15, 0x1A, 0x22),
+            panel: Color32::from_rgb(0x27, 0x2F, 0x3B),
+            border: Color32::from_rgb(0x38, 0x43, 0x53),
+            border_strong: Color32::from_rgb(0x52, 0x61, 0x76),
+            text: Color32::from_rgb(0xED, 0xF1, 0xF7),
+            text_dim: Color32::from_rgb(0xB1, 0xBE, 0xD0),
+            text_disabled: Color32::from_rgb(0x91, 0xA1, 0xB8),
+            icon: Color32::from_rgb(0xB1, 0xBE, 0xD0),
+            hover: Color32::from_rgb(0x2C, 0x3D, 0x60),
+            pressed: Color32::from_rgb(0x2C, 0x3D, 0x60),
+            checked: Color32::from_rgb(0x2C, 0x3D, 0x60),
+            accent: Color32::from_rgb(0x9B, 0xB8, 0xFF),
+            accent_text: Color32::from_rgb(0x9B, 0xB8, 0xFF),
+            // Match the shell: dark ink on the light accent keeps primary actions readable.
+            on_accent: Color32::from_rgb(0x17, 0x27, 0x45),
+            input: Color32::from_rgb(0x20, 0x26, 0x30),
+            input_border: Color32::from_rgb(0x91, 0xA1, 0xB8),
+            group_label: Color32::from_rgb(0xB1, 0xBE, 0xD0),
             // The text area is lighter than the margins, as in the light theme (#1148).
             ruler: Color32::from_rgb(0x45, 0x45, 0x45),
             ruler_margin: Color32::from_rgb(0x2E, 0x2E, 0x2E),
             ruler_tick: Color32::from_rgb(0xB4, 0xB4, 0xB4),
-            status_bar: Color32::from_rgb(0x1F, 0x1F, 0x1F),
-            selection: Color32::from_rgba_unmultiplied(0x7A, 0x93, 0xF0, 0x55),
+            status_bar: Color32::from_rgb(0x27, 0x2F, 0x3B),
+            selection: Color32::from_rgba_unmultiplied(0x9B, 0xB8, 0xFF, 0x55),
             find_highlight: Color32::from_rgba_unmultiplied(0xC8, 0xA8, 0x00, 0x70),
             page_shadow: Color32::from_rgba_unmultiplied(0, 0, 0, 0x60),
             handle: Color32::from_rgb(0xF2, 0xF2, 0xF2),
@@ -361,11 +362,11 @@ impl Tokens {
             guide: Color32::from_rgb(0xE0, 0x4C, 0xB0),
             crop_handle: Color32::BLACK,
             crop_dim: Color32::from_rgba_unmultiplied(0x30, 0x30, 0x30, 0xE0),
-            menu: Color32::from_rgb(0x2B, 0x2B, 0x2B),
-            blue: Color32::from_rgb(0x6C, 0x9B, 0xEA),
-            red: Color32::from_rgb(0xEE, 0x6A, 0x6A),
-            green: Color32::from_rgb(0x5B, 0xC0, 0x8A),
-            orange: Color32::from_rgb(0xF0, 0xA0, 0x50),
+            menu: Color32::from_rgb(0x20, 0x26, 0x30),
+            blue: Color32::from_rgb(0x9B, 0xB8, 0xFF),
+            red: Color32::from_rgb(0xFF, 0xA5, 0xA0),
+            green: Color32::from_rgb(0x79, 0xD4, 0xAA),
+            orange: Color32::from_rgb(0xEF, 0xC9, 0x82),
         }
     }
     pub fn get(ctx: &egui::Context) -> Tokens {
@@ -663,27 +664,121 @@ fn visuals(t: &Tokens) -> Visuals {
     v.selection.bg_fill = t.selection;
     v.selection.stroke = Stroke::new(1.0, t.accent);
     v.hyperlink_color = t.accent_text;
+    v.weak_text_color = Some(t.text_dim);
+    v.error_fg_color = t.red;
+    v.warn_fg_color = t.orange;
+    v.text_cursor.stroke = Stroke::new(1.5, t.accent);
     v.widgets.noninteractive.bg_stroke = Stroke::new(1.0, t.border);
     v.widgets.noninteractive.fg_stroke = Stroke::new(1.0, t.text);
     v.widgets.inactive.bg_fill = t.input;
     v.widgets.inactive.weak_bg_fill = t.input;
     v.widgets.inactive.bg_stroke = Stroke::new(1.0, t.input_border);
     v.widgets.inactive.fg_stroke = Stroke::new(1.0, t.text);
-    v.widgets.inactive.corner_radius = CornerRadius::same(4);
+    v.widgets.inactive.corner_radius = CornerRadius::same(6);
     v.widgets.hovered.bg_fill = t.hover;
     v.widgets.hovered.weak_bg_fill = t.hover;
     v.widgets.hovered.bg_stroke = Stroke::new(1.0, t.border_strong);
     v.widgets.hovered.fg_stroke = Stroke::new(1.0, t.text);
-    v.widgets.hovered.corner_radius = CornerRadius::same(4);
+    v.widgets.hovered.corner_radius = CornerRadius::same(6);
     v.widgets.active.bg_fill = t.pressed;
     v.widgets.active.weak_bg_fill = t.pressed;
     v.widgets.active.fg_stroke = Stroke::new(1.0, t.text);
-    v.widgets.active.corner_radius = CornerRadius::same(4);
+    v.widgets.active.corner_radius = CornerRadius::same(6);
     v.widgets.open.bg_fill = t.pressed;
-    v.widgets.open.weak_bg_fill = t.pressed;
+    // The topmost egui window also uses this fill for its title bar. Keep it on the same
+    // surface as the body instead of painting the old solid grey header strip.
+    v.widgets.open.weak_bg_fill = t.menu;
+    v.widgets.open.bg_stroke = Stroke::new(1.0, t.accent);
+    v.widgets.open.fg_stroke = Stroke::new(1.0, t.text);
+    v.widgets.open.corner_radius = CornerRadius::same(6);
+    v.widgets.active.bg_stroke = Stroke::new(1.0, t.accent);
     v.popup_shadow = egui::Shadow { offset: [0, 4], blur: 16, spread: 0, color: Color32::from_black_alpha(if t.dark { 120 } else { 40 }) };
     v.window_shadow = egui::Shadow { offset: [0, 8], blur: 28, spread: 0, color: Color32::from_black_alpha(if t.dark { 140 } else { 50 }) };
     v
+}
+
+/// Shared surface for editor dialogs, including the colour picker. Menus keep their compact
+/// padding; forms get the same opaque surface, border and radius as the shell's dialogs.
+pub fn dialog_frame(ctx: &egui::Context) -> egui::Frame {
+    let t = Tokens::get(ctx);
+    egui::Frame::NONE.fill(t.menu).stroke(Stroke::new(1.0, t.border_strong)).corner_radius(8).inner_margin(20).shadow(egui::Shadow {
+        offset: [0, 8],
+        blur: 28,
+        spread: 0,
+        color: Color32::from_black_alpha(if t.dark { 100 } else { 28 }),
+    })
+}
+
+/// All document-property windows share one frame and viewport bounds. A scrollable body keeps
+/// long forms and their actions reachable on small screens, without changing their commands,
+/// keyboard shortcuts, close buttons or draggable title bars.
+pub fn dialog_window(ctx: &egui::Context, title: impl Into<egui::WidgetText>) -> egui::Window<'static> {
+    let available = ctx.content_rect().size() - egui::vec2(48.0, 48.0);
+    let title: egui::WidgetText = title.into();
+    egui::Window::new(title)
+        .frame(dialog_frame(ctx))
+        .title_frame(egui::Frame::NONE.fill(Tokens::get(ctx).menu).corner_radius(8).inner_margin(egui::Margin {
+            left: 20,
+            right: 20,
+            top: 16,
+            bottom: 12,
+        }))
+        .collapsible(false)
+        .resizable(false)
+        .default_width(520.0_f32.min(available.x.max(240.0)))
+        .max_width(available.x.max(240.0))
+        .max_height(available.y.max(180.0))
+}
+
+/// Size to the contents up to the viewport limit. Using a shrinking body scroll area avoids
+/// egui Window's fixed 420-point scrolling height and unnecessary scrollbars in short forms.
+pub fn dialog_body<R>(ui: &mut egui::Ui, body: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    dialog_ui(ui);
+    let viewport = ui.ctx().content_rect();
+    ui.set_max_height((viewport.height() - 148.0).max(100.0));
+    egui::ScrollArea::both()
+        .max_width((viewport.width() - 88.0).max(160.0))
+        .max_height((viewport.height() - 148.0).max(100.0))
+        .auto_shrink([true, true])
+        .show(ui, body)
+        .inner
+}
+
+/// Scoped form density. This is applied inside every dialog rather than to the whole context,
+/// so the ribbon, document layout and compact floating toolbars retain their existing geometry.
+pub fn dialog_ui(ui: &mut egui::Ui) {
+    let style = ui.style_mut();
+    office_ui_fonts::apply_style(style);
+    style.spacing.item_spacing = egui::vec2(10.0, 8.0);
+    style.spacing.button_padding = egui::vec2(12.0, 7.0);
+    style.spacing.interact_size = egui::vec2(32.0, 32.0);
+    style.spacing.menu_margin = egui::Margin::same(6);
+    for state in [
+        &mut style.visuals.widgets.inactive,
+        &mut style.visuals.widgets.hovered,
+        &mut style.visuals.widgets.active,
+        &mut style.visuals.widgets.open,
+    ] {
+        state.corner_radius = CornerRadius::same(6);
+    }
+}
+
+/// Footer shared by property forms and confirmation dialogs. The closure chooses the buttons
+/// and retains each dialog's existing Enter/Escape behavior.
+pub fn dialog_actions<R>(ui: &mut egui::Ui, actions: impl FnOnce(&mut egui::Ui) -> R) -> egui::InnerResponse<R> {
+    ui.add_space(12.0);
+    ui.separator();
+    ui.add_space(4.0);
+    ui.allocate_ui_with_layout(
+        egui::vec2(ui.available_width(), 36.0),
+        egui::Layout::right_to_left(egui::Align::Center).with_main_wrap(true),
+        |ui| {
+            ui.spacing_mut().item_spacing.x = 8.0;
+            ui.spacing_mut().button_padding = egui::vec2(14.0, 8.0);
+            ui.spacing_mut().interact_size.y = 36.0;
+            actions(ui)
+        },
+    )
 }
 
 pub fn c32(c: office_word_doc::Rgb) -> Color32 {

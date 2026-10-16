@@ -1,4 +1,5 @@
 export const AUTOSAVE_INTERVAL_MS = 30_000
+export const AUTOSAVE_DEFER_MS = 1_200
 export const AUTOSAVE_MAX_BACKOFF_MS = 300_000
 
 /** The shell supplies current state; this module never opens a dialog or a file. */
@@ -35,10 +36,11 @@ export interface AutosaveOptions {
    * Start the shell's save transaction synchronously, and recheck the captured
    * key/fileId after exporting. Reject Save As / conversion requests instead of
    * opening a dialog, and never route this callback to a browser download.
-   * Return true after the exact exported revision has been acknowledged, or
-   * when an unfinished editor draft safely defers this tick without exporting.
+   * Return true only after the exact exported revision has been acknowledged.
+   * Return 'deferred' for an unfinished editor draft; it will be checked again
+   * shortly without reporting a successful save or increasing failure backoff.
    */
-  save(target: AutosaveTarget): Promise<boolean>
+  save(target: AutosaveTarget): Promise<boolean | 'deferred'>
   onError?(error: unknown, target: AutosaveTarget | undefined, retryInMs: number): void
   intervalMs?: number
   maxBackoffMs?: number
@@ -59,10 +61,10 @@ const defaultClock: AutosaveClock = {
   clearTimeout: timer => globalThis.clearTimeout(timer as ReturnType<typeof setTimeout>),
 }
 
-function eligibleTarget(state: AutosaveState): AutosaveTarget | undefined {
+function eligibleTarget(state: AutosaveState, allowTransient = false): AutosaveTarget | undefined {
   if (state.enabled !== true || state.native !== true || state.dirty !== true || state.ready !== true ||
-      state.canSaveDirectly !== true || state.requiresSaveAs !== false || state.busy !== false ||
-      state.modal !== false || state.composing !== false || state.remoteEditing !== false ||
+      state.canSaveDirectly !== true || state.requiresSaveAs !== false || state.remoteEditing !== false ||
+      (!allowTransient && (state.busy !== false || state.modal !== false || state.composing !== false)) ||
       !state.key?.trim() || !state.fileId?.trim()) return
   // Capture values, not the reactive document object that the shell may replace.
   return Object.freeze({ key: state.key, fileId: state.fileId })
@@ -102,7 +104,7 @@ export function createAutosaveScheduler(options: AutosaveOptions): AutosaveSched
     timer = undefined
   }
 
-  function notify() {
+  function notify(delay = intervalMs) {
     if (disposed) return
     const state = readState()
     if (disposed) return
@@ -115,7 +117,7 @@ export function createAutosaveScheduler(options: AutosaveOptions): AutosaveSched
       scheduled = false
       timer = undefined
       void attempt()
-    }, intervalMs)
+    }, delay)
   }
 
   async function attempt() {
@@ -123,13 +125,18 @@ export function createAutosaveScheduler(options: AutosaveOptions): AutosaveSched
     const state = readState()
     const target = state && eligibleTarget(state)
     if (disposed) return
-    if (!target) { notify(); return }
+    // Once due, a short typing burst or dialog must not cost another full
+    // interval. Keep drafts intact and retry as soon as the editor is ready.
+    if (!target) { notify(state && eligibleTarget(state, true) ? Math.min(intervalMs, AUTOSAVE_DEFER_MS) : intervalMs); return }
     const id = JSON.stringify([target.key, target.fileId])
     if ((retries.get(id)?.notBefore ?? 0) > clock.now()) { notify(); return }
     running = true
+    let deferred = false
     try {
-      if (!await options.save(target)) throw Error('自动保存未完成，稍后重试。')
-      if (!disposed) retries.delete(id)
+      const result = await options.save(target)
+      if (result === 'deferred') deferred = true
+      else if (result !== true) throw Error('自动保存未完成，稍后重试。')
+      else if (!disposed) retries.delete(id)
     } catch (error) {
       if (!disposed) {
         const failures = Math.min((retries.get(id)?.failures ?? 0) + 1, 32)
@@ -139,7 +146,7 @@ export function createAutosaveScheduler(options: AutosaveOptions): AutosaveSched
       }
     } finally {
       running = false
-      notify()
+      notify(deferred ? Math.min(intervalMs, AUTOSAVE_DEFER_MS) : intervalMs)
     }
   }
 

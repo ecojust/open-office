@@ -560,6 +560,73 @@ fn stamps_draw_their_label_and_by_line() {
 }
 
 #[test]
+fn chinese_stamp_authors_keep_portable_outlines_and_logical_text_after_reopen() {
+    if !office_pdf_fonts::CRAFT_FONTS.iter().any(|face| face.covers("Hans") || face.covers("Hant") || face.family == "LXGW WenKai") {
+        // Only builds with no Chinese font input may skip; a configured face must work.
+        return;
+    }
+    let faces = office_pdf_fonts::document_japanese_fonts_for_style(false, false);
+    for ch in "张三".chars() {
+        assert!(
+            faces.iter().any(|face| office_pdf_fonts::japanese_glyph_from(face, ch).is_ok()),
+            "the configured Chinese document font must provide a usable outline for {ch}"
+        );
+    }
+    let mut doc = fixture();
+    let by = "By 张三 at 2:14 pm, Oct 02, 2026";
+    let shape = Shape::Stamp { rect: [100.0, 100.0, 260.0, 142.0], stamp: StampKind::DynApproved, by: Some(by.into()) };
+    let i = add_annotation(
+        &mut doc,
+        &NewAnnotation { page: 0, style: Style::default_for(&shape), shape, contents: String::new(), author: "张三".into() },
+        &meta("chinese-author"),
+    )
+    .unwrap();
+    let logical: String = by.encode_utf16().map(|unit| format!("{unit:04X}")).collect();
+    let check = |doc: &Document| {
+        let d = &list(doc, 0)[i];
+        assert_eq!(text(d, b"T"), "张三");
+        assert_eq!(text(d, b"PCByLine"), by);
+        assert_eq!(office_pdf_fonts::undrawn_mark(d), None, "available Chinese glyphs must not be marked missing");
+        let ap = ap_content(doc, d);
+        assert!(ap.contains(&format!("/ActualText <FEFF{logical}>")), "logical author retained");
+        assert!(ap.contains("(APPROVED) Tj") && !ap.contains("(?)"), "no replacement characters: {ap}");
+        assert!(ap.matches("f Q\n").count() >= 2, "both Chinese characters have embedded vector outlines");
+        assert_eq!(ap.matches("BT").count(), ap.matches("ET").count(), "balanced text objects");
+    };
+    check(&doc);
+    check(&reopen(&doc));
+    set_style(&mut doc, 0, i, Some([0.2, 0.3, 0.7]), Some(0.8), None, None, &meta("restyle")).unwrap();
+    check(&reopen(&doc));
+    set_rect(&mut doc, 0, i, [100.0, 100.0, 420.0, 184.0], &meta("resize")).unwrap();
+    check(&reopen(&doc));
+}
+
+#[test]
+fn unsupported_stamp_authors_remain_marked_without_losing_their_text() {
+    let mut doc = fixture();
+    let by = "By \u{10ffff} at 2:14 pm";
+    let shape = Shape::Stamp { rect: [100.0, 100.0, 260.0, 142.0], stamp: StampKind::DynApproved, by: Some(by.into()) };
+    let i = add_annotation(&mut doc, &new(0, shape), &meta("unsupported-author")).unwrap();
+    let saved = reopen(&doc);
+    let d = &list(&saved, 0)[i];
+    assert_eq!(text(d, b"PCByLine"), by);
+    assert_eq!(office_pdf_fonts::undrawn_mark(d), Some('\u{10ffff}'));
+    assert!(!ap_content(&saved, d).contains("/ActualText"), "unsupported text must not be claimed as rendered");
+}
+
+#[test]
+fn overlong_stamp_author_outlines_are_bounded_and_original_text_is_preserved() {
+    let mut doc = fixture();
+    let by = format!("By {}", "张".repeat(257));
+    let shape = Shape::Stamp { rect: [100.0, 100.0, 260.0, 142.0], stamp: StampKind::DynApproved, by: Some(by.clone()) };
+    let i = add_annotation(&mut doc, &new(0, shape), &meta("bounded-author")).unwrap();
+    let d = &list(&doc, 0)[i];
+    assert_eq!(text(d, b"PCByLine"), by);
+    assert_eq!(office_pdf_fonts::undrawn_mark(d), Some('张'));
+    assert!(!ap_content(&doc, d).contains("/ActualText"));
+}
+
+#[test]
 fn links_are_added_edited_listed_and_removed() {
     use crate::links::{self, Highlight, LinkAction, LinkStyle};
     let mut doc = fixture();
@@ -1184,14 +1251,14 @@ fn comment_text_the_standard_fonts_cannot_draw_is_kept_and_marked() {
     .unwrap();
     assert_eq!(mark(&doc, f), Some('张'));
     let stamp =
-        Shape::Stamp { rect: [100.0, 100.0, 260.0, 142.0], stamp: StampKind::DynApproved, by: Some("By 张三 at 2:14 pm, Oct 02, 2026".into()) };
+        Shape::Stamp { rect: [100.0, 100.0, 260.0, 142.0], stamp: StampKind::DynApproved, by: Some("By \u{10ffff} at 2:14 pm, Oct 02, 2026".into()) };
     let s = add_annotation(
         &mut doc,
         &NewAnnotation { page: 0, style: Style::default_for(&stamp), shape: stamp, contents: String::new(), author: "张三".into() },
         &meta("s"),
     )
     .unwrap();
-    assert_eq!(mark(&doc, s), Some('张'));
+    assert_eq!(mark(&doc, s), Some('\u{10ffff}'));
     // Our own `?` appearance is redrawn on a restyle; Western European text clears the mark.
     set_style(&mut doc, 0, t, Some([1.0, 0.0, 0.0]), None, None, None, &meta("")).unwrap();
     assert_eq!(mark(&doc, t), Some('签'));

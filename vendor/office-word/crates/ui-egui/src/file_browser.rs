@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use egui::{Align2, Rect, Sense, Ui, pos2, vec2};
 
 use crate::file_dialogs::{AfterPick, FileDialogRequest, open_filters};
-use crate::theme::{APP_COLOR, Tokens, regular};
+use crate::theme::{Tokens, regular};
 use crate::{WordApp, icons};
 
 /// At most this many entries are listed; a bigger folder shows the first ones and says so.
@@ -304,15 +304,15 @@ pub(crate) fn show(app: &mut WordApp, ctx: &egui::Context) {
     let t = Tokens::get(ctx);
     let mut open = true;
     let mut done: Option<Option<PathBuf>> = None;
-    egui::Window::new(tl!(b.title()))
+    crate::theme::dialog_window(ctx, tl!(b.title()))
         .id(egui::Id::new("builtin_file_browser"))
-        .collapsible(false)
-        .resizable(false)
         .anchor(Align2::CENTER_CENTER, vec2(0.0, -20.0))
         .open(&mut open)
         .show(ctx, |ui| {
-            ui.set_width(620.0);
-            done = body(ui, &mut b, &t);
+            crate::theme::dialog_body(ui, |ui| {
+                ui.set_width(620.0);
+                done = body(ui, &mut b, &t);
+            });
         });
     if !open {
         done = Some(None);
@@ -439,12 +439,10 @@ fn body(ui: &mut Ui, b: &mut FileBrowser, t: &Tokens) -> Option<Option<PathBuf>>
     ui.add_space(8.0);
     let mut cancel = ui.input(|i| i.key_pressed(egui::Key::Escape));
     let enter = !location_done && ui.input(|i| i.key_pressed(egui::Key::Enter));
-    ui.horizontal(|ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            cancel |= ui.button(tl!("Cancel")).clicked();
-            let ok = ui.add(egui::Button::new(egui::RichText::new(tl!(b.ok_label())).color(egui::Color32::WHITE)).fill(APP_COLOR));
-            pick |= ok.clicked() || enter;
-        });
+    crate::theme::dialog_actions(ui, |ui| {
+        cancel |= ui.button(tl!("Cancel")).clicked();
+        let ok = ui.add(crate::widgets::primary_button(ui, tl!(b.ok_label())));
+        pick |= ok.clicked() || enter;
     });
     if cancel {
         return Some(None);

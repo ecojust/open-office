@@ -18,6 +18,9 @@ Comments (annotations), ISO 32000-2 §12.5. Layer L3, depends on `office-pdf-cos
   mark's overlay text, which becomes page content when applied; and a restyle or resize of a
   comment another program drew with a font that has those characters, whose appearance is kept
   rather than redrawn with `?` (new text for it is taken).
+  Dynamic stamp author lines additionally use the approved bundled CJK document face: Chinese
+  names become bounded vector outlines with `ActualText`, preserving their appearance and logical
+  text on save/reopen without an installed font. Missing glyphs retain the marked fallback.
 - **Edits:** reply (`/IRT`), set review status (a `/State` reply, as Acrobat's "Set status"
   does), change text, move, resize, restyle, delete (with pop-up and replies).
 

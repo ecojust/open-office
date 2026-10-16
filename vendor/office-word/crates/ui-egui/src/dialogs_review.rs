@@ -65,17 +65,14 @@ pub fn body(app: &mut WordApp, ui: &mut Ui, d: &mut ReviewDialog) -> bool {
 /// OK / Cancel; returns (ok, cancel). `ok_enabled` greys OK out.
 fn buttons(ui: &mut Ui, ok_enabled: bool) -> (bool, bool) {
     let mut r = (false, false);
-    ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button(tl!("Cancel")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-                r.1 = true;
-            }
-            let okb = ui.add_enabled(ok_enabled, crate::widgets::primary_button(ui, tl!("OK")));
-            if okb.clicked() {
-                r.0 = true;
-            }
-        });
+    crate::theme::dialog_actions(ui, |ui| {
+        if ui.button(tl!("Cancel")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            r.1 = true;
+        }
+        let okb = ui.add_enabled(ok_enabled, crate::widgets::primary_button(ui, tl!("OK")));
+        if okb.clicked() {
+            r.0 = true;
+        }
     });
     r
 }

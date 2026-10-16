@@ -55,7 +55,8 @@ impl Entry {
         }
         let mut session = Session::new();
         if bytes.is_empty() {
-            session.execute("file.new", &json!({})).map_err(clean_error)?;
+            let presentation = crate::starter::presentation()?;
+            session.add_document(DocState::new(presentation, None, name.to_owned()));
         } else {
             if office_presentation_pptx::is_encrypted(bytes) {
                 return Err("暂不支持密码保护的演示文稿。".into());
@@ -150,6 +151,45 @@ mod tests {
         Entry::new("Presentation.pptx", &[], 1, Services::default()).unwrap()
     }
     #[test]
+    fn every_new_document_starts_with_the_clean_three_slide_template() {
+        for name in ["演示文稿.pptx", "演示文稿.potx", "演示文稿.ppsx"] {
+            let mut entry = Entry::new(name, &[], 1, Services::default()).unwrap();
+            let snapshot = entry.snapshot("new", None).unwrap();
+            assert_eq!(snapshot["slides"].as_array().unwrap().len(), 3);
+            assert_eq!(snapshot["activeSlide"], 0);
+            assert_eq!(snapshot["revision"], 1);
+            assert_eq!(snapshot["dirty"], false);
+            assert_eq!(snapshot["canUndo"], false);
+            assert_eq!(snapshot["canRedo"], false);
+            assert!(entry.can_close(1.0, 1.0, false).unwrap());
+        }
+    }
+    #[test]
+    fn editing_and_discarding_returns_to_all_three_starter_slides() {
+        let mut entry = blank();
+        let before = entry.app.session.doc().unwrap().doc.clone();
+        let title = before.slides[0].shapes.iter().find(|shape| shape.name == "主标题").unwrap().id;
+        entry.app.run("text.set", json!({"id":title,"text":"我的新演示"})).unwrap();
+        assert!(entry.dirty());
+        assert_eq!(entry.app.session.doc().unwrap().doc.slides[0].title(), "我的新演示");
+        let current = entry.snapshot("new", None).unwrap()["revision"].as_f64().unwrap();
+        assert!(entry.discard(1.0, current).unwrap());
+        assert_eq!(entry.app.session.doc().unwrap().doc, before);
+        assert!(!entry.dirty());
+        assert!(entry.app.session.doc().unwrap().history.undo.is_empty());
+    }
+    #[test]
+    fn opening_existing_files_keeps_their_slide_count_and_content() {
+        let original = office_presentation_model::defaults::new_presentation(None);
+        let bytes = office_presentation_pptx::export(&original).unwrap();
+        let entry = Entry::new("已有文稿.pptx", &bytes, 1, Services::default()).unwrap();
+        let reopened = &entry.app.session.doc().unwrap().doc;
+        assert_eq!(reopened.slides.len(), 1);
+        assert!(reopened.media.is_empty());
+        assert!(!entry.dirty());
+        assert!(reopened.slides.iter().flat_map(|slide| &slide.shapes).filter_map(|shape| shape.text.as_ref()).all(|body| body.is_empty()));
+    }
+    #[test]
     fn pptx_round_trip_preserves_unicode_and_formatting_without_clearing_dirty() {
         let mut entry = blank();
         entry.app.run("insert.textBox", json!({"rect":[80,90,500,90],"text":"Open Office 演示😀"})).unwrap();
@@ -201,7 +241,7 @@ mod tests {
         let mut second = Entry::new("Other.pptx", &[], 2, Services::default()).unwrap();
         let snapshot = first.snapshot("one", None).unwrap();
         first.app.run("slide.new", json!({})).unwrap();
-        assert_eq!(second.snapshot("two", None).unwrap()["slides"].as_array().unwrap().len(), 1);
+        assert_eq!(second.snapshot("two", None).unwrap()["slides"].as_array().unwrap().len(), 3);
         assert!(!first.can_close(1.0, snapshot["revision"].as_f64().unwrap(), true).unwrap());
         let current = first.snapshot("one", None).unwrap()["revision"].as_f64().unwrap();
         assert!(!first.can_close(1.0, current, false).unwrap());

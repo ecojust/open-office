@@ -663,28 +663,25 @@ fn mark_ui(app: &mut WordApp, ui: &mut Ui, f: &mut MarkForm) -> Next {
         ui.label(egui::RichText::new(&f.message).small());
     }
     let mut close = false;
-    ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button(tl!("Close")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-                close = true;
-            }
-            let can = !f.entry.trim().is_empty();
-            if ui.add_enabled(can, egui::Button::new(tl!("Mark All"))).clicked() {
-                f.message = match app.run("references.markEntry", f.params(true)) {
-                    Ok(v) => {
-                        crate::i18n::fmt(tl!("{n} entries marked."), &[("n", &v.get("marked").and_then(Value::as_u64).unwrap_or(0).to_string())])
-                    }
-                    Err(e) => e,
-                };
-            }
-            if ui.add_enabled(can, crate::widgets::primary_button(ui, tl!("Mark"))).clicked() {
-                f.message = match app.run("references.markEntry", f.params(false)) {
-                    Ok(_) => tl!("Entry marked.").to_string(),
-                    Err(e) => e,
-                };
-            }
-        });
+    crate::theme::dialog_actions(ui, |ui| {
+        if ui.button(tl!("Close")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            close = true;
+        }
+        let can = !f.entry.trim().is_empty();
+        if ui.add_enabled(can, egui::Button::new(tl!("Mark All"))).clicked() {
+            f.message = match app.run("references.markEntry", f.params(true)) {
+                Ok(v) => {
+                    crate::i18n::fmt(tl!("{n} entries marked."), &[("n", &v.get("marked").and_then(Value::as_u64).unwrap_or(0).to_string())])
+                }
+                Err(e) => e,
+            };
+        }
+        if ui.add_enabled(can, crate::widgets::primary_button(ui, tl!("Mark"))).clicked() {
+            f.message = match app.run("references.markEntry", f.params(false)) {
+                Ok(_) => tl!("Entry marked.").to_string(),
+                Err(e) => e,
+            };
+        }
     });
     if close { Next::Close } else { Next::Stay }
 }
@@ -1119,13 +1116,10 @@ fn sources_ui(app: &mut WordApp, ui: &mut Ui, selected: &mut Option<usize>) -> N
             next = Next::Close;
         }
     });
-    ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button(tl!("Close")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-                next = Next::Close;
-            }
-        });
+    crate::theme::dialog_actions(ui, |ui| {
+        if ui.button(tl!("Close")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            next = Next::Close;
+        }
     });
     next
 }

@@ -37,6 +37,9 @@ impl Entry {
             }
             let mut app = OfficePdfApp::new();
             app.embedded = true;
+            // The host supplies an explicit local identity. A browser cannot read
+            // an operating-system login, and "Guest" is not the user's signature.
+            app.comment_prefs.author.clear();
             app.set_option("language", "zh-Hans")?;
             #[cfg(target_arch = "wasm32")]
             {
@@ -189,10 +192,18 @@ impl Entry {
         if command == "ui.set" {
             let key = params.get("key").and_then(Value::as_str).ok_or("缺少视图选项。")?;
             let value = params.get("value").and_then(Value::as_str).ok_or("缺少视图选项值。")?;
-            if !matches!(key, "page" | "zoom" | "mode" | "panel" | "find" | "select" | "fields") {
+            if !matches!(key, "page" | "zoom" | "mode" | "panel" | "find" | "select" | "fields" | "author") {
                 return Err("此选项由 Open Office 全局设置管理。".into());
             }
-            self.app.set_option(key, value)?;
+            if key == "author" {
+                let author = value.trim();
+                if value.chars().any(char::is_control) || author.chars().count() > 200 {
+                    return Err("署名最多 200 个字符，不能包含换行或控制字符。".into());
+                }
+                self.app.set_option(key, author)?;
+            } else {
+                self.app.set_option(key, value)?;
+            }
             return Ok(Value::Null);
         }
         self.commit_pending()?;
@@ -335,6 +346,49 @@ mod tests {
     fn blank() -> Entry {
         Entry::new("Test.pdf", &[], 1).unwrap()
     }
+    #[test]
+    fn explicit_author_is_unicode_bounded_and_does_not_edit_the_document() {
+        let mut entry = blank();
+        assert_eq!(entry.app.comment_prefs.author, "");
+        assert!(!entry.app.session.stamp_by_line("").contains("By "));
+        let revision = entry.revision;
+        entry.command("ui.set", &json!({"key":"author", "value":"  陈江 · Open Office  "})).unwrap();
+        assert_eq!(entry.app.comment_prefs.author, "陈江 · Open Office");
+        assert_eq!(entry.snapshot("test").unwrap()["ui"]["author"], "陈江 · Open Office");
+        assert_eq!(entry.revision, revision);
+        assert!(!entry.dirty());
+        for value in ["invalid\nname".to_owned(), "invalid\u{85}name".to_owned(), "𠮷".repeat(201)] {
+            assert!(entry.command("ui.set", &json!({"key":"author", "value":value})).is_err());
+            assert_eq!(entry.app.comment_prefs.author, "陈江 · Open Office");
+        }
+        entry.command("ui.set", &json!({"key":"author", "value":""})).unwrap();
+        assert_eq!(entry.app.comment_prefs.author, "");
+        assert!(!entry.dirty());
+    }
+
+    #[test]
+    fn changing_identity_leaves_already_placed_stamp_authors_unchanged_after_save() {
+        use office_pdf_engine::{NewAnnotation, Shape, StampKind, Style};
+        let mut entry = blank();
+        entry.command("ui.set", &json!({"key":"author", "value":"Ada"})).unwrap();
+        let author = entry.app.comment_prefs.author.clone();
+        let shape = Shape::Stamp {
+            rect: [60.0, 60.0, 260.0, 102.0],
+            stamp: StampKind::DynApproved,
+            by: Some(entry.app.session.stamp_by_line(&author)),
+        };
+        let id = entry.id().unwrap();
+        entry.app.session.apply(id, Edit::AddAnnotation(NewAnnotation {
+            page: 0, style: Style::default_for(&shape), shape, contents: String::new(), author,
+        })).unwrap();
+        entry.command("ui.set", &json!({"key":"author", "value":"陈江"})).unwrap();
+        let saved = entry.export("pdf").unwrap();
+        let reopened = Entry::new("Saved.pdf", &saved, 2).unwrap();
+        let annotations = &reopened.app.session.get(reopened.id().unwrap()).unwrap().info.annotations;
+        assert_eq!(annotations.len(), 1);
+        assert_eq!(annotations[0].author.as_deref(), Some("Ada"));
+    }
+
     #[test]
     fn export_preserves_unsaved_edits_and_receipts_reject_newer_changes() {
         let mut entry = blank();

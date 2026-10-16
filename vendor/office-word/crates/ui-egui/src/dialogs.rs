@@ -1488,9 +1488,11 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
         Dialog::Layout(d) => d.title(),
     };
     let id = egui::Id::new(("dialog", title));
-    let shown = place_dialog(ctx, id, egui::Window::new(tl!(title)).id(id).collapsible(false).resizable(false)).open(&mut open).show(ctx, |ui| {
-        ui.set_min_width(340.0);
-        close = body(app, ui, &mut d);
+    let shown = place_dialog(ctx, id, crate::theme::dialog_window(ctx, tl!(title)).id(id)).open(&mut open).show(ctx, |ui| {
+        crate::theme::dialog_body(ui, |ui| {
+            ui.set_min_width(340.0);
+            close = body(app, ui, &mut d);
+        });
     });
     if shown.is_some() {
         count_dialog_frame(ctx, id);
@@ -1624,19 +1626,16 @@ fn page_paper_group(ui: &mut Ui, paper: &mut (f32, f32), landscape: &mut bool, c
 
 pub(crate) fn buttons(ui: &mut Ui, ok: &str) -> (bool, bool) {
     let mut r = (false, false);
-    ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            // Enter and Escape belong to the Colors dialog while it is open above this one.
-            let keys = !crate::colors::is_open(ui.ctx());
-            if ui.button(tl!("Cancel")).clicked() || (keys && ui.input(|i| i.key_pressed(egui::Key::Escape))) {
-                r.1 = true;
-            }
-            let okb = ui.add(crate::widgets::primary_button(ui, ok));
-            if okb.clicked() || (keys && ui.input(|i| i.key_pressed(egui::Key::Enter))) {
-                r.0 = true;
-            }
-        });
+    crate::theme::dialog_actions(ui, |ui| {
+        // Enter and Escape belong to the Colors dialog while it is open above this one.
+        let keys = !crate::colors::is_open(ui.ctx());
+        if ui.button(tl!("Cancel")).clicked() || (keys && ui.input(|i| i.key_pressed(egui::Key::Escape))) {
+            r.1 = true;
+        }
+        let okb = ui.add(crate::widgets::primary_button(ui, ok));
+        if okb.clicked() || (keys && ui.input(|i| i.key_pressed(egui::Key::Enter))) {
+            r.0 = true;
+        }
     });
     r
 }
@@ -2042,27 +2041,27 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
                 ui.label(egui::RichText::new(message.as_str()).weak());
             }
             let mut close = false;
-            ui.horizontal(|ui| {
-                if replace_mode {
-                    if ui.button(tl!("Replace All")).clicked() {
-                        match app.run("edit.replaceAll", opts.clone()) {
-                            Ok(r) => *message = format!("All done. We made {} replacements.", r["replaced"]),
-                            Err(e) => *message = e,
-                        }
-                    }
-                    if ui.button(tl!("Replace")).clicked() {
-                        let _ = app.run("edit.replace", opts.clone());
-                    }
+            crate::theme::dialog_actions(ui, |ui| {
+                if ui.button(tl!("Close")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                    close = true;
                 }
-                if ui.button(tl!("Find Next")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                if ui.add(crate::widgets::primary_button(ui, tl!("Find Next"))).clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                     // One step per click: `edit.find` would select a match itself, and the step after it skip one.
                     match app.run("edit.findNext", opts.clone()) {
                         Ok(r) => *message = format!("Match {} of {}", r["index"].as_u64().unwrap_or(0) + 1, r["count"]),
                         Err(e) => *message = e,
                     }
                 }
-                if ui.button(tl!("Close")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-                    close = true;
+                if replace_mode {
+                    if ui.button(tl!("Replace")).clicked() {
+                        let _ = app.run("edit.replace", opts.clone());
+                    }
+                    if ui.button(tl!("Replace All")).clicked() {
+                        match app.run("edit.replaceAll", opts.clone()) {
+                            Ok(r) => *message = format!("All done. We made {} replacements.", r["replaced"]),
+                            Err(e) => *message = e,
+                        }
+                    }
                 }
             });
             close
@@ -2692,19 +2691,17 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
         Dialog::DiscardRecovery { name, .. } => {
             ui.label(crate::i18n::fmt(tl!("Discard the recovery copy of {name}?"), &[("name", name)]));
             ui.label(tl!("This cannot be undone. Your original file stays unchanged."));
-            let answer = ui
-                .horizontal(|ui| {
-                    let cancel = ui.button(tl!("Cancel"));
-                    let discard = ui.button(tl!("Discard"));
-                    if cancel.clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-                        Some("cancel")
-                    } else if discard.clicked() {
-                        Some("discard")
-                    } else {
-                        None
-                    }
-                })
-                .inner;
+            let answer = crate::theme::dialog_actions(ui, |ui| {
+                let cancel = ui.button(tl!("Cancel"));
+                let discard = ui.button(tl!("Discard"));
+                if cancel.clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                    Some("cancel")
+                } else if discard.clicked() {
+                    Some("discard")
+                } else {
+                    None
+                }
+            }).inner;
             if let Some(answer) = answer {
                 app.dialog = Some(d.clone());
                 let result = app.run("ui.recoveryDiscard", json!({"answer": answer}));
@@ -2723,15 +2720,11 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
                 ui.add_space(4.0);
                 ui.label(egui::RichText::new(message.as_str()).color(ui.visuals().error_fg_color));
             }
-            ui.add_space(8.0);
-            let buttons = ui.horizontal(|ui| {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let cancel = ui.button(tl!("Cancel"));
-                    let dont_save = ui.button(tl!("Don't Save"));
-                    let save = ui.add(crate::widgets::primary_button(ui, tl!("Save")));
-                    [(cancel, "cancel"), (dont_save, "dontSave"), (save, "save")]
-                })
-                .inner
+            let buttons = crate::theme::dialog_actions(ui, |ui| {
+                let cancel = ui.button(tl!("Cancel"));
+                let dont_save = ui.button(tl!("Don't Save"));
+                let save = ui.add(crate::widgets::primary_button(ui, tl!("Save")));
+                [(cancel, "cancel"), (dont_save, "dontSave"), (save, "save")]
             });
             let buttons = buttons.inner;
             // The keyboard alone answers, as in Word (#861): Save has focus when the prompt opens,
@@ -3510,10 +3503,8 @@ fn bookmark(app: &mut WordApp, ui: &mut Ui, name: &mut String, by_location: &mut
     }
     ui.add_space(8.0);
     let mut close = ui.input(|i| i.key_pressed(egui::Key::Escape));
-    ui.horizontal(|ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            close |= ui.button(if *deleted { tl!("Close") } else { tl!("Cancel") }).clicked();
-        });
+    crate::theme::dialog_actions(ui, |ui| {
+        close |= ui.button(if *deleted { tl!("Close") } else { tl!("Cancel") }).clicked();
     });
     close
 }
@@ -3766,14 +3757,13 @@ fn goto_body(app: &mut WordApp, ui: &mut Ui, what: &mut GoToWhat, target: &mut S
     let mut close = false;
     let mut go: Option<Value> = None;
     let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
-    ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        let page_step = *what == GoToWhat::Page && target.trim().is_empty();
-        if page_step && ui.button(tl!("Previous")).clicked() {
-            go = Some(json!({"pageBy": -1}));
+    crate::theme::dialog_actions(ui, |ui| {
+        if ui.button(tl!("Close")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            close = true;
         }
+        let page_step = *what == GoToWhat::Page && target.trim().is_empty();
         let label = if page_step { tl!("Next") } else { tl!("Go To") };
-        if ui.button(label).clicked() || enter {
+        if ui.add(crate::widgets::primary_button(ui, label)).clicked() || enter {
             go = match what {
                 GoToWhat::Page => match goto_page(target) {
                     Some(p) => Some(p),
@@ -3786,8 +3776,8 @@ fn goto_body(app: &mut WordApp, ui: &mut Ui, what: &mut GoToWhat, target: &mut S
                 GoToWhat::Bookmark => None,
             };
         }
-        if ui.button(tl!("Close")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-            close = true;
+        if page_step && ui.button(tl!("Previous")).clicked() {
+            go = Some(json!({"pageBy": -1}));
         }
     });
     if let Some(params) = go {

@@ -161,19 +161,16 @@ pub fn body(app: &mut WordApp, ui: &mut Ui, f: &mut ControlForm) -> bool {
         _ => {}
     }
     let mut done = false;
-    ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button(tl!("Cancel")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-                done = true;
+    crate::theme::dialog_actions(ui, |ui| {
+        if ui.button(tl!("Cancel")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            done = true;
+        }
+        if ui.add(crate::widgets::primary_button(ui, tl!("OK"))).clicked() {
+            match app.run("developer.properties", f.params()) {
+                Ok(_) => done = true,
+                Err(e) => app.status(e),
             }
-            if ui.button(egui::RichText::new(tl!("OK")).color(egui::Color32::WHITE)).clicked() {
-                match app.run("developer.properties", f.params()) {
-                    Ok(_) => done = true,
-                    Err(e) => app.status(e),
-                }
-            }
-        });
+        }
     });
     done
 }

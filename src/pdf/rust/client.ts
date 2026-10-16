@@ -2,6 +2,7 @@ import type { NativeDocument } from '../../types'
 import type { Appearance } from '../../shared/appearance'
 import { base64ToBytes } from '../../shared/document'
 import { createId } from '../../shared/id'
+import { normalizePdfAuthor, pdfAuthorPreference } from '../author'
 import type { OfficePdfEvent, OfficePdfFileAction, OfficePdfSnapshot } from './types'
 
 interface OfficePdfHost {
@@ -41,6 +42,11 @@ function snapshotOf(raw: string, sessionId: string): OfficePdfSnapshot {
   const value = JSON.parse(raw) as OfficePdfSnapshot
   if (value.sessionId !== sessionId || !Number.isSafeInteger(value.documentId) || !Number.isSafeInteger(value.revision) || value.revision < 0 || typeof value.dirty !== 'boolean' || !Array.isArray(value.pages) || !Number.isSafeInteger(value.pageCount) || value.pageCount < 1 || value.pages.length !== value.pageCount) throw Error('PDF 编辑器返回了无效的 PDF 文档状态。')
   return value
+}
+function applyAuthor(api: OfficePdfHost, id: string, author: string): OfficePdfSnapshot {
+  const result = JSON.parse(api.command(id, 'ui.set', JSON.stringify({ key: 'author', value: author }))) as { ok: boolean; snapshot?: OfficePdfSnapshot; error?: string }
+  if (!result.ok) throw Error(result.error || 'PDF 署名设置失败。')
+  return snapshotOf(result.snapshot ? JSON.stringify(result.snapshot) : api.inspect(id), id)
 }
 function receive(raw: string) {
   try {
@@ -110,6 +116,7 @@ export class RustPdfSession {
   readonly id: string
   private closed = false
   private desiredInteractive = false
+  private authorReady = false
   private listeners = new Set<(snapshot: OfficePdfSnapshot) => void>()
   private eventListeners = new Set<(event: OfficePdfEvent) => void>()
   constructor(public snapshot: OfficePdfSnapshot) { this.id = snapshot.sessionId }
@@ -156,8 +163,15 @@ export class RustPdfSession {
       activeId = this.id
       // Starting the WASM renderer is asynchronous. The shell may finish its
       // open/save task while it starts, so apply the latest input state here.
-      interactive = this.desiredInteractive
+      interactive = false
+      this.authorReady = false
+      api.setActive(false)
       this.accept(snapshotOf(api.activate(this.id), this.id))
+      // Each document owns its Rust preferences. Apply the shared explicit identity
+      // before accepting input, including when an already-open tab becomes active.
+      this.accept(applyAuthor(api, this.id, pdfAuthorPreference.read()))
+      this.authorReady = true
+      interactive = this.desiredInteractive
       api.setActive(interactive)
       window.dispatchEvent(new Event('resize'))
     })
@@ -165,9 +179,9 @@ export class RustPdfSession {
   setInteractive(enabled: boolean) {
     this.desiredInteractive = enabled
     if (activeId !== this.id) return
-    interactive = enabled
+    interactive = enabled && this.authorReady
     if (disableTimer) { clearTimeout(disableTimer); disableTimer = undefined }
-    if (enabled || compositionId !== this.id) host?.setActive(enabled)
+    if (interactive || compositionId !== this.id) host?.setActive(interactive)
   }
   deactivate() {
     // An old tab can unmount while the next tab's attach is awaiting its turn.
@@ -219,6 +233,18 @@ export class RustPdfSession {
       this.accept(snapshotOf(result.snapshot ? JSON.stringify(result.snapshot) : api.inspect(this.id), this.id))
       if (!result.ok) throw Error(result.error || 'PDF 文档操作失败。')
       return this.snapshot
+    })
+  }
+  setAuthor(value: string): Promise<boolean> {
+    const author = normalizePdfAuthor(value)
+    return serialize(async () => {
+      this.assertOpen()
+      if (activeId !== this.id) throw Error('请先切换到此 PDF 文档，再设置署名。')
+      const api = await getHost()
+      // Preference changes neither commit pending annotation text nor change a
+      // document's revision. Existing annotations retain their original author.
+      this.accept(applyAuthor(api, this.id, author))
+      return pdfAuthorPreference.save(author)
     })
   }
   query(commandId: string, params: Record<string, unknown> = {}): Promise<unknown> {

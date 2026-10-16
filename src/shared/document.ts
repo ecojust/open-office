@@ -48,7 +48,7 @@ export function defaultSaveExtension(extension:Extension):SaveExtension {
  if(extension==='potx'||extension==='ppsx')return 'pptx'
  return extension
 }
-/** Header screening only: the active Rust parser validates the full package
+/** Header screening only: the active editor validates the full package
  * before an existing editing session is changed. */
 export function validateDocumentSignature(bytes:Uint8Array,extension:Extension):void {
  if(!bytes.length)throw Error('文档为空，无法打开。')
@@ -61,7 +61,7 @@ export function validateDocumentSignature(bytes:Uint8Array,extension:Extension):
  } else if(extension==='oonote') {
   try {
    const data:unknown=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))
-   valid=!!data&&typeof data==='object'&&'format' in data&&data.format==='open-office-notebook'&&'version' in data&&data.version===1&&'sections' in data&&Array.isArray(data.sections)
+   valid=!!data&&typeof data==='object'&&'format' in data&&data.format==='open-office-notebook'&&'version' in data&&(data.version===1||data.version===2)&&'sections' in data&&Array.isArray(data.sections)
   } catch {valid=false}
  } else if(extension==='csv'||extension==='tsv') {
   try { const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);valid=!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(text) } catch { valid=false }

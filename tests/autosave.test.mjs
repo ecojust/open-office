@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createAutosaveScheduler, AUTOSAVE_INTERVAL_MS, AUTOSAVE_MAX_BACKOFF_MS } from '../src/shared/autosave.ts'
+import { createAutosaveScheduler, AUTOSAVE_INTERVAL_MS, AUTOSAVE_DEFER_MS, AUTOSAVE_MAX_BACKOFF_MS } from '../src/shared/autosave.ts'
 
 const settle = () => new Promise(resolve => setImmediate(resolve))
 
@@ -104,6 +104,40 @@ test('preference changes cancel pending ticks and repeated notifications cannot 
   scheduler.notify()
   await clock.advance(30_000)
   assert.deepEqual(calls, [30_000, 120_000])
+  scheduler.dispose()
+})
+
+test('a due save resumes shortly after typing stops instead of missing another thirty-second interval', async () => {
+  const clock = fakeClock(), state = editable(), calls = []
+  const scheduler = createAutosaveScheduler({ clock, readState: () => state,
+    async save() { calls.push(clock.now()); state.dirty = false; return true } })
+  await clock.advance(29_900)
+  state.composing = true
+  await clock.advance(100)
+  assert.deepEqual(calls, [])
+  await clock.advance(500)
+  state.composing = false
+  await clock.advance(AUTOSAVE_DEFER_MS - 500)
+  assert.deepEqual(calls, [31_200])
+  scheduler.dispose()
+})
+
+test('unfinished editor drafts defer without false success or exponential failure backoff', async () => {
+  const clock = fakeClock(), state = editable(), calls = [], errors = []
+  let pending = true
+  const scheduler = createAutosaveScheduler({ clock, readState: () => state,
+    async save() { calls.push(clock.now()); if (pending) return 'deferred'; state.dirty = false; return true },
+    onError(error) { errors.push(error) } })
+  await clock.advance(30_000 + AUTOSAVE_DEFER_MS * 3)
+  assert.deepEqual(calls, [30_000, 31_200, 32_400, 33_600])
+  assert.deepEqual(errors, [])
+  assert.equal(state.dirty, true)
+  pending = false
+  await clock.advance(AUTOSAVE_DEFER_MS)
+  assert.equal(calls.at(-1), 34_800)
+  assert.equal(state.dirty, false)
+  await clock.advance(90_000)
+  assert.equal(calls.length, 5)
   scheduler.dispose()
 })
 

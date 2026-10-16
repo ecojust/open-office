@@ -144,14 +144,11 @@ pub fn note_options(app: &mut WordApp, ui: &mut Ui, f: &mut NoteForm) -> bool {
     });
     // Insert / Apply / Cancel.
     let (mut insert, mut apply, mut cancel) = (false, false, false);
-    ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            cancel = ui.button(tl!("Cancel")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape));
-            apply = ui.button(tl!("Apply")).clicked();
-            let label = if f.endnote { "Insert Endnote" } else { "Insert Footnote" };
-            insert = ui.add(crate::widgets::primary_button(ui, tl!(label))).clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter));
-        });
+    crate::theme::dialog_actions(ui, |ui| {
+        cancel = ui.button(tl!("Cancel")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape));
+        apply = ui.button(tl!("Apply")).clicked();
+        let label = if f.endnote { "Insert Endnote" } else { "Insert Footnote" };
+        insert = ui.add(crate::widgets::primary_button(ui, tl!(label))).clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter));
     });
     if insert || apply {
         if let Err(e) = app.run("references.noteOptions", f.params()) {

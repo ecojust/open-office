@@ -47,6 +47,7 @@ impl OfficePdfApp {
     pub fn embedding_state(&self) -> Value {
         let mut state = Host::state(self);
         if let Some(object) = state.as_object_mut() {
+            object.insert("author".into(), json!(self.comment_prefs.author));
             object.insert("backgroundExportReady".into(), json!(self.background_export_ready()));
             object.insert("toolbar".into(), json!(self.ctx.as_ref().map(crate::embedded_toolbar::drawn).unwrap_or_default()));
             object.insert("deletePrompt".into(), json!(self.pending_removal.as_ref().map(|pending| &pending.label)));

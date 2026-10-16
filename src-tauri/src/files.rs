@@ -619,28 +619,37 @@ fn valid_notebook(bytes: &[u8]) -> bool {
     else {
         return false;
     };
+    let version = notebook.get("version").and_then(|value| value.as_u64());
     if notebook.get("format").and_then(|value| value.as_str()) != Some("open-office-notebook")
-        || notebook.get("version").and_then(|value| value.as_u64()) != Some(1)
+        || !matches!(version, Some(1 | 2))
     {
         return false;
     }
+    let valid_id = |id: &str| {
+        !id.is_empty()
+            && id.len() <= 100
+            && id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    };
     let mut ids = std::collections::HashSet::new();
     let valid_node =
         |node: &serde_json::Value, titled: bool, ids: &mut std::collections::HashSet<String>| {
             let Some(id) = node.get("id").and_then(|value| value.as_str()) else {
                 return false;
             };
-            !id.is_empty()
-                && id.len() <= 100
-                && id
-                    .bytes()
-                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+            valid_id(id)
                 && ids.insert(id.to_owned())
                 && (!titled
                     || node
                         .get("title")
                         .and_then(|value| value.as_str())
-                        .is_some_and(|title| title.chars().count() <= 200))
+                        .is_some_and(|title| {
+                            title.chars().count() <= 200
+                                && !title.chars().any(|character| {
+                                    matches!(character, '\u{0}'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}')
+                                })
+                        }))
         };
     if !valid_node(&notebook, true, &mut ids) {
         return false;
@@ -652,6 +661,7 @@ fn valid_notebook(bytes: &[u8]) -> bool {
         return false;
     }
     let mut page_count = 0;
+    let mut region_count = 0;
     let mut block_count = 0;
     for section in sections {
         if !valid_node(section, true, &mut ids) {
@@ -664,26 +674,101 @@ fn valid_notebook(bytes: &[u8]) -> bool {
         if pages.is_empty() || page_count > 2000 {
             return false;
         }
+        let mut parents = std::collections::HashMap::new();
         for page in pages {
             if !valid_node(page, true, &mut ids) {
                 return false;
             }
-            let Some(blocks) = page.get("blocks").and_then(|value| value.as_array()) else {
-                return false;
-            };
-            block_count += blocks.len();
-            if blocks.is_empty() || block_count > 20000 {
-                return false;
-            }
-            for block in blocks {
-                if !valid_node(block, false, &mut ids)
-                    || !matches!(
-                        block.get("type").and_then(|value| value.as_str()),
-                        Some("paragraph" | "heading" | "bullet" | "numbered" | "todo" | "image")
-                    )
-                {
+            let mut block_lists = Vec::new();
+            if version == Some(1) {
+                let Some(blocks) = page.get("blocks").and_then(|value| value.as_array()) else {
+                    return false;
+                };
+                block_lists.push(blocks);
+            } else {
+                let parent = match page.get("parentId") {
+                    Some(value) => {
+                        let Some(parent) = value.as_str().filter(|id| valid_id(id)) else {
+                            return false;
+                        };
+                        Some(parent)
+                    }
+                    None => None,
+                };
+                parents.insert(page["id"].as_str().unwrap(), parent);
+                let Some(regions) = page.get("regions").and_then(|value| value.as_array()) else {
+                    return false;
+                };
+                region_count += regions.len();
+                if regions.is_empty() || region_count > 20000 {
                     return false;
                 }
+                for region in regions {
+                    if !valid_node(region, false, &mut ids) {
+                        return false;
+                    }
+                    let geometry = |name: &str, minimum: f64| {
+                        region.get(name).and_then(|value| value.as_f64()).filter(|value| {
+                            value.is_finite() && *value >= minimum && *value <= 20000.0
+                        })
+                    };
+                    let (Some(x), Some(y), Some(width)) =
+                        (geometry("x", 0.0), geometry("y", 0.0), geometry("width", 80.0))
+                    else {
+                        return false;
+                    };
+                    let height = if region.get("height").is_some() {
+                        let Some(height) = geometry("height", 40.0) else {
+                            return false;
+                        };
+                        height
+                    } else {
+                        40.0
+                    };
+                    if x + width > 20000.0 || y + height > 20000.0 {
+                        return false;
+                    }
+                    let Some(blocks) = region.get("blocks").and_then(|value| value.as_array()) else {
+                        return false;
+                    };
+                    if blocks.iter().any(|block| {
+                        block.get("type").and_then(|value| value.as_str()) == Some("image")
+                    }) && (blocks.len() != 1 || region.get("height").is_none())
+                    {
+                        return false;
+                    }
+                    block_lists.push(blocks);
+                }
+            }
+            for blocks in block_lists {
+                block_count += blocks.len();
+                if blocks.is_empty() || block_count > 20000 {
+                    return false;
+                }
+                for block in blocks {
+                    if !valid_node(block, false, &mut ids)
+                        || !matches!(
+                            block.get("type").and_then(|value| value.as_str()),
+                            Some("paragraph" | "heading" | "bullet" | "numbered" | "todo" | "image")
+                        )
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        // Parent references are section-local; eight levels include the root.
+        for (page_id, parent) in &parents {
+            let mut ancestors = std::collections::HashSet::from([*page_id]);
+            let mut cursor = *parent;
+            while let Some(parent_id) = cursor {
+                if !ancestors.insert(parent_id) || ancestors.len() > 8 {
+                    return false;
+                }
+                let Some(next) = parents.get(parent_id) else {
+                    return false;
+                };
+                cursor = *next;
             }
         }
     }
@@ -1103,6 +1188,20 @@ mod tests {
         })
     }
 
+    fn notebook_v2_fixture() -> serde_json::Value {
+        let mut notebook = notebook_fixture();
+        notebook["version"] = 2.into();
+        let page = notebook["sections"][0]["pages"][0].as_object_mut().unwrap();
+        let blocks = page.remove("blocks").unwrap();
+        page.insert(
+            "regions".into(),
+            serde_json::json!([{
+                "id": "region-1", "x": 24, "y": 24, "width": 480, "blocks": blocks
+            }]),
+        );
+        notebook
+    }
+
     #[test]
     fn reopening_and_saving_an_existing_file_keeps_its_identity_and_original_path() {
         let directory = tempfile::tempdir().unwrap();
@@ -1284,31 +1383,40 @@ mod tests {
         );
         assert_eq!(serde_json::to_value(DocExt::Oonote).unwrap(), "oonote");
         assert_eq!(serde_json::to_value(DocumentKind::Note).unwrap(), "note");
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("工作笔记.oonote");
-        let mut notebook = notebook_fixture();
-        fs::write(&path, serde_json::to_vec(&notebook).unwrap()).unwrap();
-        let store = DocumentStore::new(directory.path().join("data")).unwrap();
-        let opened = store.register_open(path.clone()).unwrap();
-        assert_eq!(opened.kind, DocumentKind::Note);
-        notebook["sections"][0]["pages"][0]["blocks"][0]["content"][0]["text"] = "已经更新".into();
-        let edited = serde_json::to_vec(&notebook).unwrap();
-        validate_document_signature(&edited, DocExt::Oonote).unwrap();
-        let result = store
-            .save_existing(
-                &store.record(&opened.id).unwrap(),
-                DocExt::Oonote,
-                Some(&opened.sha256),
-                edited.clone(),
-            )
-            .unwrap();
-        let SaveResult::Saved { document } = result else {
-            panic!("expected notebook save")
-        };
-        assert_eq!(document.id, opened.id);
-        assert_eq!(document.kind, DocumentKind::Note);
-        assert_eq!(fs::read(&path).unwrap(), edited);
-        assert_eq!(store.register_open(path).unwrap().sha256, document.sha256);
+        for original in [notebook_fixture(), notebook_v2_fixture()] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("工作笔记.oonote");
+            fs::write(&path, serde_json::to_vec(&original).unwrap()).unwrap();
+            let store = DocumentStore::new(directory.path().join("data")).unwrap();
+            let opened = store.register_open(path.clone()).unwrap();
+            assert_eq!(opened.kind, DocumentKind::Note);
+            // Both an existing v2 notebook and a migrated v1 notebook save back
+            // through the same original-file identity without making a copy.
+            let mut notebook = notebook_v2_fixture();
+            notebook["sections"][0]["pages"][0]["regions"][0]["blocks"][0]["content"][0]["text"] =
+                "已经更新".into();
+            notebook["sections"][0]["pages"][0]["regions"][0]["x"] = 360.into();
+            let edited = serde_json::to_vec(&notebook).unwrap();
+            validate_document_signature(&edited, DocExt::Oonote).unwrap();
+            let result = store
+                .save_existing(
+                    &store.record(&opened.id).unwrap(),
+                    DocExt::Oonote,
+                    Some(&opened.sha256),
+                    edited.clone(),
+                )
+                .unwrap();
+            let SaveResult::Saved { document } = result else {
+                panic!("expected notebook save")
+            };
+            assert_eq!(document.id, opened.id);
+            assert_eq!(document.kind, DocumentKind::Note);
+            assert_eq!(fs::read(&path).unwrap(), edited);
+            let reopened = store.register_open(path).unwrap();
+            assert_eq!(reopened.id, opened.id);
+            assert_eq!(reopened.sha256, document.sha256);
+            assert_eq!(STANDARD.decode(reopened.base64).unwrap(), edited);
+        }
     }
 
     #[test]
@@ -1331,7 +1439,7 @@ mod tests {
         }
         for (pointer, value) in [
             ("/format", serde_json::json!("unknown")),
-            ("/version", serde_json::json!(2)),
+            ("/version", serde_json::json!(3)),
             ("/id", serde_json::json!("not valid")),
             ("/title", serde_json::json!("字".repeat(201))),
             ("/sections", serde_json::json!([])),
@@ -1355,6 +1463,103 @@ mod tests {
             );
         }
         assert!(!valid_notebook(&vec![b' '; NOTEBOOK_LIMIT + 1]));
+    }
+
+    #[test]
+    fn notebook_v2_envelope_bounds_regions_and_isolates_images() {
+        let valid = notebook_v2_fixture();
+        assert!(valid_notebook(&serde_json::to_vec(&valid).unwrap()));
+        let mut boundary = valid.clone();
+        let region = &mut boundary["sections"][0]["pages"][0]["regions"][0];
+        region["x"] = 19920.into();
+        region["y"] = 19960.into();
+        region["width"] = 80.into();
+        region["height"] = 40.into();
+        assert!(valid_notebook(&serde_json::to_vec(&boundary).unwrap()));
+        for (field, value) in [
+            ("x", serde_json::json!(-1)),
+            ("y", serde_json::json!(20000)),
+            ("width", serde_json::json!(79)),
+            ("width", serde_json::json!(20000)),
+            ("width", serde_json::json!("480")),
+            ("height", serde_json::json!(39)),
+            ("height", serde_json::json!(20000)),
+            ("height", serde_json::json!(null)),
+            ("x", serde_json::json!(false)),
+            ("id", serde_json::json!("block-1")),
+            ("blocks", serde_json::json!([])),
+        ] {
+            let mut invalid = valid.clone();
+            invalid["sections"][0]["pages"][0]["regions"][0][field] = value;
+            assert!(
+                !valid_notebook(&serde_json::to_vec(&invalid).unwrap()),
+                "{field}"
+            );
+        }
+        let mut invalid = valid.clone();
+        invalid["sections"][0]["pages"][0]["regions"] = serde_json::json!([]);
+        assert!(!valid_notebook(&serde_json::to_vec(&invalid).unwrap()));
+        let mut image = valid.clone();
+        image["sections"][0]["pages"][0]["regions"][0]["height"] = 240.into();
+        image["sections"][0]["pages"][0]["regions"][0]["blocks"] = serde_json::json!([{
+            "id": "image-1", "type": "image", "alt": "图", "dataUrl": "validated-by-editor"
+        }]);
+        assert!(valid_notebook(&serde_json::to_vec(&image).unwrap()));
+        let mut missing_height = image.clone();
+        missing_height["sections"][0]["pages"][0]["regions"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("height");
+        assert!(!valid_notebook(&serde_json::to_vec(&missing_height).unwrap()));
+        image["sections"][0]["pages"][0]["regions"][0]["blocks"]
+            .as_array_mut()
+            .unwrap()
+            .push(valid["sections"][0]["pages"][0]["regions"][0]["blocks"][0].clone());
+        assert!(!valid_notebook(&serde_json::to_vec(&image).unwrap()));
+    }
+
+    #[test]
+    fn notebook_v2_envelope_requires_same_section_acyclic_parents_with_eight_levels() {
+        let mut valid = notebook_v2_fixture();
+        for depth in 2..=8 {
+            valid["sections"][0]["pages"]
+                .as_array_mut()
+                .unwrap()
+                .push(serde_json::json!({
+                    "id": format!("page-{depth}"), "title": "子页面", "parentId": format!("page-{}", depth - 1),
+                    "regions": [{"id": format!("region-{depth}"), "x": 24, "y": 24, "width": 480,
+                        "blocks": [{"id": format!("block-{depth}"), "type": "paragraph", "content": []}]}]
+                }));
+        }
+        assert!(valid_notebook(&serde_json::to_vec(&valid).unwrap()));
+        for parent in [
+            serde_json::json!("missing"),
+            serde_json::json!("page-1"),
+            serde_json::json!("page-8"),
+            serde_json::json!(null),
+            serde_json::json!(42),
+        ] {
+            let mut invalid = valid.clone();
+            invalid["sections"][0]["pages"][0]["parentId"] = parent;
+            assert!(!valid_notebook(&serde_json::to_vec(&invalid).unwrap()));
+        }
+        let mut too_deep = valid.clone();
+        let mut child = notebook_v2_fixture()["sections"][0]["pages"][0].clone();
+        child["id"] = "page-9".into();
+        child["parentId"] = "page-8".into();
+        child["regions"][0]["id"] = "region-9".into();
+        child["regions"][0]["blocks"][0]["id"] = "block-9".into();
+        too_deep["sections"][0]["pages"]
+            .as_array_mut()
+            .unwrap()
+            .push(child.clone());
+        assert!(!valid_notebook(&serde_json::to_vec(&too_deep).unwrap()));
+        let mut cross_section = valid.clone();
+        cross_section["sections"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({"id": "section-2", "title": "其他分区", "pages": [child]}));
+        assert!(!valid_notebook(&serde_json::to_vec(&cross_section).unwrap()));
     }
 
     #[test]

@@ -9,6 +9,14 @@ export function presentationReport() {
     schemaVersion: 1, kind: 'office-presentation-native', engine: 'office-presentation-wasm', transport: 'local-wasm-in-native-webview', ok: true,
     checks: [...REQUIRED_OFFICE_PRESENTATION_CHECKS], limitations: [...OFFICE_PRESENTATION_SMOKE_LIMITATIONS],
     cleanup: { attempted: 2, closed: 2, ok: true, remainingCanvas: 0, remainingInput: 0 },
+    starterTemplate: {
+      slideSize: [960, 540], activeIndex: 0, dirty: false, canUndo: false, canRedo: false,
+      slides: [
+        { texts: ['Open Office 演示', '从一个想法，开始精彩表达', '汇报人 / 你的姓名'], background: 'picture', shapeCount: 3, vectorGroups: 0 },
+        { texts: ['请输入标题'], background: '#FAFCFF', shapeCount: 2, vectorGroups: 1 },
+        { texts: ['open office'], background: 'picture', shapeCount: 1, vectorGroups: 0 },
+      ],
+    },
     canvas: { width: 1280, height: 800, slideCount: 2, paintCalls: 42 },
     domInput: { eventType: 'input', isTrusted: false, text: OFFICE_PRESENTATION_SMOKE_TEXT, accepted: true },
     resources: { wasmLoaded: true, sameOrigin: true, wasmPath: '/office-presentation/office-presentation_bg.wasm',

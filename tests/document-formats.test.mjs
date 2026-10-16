@@ -54,7 +54,8 @@ test('local notebooks route to their own editable format and reject invalid head
   assert.deepEqual(saveFormats('note').map(format=>format.extension),['oonote'])
   const header={format:'open-office-notebook',version:1,sections:[]}
   assert.doesNotThrow(()=>validateDocumentSignature(encode(JSON.stringify(header)),'oonote'))
-  for(const value of [null,[],{}, {...header,version:2},{...header,sections:{}},'<html>notes</html>']) {
+  assert.doesNotThrow(()=>validateDocumentSignature(encode(JSON.stringify({...header,version:2})),'oonote'))
+  for(const value of [null,[],{}, {...header,version:3},{...header,version:'2'},{...header,sections:{}},'<html>notes</html>']) {
     assert.throws(()=>validateDocumentSignature(encode(JSON.stringify(value)),'oonote'))
   }
   assert.throws(()=>validateDocumentSignature(new Uint8Array([0xc3,0x28]),'oonote'))

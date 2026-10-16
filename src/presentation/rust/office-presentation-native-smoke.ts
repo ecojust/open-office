@@ -29,6 +29,14 @@ export interface OfficePresentationNativeSmokeReport {
   limitations: string[]
   cleanup: { attempted: number; closed: number; ok: boolean; remainingCanvas: number; remainingInput: number }
   canvas?: { width: number; height: number; slideCount: number; paintCalls: number }
+  starterTemplate?: {
+    slideSize: number[]
+    activeIndex: number
+    dirty: boolean
+    canUndo: boolean
+    canRedo: boolean
+    slides: Array<{ texts: string[]; background: string; shapeCount: number; vectorGroups: number }>
+  }
   domInput?: { eventType: 'input'; isTrusted: false; text: string; accepted: true }
   resources?: { wasmLoaded: true; sameOrigin: true; wasmPath: '/office-presentation/office-presentation_bg.wasm'; manifestSha256: string; sourceHash: string; upstreamCommit: string; files: Record<'office-presentation.js' | 'office-presentation_bg.wasm', { sha256: string; bytes: number }> }
   format?: { bold: boolean }
@@ -116,11 +124,37 @@ async function verifyResources(): Promise<NonNullable<OfficePresentationNativeSm
   return { wasmLoaded: true, sameOrigin: true, wasmPath: '/office-presentation/office-presentation_bg.wasm', manifestSha256: manifest.sha256, sourceHash: metadata.sourceHash!, upstreamCommit: metadata.upstreamCommit!, files }
 }
 
-type SlideSummary = { shapes: Array<{ id: number; text?: string }> }
+type SlideSummary = { background?: string; shapes: Array<{ id: number; text?: string; kind?: string; box?: number[]; children?: Array<{ kind?: string }> }> }
 type ShapeDetails = { shape: { text?: { paragraphs: Array<{ runs: Array<{ text: string; props?: { bold?: boolean } }> }> } } }
 const secondSlideText = 'Second slide 第二页'
 const readSlide = (mounted: MountedOfficePresentationSmokeEditor, index: number) => mounted.editor.query('slide.inspect', { index }) as Promise<SlideSummary>
 const readText = (mounted: MountedOfficePresentationSmokeEditor, id: number) => mounted.editor.query('text.get', { id }) as Promise<{ text: string }>
+const starterTexts = [
+  ['Open Office 演示', '从一个想法，开始精彩表达', '汇报人 / 你的姓名'],
+  ['请输入标题'],
+  ['open office'],
+]
+/** Check the new-document entry before replacing its contents with the small
+ * input/export diagnostic. An older one-slide WASM cannot satisfy this check. */
+async function verifyStarterTemplate(mounted: MountedOfficePresentationSmokeEditor): Promise<NonNullable<OfficePresentationNativeSmokeReport['starterTemplate']>> {
+  const state = await mounted.editor.inspect()
+  const document = await mounted.editor.query('document.inspect') as { slideSize?: number[] }
+  assert(state.slides.length === 3 && state.activeSlide === 0, 'new presentation must start with cover, content and closing slides')
+  assert(!state.dirty && state.canUndo === false && state.canRedo === false, 'starter presentation is not a clean baseline')
+  assert(JSON.stringify(document.slideSize) === '[960,540]', 'starter presentation is not widescreen')
+  const slides: NonNullable<OfficePresentationNativeSmokeReport['starterTemplate']>['slides'] = []
+  for (let index = 0; index < 3; index++) {
+    const slide = await readSlide(mounted, index)
+    const texts = slide.shapes.flatMap(shape => shape.text ? [shape.text] : [])
+    assert(JSON.stringify(texts) === JSON.stringify(starterTexts[index]), `starter slide ${index + 1} has incorrect editable text`)
+    assert(slide.shapes.length === [3, 2, 1][index], `starter slide ${index + 1} has incorrect editable objects`)
+    const vectorGroups = slide.shapes.filter(shape => shape.kind === 'group' && shape.children?.length === 8
+      && shape.children.every(child => child.kind === 'shape') && JSON.stringify(shape.box) === '[64,42,96,33.6]').length
+    assert(slide.background === ['picture', '#FAFCFF', 'picture'][index] && vectorGroups === (index === 1 ? 1 : 0), `starter slide ${index + 1} has no theme artwork`)
+    slides.push({ texts, background: slide.background || '', shapeCount: slide.shapes.length, vectorGroups })
+  }
+  return { slideSize: document.slideSize!, activeIndex: state.activeSlide!, dirty: state.dirty, canUndo: state.canUndo!, canRedo: state.canRedo!, slides }
+}
 async function isBold(mounted: MountedOfficePresentationSmokeEditor, id: number) {
   const details = await mounted.editor.query('shape.inspect', { id }) as ShapeDetails
   const runs = details.shape.text?.paragraphs.flatMap(paragraph => paragraph.runs).filter(run => run.text.length)
@@ -188,6 +222,14 @@ export async function verifyMountedOfficePresentationEditor(adapter: OfficePrese
     assert(assets.length > 0 && assets.every(url => url.origin === location.origin), 'local presentation WASM request was not observed')
     report.resources = await verifyResources()
     passed('default-mounted-local-wasm-canvas-painted')
+    report.starterTemplate = await verifyStarterTemplate(first)
+    passed('new-presentation-three-slide-starter')
+    // Keep the existing input/format/export oracle independent from starter
+    // artwork: create one genuinely blank slide, then remove all three starters.
+    await first.editor.command('slide.new', { at: 0, layout: 'blank' })
+    for (let index = 3; index >= 1; index--) await first.editor.command('slide.delete', { index })
+    await first.editor.command('slide.go', { index: 0 })
+    assert((await first.editor.inspect()).slides.length === 1 && (await readSlide(first, 0)).shapes.length === 0, 'diagnostic blank slide setup failed')
     const firstShape = await addTextBox(first, 0, '')
     await first.editor.command('text.edit', { id: firstShape, end: true })
     await frame(); await frame()

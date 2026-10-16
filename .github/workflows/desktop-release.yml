@@ -144,6 +144,7 @@ jobs:
           cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p office-word-ui-egui --lib embedded_ -- --test-threads=1 || regression_status=1
           cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p office-word-ui-egui --lib command_search_ -- --test-threads=1 || regression_status=1
           cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p office-word-ui-egui --lib office_svg:: -- --test-threads=1 || regression_status=1
+          cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p office-word-ui-egui --lib theme::tests:: -- --test-threads=1 || regression_status=1
           exit "$regression_status"
       - name: Verify embedded spreadsheet and Unicode PDF regressions
         if: matrix.id == 'macos-arm64'
@@ -178,6 +179,7 @@ jobs:
         run: |
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-fonts --lib shaping::cjk_tests::cjk_clusters_use_the_bundled_face_and_preserve_unicode -- --exact
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-edit --lib tests::added_cjk_text_embeds_searchable_glyphs_wraps_and_survives_reopen -- --exact
+          cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-annot --lib stamp -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p open-office-pdf-host --lib
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib embedding:: -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib embedded_toolbar:: -- --test-threads=1

@@ -4,11 +4,12 @@ import { NOTEBOOK_NATIVE_CHECKS, NOTEBOOK_NATIVE_LIMITATIONS, NOTEBOOK_PAGE_TITL
 const bytes = model => { const data = Buffer.from(JSON.stringify(model)); return { base64: data.toString('base64'), sha256: createHash('sha256').update(data).digest('hex'), size: data.length }; };
 // Validator fixture only; it is never installed-app or native process evidence.
 export function notebookReport() {
-  const model = { format: 'open-office-notebook', version: 1, id: 'notebook', title: 'native-notebook', sections: [{ id: 'section', title: '日常笔记',
-    pages: [{ id: 'page', title: '无标题页面', blocks: [{ id: 'block', type: 'paragraph', content: [] }] }] }] };
+  const model = { format: 'open-office-notebook', version: 2, id: 'notebook', title: 'native-notebook', sections: [{ id: 'section', title: '日常笔记',
+    pages: [{ id: 'page', title: '无标题页面', regions: [{ id: 'region', x: 24, y: 24, width: 480,
+      blocks: [{ id: 'block', type: 'paragraph', content: [] }] }] }] }] };
   const initial = bytes(model);
   model.sections[0].pages[0].title = NOTEBOOK_PAGE_TITLE;
-  model.sections[0].pages[0].blocks[0].content = [{ text: NOTEBOOK_PAGE_TEXT }];
+  model.sections[0].pages[0].regions[0].blocks[0].content = [{ text: NOTEBOOK_PAGE_TEXT }];
   const final = bytes(model), targetId = 'approved-native-notebook-file';
   return { schemaVersion: 1, kind: 'notebook-native', transport: 'native-webview-ipc', ok: true,
     native: { tauri: true, origin: 'http://127.0.0.1:31415' }, checks: [...NOTEBOOK_NATIVE_CHECKS], limitations: [...NOTEBOOK_NATIVE_LIMITATIONS],

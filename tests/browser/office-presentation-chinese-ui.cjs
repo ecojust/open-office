@@ -109,8 +109,9 @@ async function expectTitles(expected) {
     assert.equal(await page.getByTestId('rust-presentation-editor').getAttribute('data-engine'), 'office-presentation-wasm');
     await page.getByTestId('theme-light').click();
     await waitUi({ brightness: 'light' });
-    await page.screenshot({ path: path.join(output, 'blank-presentation.png'), fullPage: true });
-    report.placeholderScreenshot = 'blank-presentation.png';
+    assert.deepEqual((await inspect()).slides.map(slide => slide.name), ['Open Office 演示', '请输入标题', 'open office'], 'New presentations use the three-slide starter');
+    await page.screenshot({ path: path.join(output, 'starter-presentation.png'), fullPage: true });
+    report.placeholderScreenshot = 'starter-presentation.png';
     report.stage = 'document-and-tabs';
     // Titles deliberately match UI dictionary entries: neither may be localized as document text.
     const initialCount = (await inspect()).slides.length;

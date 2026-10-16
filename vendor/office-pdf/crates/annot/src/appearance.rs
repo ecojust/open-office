@@ -278,14 +278,20 @@ fn text_turn(d: &Dict) -> i64 {
 /// The first text [`build`] would draw in the standard fonts (Helvetica, WinAnsiEncoding) that
 /// they can't, which would come out as `?`: what it is (for the message) and the character. The
 /// text of a text box, callout or Fill & Sign text, a measurement's label, a dynamic stamp's
-/// "By …" line, and a redaction mark's overlay text (drawn when it is applied). `None` when all of
-/// it can be drawn.
+/// "By …" line, and a redaction mark's overlay text (drawn when it is applied). Dynamic stamps
+/// also use approved document-font outlines. `None` when all of it can be drawn.
 pub fn undrawable_text(d: &Dict) -> Option<(&'static str, char)> {
     let text = |key: &[u8]| d.get(key).and_then(Object::as_string).map(PdfString::to_text);
     let (what, text) = match d.name(b"Subtype")? {
         b"FreeText" => ("the comment's text", text(b"Contents")?),
         b"Line" | b"PolyLine" | b"Polygon" => ("the measurement label", text(b"PCMeasureValue")?),
-        b"Stamp" if matches!(d.get(b"PCStamp"), Some(Object::Bool(true))) => ("the stamp's \"By\" line", text(b"PCByLine")?),
+        b"Stamp" if matches!(d.get(b"PCStamp"), Some(Object::Bool(true))) => {
+            let by = text(b"PCByLine")?;
+            if stamp_by_line(&by).is_some() {
+                return None;
+            }
+            ("the stamp's \"By\" line", by)
+        }
         // Drawn in Helvetica when the redaction is applied: refused when it is marked.
         b"Redact" => ("the redaction's overlay text", text(b"OverlayText")?),
         _ => return None,
@@ -805,6 +811,87 @@ pub fn build(d: &Dict) -> Option<Stream> {
     Some(form(rect, &out, res))
 }
 
+/// One measured glyph in a dynamic stamp's author line. Standard-font bytes keep their original
+/// metrics; other glyphs use the same bounded, approved document-font outlines as edited text.
+enum StampByGlyph {
+    Standard(u8, f64),
+    Outline(office_pdf_fonts::GlyphOutline),
+}
+
+struct StampByLine {
+    glyphs: Vec<StampByGlyph>,
+    width: f64,
+}
+
+/// Outline only a complete, short line. A missing face, missing glyph or excessive outline
+/// returns to the existing marked fallback, so an unsupported name is never silently accepted.
+fn stamp_by_line(text: &str) -> Option<StampByLine> {
+    first_undrawable(text)?;
+    if text.chars().take(257).count() > 256 {
+        return None;
+    }
+    let faces = office_pdf_fonts::document_japanese_fonts_for_style(false, false);
+    let mut glyphs = Vec::new();
+    let mut outlines = std::collections::BTreeMap::<char, office_pdf_fonts::GlyphOutline>::new();
+    let mut width = 0.0;
+    let mut points = 0usize;
+    let mut buf = [0u8; 4];
+    for ch in text.chars() {
+        if let Some(byte) = office_pdf_fonts::win_ansi_byte(ch).or_else(|| (ch == '\t').then_some(b' ')) {
+            let advance = text_width(ch.encode_utf8(&mut buf), 1.0);
+            width += advance;
+            glyphs.push(StampByGlyph::Standard(byte, advance));
+            continue;
+        }
+        let outline = if let Some(outline) = outlines.get(&ch) {
+            outline.clone()
+        } else {
+            let outline = faces.iter().find_map(|face| office_pdf_fonts::japanese_glyph_from(face, ch).ok())?;
+            outlines.insert(ch, outline.clone());
+            outline
+        };
+        points = points.checked_add(outline.contours.iter().map(Vec::len).sum::<usize>())?;
+        if points > 65_536 {
+            return None;
+        }
+        width += outline.width;
+        glyphs.push(StampByGlyph::Outline(outline));
+    }
+    (width.is_finite() && width > 0.0).then_some(StampByLine { glyphs, width })
+}
+
+fn draw_stamp_by_line(out: &mut Vec<u8>, text: &str, line: StampByLine, size: f64, x: f64, y: f64) {
+    // ActualText retains the full logical author line while the embedded paths make its Chinese
+    // glyphs portable: reopening and printing require no installed font or external resource.
+    let logical: String = text.encode_utf16().map(|unit| format!("{unit:04X}")).collect();
+    out.extend(format!("/Span <</ActualText <FEFF{logical}>>> BDC\n").bytes());
+    let mut advance = 0.0;
+    for glyph in line.glyphs {
+        match glyph {
+            StampByGlyph::Standard(byte, width) => {
+                out.extend(format!("BT /Helv {} Tf 1 0 0 1 {} {} Tm ", n(size), n(x + advance * size), n(y)).bytes());
+                out.extend(literal(&[byte]));
+                out.extend_from_slice(b" Tj ET\n");
+                advance += width;
+            }
+            StampByGlyph::Outline(glyph) => {
+                out.extend(format!("q {} 0 0 {} {} {} cm\n", n(size), n(size), n(x + advance * size), n(y)).bytes());
+                for contour in glyph.contours {
+                    let Some(first) = contour.first() else { continue };
+                    out.extend(format!("{} {} m\n", n(first[0]), n(first[1])).bytes());
+                    for point in contour.iter().skip(1) {
+                        out.extend(format!("{} {} l\n", n(point[0]), n(point[1])).bytes());
+                    }
+                    out.extend_from_slice(b"h\n");
+                }
+                out.extend_from_slice(b"f Q\n");
+                advance += glyph.width;
+            }
+        }
+    }
+    out.extend_from_slice(b"EMC\n");
+}
+
 /// A rubber stamp: a rounded frame (a pointed tag for sign-here stamps) with the label in bold
 /// capitals, and the dynamic stamps' "By … at …" line.
 fn stamp(kind: crate::StampKind, rect: [f64; 4], col: Rgb, by: Option<&str>, opacity: f64, mut res: Dict) -> Stream {
@@ -899,21 +986,26 @@ fn stamp(kind: crate::StampKind, rect: [f64; 4], col: Rgb, by: Option<&str>, opa
             .bytes(),
     );
     out.extend(literal(&win_ansi(label)));
-    out.extend_from_slice(b" Tj\n");
+    out.extend_from_slice(b" Tj\nET\n");
     if let Some(b) = by {
+        let outlined = stamp_by_line(b);
+        let unit_width = outlined.as_ref().map_or_else(|| text_width(b, 1.0), |line| line.width);
         let mut s = by_h;
-        let bw = text_width(b, s);
+        let bw = unit_width * s;
         if bw > text_area.1 - text_area.0 - 4.0 {
             s *= (text_area.1 - text_area.0 - 4.0) / bw;
         }
-        let bw = text_width(b, s);
-        out.extend(
-            format!("/Helv {} Tf\n1 0 0 1 {} {} Tm ", n(s), n(text_area.0 + (text_area.1 - text_area.0 - bw) / 2.0), n(y0 + h * 0.18)).bytes(),
-        );
-        out.extend(literal(&win_ansi(b)));
-        out.extend_from_slice(b" Tj\n");
+        let bw = unit_width * s;
+        let x = text_area.0 + (text_area.1 - text_area.0 - bw) / 2.0;
+        let y = y0 + h * 0.18;
+        if let Some(line) = outlined {
+            draw_stamp_by_line(&mut out, b, line, s, x, y);
+        } else {
+            out.extend(format!("BT\n/Helv {} Tf\n1 0 0 1 {} {} Tm ", n(s), n(x), n(y)).bytes());
+            out.extend(literal(&win_ansi(b)));
+            out.extend_from_slice(b" Tj\nET\n");
+        }
     }
-    out.extend_from_slice(b"ET\n");
     let font = |base: &str| {
         let mut f = Dict::new();
         f.set(b"Type".to_vec(), Object::name("Font"));

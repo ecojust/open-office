@@ -27,7 +27,7 @@ import type { EditingSmokeAdapter } from './sheet/rust/macos-editing-smoke'
 import type { NotebookNativeSmokeAdapter } from './notes/native-smoke'
 import { bytesToBase64, base64ToBytes, extensionOf, kindOf, withExtension, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFormats, saveFileName, type SaveExtension, type Kind, type Extension, type EditorHandle } from './shared/document'
 
-interface Tab { key: string; document: NativeDocument; fileId?: string; requiresSaveAs?: boolean; importWarnings?:string[]; dirty: boolean; ready: boolean; loadError?: string }
+interface Tab { key: string; document: NativeDocument; fileId?: string; requiresSaveAs?: boolean; importWarnings?:string[]; dirty: boolean; ready: boolean; loadError?: string; autoSavedAt?: number }
 const appVersion = __APP_VERSION__
 const buildVersion = __BUILD_VERSION__
 const brandIcon = new URL('./favicon.svg', document.baseURI).href
@@ -40,7 +40,7 @@ const appearanceOptions = [
 const smokeMode = ref(smokeRequested())
 let nativeSmokeSaveObserver: ((request: SaveDocumentRequest, result: SaveResult) => void) | undefined
 smokeStage('app-setup', 'Vue setup reached')
-const tabs = ref<Tab[]>([]), activeKey = ref(''), home = ref(true), section = ref('home')
+const tabs = ref<Tab[]>([]), activeKey = ref(''), home = ref(true)
 const tabBar = ref<HTMLElement>()
 let tabBarObserver: ResizeObserver | undefined
 function revealActiveTab() {
@@ -134,6 +134,8 @@ let appDisposed = false
 onBeforeUnmount(() => { appDisposed = true; setRustWordDocument(); setRustSheetDocument(); setRustPresentationDocument(); setRustPdfDocument(); setNoteDocument() })
 const recents = ref<RecentDocument[]>([]), busy = ref(''), error = ref(''), status = ref('所有文件，仅在你的设备上处理')
 const help = ref(false), search = ref(''), closeTarget = ref<Tab | 'window' | 'all' | null>(null)
+const recentList = ref<HTMLElement>()
+watch(search, () => { if(recentList.value) recentList.value.scrollTop = 0 }, { flush: 'post' })
 const saveAsDraft = ref<{ key:string; kind:Kind; format:SaveExtension; name:string; error:string } | null>(null)
 const composing = ref(false), backgroundSaving = ref(false)
 const globalActionsBlocked = computed(() => !!busy.value || !!saveAsDraft.value || !!closeTarget.value || help.value)
@@ -389,6 +391,7 @@ async function saveActive(saveAs=false, format?:Extension, chosenName?:string, d
     tab.requiresSaveAs=false
     tab.importWarnings=[]
     await handle.markSaved?.(exported.base64,directOnly?{background:true}:undefined);tab.dirty=false
+    if(!directOnly){tab.autoSavedAt=undefined;autosaveWaiting.value=undefined}
   }
   await refreshRecents();status.value=isCopy?`${exported.extension.toUpperCase()} 副本已保存`:'已保存到本机';return true
 }
@@ -573,10 +576,10 @@ function keydown(event:KeyboardEvent) {
   if(key==='p'&&currentDocument.value){event.preventDefault();globalFileAction('print')}
 }
 function beforeUnload(event:BeforeUnloadEvent){if(tabs.value.some(t=>t.dirty)){event.preventDefault();event.returnValue=''}}
-let lastInputAt = 0
+const lastInputAt = ref(0)
 function inputActivity(event: Event) {
   if (!(event.target instanceof Element) || !event.target.closest('.editor-content')) return
-  lastInputAt = Date.now()
+  lastInputAt.value = Date.now()
   if(event.type==='compositionstart')composing.value=true
   if(event.type==='compositionend')composing.value=false
 }
@@ -585,24 +588,60 @@ function handleFor(tab: Tab) {
     tab.document.kind==='presentation'?rustPresentationHandles:tab.document.kind==='pdf'?rustPdfHandles:noteHandles).get(tab.key)
 }
 const autosaveEnabled=ref((()=>{try{return localStorage.getItem('open-office-autosave')==='true'}catch{return false}})())
-const autosaveTitle=computed(()=>native.isTauri()?'每 30 秒将修改保存回当前文件；新建文件请先选择保存位置。':'浏览器编辑请使用保存按钮下载；桌面版支持直接保存原文件。')
+const autosaveWaiting=ref<{key:string;reason:string}>()
+const autosaveTitle=computed(()=>native.isTauri()?'每 30 秒将修改保存回当前文件；输入或弹窗期间暂缓，完成编辑后自动继续。新建文件请先选择保存位置。':'浏览器编辑请使用保存按钮下载；桌面版支持直接保存原文件。')
+const saveStateLabel=computed(()=>{
+  const tab=currentDocument.value
+  if(!tab)return '本地办公'
+  if(tab.loadError)return '打开失败'
+  if(!tab.ready)return '正在载入'
+  if(backgroundSaving.value)return '正在自动保存'
+  if(!tab.dirty)return tab.autoSavedAt?'已自动保存':'已保存'
+  if(!autosaveEnabled.value||!native.isTauri())return '尚未保存'
+  if(!tab.fileId||tab.requiresSaveAs||defaultSaveExtension(tab.document.extension)!==tab.document.extension)return '请先保存'
+  if(composing.value)return '等待输入完成'
+  if(autosaveWaiting.value?.key===tab.key)return autosaveWaiting.value.reason
+  return '等待自动保存'
+})
+const saveStateTitle=computed(()=>{
+  const tab=currentDocument.value
+  if(!tab)return '文件保存在本机'
+  if(saveStateLabel.value==='请先保存')return '请先点击保存，选择保存位置或完成格式转换，之后即可自动保存。'
+  if(saveStateLabel.value==='等待完成编辑')return '请确认当前单元格、文本框或弹窗中的编辑；自动保存会在完成后继续，当前输入不会被打断。'
+  if(!tab.dirty&&tab.autoSavedAt)return `${tab.document.name} · ${new Date(tab.autoSavedAt).toLocaleTimeString()} 已自动保存到本机`
+  return `${tab.document.name} · ${saveStateLabel.value}`
+})
 const autosave=createAutosaveScheduler({
   readState(){const tab=active.value;return {enabled:autosaveEnabled.value,native:native.isTauri(),key:tab?.key,fileId:tab?.fileId,
     dirty:!!tab?.dirty,ready:!!tab?.ready,requiresSaveAs:!!tab?.requiresSaveAs,
     canSaveDirectly:!!tab&&!!handleFor(tab)&&!isImportOnly(tab.document.extension)&&defaultSaveExtension(tab.document.extension)===tab.document.extension,
     busy:!!busy.value,modal:!!saveAsDraft.value||!!closeTarget.value||help.value,
-    composing:composing.value||Date.now()-lastInputAt<1200,remoteEditing:false}},
+    composing:composing.value||Date.now()-lastInputAt.value<1200,remoteEditing:false}},
   async save(target){
     const tab=active.value
     // A pause inside an unfinished cell, text box or form is not confirmation.
     // Check before the shell's input barrier; the editor checks again atomically
     // when exporting and acknowledging the saved bytes.
-    if(!tab||tab.key!==target.key||!await handleFor(tab)?.canBackgroundExport?.())return true
-    return editorTransaction('正在自动保存',()=>saveActive(false,undefined,undefined,target),true)
+    if(!tab||tab.key!==target.key||tab.fileId!==target.fileId)return 'deferred'
+    if(!await handleFor(tab)?.canBackgroundExport?.()) {
+      autosaveWaiting.value={key:tab.key,reason:'等待完成编辑'}
+      return 'deferred'
+    }
+    // Readiness may cross an asynchronous engine queue. Recheck the shell before
+    // reserving the write transaction, including a preference switched off then.
+    if(!autosaveEnabled.value||active.value?.key!==target.key||tab.fileId!==target.fileId||
+      globalActionsBlocked.value||composing.value||Date.now()-lastInputAt.value<1200)return 'deferred'
+    autosaveWaiting.value=undefined
+    const saved=await editorTransaction('正在自动保存',()=>saveActive(false,undefined,undefined,target),true)
+    if(saved)tab.autoSavedAt=Date.now()
+    return saved
   },
-  onError(){status.value='自动保存暂未完成，当前修改仍保留，稍后重试。'},
+  onError(_error,target){
+    if(target)autosaveWaiting.value={key:target.key,reason:'自动保存待重试'}
+    status.value='自动保存暂未完成，当前修改仍保留，稍后重试。'
+  },
 })
-watch(autosaveEnabled,value=>{try{localStorage.setItem('open-office-autosave',String(value))}catch{}autosave.notify()})
+watch(autosaveEnabled,value=>{try{localStorage.setItem('open-office-autosave',String(value))}catch{}autosaveWaiting.value=undefined;autosave.notify()})
 onMounted(async()=>{
   for(const type of ['input','keydown','pointerdown','compositionstart','compositionend'])document.addEventListener(type,inputActivity,true)
 })
@@ -909,7 +948,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
   <div class="app-shell" :class="{'editing':!home}">
     <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.xlsx,.csv,.tsv,.pptx,.potx,.ppsx,.pdf,.oonote" @change="browserFile" />
     <header class="titlebar" data-testid="global-toolbar" :inert="globalActionsBlocked">
-      <button class="brand" @click="home=true;section='home'" aria-label="返回工作台"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
+      <button class="brand" @click="home=true" aria-label="返回工作台"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
       <nav class="global-file-toolbar" aria-label="全局文件操作">
         <details ref="newMenu" class="new-document-menu" @keydown.esc.stop.prevent="closeNewMenu(true)">
           <summary data-testid="shell-new" aria-label="新建文档" title="新建文档 · Ctrl / ⌘ N"><Icon name="plus" :size="18"/><span class="file-action-label">新建</span><Icon name="chevron-down" :size="12"/></summary>
@@ -932,7 +971,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       </nav>
       <span class="titlebar-context" :title="currentDocument?.document.name">{{currentDocument?.document.name || '工作台'}}</span>
       <div class="titlebar-right">
-        <span class="save-state" data-testid="global-save-state" :title="currentDocument?.document.name"><i v-if="currentDocument?.dirty" class="dirty-dot"/>{{currentDocument ? currentDocument.loadError ? '打开失败' : !currentDocument.ready ? '正在载入' : currentDocument.dirty ? '尚未保存' : '已保存' : '本地办公'}}</span>
+        <span class="save-state" data-testid="global-save-state" role="status" aria-live="polite" :title="saveStateTitle"><i v-if="currentDocument?.dirty" class="dirty-dot"/>{{saveStateLabel}}</span>
         <div class="theme-switch" role="group" aria-label="界面主题">
           <button v-for="option in appearanceOptions" :key="option.value" :data-testid="'theme-'+option.value" :aria-label="option.label" :title="option.label" :aria-pressed="appearance===option.value" @click="appearance=option.value"><Icon :name="option.icon" :size="18"/></button>
         </div>
@@ -942,13 +981,13 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
     <div v-show="home" class="workspace" :inert="globalActionsBlocked">
       <aside class="sidebar">
         <button class="primary open-sidebar" @click="openFile" aria-label="打开文件" title="打开文件 · Ctrl / ⌘ O"><Icon name="folder"/><span>打开文件</span><kbd>⌘ / Ctrl O</kbd></button>
-        <nav aria-label="工作区"><button :class="{selected:section==='home'}" :aria-current="section==='home'?'page':undefined" aria-label="工作台" title="工作台" @click="section='home'"><Icon name="home"/><span>工作台</span></button><button :class="{selected:section==='recent'}" :aria-current="section==='recent'?'page':undefined" aria-label="最近打开" title="最近打开" @click="section='recent'"><Icon name="clock"/><span>最近打开</span></button></nav>
+        <nav aria-label="工作区"><button class="selected" aria-current="page" aria-label="工作台" title="工作台" @click="home=true"><Icon name="home"/><span>工作台</span></button></nav>
         <div v-if="tabs.length" class="sidebar-documents"><div class="sidebar-documents-heading"><span class="eyebrow">正在编辑 · {{tabs.length}}</span><button data-testid="home-close-all" @click="closeAllTabs" title="关闭所有打开的文档">全部关闭</button></div><button v-for="tab in tabs" :key="tab.key" :title="tab.document.name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button></div>
         <div class="sidebar-bottom"><Icon name="shield"/><strong>文件保存在本机</strong><p>打开、编辑与保存，都在本地完成。</p><button @click="help=true">格式支持与快捷键 <Icon name="arrow" :size="15"/></button></div>
       </aside>
       <main class="home-main">
-        <div class="home-heading"><div><span class="eyebrow">本地工作空间</span><h1>{{section==='home'?'工作台':'最近打开'}}</h1><p>{{section==='home'?'新建一份文档，或继续编辑本机文件。':'在这里查找并继续之前的工作。'}}</p></div></div>
-        <section v-if="section==='home'" class="create-grid" aria-label="新建文件">
+        <div class="home-heading"><div><span class="eyebrow">本地工作空间</span><h1>工作台</h1><p>新建一份文档，或继续编辑本机文件。</p></div></div>
+        <section class="create-grid" aria-label="新建文件">
           <button class="create-card word" @click="newDocument('word')"><span class="document-art"><Icon name="file" :size="28"/></span><span class="card-bottom"><span><strong>文字文档</strong><small>文字排版、表格与图片编辑</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">DOCX</span></button>
           <button class="create-card sheet" @click="newDocument('sheet')"><span class="document-art"><Icon name="sheet" :size="28"/></span><span class="card-bottom"><span><strong>电子表格</strong><small>数据整理与公式计算</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">XLSX · CSV · TSV</span></button>
           <button class="create-card presentation" @click="newDocument('presentation')"><span class="document-art"><Icon name="presentation" :size="28"/></span><span class="card-bottom"><span><strong>演示文稿</strong><small>幻灯片设计与演示</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">PPTX · POTX · PPSX</span></button>
@@ -956,8 +995,10 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
           <button class="create-card note" data-testid="home-new-note" @click="newDocument('note')"><span class="document-art"><Icon name="notebook" :size="28"/></span><span class="card-bottom"><span><strong>笔记本</strong><small>分区与页面、灵感记录和待办</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">OONOTE</span></button>
         </section>
         <section class="recent-section"><div class="section-heading"><h2>最近打开 <span>{{recents.length}}</span></h2><label class="search-box"><Icon name="search" :size="18"/><input v-model="search" placeholder="查找最近的文件" aria-label="查找最近的文件"/></label></div>
-          <div v-if="!filteredRecents.length" class="empty-files"><div class="empty-icon"><Icon name="folder" :size="28"/></div><strong>{{search?'没有找到匹配的文件':'你的下一份作品，从这里开始'}}</strong><p>{{native.isTauri()?'打开本机文件后，可以在这里快速找到它。':'浏览器支持本地编辑和导出文件；桌面版还可直接保存到本机文件。'}}</p><button class="text-button" @click="openFile">打开一份文件 <Icon name="arrow" :size="16"/></button></div>
-          <div v-else class="recent-list"><button v-for="item in filteredRecents" :key="item.id" class="recent-row" @click="openRecent(item)"><span class="file-icon" :class="item.kind"><Icon :name="icons[item.kind]"/></span><span class="recent-name">{{item.name}}<small>{{kindNames[item.kind]}} · {{item.extension.toUpperCase()}}</small></span><time>{{new Date(item.lastOpenedAt* (item.lastOpenedAt<1e12?1000:1)).toLocaleDateString('zh-CN')}}</time><Icon name="arrow" :size="18"/></button></div>
+          <div ref="recentList" class="recent-list" role="region" aria-label="最近打开的文件" tabindex="0">
+            <div v-if="!filteredRecents.length" class="empty-files"><div class="empty-icon"><Icon name="folder" :size="28"/></div><strong>{{search?'没有找到匹配的文件':'你的下一份作品，从这里开始'}}</strong><p>{{native.isTauri()?'打开本机文件后，可以在这里快速找到它。':'浏览器支持本地编辑和导出文件；桌面版还可直接保存到本机文件。'}}</p><button class="text-button" @click="openFile">打开一份文件 <Icon name="arrow" :size="16"/></button></div>
+            <template v-else><button v-for="item in filteredRecents" :key="item.id" class="recent-row" @click="openRecent(item)"><span class="file-icon" :class="item.kind"><Icon :name="icons[item.kind]"/></span><span class="recent-name">{{item.name}}<small>{{kindNames[item.kind]}} · {{item.extension.toUpperCase()}}</small></span><time>{{new Date(item.lastOpenedAt* (item.lastOpenedAt<1e12?1000:1)).toLocaleDateString('zh-CN')}}</time><Icon name="arrow" :size="18"/></button></template>
+          </div>
         </section>
         <footer class="home-footer"><span>支持文档、表格、演示、PDF 与本地笔记本</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
       </main>
@@ -1017,11 +1058,9 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 .close-document-list li > span:not(.close-document-state) { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .close-document-state { color:var(--ui-warning); font-size:11px; }
 .close-documents-dialog .modal-actions { flex-wrap:wrap; }
-.create-grid { grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr)); }
 .create-card.note { --accent:#8965bb; --pale:color-mix(in srgb,#8965bb 12%,var(--ui-surface)); }
 .file-icon.note { color:#8965bb; background:color-mix(in srgb,#8965bb 12%,var(--ui-surface)); }
 @media(max-width:600px) { .close-all-tabs { padding:0 9px; } .close-all-tabs span { display:none; } }
-@media(max-width:540px) { .create-grid { grid-template-columns:1fr; } }
 @media(max-width:900px) { .autosave-toggle { width:38px!important; padding:4px!important; flex:none; } .autosave-label { display:none; } }
 .autosave-toggle{display:inline-flex;gap:6px!important;align-items:center;white-space:nowrap}.autosave-track{width:25px;height:15px;border-radius:12px;background:var(--ui-line-strong);padding:2px;display:inline-flex;align-items:center}.autosave-track i{width:11px;height:11px;border-radius:50%;background:white;box-shadow:0 1px 3px #0002;transition:transform .15s}.autosave-track.enabled{background:var(--ui-accent)}.autosave-track.enabled i{transform:translateX(10px)}
 

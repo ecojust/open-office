@@ -40,10 +40,19 @@ test('native notebook publication rejects altered byte evidence, wrong save targ
 
 test('independent JSON inspection rejects extra or altered content even when reported hashes and receipts agree', () => {
   for (const mutate of [
-    model => { model.sections[0].pages[0].blocks[0].content[0].text = 'different'; },
-    model => { model.sections[0].pages[0].blocks.push({ id: 'extra', type: 'paragraph', content: [{ text: 'hidden extra' }] }); },
-    model => { model.sections[0].pages[0].blocks[0].content[0].marks = ['bold']; },
+    model => { model.sections[0].pages[0].regions[0].blocks[0].content[0].text = 'different'; },
+    model => { model.sections[0].pages[0].regions[0].blocks.push({ id: 'extra', type: 'paragraph', content: [{ text: 'hidden extra' }] }); },
+    model => { model.sections[0].pages[0].regions[0].blocks[0].content[0].marks = ['bold']; },
     model => { model.sections[0].pages[0].id = model.id; },
+    model => { model.sections[0].pages[0].regions[0].id = 'changed-region'; },
+    model => { model.sections[0].pages[0].regions[0].id = model.id; },
+    model => { model.sections[0].pages[0].regions[0].x++; },
+    model => { model.sections[0].pages[0].regions[0].y++; },
+    model => { model.sections[0].pages[0].regions[0].width++; },
+    model => { model.sections[0].pages[0].regions[0].height = 100; },
+    model => { model.sections[0].pages[0].regions.push({ id: 'extra-region', x: 600, y: 24, width: 480, blocks: [{ id: 'extra-block', type: 'paragraph', content: [] }] }); },
+    model => { model.sections[0].pages[0].parentId = 'unexpected-parent'; },
+    model => { const page = model.sections[0].pages[0]; model.version = 1; page.blocks = page.regions[0].blocks; delete page.regions; },
     model => { model.extra = 'unexpected'; },
   ]) {
     const report = notebookReport(), model = JSON.parse(Buffer.from(report.persistence.readbackBase64, 'base64').toString('utf8')); mutate(model);

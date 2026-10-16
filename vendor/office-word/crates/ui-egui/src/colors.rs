@@ -449,7 +449,10 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
         ctx.data_mut(|m| m.insert_temp(open_flag_id(), false));
         return;
     };
-    let resp = egui::Modal::new(Id::new("word.colorsDialog")).show(ctx, |ui| body(ui, &mut d));
+    let resp = egui::Modal::new(Id::new("word.colorsDialog"))
+        .frame(crate::theme::dialog_frame(ctx))
+        .backdrop_color(Color32::from_rgba_unmultiplied(0x20, 0x2B, 0x3B, 0x55))
+        .show(ctx, |ui| crate::theme::dialog_body(ui, |ui| body(ui, &mut d)));
     let mut done = resp.inner;
     if done.is_none() && resp.should_close() {
         done = Some(false);
@@ -483,7 +486,7 @@ pub fn finish(app: &mut WordApp, ctx: &egui::Context, d: &ColorsDialog) {
 fn body(ui: &mut Ui, d: &mut ColorsDialog) -> Option<bool> {
     let t = Tokens::get(ui.ctx());
     ui.set_width(430.0);
-    ui.label(egui::RichText::new(tl!("Colors")).font(crate::theme::semibold(14.0)));
+    ui.heading(tl!("Colors"));
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         for (tab, label) in [(ColorsTab::Standard, "Standard"), (ColorsTab::Custom, "Custom")] {
@@ -507,18 +510,15 @@ fn body(ui: &mut Ui, d: &mut ColorsDialog) -> Option<bool> {
         });
     });
     let mut out = None;
-    ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button(tl!("Cancel")).clicked() {
-                out = Some(false);
-            }
-            let okb = ui.add(crate::widgets::primary_button(ui, tl!("OK")));
-            let typing = ui.ctx().memory(|m| m.focused().is_some());
-            if okb.clicked() || (!typing && ui.input(|i| i.key_pressed(egui::Key::Enter))) {
-                out = Some(true);
-            }
-        });
+    crate::theme::dialog_actions(ui, |ui| {
+        if ui.button(tl!("Cancel")).clicked() {
+            out = Some(false);
+        }
+        let okb = ui.add(crate::widgets::primary_button(ui, tl!("OK")));
+        let typing = ui.ctx().memory(|m| m.focused().is_some());
+        if okb.clicked() || (!typing && ui.input(|i| i.key_pressed(egui::Key::Enter))) {
+            out = Some(true);
+        }
     });
     out
 }

@@ -15,6 +15,7 @@ const RUNTIME_FILES = ['office-presentation.js', 'office-presentation_bg.wasm'];
 export const OFFICE_PRESENTATION_SMOKE_TEXT = 'Open Office 演示😀';
 export const REQUIRED_OFFICE_PRESENTATION_CHECKS = Object.freeze([
   'default-mounted-local-wasm-canvas-painted',
+  'new-presentation-three-slide-starter',
   'synthetic-dom-input-chinese-emoji',
   'rust-slide-editing-and-text-formatting',
   'pptx-export-and-save-receipt',
@@ -194,10 +195,18 @@ export function validateOfficePresentationNativeReport(report) {
   object(report, 'native canvas report');
   check(report.schemaVersion === 1 && report.kind === 'office-presentation-native' && report.ok === true, 'native canvas checks failed');
   check(report.engine === 'office-presentation-wasm' && report.transport === 'local-wasm-in-native-webview', 'default canvas must use local WASM in the native WebView');
-  assert.deepEqual(report.checks, [...REQUIRED_OFFICE_PRESENTATION_CHECKS], 'OfficePresentation requires all seven ordered canvas checks');
+  assert.deepEqual(report.checks, [...REQUIRED_OFFICE_PRESENTATION_CHECKS], 'OfficePresentation requires all ordered canvas checks');
   assert.deepEqual(report.limitations, [...OFFICE_PRESENTATION_SMOKE_LIMITATIONS], 'OfficePresentation native smoke must disclose its synthetic-input and file-dialog limits');
   assert.deepEqual(report.cleanup, { attempted: 2, closed: 2, ok: true, remainingCanvas: 0, remainingInput: 0 }, 'OfficePresentation did not clean up both sessions and its renderer');
   check(report.error === undefined && report.closeError === undefined, 'native smoke reported an operation or cleanup error');
+  assert.deepEqual(report.starterTemplate, {
+    slideSize: [960, 540], activeIndex: 0, dirty: false, canUndo: false, canRedo: false,
+    slides: [
+      { texts: ['Open Office 演示', '从一个想法，开始精彩表达', '汇报人 / 你的姓名'], background: 'picture', shapeCount: 3, vectorGroups: 0 },
+      { texts: ['请输入标题'], background: '#FAFCFF', shapeCount: 2, vectorGroups: 1 },
+      { texts: ['open office'], background: 'picture', shapeCount: 1, vectorGroups: 0 },
+    ],
+  }, 'OfficePresentation requires the clean three-slide starter with editable titles and theme artwork');
   object(report.canvas, 'canvas observations');
   for (const name of ['width', 'height', 'slideCount', 'paintCalls']) positive(report.canvas[name], `canvas ${name}`);
   check(report.canvas.width > 100 && report.canvas.height > 100 && report.canvas.slideCount === 2, 'default canvas was not visible with both slides');

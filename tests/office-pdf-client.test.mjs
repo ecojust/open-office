@@ -7,6 +7,7 @@ import ts from 'typescript'
 import * as vue from 'vue'
 import { base64ToBytes, bytesToBase64 } from '../src/shared/document.ts'
 import { createId } from '../src/shared/id.ts'
+import { createPdfAuthorPreference, normalizePdfAuthor } from '../src/pdf/author.ts'
 
 const clientSource = await readFile(new URL('../src/pdf/rust/client.ts', import.meta.url), 'utf8')
 const editorSource = (await readFile(new URL('../src/components/RustPdfEditor.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
@@ -23,7 +24,8 @@ function evaluate(source, require, globals = {}) {
 function harness(kind = 'pdf') {
   const sheet = kind === 'sheet', format = sheet ? 'xlsx' : 'pdf'
   const state = new Map(), calls = [], document = { baseURI: 'http://localhost/', activeElement: null }
-  let receive, documentId = 0, pendingText, startGate, drainGate, flushError, discardPending = false, activeHostId
+  const authorStore = new Map(), author = { normalizePdfAuthor, pdfAuthorPreference: createPdfAuthorPreference(() => ({ getItem: key => authorStore.get(key) ?? null, setItem: (key, value) => authorStore.set(key, value) })) }
+  let receive, documentId = 0, pendingText, startGate, drainGate, flushError, authorError, discardPending = false, activeHostId
   class Element {
     children = []; parentElement; style = {}; dataset = {}; isConnected = true; listeners = new Map()
     append(child) { child.remove(); this.children.push(child); child.parentElement = this }
@@ -55,6 +57,10 @@ function harness(kind = 'pdf') {
     command(id, commandId, params) {
       calls.push(['command', id, commandId]); const value = JSON.parse(params), doc = state.get(id)
       if (commandId === 'text.set') edit(id, value.text)
+      else if (commandId === 'ui.set' && value.key === 'author') {
+        if (authorError) return JSON.stringify({ ok: false, error: authorError })
+        doc.author = value.value
+      }
       else if (commandId === 'edit.undo' && doc.undo.length) { doc.redo.push(doc.text); doc.text = doc.undo.pop(); doc.revision++; doc.dirty = true; doc.canRedo = true }
       else if (commandId === 'edit.redo' && doc.redo.length) { doc.undo.push(doc.text); doc.text = doc.redo.pop(); doc.revision++; doc.dirty = true }
       return JSON.stringify({ ok: true, snapshot: JSON.parse(snapshot(id)), result: { text: doc.text } })
@@ -71,6 +77,7 @@ function harness(kind = 'pdf') {
   const client = evaluate(sheet ? sheetClientSource : clientSource, name => {
     if (name === '../../shared/document') return { base64ToBytes }
     if (name === '../../shared/id') return { createId }
+    if (name === '../author') return author
     if (name === (sheet ? 'http://localhost/office-sheet/office-sheet.js' : 'http://localhost/office-pdf/office_pdf.js')) return { default: async () => {}, createHost(callback) { receive = callback; return host } }
     throw Error(`Unexpected import ${name}`)
   }, globals)
@@ -83,13 +90,55 @@ function harness(kind = 'pdf') {
     scope.run(() => evaluate(sheet ? sheetEditorSource : editorSource, name => {
       if (name === 'vue') return { ...vue, onBeforeUnmount(callback) { unmount.push(callback) } }
       if (name === '../shared/document') return { bytesToBase64 }
+      if (name === '../pdf/author') return author
+      if (name === '../shared/dialog-focus') return { useDialogFocus() {} }
       if (name === `../${kind}/rust/client`) return client
       throw Error(`Unexpected component import ${name}`)
     }, { ...globals, defineProps: () => props, withDefaults: value => value, defineEmits: () => (...event) => events.push(event), defineExpose(value) { exposed = value } }))
     return { props, events, editor: exposed, dispose() { unmount.forEach(callback => callback()); scope.stop() } }
   }
-  return { client, open, source, state, calls, document, Element, component, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value }, setDrainGate(value) { drainGate = value }, setFlushError(value) { flushError = value } }
+  return { client, open, source, state, calls, document, Element, component, authorStore, author: author.pdfAuthorPreference, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value }, setDrainGate(value) { drainGate = value }, setFlushError(value) { flushError = value }, setAuthorError(value) { authorError = value } }
 }
+
+test('PDF identity applies before editing and follows open tabs without changing document receipts or drafts', async () => {
+  const h = harness(), first = await h.open(), second = await h.open()
+  await first.attach(new h.Element(), true)
+  assert.equal(h.state.get(first.id).author, '')
+  const revision = first.snapshot.revision
+  h.pending(first.id, 'uncommitted draft')
+  const flushes = h.calls.filter(call => call[0] === 'flush').length
+  assert.equal(await first.setAuthor(' 陈江 '), true)
+  assert.equal(h.state.get(first.id).author, '陈江')
+  assert.equal(first.snapshot.revision, revision)
+  assert.equal(first.snapshot.dirty, false)
+  assert.equal(h.state.get(first.id).text, '')
+  assert.equal(h.calls.filter(call => call[0] === 'flush').length, flushes)
+  await second.attach(new h.Element(), true)
+  assert.equal(h.state.get(second.id).author, '陈江')
+  await assert.rejects(first.setAuthor('Other'), /先切换/)
+  await second.setAuthor('')
+  await first.attach(new h.Element(), true)
+  assert.equal(h.state.get(first.id).author, '')
+  assert.equal(h.author.read(), '')
+  assert.equal(h.state.get(first.id).text, 'uncommitted draft')
+  assert.equal(h.state.get(second.id).dirty, false)
+  await first.close(true); await second.close(true)
+})
+
+test('PDF identity setup failures cannot silently enable an old default author or overwrite the saved choice', async () => {
+  const h = harness(), session = await h.open(), container = new h.Element()
+  h.author.save('Ada'); h.setAuthorError('Author setup failed')
+  await assert.rejects(session.attach(container, true), /Author setup failed/)
+  session.setInteractive(true)
+  assert.equal(h.calls.filter(call => call[0] === 'active').at(-1)[1], false)
+  await assert.rejects(session.setAuthor('陈江'), /Author setup failed/)
+  assert.equal(h.author.read(), 'Ada')
+  h.setAuthorError(undefined)
+  await session.attach(container, true)
+  assert.equal(h.state.get(session.id).author, 'Ada')
+  assert.equal(h.calls.filter(call => call[0] === 'active').at(-1)[1], true)
+  await session.close(true)
+})
 
 test('PDF failed import keeps the edited session, selection and undo history', async () => {
   const h = harness(), first = await h.open()

@@ -19,7 +19,7 @@ const dialogFocus = await readFile(new URL('../src/shared/dialog-focus.ts', impo
 const appearanceSource = await readFile(new URL('../src/shared/appearance.ts', import.meta.url), 'utf8')
 const autosaveSource = await readFile(new URL('../src/shared/autosave.ts', import.meta.url), 'utf8')
 const names = 'tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,rustPdfEntries,rustPdfHandles,setRustPdfHandle,rustWordEntries,rustWordHandles,setRustWordHandle,rustSheetEntries,rustSheetHandles,setRustSheetHandle,rustPresentationEntries,rustPresentationHandles,setRustPresentationHandle,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,browserFile,saveActive,closeTab,closeAllTabs,closeWindow,resolveClose,removeTab,removeTabs,task,editorTransaction,nativeTransactionalEditor,appearance,currentDocument,globalActionsBlocked,documentActionsDisabled,globalFileAction,globalNewDocument,keydown,rustEditorFileAction,previewSlides'
-  + ',autosaveEnabled,autosave,backgroundSaving,editorInputBlocked,noteEntries,noteHandles,setNoteHandle,activeNote'
+  + ',autosaveEnabled,autosave,autosaveWaiting,saveStateLabel,saveStateTitle,backgroundSaving,editorInputBlocked,noteEntries,noteHandles,setNoteHandle,activeNote'
 
 
 function compile(source, require, extra = {}) {
@@ -51,11 +51,13 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
   if (storedAutosave !== undefined) storage.set('open-office-autosave', storedAutosave)
   const windowListeners = new Map(), documentListeners = new Map(), mediaListeners = new Set()
   const timers = new Map(), intervals = new Map()
+  let now = Date.now()
   const media = { matches: systemDark, addEventListener(_type, callback) { mediaListeners.add(callback) }, removeEventListener(_type, callback) { mediaListeners.delete(callback) } }
   class Element {}
   // Share DOM identities with the real dialog helper across both VM contexts.
   // Layout notifications remain controlled because this harness has no renderer.
   const browser = {
+    Date: class extends Date { static now() { return now } },
     crossOriginIsolated: true,
     Blob,
     AbortController, Response, Headers,
@@ -226,6 +228,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     async fireTimeout(milliseconds) {
       const entry=[...timers].find(([,value])=>value.milliseconds===milliseconds)
       assert.ok(entry,`Expected a scheduled ${milliseconds}ms timer`)
+      now += milliseconds
       browser.clearTimeout(entry[0]);entry[1].callback(...entry[1].args)
       for(let n=0;n<30;n++){await Promise.resolve();await vue.nextTick()}
     },
@@ -342,6 +345,65 @@ test('mounted shell runs the real autosave scheduler and releases input listener
   assert.equal([...h.documentListeners.values()].reduce((count,listeners)=>count+listeners.size,0),0)
 })
 
+test('autosave resumes after IME confirmation without waiting for another full interval or faking a save',async()=>{
+  const h=shell({storedAutosave:'true'}),tab=h.tab('ime-resume',{dirty:false});h.active(tab);h.state.home.value=false
+  const target=Object.assign(new h.browser.HTMLElement(),{closest:()=>({})})
+  try {
+    await h.mount()
+    assert.equal(h.state.saveStateLabel.value,'已保存','Opening a file is not an automatic save')
+    h.state.dirtyFor(tab.key,true)
+    assert.equal(h.state.saveStateLabel.value,'等待自动保存')
+    h.dispatchDocument('compositionstart',{target})
+    await h.fireTimeout(30000)
+    assert.equal(h.calls.filter(call=>call[0]==='save').length,0)
+    assert.equal(h.state.saveStateLabel.value,'等待输入完成')
+    assert.equal(tab.autoSavedAt,undefined)
+    h.dispatchDocument('compositionend',{target})
+    await h.fireTimeout(1200);await h.idle()
+    assert.equal(h.calls.filter(call=>call[0]==='save').length,1)
+    assert.equal(tab.dirty,false)
+    assert.equal(h.state.saveStateLabel.value,'已自动保存')
+    assert.match(h.state.saveStateTitle.value,/已自动保存到本机/)
+  } finally {h.unmount()}
+})
+
+test('autosave explains missing save destinations and never reports a failed native write as saved',async()=>{
+  const h=shell({storedAutosave:'true'}),tab=h.tab('status-reasons',{dirty:true});h.active(tab);h.state.home.value=false
+  try {
+    tab.fileId=undefined
+    assert.equal(h.state.saveStateLabel.value,'请先保存')
+    assert.match(h.state.saveStateTitle.value,/选择保存位置/)
+    tab.fileId='selected-original'
+    h.native.saveDocument=async()=>{throw Error('Original file is read-only')}
+    await h.mount();await h.fireTimeout(30000);await h.idle();await settleShell()
+    assert.equal(tab.dirty,true)
+    assert.equal(tab.autoSavedAt,undefined)
+    assert.equal(h.state.saveStateLabel.value,'自动保存待重试')
+    h.state.autosaveEnabled.value=false;await vue.nextTick()
+    assert.equal(h.state.saveStateLabel.value,'尚未保存')
+  } finally {h.unmount()}
+})
+
+test('autosave rechecks shell interruptions after awaiting engine readiness',async()=>{
+  for(const interrupted of ['disabled','dialog','busy','composition']) {
+    const h=shell({storedAutosave:'true'}),tab=h.tab(`queued-${interrupted}`,{dirty:true});h.active(tab)
+    let resume
+    const ready=new Promise(resolve=>{resume=resolve})
+    h.rustWordHandle.canBackgroundExport=()=>ready
+    try {
+      await h.mount();await h.fireTimeout(30000)
+      if(interrupted==='disabled')h.state.autosaveEnabled.value=false
+      if(interrupted==='dialog')h.state.help.value=true
+      if(interrupted==='busy')h.state.busy.value='正在处理另一份文件'
+      if(interrupted==='composition')h.dispatchDocument('compositionstart',{target:Object.assign(new h.browser.HTMLElement(),{closest:()=>({})})})
+      resume(true);await settleShell()
+      assert.equal(h.calls.filter(call=>call[0]==='save').length,0,interrupted)
+      assert.equal(tab.dirty,true)
+      assert.equal(tab.autoSavedAt,undefined)
+    } finally {resume(true);h.state.busy.value='';h.unmount()}
+  }
+})
+
 function backgroundHandle(h,tab) {
   const handles={word:h.state.rustWordHandles,sheet:h.state.rustSheetHandles,
     presentation:h.state.rustPresentationHandles,pdf:h.state.rustPdfHandles,note:h.state.noteHandles}
@@ -366,9 +428,9 @@ test('background operations fail closed for pending input and editors without a 
 })
 
 
-test('autosave leaves unfinished input focused and retries only after explicit editor readiness',async()=>{
-  for(const kind of ['word','sheet','presentation','pdf']) {
-    const h=shell({storedAutosave:'true'}),tab=h.tab(`autosave-draft-${kind}`,{kind,dirty:true});h.active(tab)
+test('autosave leaves unfinished input focused and promptly retries only after explicit editor readiness',async()=>{
+  for(const kind of ['word','sheet','presentation','pdf','note']) {
+    const h=shell({storedAutosave:'true'}),tab=h.tab(`autosave-draft-${kind}`,{kind,dirty:true});h.active(tab);h.state.home.value=false
     const handle=backgroundHandle(h,tab)
     let pending=true,blurCount=0,exports=0,receipts=0
     const focused=Object.assign(new h.browser.HTMLElement(),{blur(){blurCount++;pending=false}})
@@ -384,9 +446,12 @@ test('autosave leaves unfinished input focused and retries only after explicit e
       assert.equal(blurCount,0);assert.equal(pending,true);assert.equal(exports,0);assert.equal(receipts,0)
       assert.equal(h.calls.filter(call=>call[0]==='save').length,0);assert.equal(tab.dirty,true)
       assert.equal(h.browser.document.activeElement,focused)
-      pending=false;await h.fireTimeout(30000);await h.idle()
+      assert.equal(h.state.saveStateLabel.value,'等待完成编辑')
+      assert.match(h.state.saveStateTitle.value,/不会被打断/)
+      pending=false;await h.fireTimeout(1200);await h.idle()
       assert.equal(blurCount,0);assert.equal(exports,1);assert.equal(receipts,1)
       assert.equal(h.calls.filter(call=>call[0]==='save').length,1);assert.equal(tab.dirty,false)
+      assert.equal(h.state.saveStateLabel.value,'已自动保存')
     } finally {h.unmount()}
   }
 })

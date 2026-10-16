@@ -28,9 +28,9 @@ function notebookBytes(base64, hash, size, label) {
   try { model = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
   catch { throw Error(`Native notebook: ${label} is not UTF-8 JSON`); }
   object(model, `${label} notebook`);
-  const section = model.sections?.[0], page = section?.pages?.[0], block = page?.blocks?.[0];
-  check(section && page && block, `${label} notebook structure missing`);
-  const ids = [model.id, section.id, page.id, block.id];
+  const section = model.sections?.[0], page = section?.pages?.[0], region = page?.regions?.[0], block = region?.blocks?.[0];
+  check(section && page && region && block, `${label} notebook structure missing`);
+  const ids = [model.id, section.id, page.id, region.id, block.id];
   check(ids.every(id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(id)) && new Set(ids).size === ids.length, `${label} notebook IDs invalid`);
   return model;
 }
@@ -59,14 +59,16 @@ export function validateNativeNotebookReport(report, workspace) {
   check(typeof persistence.targetId === 'string' && persistence.targetId.length > 0 && persistence.targetId.length <= 256, 'file identity missing');
   const initial = notebookBytes(persistence.initialBase64, persistence.initialSha256, persistence.initialSizeBytes, 'initial');
   const saved = notebookBytes(persistence.readbackBase64, persistence.finalSha256, persistence.finalSizeBytes, 'saved');
-  const section = initial.sections[0], page = section.pages[0], block = page.blocks[0];
-  assert.deepEqual(initial, { format: 'open-office-notebook', version: 1, id: initial.id, title: 'native-notebook',
-    sections: [{ id: section.id, title: '日常笔记', pages: [{ id: page.id, title: '无标题页面', blocks: [{ id: block.id, type: 'paragraph', content: [] }] }] }] }, 'Native notebook: initial content differs');
+  const section = initial.sections[0], page = section.pages[0], region = page.regions[0], block = region.blocks[0];
+  assert.deepEqual(initial, { format: 'open-office-notebook', version: 2, id: initial.id, title: 'native-notebook',
+    sections: [{ id: section.id, title: '日常笔记', pages: [{ id: page.id, title: '无标题页面',
+      regions: [{ id: region.id, x: 24, y: 24, width: 480, blocks: [{ id: block.id, type: 'paragraph', content: [] }] }] }] }] }, 'Native notebook: initial content differs');
   // The browser may replace the empty paragraph node during insertion. Its new
-  // block ID remains validated above; notebook, section and page IDs must persist.
+  // block ID remains validated above; notebook, section, page and region IDs,
+  // as well as the manually positioned region geometry, must persist.
   const expected = structuredClone(initial);
   expected.sections[0].pages[0].title = NOTEBOOK_PAGE_TITLE;
-  expected.sections[0].pages[0].blocks = [{ id: saved.sections[0].pages[0].blocks[0].id, type: 'paragraph', content: [{ text: NOTEBOOK_PAGE_TEXT }] }];
+  expected.sections[0].pages[0].regions[0].blocks = [{ id: saved.sections[0].pages[0].regions[0].blocks[0].id, type: 'paragraph', content: [{ text: NOTEBOOK_PAGE_TEXT }] }];
   assert.deepEqual(saved, expected, 'Native notebook: independently parsed saved content differs');
   check(persistence.finalSha256 !== persistence.initialSha256 && persistence.dialogObserved === false, 'save did not update original bytes or opened a dialog');
   snapshot(persistence.saved, 'saved notebook', false);

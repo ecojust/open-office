@@ -82,6 +82,9 @@ The standalone upstream brand images listed above are excluded from this modifie
 
 | Asset | Author | Source | Licence | Used for |
 |---|---|---|---|---|
+| `assets/templates/open-office/cover.svg`, `cover.png` | Open Office contributors | Contributor-original artwork, 2026-10-16; PNG rendered from adjacent SVG | MIT OR Apache-2.0, adjacent `LICENSE.txt` | Pale gradient background for the default presentation cover |
+| `assets/templates/open-office/content-mark.svg` | Open Office contributors | Contributor-original artwork, 2026-10-16; geometry represented as editable vector shapes | MIT OR Apache-2.0, adjacent `LICENSE.txt` | Rectangular slide motif on the default content page |
+| `assets/templates/open-office/closing.svg`, `closing.png` | Open Office contributors | Contributor-original artwork, 2026-10-16; PNG rendered from adjacent SVG | MIT OR Apache-2.0, adjacent `LICENSE.txt` | Blue-violet closing background; wordmark remains editable document text |
 | Generated `crates/ui-egui/src/office_icons.rs` geometry and `office_svg.rs` renderer | Open Office contributors | Open Office `src/icons`, exact source revision in build manifest | MIT | Original interface icons (245 semantic entries; document Insert Icons library unchanged) |
 | `../../assets/fonts/deck/Inter-Regular.ttf`, `Inter-SemiBold.ttf` | Rasmus Andersson / Inter Project Authors | https://github.com/rsms/inter; exact pinned bytes from Open Office Word font inventory | OFL-1.1, `OFL-Inter.txt` | Interface and Latin document/PDF text |
 | `../../assets/fonts/deck/LXGWWenKai-Regular.ttf` | LXGW; Fontworks Klee Project Authors | https://github.com/lxgw/LxgwWenKai/releases/tag/v1.522; exact bytes in font manifest | OFL-1.1, `LICENSE-LXGW-WenKai.txt` | Chinese interface and document/PDF fallback |

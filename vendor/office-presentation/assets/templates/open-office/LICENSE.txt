@@ -1,0 +1,13 @@
+Open Office presentation starter artwork
+Copyright (c) 2026 Open Office contributors
+
+Original artwork created for Open Office. No third-party imagery, logos or fonts
+are included. cover.png and closing.png are raster renderings of the adjacent
+SVG sources; content-mark.svg is also represented by editable vector shapes in
+the presentation model.
+
+These assets are licensed under either of the following, at your option:
+  - MIT License (../../../LICENSE-MIT relative to this directory)
+  - Apache License, Version 2.0 (../../../LICENSE-APACHE relative to this directory)
+
+SPDX-License-Identifier: MIT OR Apache-2.0
