@@ -172,7 +172,6 @@ a { color: var(--ui-accent); }
 .sidebar-bottom > svg { display: block; margin-bottom: 10px; color: var(--ui-success); }
 .sidebar-bottom strong { color: var(--ui-text); font-size: 12px; font-weight: 600; }
 .sidebar-bottom p { line-height: 1.8; margin: 8px 0 12px; }
-.sidebar-bottom button { display: flex; align-items: center; gap: 5px; padding: 3px 0; text-align: left; font-size: var(--ui-font-small); color: var(--ui-accent); }
 
 /* Home, document creation, recent files. */
 .home-main { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; padding: 36px clamp(24px, 4vw, 56px) 20px; overflow: hidden; }
@@ -199,7 +198,6 @@ a { color: var(--ui-accent); }
 .card-bottom strong { display: block; color: var(--ui-text); font-size: 16px; font-weight: 600; margin-bottom: 5px; }
 .card-bottom small { display: block; color: var(--ui-muted); font-size: var(--ui-font-small); line-height: 1.5; }
 .card-plus { display: grid; place-items: center; flex: none; width: 26px; height: 26px; color: var(--accent); border-radius: 4px; }
-.file-kind { position: absolute; top: 21px; right: 16px; color: var(--ui-muted); font-size: 10px; letter-spacing: .3px; }
 .recent-section { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; margin-top: 24px; }
 .section-heading { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .section-heading h2 { margin: 0; font-size: 15px; font-weight: 600; white-space: nowrap; }
@@ -277,18 +275,32 @@ a { color: var(--ui-accent); }
 .modal-actions button:hover { background: var(--ui-surface-muted); }
 .modal-actions .primary { border-color: var(--ui-accent); background: var(--ui-accent); }
 .modal-actions .primary:hover { background: var(--ui-accent); filter: brightness(.94); }
-.help-modal { width: min(720px, 100%); padding: 30px; }
+/* Only the information dialog blurs the workspace; its content stays opaque. */
+.help-backdrop {
+  background: #202b3b66;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+:root[data-theme="dark"] .help-backdrop { background: #090e18a6; }
+.help-modal { width: min(660px, 100%); padding: 28px; box-shadow: 0 24px 80px #10182838; }
 .modal-close { position: absolute; right: 18px; top: 18px; }
-.help-modal h2 { margin-top: 12px; font-size: 24px; }
-.help-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 24px 0 20px; }
-.help-grid article > svg { color: var(--ui-accent); margin-bottom: 10px; }
-.help-grid h3 { margin-bottom: 8px; font-size: 14px; font-weight: 600; }
-.help-grid p { margin: 0; font-size: 12px; }
-.help-note { padding: 14px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius); background: var(--ui-surface-muted); font-size: 12px !important; }
-.help-shortcuts { font-size: 12px !important; line-height: 2.2 !important; }
-.help-shortcuts kbd { padding: 2px 5px; border: 1px solid var(--ui-line); border-radius: 3px; font: 11px var(--ui-font); background: var(--ui-surface-muted); color: var(--ui-text); }
-.help-modal small { display: block; margin: 18px 0; color: var(--ui-muted); font-size: var(--ui-font-small); line-height: 1.8; }
-.help-modal > .primary { font-size: 12px; }
+.help-modal h2 { margin: 8px 32px 0 0; font-size: 22px; }
+.help-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 24px; margin: 24px 0; }
+.help-grid article { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.help-grid article > div { min-width: 0; }
+.help-tool-icon { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 8px; background: var(--ui-accent-soft); color: var(--ui-accent); }
+.help-grid h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+.help-grid p { margin: 0; font-size: 12px; line-height: 1.7; }
+.help-community { display: flex; align-items: center; gap: 24px; padding: 20px; border: 1px solid var(--ui-line); border-radius: 8px; background: var(--ui-surface-muted); }
+.help-community img { display: block; flex: none; width: 180px; height: 180px; border-radius: 6px; background: #fff; }
+.help-community > div { min-width: 0; }
+.help-community h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+.help-community p { margin: 0 0 12px; font-size: 12px; }
+.help-extraction-code { color: var(--ui-muted); font-size: 12px; }
+.help-extraction-code b { margin-left: 5px; font-weight: 600; letter-spacing: 1px; color: var(--ui-text); }
+.help-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; }
+.help-footer small { color: var(--ui-muted); font-size: var(--ui-font-small); }
+.help-footer .primary { font-size: 12px; }
 
 @media (max-width: 1150px) {
   .titlebar-context { display: none; }
@@ -305,7 +317,7 @@ a { color: var(--ui-accent); }
   .document-art svg { width: 24px; height: 24px; }
   .card-bottom { flex: 1; min-width: 0; margin-top: 0; }
   .card-bottom strong { font-size: 14px; margin-bottom: 0; }
-  .card-bottom small, .file-kind { display: none; }
+  .card-bottom small { display: none; }
   .recent-section { margin-top: 20px; }
   .home-footer { margin-top: 16px; }
 }
@@ -320,7 +332,6 @@ a { color: var(--ui-accent); }
   .sidebar-documents { margin-top: 14px; margin-bottom: 10px; }
   .sidebar-bottom { padding-top: 10px; }
   .sidebar-bottom > svg, .sidebar-bottom p { display: none; }
-  .sidebar-bottom button { margin-top: 6px; }
 }
 @media (max-width: 730px) {
   .titlebar { padding: 0 16px; gap: 12px; }
@@ -364,7 +375,8 @@ a { color: var(--ui-accent); }
   .recent-row { padding: 12px; gap: 10px; }
   .recent-row time { display: none; }
   .help-grid { grid-template-columns: 1fr; }
-  .help-shortcuts kbd { display: inline-block; }
+  .help-community { flex-direction: column; gap: 14px; text-align: center; }
+  .help-community p { margin-bottom: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .create-card, .busy-pill i { transition: none; animation: none; }

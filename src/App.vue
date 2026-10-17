@@ -209,6 +209,15 @@ let pendingWindowClose = false
 const editor = () => activeRustWord.value ? rustWordHandles.get(activeKey.value) : activeRustSheet.value ? rustSheetHandles.get(activeKey.value) : activeRustPresentation.value ? rustPresentationHandles.get(activeKey.value) : activeRustPdf.value ? rustPdfHandles.get(activeKey.value) : activeWorkflow.value ? workflowHandles.get(activeKey.value) : noteHandles.get(activeKey.value)
 const kindNames: Record<Kind,string> = { word:'文字文档', sheet:'电子表格', presentation:'演示文稿', pdf:'PDF 文档', note:'笔记本', canvas:'画布', diagram:'代码图表' }
 const icons: Record<Kind,string> = {word:'file',sheet:'sheet',presentation:'presentation',pdf:'pdf',note:'notebook',canvas:'canvas',diagram:'code-diagram'}
+const helpTools: { kind: Kind; name: string; description: string }[] = [
+  { kind: 'word', name: '文字', description: '撰写文章、整理报告，完成图文排版。' },
+  { kind: 'sheet', name: '表格', description: '记录数据、计算公式，制作分析图表。' },
+  { kind: 'presentation', name: '演示', description: '制作幻灯片，用模板呈现汇报与创意。' },
+  { kind: 'pdf', name: 'PDF', description: '阅读和编辑文档，添加批注、签名与图章。' },
+  { kind: 'note', name: '笔记本', description: '分区记录笔记，自由摆放文字与图片。' },
+  { kind: 'canvas', name: '画布', description: '绘制图形、连线与手绘，梳理想法和流程。' },
+  { kind: 'diagram', name: '代码图表', description: '用简洁代码绘制时序图等图表，实时预览。' },
+]
 const filteredRecents = computed(() => recents.value.filter(r => r.name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase())))
 const message = (e:unknown) => e instanceof Error ? e.message : String(e)
 async function editorTransaction<T>(label:string, work:()=>Promise<T>, preserveInput=false):Promise<T> {
@@ -1197,18 +1206,18 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <button class="primary open-sidebar" @click="openFile" aria-label="打开文件" title="打开文件 · Ctrl / ⌘ O"><Icon name="folder"/><span>打开文件</span><kbd>⌘ / Ctrl O</kbd></button>
         <nav aria-label="工作区"><button class="selected" aria-current="page" aria-label="工作台" title="工作台" @click="home=true"><Icon name="home"/><span>工作台</span></button></nav>
         <div v-if="tabs.length" class="sidebar-documents"><div class="sidebar-documents-heading"><span class="eyebrow">正在编辑 · {{tabs.length}}</span><button data-testid="home-close-all" @click="closeAllTabs" title="关闭所有打开的文档">全部关闭</button></div><button v-for="tab in tabs" :key="tab.key" :title="tab.document.name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button></div>
-        <div class="sidebar-bottom"><Icon name="shield"/><strong>文件保存在本机</strong><p>打开、编辑与保存，都在本地完成。</p><button @click="help=true">格式支持与快捷键 <Icon name="arrow" :size="15"/></button></div>
+        <div class="sidebar-bottom"><Icon name="shield"/><strong>文件保存在本机</strong><p>打开、编辑与保存，都在本地完成。</p></div>
       </aside>
       <main class="home-main">
         <div class="home-heading"><div><span class="eyebrow">本地工作空间</span><h1>工作台</h1><p>新建一份文档，或继续编辑本机文件。</p></div></div>
         <section class="create-grid" aria-label="新建文件">
-          <button class="create-card word" @click="newDocument('word')"><span class="document-art"><Icon name="file" :size="28"/></span><span class="card-bottom"><span><strong>文字文档</strong><small>文字排版、表格与图片编辑</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">DOCX</span></button>
-          <button class="create-card sheet" @click="newDocument('sheet')"><span class="document-art"><Icon name="sheet" :size="28"/></span><span class="card-bottom"><span><strong>电子表格</strong><small>数据整理与公式计算</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">XLSX · CSV · TSV</span></button>
-          <button class="create-card presentation" @click="newDocument('presentation')"><span class="document-art"><Icon name="presentation" :size="28"/></span><span class="card-bottom"><span><strong>演示文稿</strong><small>幻灯片设计与演示</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">PPTX · POTX · PPSX</span></button>
-          <button class="create-card pdf" @click="newDocument('pdf')"><span class="document-art"><Icon name="pdf" :size="28"/></span><span class="card-bottom"><span><strong>PDF 工作室</strong><small>文字编辑、批注与页面整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">PDF</span></button>
-          <button class="create-card note" data-testid="home-new-note" @click="newDocument('note')"><span class="document-art"><Icon name="notebook" :size="28"/></span><span class="card-bottom"><span><strong>笔记本</strong><small>分区与页面、灵感记录和待办</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">OONOTE</span></button>
-          <button class="create-card canvas" data-testid="home-new-canvas" @click="newDocument('canvas')"><span class="document-art"><Icon name="canvas" :size="28"/></span><span class="card-bottom"><span><strong>画布</strong><small>流程连线、自由绘制与灵感整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">CANVAS</span></button>
-          <button class="create-card diagram" data-testid="home-new-diagram" @click="newDocument('diagram')"><span class="document-art"><Icon name="code-diagram" :size="28"/></span><span class="card-bottom"><span><strong>代码图表</strong><small>代码绘图、实时预览与图表模板</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">DIAGRAM</span></button>
+          <button class="create-card word" @click="newDocument('word')"><span class="document-art"><Icon name="file" :size="28"/></span><span class="card-bottom"><span><strong>文字文档</strong><small>文字排版、表格与图片编辑</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card sheet" @click="newDocument('sheet')"><span class="document-art"><Icon name="sheet" :size="28"/></span><span class="card-bottom"><span><strong>电子表格</strong><small>数据整理与公式计算</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card presentation" @click="newDocument('presentation')"><span class="document-art"><Icon name="presentation" :size="28"/></span><span class="card-bottom"><span><strong>演示文稿</strong><small>幻灯片设计与演示</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card pdf" @click="newDocument('pdf')"><span class="document-art"><Icon name="pdf" :size="28"/></span><span class="card-bottom"><span><strong>PDF 工作室</strong><small>文字编辑、批注与页面整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card note" data-testid="home-new-note" @click="newDocument('note')"><span class="document-art"><Icon name="notebook" :size="28"/></span><span class="card-bottom"><span><strong>笔记本</strong><small>分区与页面、灵感记录和待办</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card canvas" data-testid="home-new-canvas" @click="newDocument('canvas')"><span class="document-art"><Icon name="canvas" :size="28"/></span><span class="card-bottom"><span><strong>画布</strong><small>流程连线、自由绘制与灵感整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card diagram" data-testid="home-new-diagram" @click="newDocument('diagram')"><span class="document-art"><Icon name="code-diagram" :size="28"/></span><span class="card-bottom"><span><strong>代码图表</strong><small>代码绘图、实时预览与图表模板</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
         </section>
         <section class="recent-section"><div class="section-heading"><h2>最近打开 <span>{{recents.length}}</span></h2><label class="search-box"><Icon name="search" :size="18"/><input v-model="search" placeholder="查找最近的文件" aria-label="查找最近的文件"/></label></div>
           <div ref="recentList" class="recent-list" role="region" aria-label="最近打开的文件" tabindex="0">
@@ -1288,7 +1297,28 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <div class="modal-actions"><button data-testid="close-cancel" :disabled="!!busy" @click="closeTarget=null">取消</button><button data-testid="close-discard" :disabled="!!busy" @click="resolveClose('discard')">{{closeTarget==='window'?'全部不保存并退出':closeTarget==='all'?'全部不保存并关闭':'不保存并关闭'}}</button><button class="primary" data-testid="close-save" :disabled="!!busy" @click="resolveClose('save')">{{closeTarget==='window'?'全部保存并退出':closeTarget==='all'?'全部保存并关闭':'保存并关闭'}}</button></div>
       </section>
     </div>
-    <div v-if="help" class="modal-backdrop" @click.self="help=false" @keydown.esc.stop.prevent="help=false"><section ref="helpDialog" class="modal help-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>提供中文文字排版、表格与公式、数据分析、幻灯片编排及 PDF 导出。文字、表格、演示与 PDF 均使用本地 Rust 文档引擎。支持 DOCX、XLSX、CSV、TSV、PPTX、POTX 与 PPSX；模板与放映文稿另存为 PPTX。旧 DOC、RTF、ODT、XLS、ODS、PPT 与 ODP 请先转换为支持的格式。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持 PDF 阅读、文字编辑、批注、页面整理与书签导航。编辑、排版和保存均由本地 Rust 引擎处理。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件可能使原签名失效，请先核对签名状态。演示文稿支持幻灯片编排、对象编辑、备注与放映。复杂转场、动画、SmartArt 与媒体兼容性请以导出结果为准。复杂文档的兼容性仍需逐步完善：复杂排版、最新函数、宏与插件仍有差异。请检查导出结果；宏不自动执行。</p><p class="help-note"><strong>永久本地范围：</strong>不提供账户、云盘、云协作或云 AI，也不将这些服务列入后续功能计划。安装包内的编辑引擎在本机处理文档。</p><p class="help-note"><strong>原文件与自动保存：</strong>打开本机文件后直接编辑，保存会写回原路径；另存为和格式转换才会创建新文件。自动保存开关位于保存按钮旁，每 10 秒保存当前文件，并显示倒计时；输入或弹窗操作未完成时暂缓。新建文件请先选择保存位置。笔记本使用本地 .oonote 格式，支持分区、页面、富文本和待办。画布支持图形、连线、手绘与模板；代码图表支持源码实时预览和风格切换。两者以 .owflow 保存完整编辑内容，也可导出 SVG 和 PNG。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 {{appVersion}} · 构建 {{buildVersion}} · 使用本地 Rust 文档引擎。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
+    <div v-if="help" class="modal-backdrop help-backdrop" @click.self="help=false" @keydown.esc.stop.prevent="help=false">
+      <section ref="helpDialog" class="modal help-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="help-heading">
+        <button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button>
+        <span class="eyebrow">OPEN OFFICE</span>
+        <h2 id="help-heading">七种工具，随需使用</h2>
+        <div class="help-grid">
+          <article v-for="tool in helpTools" :key="tool.kind">
+            <span class="help-tool-icon"><Icon :name="icons[tool.kind]" :size="21"/></span>
+            <div><h3>{{tool.name}}</h3><p>{{tool.description}}</p></div>
+          </article>
+        </div>
+        <div class="help-community" aria-labelledby="help-community-heading">
+          <img src="/software-community-qr.svg" width="180" height="180" alt="软件及交流群二维码，扫码访问软件下载与交流群页面"/>
+          <div>
+            <h3 id="help-community-heading">软件及交流群</h3>
+            <p>扫码获取软件与交流群</p>
+            <span class="help-extraction-code">提取码 <b>rhb3</b></span>
+          </div>
+        </div>
+        <footer class="help-footer"><small>版本 {{appVersion}}</small><button class="primary" @click="help=false">开始工作</button></footer>
+      </section>
+    </div>
   </div>
 </template>
 
