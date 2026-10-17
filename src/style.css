@@ -299,8 +299,8 @@ a { color: var(--ui-accent); }
 .help-extraction-code { color: var(--ui-muted); font-size: 12px; }
 .help-extraction-code b { margin-left: 5px; font-weight: 600; letter-spacing: 1px; color: var(--ui-text); }
 .help-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; }
-.help-footer small { color: var(--ui-muted); font-size: var(--ui-font-small); }
-.help-footer .primary { font-size: 12px; }
+.help-footer small { min-width: 0; color: var(--ui-muted); font-size: var(--ui-font-small); line-height: 1.6; overflow-wrap: anywhere; }
+.help-footer .primary { flex: none; font-size: 12px; }
 
 @media (max-width: 1150px) {
   .titlebar-context { display: none; }

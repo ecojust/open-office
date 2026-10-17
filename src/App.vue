@@ -1316,7 +1316,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
             <span class="help-extraction-code">提取码 <b>rhb3</b></span>
           </div>
         </div>
-        <footer class="help-footer"><small>版本 {{appVersion}}</small><button class="primary" @click="help=false">开始工作</button></footer>
+        <footer class="help-footer"><small>版本 {{appVersion}} · 构建 {{buildVersion}}</small><button class="primary" @click="help=false">开始工作</button></footer>
       </section>
     </div>
   </div>
