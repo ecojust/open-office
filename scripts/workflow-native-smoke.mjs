@@ -18,7 +18,7 @@ export const WORKFLOW_NATIVE_LIMITATIONS = Object.freeze([
 ]);
 export const CANVAS_TEXT = '原生画布保存重开';
 export const DIAGRAM_SOURCE = 'flowchart LR\n  start[原生代码图表] --> done[本地保存与重开]';
-export const INITIAL_DIAGRAM_SOURCE = 'flowchart TD\n  start([开始]) --> idea[整理想法]\n  idea --> review{准备好了吗？}\n  review -->|是| done([发布])\n  review -->|再完善| idea';
+export const INITIAL_DIAGRAM_SOURCE = 'sequenceDiagram\n  actor User as 用户\n  participant App as 应用\n  participant Data as 数据服务\n  autonumber\n  User->>+App: 提交请求\n  App->>+Data: 读取数据\n  Data-->>-App: 返回结果\n  App-->>-User: 展示结果';
 // These expectations deliberately do not use the application parser, serializer,
 // scene defaults or diagram renderer: accepted file bytes need independent checks.
 export const EXPECTED_STYLE = Object.freeze({ stroke: '#334155', fill: '#ffffff', strokeWidth: 2, fontSize: 16,

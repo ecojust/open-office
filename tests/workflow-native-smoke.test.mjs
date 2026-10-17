@@ -6,6 +6,7 @@ import ts from 'typescript';
 import { validateNativeWorkflowReport, WORKFLOW_NATIVE_CHECKS, WORKFLOW_NATIVE_LIMITATIONS, CANVAS_TEXT, DIAGRAM_SOURCE } from '../scripts/workflow-native-smoke.mjs';
 import { workflowReport } from './helpers/workflow-smoke-report.mjs';
 import { workspaceReport } from './helpers/workspace-smoke-report.mjs';
+import { createDocument, serializeDocument } from '../src/workflow/core/documents.ts';
 
 test('native canvas and diagram acceptance validates exact disk content, original-file receipts and fresh editor sessions', () => {
   assert.deepEqual(validateNativeWorkflowReport(workflowReport(), workspaceReport()), {
@@ -17,6 +18,33 @@ test('native canvas and diagram acceptance validates exact disk content, origina
     Object.assign(snapshot, { canUndo: snapshot.revision > 0, canRedo: false });
   }
   assert.doesNotThrow(() => validateNativeWorkflowReport(report, workspaceReport()));
+});
+
+test('native workflow gate accepts the real new sequence diagram and rejects the former flowchart default', () => {
+  const report = workflowReport(), doc = report.documents[1];
+  const initial = createDocument('mermaid');
+  initial.title = 'native-diagram';
+  const installInitial = () => {
+    // Exercise production creation and serialization, while the gate retains its
+    // independent literal expectation rather than importing the sample itself.
+    const data = Buffer.from(serializeDocument(initial));
+    const hash = createHash('sha256').update(data).digest('hex');
+    Object.assign(doc.persistence, { initialBase64: data.toString('base64'), initialSha256: hash, initialSizeBytes: data.length });
+    doc.persistence.saves[0].expectedSha256 = hash;
+  };
+  installInitial();
+  rewriteSaved(doc, model => {
+    model.id = initial.id;
+    model.createdAt = initial.createdAt;
+    model.updatedAt = new Date(Date.parse(initial.createdAt) + 1000).toISOString();
+  });
+  assert.doesNotThrow(() => validateNativeWorkflowReport(report, workspaceReport()));
+
+  // Recompute file hashes and receipts too, so rejection is about stale default
+  // content, not corrupt bytes or a mismatched native save acknowledgement.
+  initial.source = 'flowchart TD\n  start([开始]) --> idea[整理想法]\n  idea --> review{准备好了吗？}\n  review -->|是| done([发布])\n  review -->|再完善| idea';
+  installInitial();
+  assert.throws(() => validateNativeWorkflowReport(report, workspaceReport()), /diagram initial content differs/);
 });
 
 test('workflow gate rejects browser reports, missing document coverage, incomplete edits and cleanup', () => {
