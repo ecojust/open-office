@@ -17,5 +17,6 @@ export type OfficePresentationFileAction = 'new' | 'open' | 'save' | 'saveAs' | 
 export type OfficePresentationEvent =
   | { type: 'state'; sessionId: string; snapshot: OfficePresentationSnapshot }
   | { type: 'file-action'; sessionId: string; action: OfficePresentationFileAction }
+  | { type: 'toggle-templates'; sessionId: string }
   | { type: 'pick-file'; sessionId: string; purpose: string; requestId?: string | number; documentId: number; revision: number; selection: unknown }
   | { type: 'error' | 'status'; sessionId: string; message: string }

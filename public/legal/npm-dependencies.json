@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lockfileSha256": "fad0120349492b0ec55e5026e5a62f47a90c8f653302d7ddc9ffb0970375bd4f",
+  "lockfileSha256": "b1104344d86c629c1341aef69b526e8dfbbeb57e16c15e0506464d102ffd7528",
   "packages": [
     {
       "name": "@babel/helper-string-parser",
@@ -965,6 +965,18 @@
       "integrity": "sha512-F4yc6palwq3TT0u+FYf0Ns4Tfl9GRFURDN2gWG7L1ecIaS/4fCIuFOjMTnCyjsu/OK6vaDKLCrGAa+KvvH+h4w=="
     },
     {
+      "name": "@xmldom/xmldom",
+      "version": "0.9.12",
+      "license": "MIT",
+      "developmentOnly": true,
+      "optional": false,
+      "installedForThisAudit": true,
+      "licenseFiles": [
+        "npm/@xmldom__xmldom@0.9.12/LICENSE"
+      ],
+      "integrity": "sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A=="
+    },
+    {
       "name": "alien-signals",
       "version": "3.2.1",
       "license": "MIT",
@@ -1040,7 +1052,7 @@
       "name": "fflate",
       "version": "0.8.2",
       "license": "MIT",
-      "developmentOnly": true,
+      "developmentOnly": false,
       "optional": false,
       "installedForThisAudit": true,
       "licenseFiles": [

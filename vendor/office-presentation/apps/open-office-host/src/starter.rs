@@ -6,8 +6,8 @@ use std::sync::Arc;
 use office_presentation_model::style::{Gradient, GradientShape, GradientStop, PictureFill};
 use office_presentation_model::text::{Align, Anchor, AutoFit, Bullet, Spacing};
 use office_presentation_model::{
-    Background, ColorRef, CustomPath, Fill, Geom, LayoutType, Line, PhType, Placeholder, Presentation, Rgba, RunProps, Shape, ShapeId,
-    ShapeKind, Slide, TextBody, Xfrm, defaults,
+    Background, ColorRef, CustomPath, Fill, Geom, LayoutType, Line, PhType, Placeholder, Presentation, Rgba, RunProps, Shape, ShapeId, ShapeKind,
+    Slide, TextBody, Xfrm, defaults,
 };
 
 const COVER: &[u8] = include_bytes!("../../../assets/templates/open-office/cover.png");
@@ -20,11 +20,7 @@ fn color(r: u8, g: u8, b: u8) -> ColorRef {
 
 fn gradient(colors: [(u8, u8, u8); 2], angle: f64) -> Fill {
     Fill::Gradient(Gradient {
-        stops: colors
-            .into_iter()
-            .enumerate()
-            .map(|(index, (r, g, b))| GradientStop { pos: index as f64, color: color(r, g, b) })
-            .collect(),
+        stops: colors.into_iter().enumerate().map(|(index, (r, g, b))| GradientStop { pos: index as f64, color: color(r, g, b) }).collect(),
         shape: GradientShape::Linear { angle, scaled: true },
         rotate_with_shape: true,
         tile: [0.0; 4],
@@ -190,15 +186,7 @@ pub(crate) fn presentation() -> Result<Presentation, String> {
     wordmark.italic = Some(true);
     wordmark.spacing = Some(-2.0);
     wordmark.fill = Some(gradient([(255, 255, 255), (190, 234, 254)], 90.0));
-    closing.shapes.push(text(
-        &mut doc,
-        "结束标题",
-        "open office",
-        Xfrm::new(100.0, 200.0, 760.0, 140.0),
-        wordmark,
-        Align::Center,
-        true,
-    )?);
+    closing.shapes.push(text(&mut doc, "结束标题", "open office", Xfrm::new(100.0, 200.0, 760.0, 140.0), wordmark, Align::Center, true)?);
     doc.slides.push(Arc::new(closing));
     Ok(doc)
 }

@@ -1,5 +1,5 @@
-export type DocumentKind = 'word' | 'sheet' | 'presentation' | 'pdf' | 'note'
-export type DocumentExtension = 'docx' | 'xlsx' | 'csv' | 'tsv' | 'pptx' | 'potx' | 'ppsx' | 'pdf' | 'oonote'
+export type DocumentKind = 'word' | 'sheet' | 'presentation' | 'pdf' | 'note' | 'canvas' | 'diagram'
+export type DocumentExtension = 'docx' | 'xlsx' | 'csv' | 'tsv' | 'pptx' | 'potx' | 'ppsx' | 'pdf' | 'oonote' | 'owflow' | 'mmd' | 'mermaid' | 'drawio' | 'xml' | 'excalidraw' | 'json' | 'svg' | 'png'
 /** Kept only to display previous recent-file records; opening still validates supported formats. */
 export type HistoricalDocumentExtension = 'odt' | 'doc' | 'rtf' | 'ods' | 'xls' | 'odp' | 'ppt'
 

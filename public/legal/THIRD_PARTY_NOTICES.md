@@ -15,9 +15,13 @@ Open Office 包含具有独立版权和许可的第三方软件。根目录 MIT 
 
 当前产品已移除早期办公兼容运行时、PDF.js 及 Python/PyMuPDF/MuPDF 后台。历史发行物仍遵循对应版本的许可和源码声明。PDF 新内核使用上游的 hayro/lopdf 及其补丁，不声称全部解析代码由本项目原创。演示编辑器的 Symphonia 音频依赖采用 MPL-2.0，逐项来源和许可记录在依赖索引。
 
+## 画布与代码图表
+
+集成 Open Workflow 的 MIT 代码，固定提交 `110b86d81de3e74787ef1a34a25ecbfe50a9d2d7`，版权为 Copyright (c) 2026 桔子桑。[许可和集成说明](public/legal/workflow/OPEN-OFFICE-INTEGRATION.md)随应用分发，源码与本地修改在 `src/workflow`。
+
 ## 前端、依赖与素材
 
-Vue 和 Tauri 的原始许可保留在 `public/legal/npm`、`public/legal/rust`。pdf-lib、fflate 和外部 Python PDF 检查器只用于开发测试，不进入产品编辑引擎。npm、原生 Rust 及四个 WASM 宿主各有依赖索引，精确版本由锁文件确定；清单中的开发或可选项不代表它们都进入每个平台安装包。
+Vue 和 Tauri 的原始许可保留在 `public/legal/npm`、`public/legal/rust`。fflate 用于画布图形 XML 的压缩页面解码；pdf-lib 和外部 Python PDF 检查器只用于开发测试。npm、原生 Rust 及四个 WASM 宿主各有依赖索引，精确版本由锁文件确定；清单中的开发或可选项不代表它们都进入每个平台安装包。
 
 `craft-ui` 等真实共享依赖保持原始包名、固定提交和许可。其 git 来源不是可以随产品改名而伪造的 URL。各编辑器的依赖索引记录这些提交及对应声明。
 

@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/ecojust/open-workflow",
+  "commit": "110b86d81de3e74787ef1a34a25ecbfe50a9d2d7",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2026 桔子桑",
+  "sourceDirectories": [
+    "src/core",
+    "src/formats",
+    "src/components"
+  ],
+  "localDirectories": [
+    "src/workflow",
+    "src/components/WorkflowEditor.vue"
+  ],
+  "licenseSha256": "1877e621fd1f3208fe8412093f6a608066ad260c0d060113af0c70cb85d26089"
+}

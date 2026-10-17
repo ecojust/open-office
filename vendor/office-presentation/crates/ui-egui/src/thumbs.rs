@@ -120,6 +120,8 @@ fn list(app: &mut SlideApp, ui: &mut Ui) {
         let p = ui.painter();
         let id = doc.slides.get(i).map(|s| s.id);
         let selected = i == cur || id.is_some_and(|id| multi.contains(&id));
+        let label = crate::i18n::format("Slide {number}", &[("number", &(i + 1).to_string())]);
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, selected, &label));
         let hidden = doc.slides.get(i).is_some_and(|s| s.hidden);
         p.text(
             pos2(row.min.x + 14.0, img.min.y + 2.0),

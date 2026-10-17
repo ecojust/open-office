@@ -14,8 +14,10 @@ import { inspectInstalledPdf, validateNativePdfEvidence, validatePdfNativeReport
 import { inspectInstalledOfficePresentation, validateNativeOfficePresentationEvidence, validateOfficePresentationNativeReport } from './office-presentation-native-smoke.mjs';
 import { validateNativeWorkspaceReport } from './workspace-native-smoke.mjs';
 import { validateNativeNotebookReport } from './notebook-native-smoke.mjs';
+import { validateNativeWorkflowReport } from './workflow-native-smoke.mjs';
 export { validateNativeWorkspaceReport } from './workspace-native-smoke.mjs';
 export { validateNativeNotebookReport } from './notebook-native-smoke.mjs';
+export { validateNativeWorkflowReport } from './workflow-native-smoke.mjs';
 
 // This launches the final packaged GUI, not a source executable or an isolated
 // engine substitute. A native desktop session is required on the CI runner.
@@ -114,7 +116,7 @@ export function emitFailureDiagnostics(report, env, reportPath) {
   }
 }
 
-/** Require four mounted Rust editors, the notebook and native scheduled autosave. */
+/** Require four mounted Rust editors, notebook, canvas, diagram and native scheduled autosave. */
 export function validateFrontendReport(report) {
   requireCheck(report && typeof report === 'object' && !Array.isArray(report), 'Missing native frontend report');
   requireCheck(report.ok === true, 'The native GUI reported a failed smoke test');
@@ -132,6 +134,7 @@ export function validateFrontendReport(report) {
   validatePdfNativeReport(report.pdf);
   const workspaceChecks = validateNativeWorkspaceReport(report.workspace);
   const notebookChecks = validateNativeNotebookReport(report.notebook, report.workspace);
+  const workflowChecks = validateNativeWorkflowReport(report.workflow, report.workspace);
 
   return {
     wordDefaultCanvas: true, wordDomInput: true, wordDocxReadback: true,
@@ -145,6 +148,7 @@ export function validateFrontendReport(report) {
     pdfUndoRedo: true, pdfFailureAtomicity: true, pdfSessionCleanup: true,
     ...workspaceChecks,
     ...notebookChecks,
+    ...workflowChecks,
   };
 }
 

@@ -89,6 +89,12 @@ pub fn inspect(app: &SlideApp, ctx: &egui::Context) -> Value {
     let r = ctx.content_rect();
     json!({
         "ui": serde_json::to_value(&app.ui).unwrap_or_default(),
+        "templatePanelOpen": app.template_panel_open,
+        "ribbonTabs": app.ribbon_tabs.iter().map(|tab| json!({
+            "name": tab.name, "label": tab.label,
+            "rect": [tab.rect.left(), tab.rect.top(), tab.rect.width(), tab.rect.height()],
+            "selected": if tab.name == "Templates" { app.template_panel_open } else { app.ui.tab == tab.name },
+        })).collect::<Vec<_>>(),
         "tool": serde_json::to_value(&app.session.tool.kind).unwrap_or_default(),
         "window": [r.width(), r.height()],
         "canvasRect": app.canvas_rect.map(|c| json!([c.left(), c.top(), c.width(), c.height()])),
@@ -182,7 +188,16 @@ pub fn handle(app: &mut SlideApp, ctx: &egui::Context, req: &ControlRequest) -> 
                 app.synthetic.push(egui::Event::Key { key, physical_key: None, pressed: false, repeat: false, modifiers: egui::Modifiers::NONE });
                 return ok(json!({"show": true}));
             }
-            wrap(app.session.key(k, mods_from(p)).map_err(|e| e.to_string()))
+            let mods = mods_from(p);
+            if ctx.memory(|memory| memory.focused().is_none())
+                && app.dialog.as_ref().is_none_or(|dialog| !dialog.modal())
+                && app.palette.is_none()
+                && app.backstage.is_none()
+                && let Some(result) = app.thumbnail_enter(k, mods)
+            {
+                return wrap(result);
+            }
+            wrap(app.session.key(k, mods).map_err(|e| e.to_string()))
         }
         "ui.text" => {
             let Some(t) = s("text") else { return err("missing `text`") };

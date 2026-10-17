@@ -7,8 +7,8 @@ import { prepareRustPresentationDocument, setRustPresentationTheme, type Prepare
 import type { OfficePresentationEvent, OfficePresentationFileAction, OfficePresentationSnapshot } from '../presentation/rust/office-presentation-types'
 import { validatePresentationMedia } from '../presentation/rust/media'
 
-const props = withDefaults(defineProps<{ document: NativeDocument; prepared?: PreparedRustPresentationDocument; active?: boolean; disabled?: boolean; theme?: Appearance }>(), { active: true, disabled: false, theme: 'system' })
-const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: OfficePresentationFileAction] }>()
+const props = withDefaults(defineProps<{ document: NativeDocument; prepared?: PreparedRustPresentationDocument; active?: boolean; disabled?: boolean; theme?: Appearance; templatesOpen?: boolean }>(), { active: true, disabled: false, theme: 'system', templatesOpen: false })
+const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: OfficePresentationFileAction]; 'toggle-templates': [] }>()
 const viewport = ref<HTMLElement>(), snapshot = shallowRef<OfficePresentationSnapshot>()
 const mediaInput = ref<HTMLInputElement>()
 const loading = ref(true), problem = ref('')
@@ -33,6 +33,7 @@ function listen(current: RustPresentationSession, token: number) {
   unlisten = current.onEvent(event => {
     if (disposed || token !== generation) return
     if (event.type === 'file-action' && props.active && !props.disabled) emit('file-action', event.action)
+    else if (event.type === 'toggle-templates' && props.active && !props.disabled) emit('toggle-templates')
     else if (event.type === 'pick-file') pickFile(event)
     else if (event.type === 'error') report(event.message)
     else if (event.type === 'status') emit('status', event.message)
@@ -40,7 +41,11 @@ function listen(current: RustPresentationSession, token: number) {
 }
 async function attach() {
   await nextTick()
-  if (!disposed && props.active && viewport.value && session) await session.attach(viewport.value, !props.disabled)
+  if (!disposed && props.active && viewport.value && session) {
+    const current = session
+    await current.attach(viewport.value, !props.disabled)
+    if (!disposed && props.active && current === session) await current.setTemplatePanelOpen(props.templatesOpen)
+  }
 }
 async function flush() {
   await opening
@@ -198,6 +203,7 @@ watch(() => props.active, value => {
   }
 })
 watch(() => props.disabled, value => { if (props.active) session?.setInteractive(!value) })
+watch(() => props.templatesOpen, value => { if (props.active) void session?.setTemplatePanelOpen(value).catch(report) })
 onBeforeUnmount(() => {
   disposed = true; generation++; mediaRequest = undefined; unsubscribe?.(); unlisten?.(); props.prepared?.discard()
   session?.deactivate()

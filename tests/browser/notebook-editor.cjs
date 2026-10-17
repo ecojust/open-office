@@ -266,6 +266,11 @@ async function todoEvidence(stage) {
     });
     let layoutExpected;
     await check('free-layout-regions-drag-resize-and-image-aspect-ratio-remain-independent', async () => {
+      // This group checks exact free movement; snapping has its own real-pointer regression.
+      for (const name of ['智能对齐', '网格吸附']) {
+        const button = note().getByRole('button', { name, exact: true });
+        if (await button.getAttribute('aria-pressed') === 'true') await button.click();
+      }
       await note().getByRole('button', { name: '新建页面', exact: true }).click(); await title().fill('布局验收'); await text('左侧文字区域。');
       await note().getByRole('button', { name: '添加文本区域', exact: true }).click();
       assert.equal(await contents().count(), 2); await page.keyboard.insertText('第二块文字由我安排位置。');

@@ -3,6 +3,17 @@ use crate::{SlideApp, theme};
 use serde_json::{Value, json};
 
 impl SlideApp {
+    /// Reflect a shell-owned panel without committing input, changing the active ribbon tab,
+    /// or creating a document revision. The shell remains the source of truth on close/switch.
+    pub(crate) fn set_host_template_panel_open(&mut self, params: &Value) -> Result<Value, String> {
+        if !self.services.embedded_editor {
+            return Err("演示模板面板由 Open Office 工作区管理。".into());
+        }
+        let open = params.get("open").and_then(Value::as_bool).ok_or("模板面板状态必须为 true 或 false。")?;
+        self.template_panel_open = open;
+        Ok(json!({"open": open}))
+    }
+
     /// A shared egui context may contain another tab's styles and embedded-font fallbacks.
     pub fn activate_host_context(&mut self) {
         self.styled = false;

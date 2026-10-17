@@ -44,12 +44,15 @@ function snapshotOf(raw: string, sessionId: string): OfficePresentationSnapshot 
 }
 function receive(raw: string) {
   try {
-    const event = JSON.parse(raw) as { type: string; sessionId: string; snapshot?: OfficePresentationSnapshot; action?: OfficePresentationFileAction | 'pickFile'; purpose?: string; requestId?: string | number; revision?: number; documentId?: number; selection?: unknown; message?: string; error?: string }
+    const event = JSON.parse(raw) as { type: string; sessionId: string; snapshot?: OfficePresentationSnapshot; action?: OfficePresentationFileAction | 'pickFile' | 'toggleTemplates'; purpose?: string; requestId?: string | number; revision?: number; documentId?: number; selection?: unknown; message?: string; error?: string }
     const session = sessions.get(event.sessionId)
     if (!session) return
     if (event.type === 'change' && event.snapshot) session.accept(snapshotOf(JSON.stringify(event.snapshot), session.id))
+    else if (event.type === 'action' && event.action === 'toggleTemplates') {
+      if (activeId === session.id && interactive) session.event({ type: 'toggle-templates', sessionId: session.id })
+    }
     else if (event.type === 'action' && event.action === 'pickFile' && activeId === session.id && interactive) session.event({ type: 'pick-file', sessionId: session.id, purpose: event.purpose ?? '', requestId: event.requestId, documentId: event.documentId ?? session.snapshot.documentId, revision: event.revision ?? session.snapshot.revision, selection: event.selection ?? session.snapshot.selection })
-    else if (event.type === 'action' && event.action && event.action !== 'pickFile' && fileActions.has(event.action) && activeId === session.id && interactive) session.event({ type: 'file-action', sessionId: session.id, action: event.action })
+    else if (event.type === 'action' && event.action && event.action !== 'pickFile' && event.action !== 'toggleTemplates' && fileActions.has(event.action) && activeId === session.id && interactive) session.event({ type: 'file-action', sessionId: session.id, action: event.action })
     else if ((event.type === 'error' || event.type === 'status') && (event.message || event.error)) session.event({ type: event.type, sessionId: session.id, message: event.message || event.error! })
   } catch (cause) {
     const session = activeId ? sessions.get(activeId) : undefined
@@ -229,6 +232,15 @@ export class RustPresentationSession {
       return this.backgroundExportReady(await getHost())
     })
   }
+  /** Synchronize ribbon chrome without committing text drafts or creating an undo step. */
+  setTemplatePanelOpen(open: boolean): Promise<void> {
+    return serialize(async () => {
+      this.assertOpen()
+      const api = await getHost()
+      const result = JSON.parse(api.command(this.id, 'host.setTemplatePanelOpen', JSON.stringify({ open }))) as { ok: boolean; error?: string }
+      if (!result.ok) throw Error(result.error || '演示模板面板状态同步失败。')
+    })
+  }
   command(commandId: string, params: Record<string, unknown> = {}, expected?: Pick<OfficePresentationSnapshot, 'documentId' | 'revision' | 'selection'>): Promise<OfficePresentationSnapshot> {
     return serialize(async () => {
       this.assertOpen()
@@ -242,7 +254,7 @@ export class RustPresentationSession {
     })
   }
   query(commandId: string, params: Record<string, unknown> = {}): Promise<unknown> {
-    if (!['document.inspect', 'slide.inspect', 'shape.inspect', 'commands.list', 'file.info', 'text.get', 'text.find', 'shape.sites'].includes(commandId)) return Promise.reject(Error('此查询不在只读检查范围内。'))
+    if (!['document.inspect', 'slide.inspect', 'shape.inspect', 'commands.list', 'file.info', 'text.get', 'text.find', 'shape.sites', 'ui.inspect'].includes(commandId)) return Promise.reject(Error('此查询不在只读检查范围内。'))
     return serialize(async () => {
       this.assertOpen()
       const api = await getHost()

@@ -3,6 +3,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { invoke } from '@tauri-apps/api/core'
 import Icon from './components/Icon.vue'
 import NotebookEditor from './components/NotebookEditor.vue'
+import WorkflowEditor from './components/WorkflowEditor.vue'
+import { importText as importWorkflowText, documentBytes as workflowBytes } from './workflow/core/files'
+import type { WorkflowDocument } from './workflow/core/types'
 import { decodeNotebook } from './notes/model'
 import { createAutosaveScheduler, type AutosaveTarget } from './shared/autosave'
 import RustWordEditor from './components/RustWordEditor.vue'
@@ -28,13 +31,13 @@ import { inspectOfficePdfSession, prepareRustPdfDocument, type PreparedRustPdfDo
 import type { OfficePdfSmokeEditor } from './pdf/rust/native-smoke'
 import type { EditingSmokeAdapter } from './sheet/rust/macos-editing-smoke'
 import type { NotebookNativeSmokeAdapter } from './notes/native-smoke'
-import { bytesToBase64, base64ToBytes, extensionOf, kindOf, withExtension, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFormats, saveFileName, type SaveExtension, type Kind, type Extension, type EditorHandle } from './shared/document'
+import { bytesToBase64, base64ToBytes, extensionOf, kindOf, documentKindOf, withExtension, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFormats, saveFileName, type SaveExtension, type Kind, type Extension, type EditorHandle, type EditorExport } from './shared/document'
 
 interface Tab { key: string; document: NativeDocument; fileId?: string; requiresSaveAs?: boolean; importWarnings?:string[]; dirty: boolean; ready: boolean; loadError?: string; autoSavedAt?: number }
 const appVersion = __APP_VERSION__
 const buildVersion = __BUILD_VERSION__
-const brandIcon = new URL('./favicon.svg', document.baseURI).href
-const { appearance } = useAppearance()
+const brandIcon = new URL('./brand-mark.png', document.baseURI).href
+const { appearance, effectiveAppearance } = useAppearance()
 const appearanceOptions = [
   { value: 'light', icon: 'sun', label: '浅色主题' },
   { value: 'dark', icon: 'moon', label: '深色主题' },
@@ -68,6 +71,8 @@ const activeRustSheet = computed(() => active.value?.document.kind === 'sheet')
 const activeRustPresentation = computed(() => active.value?.document.kind === 'presentation')
 const activeRustPdf = computed(() => active.value?.document.kind === 'pdf')
 const activeNote = computed(() => active.value?.document.kind === 'note')
+const isWorkflowKind = (kind: Kind) => kind === 'canvas' || kind === 'diagram'
+const activeWorkflow = computed(() => !!active.value && isWorkflowKind(active.value.document.kind))
 const activeRustEditor = computed(() => activeRustWord.value || activeRustSheet.value || activeRustPresentation.value || activeRustPdf.value)
 const rustWordEntries = shallowRef<{document:NativeDocument;prepared?:PreparedRustWordDocument}[]>([])
 const rustWordHandles = new Map<string,EditorHandle>()
@@ -136,8 +141,18 @@ function setNoteHandle(id:string,handle:unknown) {
   if(handle)noteHandles.set(id,handle as EditorHandle)
   else noteHandles.delete(id)
 }
+const workflowEntries = shallowRef<{document:NativeDocument}[]>([])
+const workflowHandles = new Map<string,EditorHandle>()
+function setWorkflowDocument(document?:NativeDocument) {
+  if(!document) {workflowEntries.value=[];workflowHandles.clear()}
+  else if(!workflowEntries.value.some(entry=>entry.document.id===document.id))workflowEntries.value=[...workflowEntries.value,{document}]
+}
+function setWorkflowHandle(id:string,handle:unknown) {
+  if(handle)workflowHandles.set(id,handle as EditorHandle)
+  else workflowHandles.delete(id)
+}
 let appDisposed = false
-onBeforeUnmount(() => { appDisposed = true; setRustWordDocument(); setRustSheetDocument(); setRustPresentationDocument(); setRustPdfDocument(); setNoteDocument() })
+onBeforeUnmount(() => { appDisposed = true; setRustWordDocument(); setRustSheetDocument(); setRustPresentationDocument(); setRustPdfDocument(); setNoteDocument(); setWorkflowDocument() })
 const recents = ref<RecentDocument[]>([]), busy = ref(''), error = ref(''), status = ref('所有文件，仅在你的设备上处理')
 const help = ref(false), search = ref(''), closeTarget = ref<Tab | 'window' | 'all' | null>(null)
 const recentList = ref<HTMLElement>()
@@ -190,9 +205,9 @@ useDialogFocus(closeDialog)
 const fileInput = ref<HTMLInputElement>()
 let unlisten: (() => void) | undefined
 let pendingWindowClose = false
-const editor = () => activeRustWord.value ? rustWordHandles.get(activeKey.value) : activeRustSheet.value ? rustSheetHandles.get(activeKey.value) : activeRustPresentation.value ? rustPresentationHandles.get(activeKey.value) : activeRustPdf.value ? rustPdfHandles.get(activeKey.value) : noteHandles.get(activeKey.value)
-const kindNames: Record<Kind,string> = { word:'文字文档', sheet:'电子表格', presentation:'演示文稿', pdf:'PDF 文档', note:'笔记本' }
-const icons: Record<Kind,string> = {word:'file',sheet:'sheet',presentation:'presentation',pdf:'pdf',note:'notebook'}
+const editor = () => activeRustWord.value ? rustWordHandles.get(activeKey.value) : activeRustSheet.value ? rustSheetHandles.get(activeKey.value) : activeRustPresentation.value ? rustPresentationHandles.get(activeKey.value) : activeRustPdf.value ? rustPdfHandles.get(activeKey.value) : activeWorkflow.value ? workflowHandles.get(activeKey.value) : noteHandles.get(activeKey.value)
+const kindNames: Record<Kind,string> = { word:'文字文档', sheet:'电子表格', presentation:'演示文稿', pdf:'PDF 文档', note:'笔记本', canvas:'画布', diagram:'代码图表' }
+const icons: Record<Kind,string> = {word:'file',sheet:'sheet',presentation:'presentation',pdf:'pdf',note:'notebook',canvas:'canvas',diagram:'code-diagram'}
 const filteredRecents = computed(() => recents.value.filter(r => r.name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase())))
 const message = (e:unknown) => e instanceof Error ? e.message : String(e)
 async function editorTransaction<T>(label:string, work:()=>Promise<T>, preserveInput=false):Promise<T> {
@@ -281,14 +296,15 @@ async function activate(tab:Tab) {
     await stash()
     activeKey.value=tab.key
     const kind=tab.document.kind
-    const entries=kind==='word'?rustWordEntries.value:kind==='sheet'?rustSheetEntries.value:kind==='presentation'?rustPresentationEntries.value:kind==='pdf'?rustPdfEntries.value:noteEntries.value
+    const entries=kind==='word'?rustWordEntries.value:kind==='sheet'?rustSheetEntries.value:kind==='presentation'?rustPresentationEntries.value:kind==='pdf'?rustPdfEntries.value:kind==='note'?noteEntries.value:workflowEntries.value
     const reusable=entries.some(entry=>entry.document.id===tab.key)
     if(!reusable){tab.ready=false;tab.loadError=undefined}
     if(kind==='word')setRustWordDocument(tab.document)
     else if(kind==='sheet')setRustSheetDocument(tab.document)
     else if(kind==='presentation')setRustPresentationDocument(tab.document)
     else if(kind==='pdf')setRustPdfDocument(tab.document)
-    else setNoteDocument(tab.document)
+    else if(kind==='note')setNoteDocument(tab.document)
+    else setWorkflowDocument(tab.document)
     await nextTick()
   }
   home.value=false
@@ -296,7 +312,10 @@ async function activate(tab:Tab) {
 async function addDocument(doc:NativeDocument, fileId?:string) {
   // Validate the format family before touching any active document or session.
   doc={...doc}
-  if(extensionOf(doc.name)!==doc.extension||kindOf(doc.extension)!==doc.kind)throw Error('文件名、格式与文档类型不一致，无法打开。')
+  if(extensionOf(doc.name)!==doc.extension)throw Error('文件名、格式与文档类型不一致，无法打开。')
+  const sharedEnvelope=doc.extension==='owflow'||doc.extension==='json'
+  const expectedKind=sharedEnvelope&&doc.base64?documentKindOf(base64ToBytes(doc.base64),doc.extension):doc.extension==='owflow'&&isWorkflowKind(doc.kind)?doc.kind:kindOf(doc.extension)
+  if(expectedKind!==doc.kind)throw Error('文件名、格式与文档类型不一致，无法打开。')
   const existing=fileId && tabs.value.find(t=>t.fileId===fileId)
   if(existing) { await activate(existing); return existing }
   // Rust engines support eight live models per document kind.
@@ -306,16 +325,22 @@ async function addDocument(doc:NativeDocument, fileId?:string) {
   let sheetPrepared:PreparedRustSheetDocument|undefined
   let presentationPrepared:PreparedRustPresentationDocument|undefined
   let pdfPrepared:PreparedRustPdfDocument|undefined
+  let workflowWarnings:string[]=[]
   try {
     // Every Rust parser prepares an isolated model before the active tab is touched.
     if(doc.kind==='word')wordPrepared=await prepareRustWordDocument({...doc,id:key})
     else if(doc.kind==='sheet')sheetPrepared=await prepareRustSheetDocument({...doc,id:key})
     else if(doc.kind==='presentation')presentationPrepared=await prepareRustPresentationDocument({...doc,id:key})
     else if(doc.kind==='pdf')pdfPrepared=await prepareRustPdfDocument({...doc,id:key})
-    else if(doc.base64)decodeNotebook(base64ToBytes(doc.base64))
+    else if(doc.kind==='note'&&doc.base64)decodeNotebook(base64ToBytes(doc.base64))
+    else if(isWorkflowKind(doc.kind)&&doc.base64) {
+      const imported=importWorkflowText(doc.name,new TextDecoder('utf-8',{fatal:true}).decode(base64ToBytes(doc.base64)))
+      if(imported.documents.length!==1)throw Error('请通过打开文件导入多页画布。')
+      workflowWarnings=imported.warnings
+    }
     if(appDisposed)return
     const requiresConversion=isImportOnly(doc.extension)||defaultSaveExtension(doc.extension)!==doc.extension
-    const importWarnings=[...(requiresConversion?['此格式需要转换后保存，原文件保留。']:[]),...(sheetPrepared?.warnings??presentationPrepared?.warnings??pdfPrepared?.warnings??[])]
+    const importWarnings=[...(requiresConversion?['此格式需要转换后保存，原文件保留。']:[]),...(sheetPrepared?.warnings??presentationPrepared?.warnings??pdfPrepared?.warnings??workflowWarnings)]
     const tab:Tab={key,document:{...doc,id:key},fileId,requiresSaveAs:requiresConversion,importWarnings,dirty:!fileId,ready:false}
     await stash()
     if(appDisposed)return
@@ -324,7 +349,8 @@ async function addDocument(doc:NativeDocument, fileId?:string) {
     else if(doc.kind==='sheet') {setRustSheetDocument(tab.document,sheetPrepared);sheetPrepared=undefined}
     else if(doc.kind==='presentation') {setRustPresentationDocument(tab.document,presentationPrepared);presentationPrepared=undefined}
     else if(doc.kind==='pdf') {setRustPdfDocument(tab.document,pdfPrepared);pdfPrepared=undefined}
-    else setNoteDocument(tab.document)
+    else if(doc.kind==='note')setNoteDocument(tab.document)
+    else setWorkflowDocument(tab.document)
     return storedTab
   } finally {
     // Failed preflight/stash or disposal must not retain an undelivered model.
@@ -336,15 +362,51 @@ async function addDocument(doc:NativeDocument, fileId?:string) {
 }
 function newDocument(kind:Kind) {
   void task('正在新建文档',async()=>{
-    const extension:Extension=kind==='word'?'docx':kind==='sheet'?'xlsx':kind==='presentation'?'pptx':kind==='pdf'?'pdf':'oonote'
+    const extension:Extension=kind==='word'?'docx':kind==='sheet'?'xlsx':kind==='presentation'?'pptx':kind==='pdf'?'pdf':kind==='note'?'oonote':'owflow'
     const number=tabs.value.filter(t=>t.document.kind===kind).length+1
     await addDocument({id:'',kind,extension,name:`未命名${kindNames[kind]}${number}.${extension}`,base64:'',sha256:'',sizeBytes:0})
   })
 }
 async function refreshRecents() { if(native.isTauri()) recents.value=await native.listRecentDocuments() }
+async function openImportedDocument(doc:NativeDocument,fileId?:string) {
+  if(isWorkflowKind(doc.kind)&&doc.base64) {
+    const imported=importWorkflowText(doc.name,new TextDecoder('utf-8',{fatal:true}).decode(base64ToBytes(doc.base64)))
+    if(imported.documents.length>1) {
+      // Validate every imported page and the tab budget before changing the workspace.
+      const pages=imported.documents.map((page,index)=>({page,bytes:workflowBytes(page),name:`${doc.name.replace(/\.[^.]+$/,'')} - ${index+1}.owflow`}))
+      if(tabs.value.filter(tab=>tab.document.kind==='canvas').length+pages.length>8)throw Error(`文件含 ${pages.length} 页画布，同时打开将超过 8 份，请先关闭其他画布或拆分文件。`)
+      for(const {page,bytes,name} of pages) {
+        const tab=await addDocument({id:'',name,kind:page.kind==='mermaid'?'diagram':'canvas',extension:'owflow',base64:bytesToBase64(bytes),sha256:'',sizeBytes:bytes.length})
+        if(tab){tab.requiresSaveAs=true;tab.importWarnings=['已按页面导入独立画布，保存时选择新位置，原文件保留。',...imported.warnings];await nextTick();await awaitReady(tab)}
+      }
+      return
+    }
+  }
+  await addDocument(doc,fileId)
+}
+function createCanvasCopy(model:WorkflowDocument) {
+  if(globalActionsBlocked.value)return
+  void task('正在创建画布副本',async()=>{
+    const bytes=workflowBytes(model)
+    await addDocument({id:'',name:`${Array.from(model.title.replace(/[\x00-\x1f/\\:<>"|?*]/g,' ').trim()).slice(0,60).join('')||'图表'} - 画布.owflow`,kind:'canvas',extension:'owflow',base64:bytesToBase64(bytes),sha256:'',sizeBytes:bytes.length})
+  })
+}
+function exportWorkflowCopy(id:string,output:EditorExport) {
+  if(globalActionsBlocked.value||home.value||id!==activeKey.value)return
+  void task('正在导出图片',async()=>{
+    if(!['svg','png'].includes(output.extension))throw Error('不支持此图片格式。')
+    const tab=active.value;if(!tab||tab.key!==id||!isWorkflowKind(tab.document.kind))return
+    validateDocumentSignature(base64ToBytes(output.base64),output.extension)
+    const name=withExtension(tab.document.name,output.extension)
+    if(!native.isTauri()){download(output.base64,name);status.value='图片已生成下载文件';return}
+    const result=await native.saveDocument({name,extension:output.extension,base64:output.base64,saveAs:true,protectedDocumentIds:tabs.value.flatMap(tab=>tab.fileId?[tab.fileId]:[])})
+    if(result.status==='conflict')throw Error(result.message)
+    if(result.status==='saved')status.value='图片副本已保存'
+  })
+}
 function openFile() {
   if(native.isTauri()) void task('正在打开文件',async()=>{
-    const document=await native.openDocument(); if(document) await addDocument(document,document.id)
+    const document=await native.openDocument(); if(document) await openImportedDocument(document,document.id)
     await refreshRecents()
   })
   else fileInput.value?.click()
@@ -357,10 +419,10 @@ async function browserFile(event:Event) {
     if(file.size>40*1024*1024) throw Error('请选择不超过 40 MB 的文档。')
     const bytes=new Uint8Array(await file.arrayBuffer())
     validateDocumentSignature(bytes,extension)
-    await addDocument({id:'',name:file.name,extension,kind:kindOf(extension),base64:bytesToBase64(bytes),sha256:'',sizeBytes:file.size})
+    await openImportedDocument({id:'',name:file.name,extension,kind:documentKindOf(bytes,extension),base64:bytesToBase64(bytes),sha256:'',sizeBytes:file.size})
   })
 }
-function openRecent(item:RecentDocument) { void task('正在打开最近文件',async()=>{const doc=await native.openRecent(item.id);await addDocument(doc,doc.id);await refreshRecents()}) }
+function openRecent(item:RecentDocument) { void task('正在打开最近文件',async()=>{const doc=await native.openRecent(item.id);await openImportedDocument(doc,doc.id);await refreshRecents()}) }
 function download(base64:string,name:string) {
   const url=URL.createObjectURL(new Blob([base64ToBytes(base64).buffer as ArrayBuffer])), link=document.createElement('a')
   link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000)
@@ -369,18 +431,16 @@ async function saveActive(saveAs=false, format?:Extension, chosenName?:string, d
   const tab=active.value;if(!tab)return false
   const directAllowed=()=>native.isTauri()&&tab.key===directOnly?.key&&tab.fileId===directOnly?.fileId&&!tab.requiresSaveAs&&!isImportOnly(tab.document.extension)&&defaultSaveExtension(tab.document.extension)===tab.document.extension
   if(directOnly&&!directAllowed())return false
-  if(format&&isImportOnly(format))throw Error('模板与放映文件仅支持导入，请另存为 PPTX 副本。')
   const requestedFormat=format||defaultSaveExtension(tab.document.extension)
   if(!formatsFor(tab).some(option=>option.extension===requestedFormat))throw Error('当前编辑器不支持此保存格式。')
   const handle=requireEditor(tab)
   if(directOnly&&!await handle.canBackgroundExport?.())return false
   const exported=await handle.exportFile({format:requestedFormat,...(directOnly?{background:true}:{})})
   if(activeKey.value!==tab.key)throw Error('文档已切换，本次保存已取消。')
-  if(isImportOnly(exported.extension))throw Error('编辑器未生成现代格式，保存已取消，原文件未被修改。')
   if(exported.extension!==requestedFormat)throw Error('编辑器返回的格式与所选格式不一致，保存已取消。')
   if(directOnly&&(!directAllowed()||exported.saveAs||exported.extension!==tab.document.extension))return false
   if(exported.dirty)tab.dirty=true
-  const isCopy=(tab.document.kind==='sheet'&&['csv','tsv','pdf'].includes(requestedFormat))||(!!format && format!==tab.document.extension)
+  const isCopy=(tab.document.kind==='sheet'&&['csv','tsv','pdf'].includes(requestedFormat))||(isWorkflowKind(tab.document.kind)&&requestedFormat!=='owflow')||(!!format && format!==tab.document.extension)
   const protectSource=tab.requiresSaveAs||isImportOnly(tab.document.extension)
   // The shell owns the saved filename; editor snapshots may still carry the
   // original import name after a same-format Save As.
@@ -388,11 +448,11 @@ async function saveActive(saveAs=false, format?:Extension, chosenName?:string, d
   const name=chosenName||(protectSource?exportName.replace(/\.[^.]+$/,` - 副本.${exported.extension}`):exportName)
   if(!native.isTauri()) {
     download(exported.base64,name)
-    if(!isCopy) { tab.document={...tab.document,base64:exported.base64,name,extension:exported.extension};tab.requiresSaveAs=false;tab.importWarnings=[];await handle.markSaved?.(exported.base64);tab.dirty=false }
+    if(!isCopy) { tab.document={...tab.document,base64:exported.base64,name,extension:exported.extension};tab.requiresSaveAs=false;tab.importWarnings=[];await handle.markSaved?.(exported.base64);tab.dirty=isWorkflowKind(tab.document.kind)?!!(await handle.inspect?.())?.dirty:false }
     status.value='已生成下载文件';return true
   }
   const request:SaveDocumentRequest={documentId:isCopy||protectSource?undefined:tab.fileId,name,extension:exported.extension,base64:exported.base64,expectedSha256:isCopy||protectSource?undefined:tab.document.sha256,saveAs:saveAs||isCopy||protectSource||exported.saveAs||!tab.fileId}
-  const protectedDocumentIds=[...new Set(tabs.value.filter(other=>other.key!==tab.key&&other.fileId).map(other=>other.fileId!))]
+  const protectedDocumentIds=[...new Set(tabs.value.filter(other=>(other.key!==tab.key||isCopy||protectSource)&&other.fileId).map(other=>other.fileId!))]
   if(protectedDocumentIds.length)request.protectedDocumentIds=protectedDocumentIds
   const result=await native.saveDocument(request)
   if(smokeMode.value)nativeSmokeSaveObserver?.(request,result)
@@ -403,7 +463,7 @@ async function saveActive(saveAs=false, format?:Extension, chosenName?:string, d
     tab.document={...result.document,id:tab.key,base64:exported.base64}
     tab.requiresSaveAs=false
     tab.importWarnings=[]
-    await handle.markSaved?.(exported.base64,directOnly?{background:true}:undefined);tab.dirty=false
+    await handle.markSaved?.(exported.base64,directOnly?{background:true}:undefined);tab.dirty=isWorkflowKind(tab.document.kind)?!!(await handle.inspect?.())?.dirty:false
     if(!directOnly){tab.autoSavedAt=undefined;autosaveWaiting.value=undefined}
   }
   await refreshRecents();status.value=isCopy?`${exported.extension.toUpperCase()} 副本已保存`:'已保存到本机';return true
@@ -519,11 +579,12 @@ async function removeTab(tab:Tab, discardConfirmed=false) {
   }
   tabs.value=tabs.value.filter(t=>t.key!==tab.key)
   noteEntries.value=noteEntries.value.filter(entry=>entry.document.id!==tab.key)
+  workflowEntries.value=workflowEntries.value.filter(entry=>entry.document.id!==tab.key)
   for(const entries of [rustWordEntries,rustSheetEntries,rustPresentationEntries,rustPdfEntries]) {
     for(const entry of entries.value)if(entry.document.id===tab.key)entry.prepared?.discard()
     entries.value=entries.value.filter(entry=>entry.document.id!==tab.key) as typeof entries.value
   }
-  rustWordHandles.delete(tab.key);rustSheetHandles.delete(tab.key);rustPresentationHandles.delete(tab.key);rustPdfHandles.delete(tab.key);noteHandles.delete(tab.key)
+  rustWordHandles.delete(tab.key);rustSheetHandles.delete(tab.key);rustPresentationHandles.delete(tab.key);rustPdfHandles.delete(tab.key);noteHandles.delete(tab.key);workflowHandles.delete(tab.key)
 }
 function closeTab(tab:Tab) {
   if(busy.value)return
@@ -557,7 +618,8 @@ async function removeTabs(selected:Tab[], discardConfirmed=false) {
     entries.value=entries.value.filter(entry=>!keys.has(entry.document.id)) as typeof entries.value
   }
   noteEntries.value=noteEntries.value.filter(entry=>!keys.has(entry.document.id))
-  for(const key of keys)for(const handles of [rustWordHandles,rustSheetHandles,rustPresentationHandles,rustPdfHandles,noteHandles])handles.delete(key)
+  workflowEntries.value=workflowEntries.value.filter(entry=>!keys.has(entry.document.id))
+  for(const key of keys)for(const handles of [rustWordHandles,rustSheetHandles,rustPresentationHandles,rustPdfHandles,noteHandles,workflowHandles])handles.delete(key)
   if(!tabs.value.length)home.value=true
   else if(!activeKey.value)await activate(tabs.value[0]!)
 }
@@ -661,7 +723,7 @@ function inputActivity(event: Event) {
 }
 function handleFor(tab: Tab) {
   return (tab.document.kind==='word'?rustWordHandles:tab.document.kind==='sheet'?rustSheetHandles:
-    tab.document.kind==='presentation'?rustPresentationHandles:tab.document.kind==='pdf'?rustPdfHandles:noteHandles).get(tab.key)
+    tab.document.kind==='presentation'?rustPresentationHandles:tab.document.kind==='pdf'?rustPdfHandles:tab.document.kind==='note'?noteHandles:workflowHandles).get(tab.key)
 }
 const autosaveEnabled=ref((()=>{try{return localStorage.getItem('open-office-autosave')==='true'}catch{return false}})())
 const autosaveWaiting=ref<{key:string;reason:string}>()
@@ -716,6 +778,28 @@ const autosave=createAutosaveScheduler({
     if(target)autosaveWaiting.value={key:target.key,reason:'自动保存待重试'}
     status.value='自动保存暂未完成，当前修改仍保留，稍后重试。'
   },
+})
+// Display the scheduler's actual deadline; rendering never restarts its timer.
+const autosaveClock=ref(Date.now())
+let autosaveDisplayTimer:ReturnType<typeof setInterval>|undefined
+onMounted(()=>{autosaveDisplayTimer=setInterval(()=>{autosaveClock.value=Date.now()},1000)})
+onBeforeUnmount(()=>clearInterval(autosaveDisplayTimer))
+const autosaveCountdown=computed(()=>{
+  void autosaveClock.value
+  if(!native.isTauri()||!autosaveEnabled.value)return ''
+  const tab=currentDocument.value
+  if(!tab)return '待编辑'
+  if(!tab.ready)return '等待载入'
+  const timing=autosave.inspectTiming()
+  if(backgroundSaving.value||(timing.status==='running'&&timing.target?.key===tab.key))return '保存中…'
+  if(!tab.fileId||tab.requiresSaveAs||defaultSaveExtension(tab.document.extension)!==tab.document.extension)return '请先保存'
+  if(!tab.dirty)return '已保存'
+  if(timing.status==='deferred')return composing.value||Date.now()-lastInputAt.value<1200?'等待输入完成':globalActionsBlocked.value?'等待操作完成':'等待完成编辑'
+  if(timing.remainingMs!==undefined) {
+    const seconds=Math.ceil(timing.remainingMs/1000)
+    return timing.status==='retrying'?`${seconds} 秒后重试`:seconds>0?`${seconds} 秒`:'即将保存'
+  }
+  return '等待保存'
 })
 watch(autosaveEnabled,value=>{try{localStorage.setItem('open-office-autosave',String(value))}catch{}autosaveWaiting.value=undefined;autosave.notify()})
 onMounted(async()=>{
@@ -969,6 +1053,49 @@ onMounted(async()=>{
           report.notebook=notebook
           if(!notebook.ok)throw Error(notebook.error||notebook.cleanupError||'Native notebook verification failed')
           smokeStage('notebook-native','complete')
+          smokeStage('workflow-native','starting mounted canvas and code diagram original-file verification')
+          const {runWorkflowNativeSmoke}=await import('./workflow/native-smoke')
+          type WorkflowSmokeEditor=Awaited<ReturnType<import('./workflow/native-smoke').WorkflowNativeSmokeAdapter['open']>>['editor']
+          const workflow=await runWorkflowNativeSmoke({
+            open:async source=>{
+              const tab=await editorTransaction('正在验证本机画布和代码图表',()=>addDocument(source,source.id||undefined))
+              if(!tab||!['canvas','diagram'].includes(tab.document.kind))throw Error('Native workflow smoke tab missing')
+              await nextTick();await awaitReady(tab);await nextTick()
+              const editor=workflowHandles.get(tab.key) as WorkflowSmokeEditor|undefined
+              const element=[...document.querySelectorAll<HTMLElement>('[data-testid="workflow-editor"]')].find(node=>node.dataset.documentId===tab.key)
+              if(!editor?.inspect||!editor.markSaved||!element)throw Error('Native workflow editor unavailable')
+              return {key:tab.key,element,editor}
+            },
+            bindTemporaryFile:async(key,file)=>{
+              const tab=tabs.value.find(item=>item.key===key)
+              if(!tab||tab.fileId||!['canvas','diagram'].includes(tab.document.kind)||file.kind!==tab.document.kind||file.extension!=='owflow')throw Error('Invalid temporary workflow capability')
+              tab.fileId=file.id;tab.document={...file,id:key};tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false
+              await nextTick()
+            },
+            state:key=>{
+              const tab=tabs.value.find(item=>item.key===key)
+              if(!tab)throw Error('Native workflow tab closed unexpectedly')
+              return {active:activeKey.value===key&&!home.value,ready:tab.ready,dirty:tab.dirty,busy:!!busy.value||autosave.running,fileId:tab.fileId,sha256:tab.document.sha256,
+                modal:!!saveAsDraft.value||!!templateDraft.value||!!closeTarget.value||help.value}
+            },
+            autosaveEnabled:()=>autosaveEnabled.value,
+            setAutosave:async enabled=>{autosaveEnabled.value=enabled;await nextTick();autosave.notify()},
+            observeNativeSaves:observer=>{
+              if(nativeSmokeSaveObserver)throw Error('Native save observer already installed')
+              nativeSmokeSaveObserver=observer
+              return ()=>{if(nativeSmokeSaveObserver===observer)nativeSmokeSaveObserver=undefined}
+            },
+            close:async key=>{
+              const tab=tabs.value.find(item=>item.key===key)
+              if(!tab)throw Error('Native workflow cleanup tab missing')
+              const element=[...document.querySelectorAll<HTMLElement>('[data-testid="workflow-editor"]')].find(node=>node.dataset.documentId===key)
+              await removeTab(tab,true);await nextTick()
+              if(tabs.value.some(item=>item.key===key)||workflowEntries.value.some(item=>item.document.id===key)||workflowHandles.has(key)||element?.isConnected)throw Error('Native workflow editor survived cleanup')
+            },
+          })
+          report.workflow=workflow
+          if(!workflow.ok)throw Error(workflow.error||workflow.cleanupError||'Native workflow verification failed')
+          smokeStage('workflow-native','complete')
           smokeStage('workspace-native','starting scheduled native file persistence verification')
           const {runWorkspaceNativeSmoke}=await import('./shared/workspace-native-smoke')
           const workspace=await runWorkspaceNativeSmoke({
@@ -1022,28 +1149,27 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 
 <template>
   <div class="app-shell" :class="{'editing':!home}">
-    <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.xlsx,.csv,.tsv,.pptx,.potx,.ppsx,.pdf,.oonote" @change="browserFile" />
+    <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.xlsx,.csv,.tsv,.pptx,.potx,.ppsx,.pdf,.oonote,.owflow,.mmd,.mermaid,.drawio,.xml,.excalidraw,.json" @change="browserFile" />
     <header class="titlebar" data-testid="global-toolbar" :inert="globalActionsBlocked">
       <button class="brand" @click="home=true" aria-label="返回工作台"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
       <nav class="global-file-toolbar" aria-label="全局文件操作">
         <details ref="newMenu" class="new-document-menu" @keydown.esc.stop.prevent="closeNewMenu(true)">
           <summary data-testid="shell-new" aria-label="新建文档" title="新建文档 · Ctrl / ⌘ N"><Icon name="plus" :size="18"/><span class="file-action-label">新建</span><Icon name="chevron-down" :size="12"/></summary>
           <div class="new-document-options" role="group" aria-label="选择新建文档类型">
-            <button v-for="kind in (['word','sheet','presentation','pdf','note'] as const)" :key="kind" :data-testid="'shell-new-'+kind" @click="globalNewDocument(kind)"><Icon :name="icons[kind]" :size="18"/><span>{{kindNames[kind]}}</span></button>
+            <button v-for="kind in (['word','sheet','presentation','pdf','note','canvas','diagram'] as const)" :key="kind" :data-testid="'shell-new-'+kind" @click="globalNewDocument(kind)"><Icon :name="icons[kind]" :size="18"/><span>{{kindNames[kind]}}</span></button>
           </div>
         </details>
         <div class="global-file-actions">
           <button data-testid="shell-open" @click="globalFileAction('open')" title="打开文件 · Ctrl / ⌘ O" aria-label="打开文件"><Icon name="folder" :size="18"/><span class="file-action-label">打开</span></button>
           <span class="separator"/>
           <button data-testid="shell-save" :disabled="documentActionsDisabled" @click="globalFileAction('save')" title="保存当前文档 · Ctrl / ⌘ S" aria-label="保存当前文档"><Icon name="save" :size="18"/><span class="file-action-label">保存</span></button>
-          <button data-testid="shell-autosave" class="autosave-toggle" role="switch" :aria-checked="native.isTauri()&&autosaveEnabled" :disabled="!native.isTauri()" :title="autosaveTitle" aria-label="自动保存" @click="autosaveEnabled=!autosaveEnabled"><span class="autosave-track" :class="{enabled:native.isTauri()&&autosaveEnabled}"><i/></span><span class="autosave-label">自动保存</span></button>
+          <button data-testid="shell-autosave" class="autosave-toggle" role="switch" :aria-checked="native.isTauri()&&autosaveEnabled" :disabled="!native.isTauri()" :title="autosaveTitle" aria-label="自动保存" :aria-describedby="autosaveCountdown ? 'autosave-timing' : undefined" @click="autosaveEnabled=!autosaveEnabled"><span class="autosave-track" :class="{enabled:native.isTauri()&&autosaveEnabled}"><i/></span><span class="autosave-label">自动保存</span><span v-if="autosaveCountdown" id="autosave-timing" data-testid="autosave-countdown" class="autosave-countdown" role="timer" aria-live="off">{{autosaveCountdown}}</span></button>
           <button data-testid="shell-save-as" :disabled="documentActionsDisabled" @click="globalFileAction('saveAs')" title="当前文档另存为 · Ctrl / ⌘ Shift S" aria-label="当前文档另存为"><Icon name="save-as" :size="18"/><span class="file-action-label">另存为</span></button>
-          <button data-testid="shell-export-pdf" :disabled="documentActionsDisabled||(currentDocument?.document.kind==='pdf'||currentDocument?.document.kind==='note')" @click="globalFileAction('exportPdf')" title="导出当前文档为 PDF" aria-label="导出当前文档为 PDF"><Icon name="download" :size="18"/><span class="file-action-label">导出 PDF</span></button>
+          <button data-testid="shell-export-pdf" :disabled="documentActionsDisabled||currentDocument?.document.kind==='pdf'||!formatsFor(currentDocument).some(option=>option.extension==='pdf')" @click="globalFileAction('exportPdf')" title="导出当前文档为 PDF" aria-label="导出当前文档为 PDF"><Icon name="download" :size="18"/><span class="file-action-label">导出 PDF</span></button>
           <button data-testid="shell-print" :disabled="documentActionsDisabled" @click="globalFileAction('print')" title="打印当前文档 · Ctrl / ⌘ P" aria-label="打印当前文档"><Icon name="print" :size="18"/><span class="file-action-label">打印</span></button>
           <span class="separator"/>
           <button :disabled="documentActionsDisabled" @click="globalFileAction('undo')" title="撤销" aria-label="撤销"><Icon name="undo" :size="18"/></button>
           <button :disabled="documentActionsDisabled" @click="globalFileAction('redo')" title="重做" aria-label="重做"><Icon name="redo" :size="18"/></button>
-          <button v-if="currentDocument?.document.kind==='presentation'" data-testid="shell-presentation-templates" :disabled="documentActionsDisabled" :aria-expanded="templatePanelOpen" :class="{'templates-active':templatePanelOpen}" @click="togglePresentationTemplates" title="演示模板" aria-label="演示模板"><Icon name="presentation" :size="18"/><span>模板</span></button>
         </div>
       </nav>
       <span class="titlebar-context" :title="currentDocument?.document.name">{{currentDocument?.document.name || '工作台'}}</span>
@@ -1070,6 +1196,8 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
           <button class="create-card presentation" @click="newDocument('presentation')"><span class="document-art"><Icon name="presentation" :size="28"/></span><span class="card-bottom"><span><strong>演示文稿</strong><small>幻灯片设计与演示</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">PPTX · POTX · PPSX</span></button>
           <button class="create-card pdf" @click="newDocument('pdf')"><span class="document-art"><Icon name="pdf" :size="28"/></span><span class="card-bottom"><span><strong>PDF 工作室</strong><small>文字编辑、批注与页面整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">PDF</span></button>
           <button class="create-card note" data-testid="home-new-note" @click="newDocument('note')"><span class="document-art"><Icon name="notebook" :size="28"/></span><span class="card-bottom"><span><strong>笔记本</strong><small>分区与页面、灵感记录和待办</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">OONOTE</span></button>
+          <button class="create-card canvas" data-testid="home-new-canvas" @click="newDocument('canvas')"><span class="document-art"><Icon name="canvas" :size="28"/></span><span class="card-bottom"><span><strong>画布</strong><small>流程连线、自由绘制与灵感整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">CANVAS</span></button>
+          <button class="create-card diagram" data-testid="home-new-diagram" @click="newDocument('diagram')"><span class="document-art"><Icon name="code-diagram" :size="28"/></span><span class="card-bottom"><span><strong>代码图表</strong><small>代码绘图、实时预览与图表模板</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span><span class="file-kind">DIAGRAM</span></button>
         </section>
         <section class="recent-section"><div class="section-heading"><h2>最近打开 <span>{{recents.length}}</span></h2><label class="search-box"><Icon name="search" :size="18"/><input v-model="search" placeholder="查找最近的文件" aria-label="查找最近的文件"/></label></div>
           <div ref="recentList" class="recent-list" role="region" aria-label="最近打开的文件" tabindex="0">
@@ -1077,7 +1205,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
             <template v-else><button v-for="item in filteredRecents" :key="item.id" class="recent-row" @click="openRecent(item)"><span class="file-icon" :class="item.kind"><Icon :name="icons[item.kind]"/></span><span class="recent-name">{{item.name}}<small>{{kindNames[item.kind]}} · {{item.extension.toUpperCase()}}</small></span><time>{{new Date(item.lastOpenedAt* (item.lastOpenedAt<1e12?1000:1)).toLocaleDateString('zh-CN')}}</time><Icon name="arrow" :size="18"/></button></template>
           </div>
         </section>
-        <footer class="home-footer"><span>支持文档、表格、演示、PDF 与本地笔记本</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
+        <footer class="home-footer"><span>文档 · 表格 · 演示 · PDF · 笔记本 · 画布 · 代码图表</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
       </main>
     </div>
     <section v-show="!home" class="editor-workspace" :inert="editorInputBlocked">
@@ -1094,13 +1222,14 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       <div class="editor-content" :inert="editorInputBlocked">
         <RustWordEditor :theme="appearance" v-for="entry in rustWordEntries" :key="entry.document.id" v-show="activeRustWord&&activeKey===entry.document.id" :ref="handle=>setRustWordHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustWord&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <RustSheetEditor :theme="appearance" v-for="entry in rustSheetEntries" :key="entry.document.id" v-show="activeRustSheet&&activeKey===entry.document.id" :ref="handle=>setRustSheetHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustSheet&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
-        <RustPresentationEditor :theme="appearance" v-for="entry in rustPresentationEntries" :key="entry.document.id" v-show="activeRustPresentation&&activeKey===entry.document.id" :ref="handle=>setRustPresentationHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPresentation&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
+        <RustPresentationEditor :theme="appearance" v-for="entry in rustPresentationEntries" :key="entry.document.id" v-show="activeRustPresentation&&activeKey===entry.document.id" :ref="handle=>setRustPresentationHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPresentation&&activeKey===entry.document.id" :disabled="editorInputBlocked" :templates-open="templatePanelOpen" @toggle-templates="activeKey===entry.document.id&&togglePresentationTemplates()" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <RustPdfEditor :theme="appearance" v-for="entry in rustPdfEntries" :key="entry.document.id" v-show="activeRustPdf&&activeKey===entry.document.id" :ref="handle=>setRustPdfHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPdf&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <NotebookEditor :theme="appearance" v-for="entry in noteEntries" :key="entry.document.id" v-show="activeNote&&activeKey===entry.document.id" :ref="handle=>setNoteHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeNote&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
+        <WorkflowEditor :theme="effectiveAppearance" v-for="entry in workflowEntries" :key="entry.document.id" v-show="activeWorkflow&&activeKey===entry.document.id" :ref="handle=>setWorkflowHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeWorkflow&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)" @create-canvas="activeKey===entry.document.id&&createCanvasCopy($event)" @export="exportWorkflowCopy(entry.document.id,$event)"/>
       </div>
       <PresentationTemplates v-if="!home&&activeRustPresentation&&templatePanelOpen" class="template-panel" :templates="presentationTemplates" :loading="templateListLoading" :error="templateListError" :disabled="documentActionsDisabled" @select="openPresentationTemplateDialog('apply',$event)" @save="openPresentationTemplateDialog('save')" @delete="openPresentationTemplateDialog('delete',$event)" @retry="refreshPresentationTemplates" @close="templatePanelOpen=false"/>
       </div>
-      <footer class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · {{activeRustWord?'文字编辑':activeRustSheet?'表格编辑':activeRustPresentation?'演示编辑':activeRustPdf?'PDF 编辑':'笔记编辑'}}</span></footer>
+      <footer class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · {{activeRustWord?'文字编辑':activeRustSheet?'表格编辑':activeRustPresentation?'演示编辑':activeRustPdf?'PDF 编辑':activeNote?'笔记编辑':active?.document.kind==='canvas'?'画布编辑':'代码图表'}}</span></footer>
     </section>
     <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{error}}</span><button @click="error=''" aria-label="关闭错误提示"><Icon name="close" :size="16"/></button></div>
     <div v-if="busy&&!backgroundSaving" class="busy-overlay" role="status"><span class="busy-pill"><i/>{{busy}}</span></div>
@@ -1148,14 +1277,13 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <div class="modal-actions"><button data-testid="close-cancel" :disabled="!!busy" @click="closeTarget=null">取消</button><button data-testid="close-discard" :disabled="!!busy" @click="resolveClose('discard')">{{closeTarget==='window'?'全部不保存并退出':closeTarget==='all'?'全部不保存并关闭':'不保存并关闭'}}</button><button class="primary" data-testid="close-save" :disabled="!!busy" @click="resolveClose('save')">{{closeTarget==='window'?'全部保存并退出':closeTarget==='all'?'全部保存并关闭':'保存并关闭'}}</button></div>
       </section>
     </div>
-    <div v-if="help" class="modal-backdrop" @click.self="help=false" @keydown.esc.stop.prevent="help=false"><section ref="helpDialog" class="modal help-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>提供中文文字排版、表格与公式、数据分析、幻灯片编排及 PDF 导出。文字、表格、演示与 PDF 均使用本地 Rust 文档引擎。支持 DOCX、XLSX、CSV、TSV、PPTX、POTX 与 PPSX；模板与放映文稿另存为 PPTX。旧 DOC、RTF、ODT、XLS、ODS、PPT 与 ODP 请先转换为支持的格式。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持 PDF 阅读、文字编辑、批注、页面整理与书签导航。编辑、排版和保存均由本地 Rust 引擎处理。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件可能使原签名失效，请先核对签名状态。演示文稿支持幻灯片编排、对象编辑、备注与放映。复杂转场、动画、SmartArt 与媒体兼容性请以导出结果为准。复杂文档的兼容性仍需逐步完善：复杂排版、最新函数、宏与插件仍有差异。请检查导出结果；宏不自动执行。</p><p class="help-note"><strong>永久本地范围：</strong>不提供账户、云盘、云协作或云 AI，也不将这些服务列入后续功能计划。安装包内的编辑引擎在本机处理文档。</p><p class="help-note"><strong>原文件与自动保存：</strong>打开本机文件后直接编辑，保存会写回原路径；另存为和格式转换才会创建新文件。自动保存开关位于保存按钮旁，每 30 秒保存当前文件，新建文件请先选择保存位置。笔记本使用本地 .oonote 格式，支持分区、页面、富文本和待办。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 {{appVersion}} · 构建 {{buildVersion}} · 使用本地 Rust 文档引擎。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
+    <div v-if="help" class="modal-backdrop" @click.self="help=false" @keydown.esc.stop.prevent="help=false"><section ref="helpDialog" class="modal help-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>提供中文文字排版、表格与公式、数据分析、幻灯片编排及 PDF 导出。文字、表格、演示与 PDF 均使用本地 Rust 文档引擎。支持 DOCX、XLSX、CSV、TSV、PPTX、POTX 与 PPSX；模板与放映文稿另存为 PPTX。旧 DOC、RTF、ODT、XLS、ODS、PPT 与 ODP 请先转换为支持的格式。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持 PDF 阅读、文字编辑、批注、页面整理与书签导航。编辑、排版和保存均由本地 Rust 引擎处理。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件可能使原签名失效，请先核对签名状态。演示文稿支持幻灯片编排、对象编辑、备注与放映。复杂转场、动画、SmartArt 与媒体兼容性请以导出结果为准。复杂文档的兼容性仍需逐步完善：复杂排版、最新函数、宏与插件仍有差异。请检查导出结果；宏不自动执行。</p><p class="help-note"><strong>永久本地范围：</strong>不提供账户、云盘、云协作或云 AI，也不将这些服务列入后续功能计划。安装包内的编辑引擎在本机处理文档。</p><p class="help-note"><strong>原文件与自动保存：</strong>打开本机文件后直接编辑，保存会写回原路径；另存为和格式转换才会创建新文件。自动保存开关位于保存按钮旁，每 30 秒保存当前文件，并显示倒计时；输入或弹窗操作未完成时暂缓。新建文件请先选择保存位置。笔记本使用本地 .oonote 格式，支持分区、页面、富文本和待办。画布支持图形、连线、手绘与模板；代码图表支持源码实时预览和风格切换。两者以 .owflow 保存完整编辑内容，也可导出 SVG 和 PNG。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 {{appVersion}} · 构建 {{buildVersion}} · 使用本地 Rust 文档引擎。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
   </div>
 </template>
 
 <style scoped>
 .editor-stage { display:flex; flex:1; min-width:0; min-height:0; position:relative; }
 .template-panel { flex:none; border-left:1px solid var(--ui-line); }
-.global-file-actions .templates-active { color:var(--ui-accent); background:var(--ui-accent-soft); }
 .template-dialog { width:min(480px,100%); max-height:calc(100dvh - 40px); overflow:auto; }
 .template-dialog-summary { display:flex; align-items:center; gap:14px; margin:20px 0 15px; padding:12px; border:1px solid var(--ui-line); border-radius:var(--ui-radius); }
 .template-dialog-summary img { width:128px; aspect-ratio:16/9; object-fit:contain; border-radius:4px; border:1px solid var(--ui-line); }
@@ -1164,7 +1292,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 .template-dialog-summary span { display:block; margin-top:6px; color:var(--ui-muted); font-size:12px; }
 .template-dialog .template-dialog-notice { color:var(--ui-warning); }
 .template-dialog .template-dialog-error { color:var(--ui-danger); }
-@media(max-width:900px) { .template-panel { position:absolute; right:0; top:0; bottom:0; width:min(300px,100%); z-index:10; box-shadow:-5px 0 20px #18213618; } }
+@media(max-width:900px) { .template-panel { position:absolute; right:0; top:28px; bottom:0; height:auto; width:min(300px,100%); z-index:10; box-shadow:-5px 0 20px #18213618; } }
 .tab-strip { display:flex; flex:none; min-width:0; height:40px; overflow:hidden; background:var(--ui-surface-muted); border-bottom:1px solid var(--ui-line); }
 .tab-strip .home-tab { border-right:1px solid var(--ui-line); }
 .tab-strip .new-tab { border-left:1px solid var(--ui-line); }
@@ -1182,7 +1310,8 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 .create-card.note { --accent:#8965bb; --pale:color-mix(in srgb,#8965bb 12%,var(--ui-surface)); }
 .file-icon.note { color:#8965bb; background:color-mix(in srgb,#8965bb 12%,var(--ui-surface)); }
 @media(max-width:600px) { .close-all-tabs { padding:0 9px; } .close-all-tabs span { display:none; } }
-@media(max-width:900px) { .autosave-toggle { width:38px!important; padding:4px!important; flex:none; } .autosave-label { display:none; } }
+@media(max-width:900px) { .autosave-toggle { width:auto!important; min-width:38px; padding:4px!important; flex:none; } .autosave-label { display:none; } }
+.autosave-countdown{font-size:11px;font-variant-numeric:tabular-nums;min-width:30px;color:var(--ui-accent)}
 .autosave-toggle{display:inline-flex;gap:6px!important;align-items:center;white-space:nowrap}.autosave-track{width:25px;height:15px;border-radius:12px;background:var(--ui-line-strong);padding:2px;display:inline-flex;align-items:center}.autosave-track i{width:11px;height:11px;border-radius:50%;background:white;box-shadow:0 1px 3px #0002;transition:transform .15s}.autosave-track.enabled{background:var(--ui-accent)}.autosave-track.enabled i{transform:translateX(10px)}
 
 .save-format-dialog { width: min(480px, 100%); }

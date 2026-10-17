@@ -133,6 +133,32 @@ mod tests {
         Entry::new("Presentation.pptx", &[], 1, Services::default()).unwrap()
     }
     #[test]
+    fn template_panel_metadata_preserves_save_receipts_and_ime_drafts() {
+        let mut entry = Entry::new("Presentation.pptx", &[], 1, Services { embedded_editor: true, ..Services::default() }).unwrap();
+        let clean = entry.snapshot("one", None).unwrap();
+        for open in [true, false] {
+            entry.app.run("host.setTemplatePanelOpen", json!({"open":open})).unwrap();
+            assert_eq!(entry.snapshot("one", None).unwrap(), clean);
+        }
+        assert!(entry.mark_saved(1.0, clean["revision"].as_f64().unwrap()).unwrap());
+        let id = entry.app.run("insert.textBox", json!({"text":""})).unwrap()["id"].clone();
+        entry.app.run("text.edit", json!({"id":id})).unwrap();
+        entry.app.run("text.compose", json!({"text":"演"})).unwrap();
+        let composing = entry.snapshot("one", None).unwrap();
+        let draft = entry.app.embedding_draft();
+        let document = entry.app.session.doc().unwrap().doc.clone();
+        for open in [true, false] {
+            entry.app.run("host.setTemplatePanelOpen", json!({"open":open})).unwrap();
+            assert_eq!(entry.snapshot("one", None).unwrap(), composing);
+            assert_eq!(entry.app.embedding_draft(), draft);
+            assert!(entry.app.has_pending_input());
+            assert!(Arc::ptr_eq(&document, &entry.app.session.doc().unwrap().doc));
+        }
+        assert!(entry.app.run("host.setTemplatePanelOpen", json!({"open":"true"})).is_err());
+        assert_eq!(entry.snapshot("one", None).unwrap(), composing);
+        assert!(entry.export("pptx").is_err(), "panel state updates cannot silently finish composition");
+    }
+    #[test]
     fn every_new_document_starts_with_the_clean_three_slide_template() {
         for name in ["演示文稿.pptx", "演示文稿.potx", "演示文稿.ppsx"] {
             let mut entry = Entry::new(name, &[], 1, Services::default()).unwrap();

@@ -8,6 +8,7 @@ import * as vue from 'vue'
 import { baseParse } from '@vue/compiler-dom'
 import { zipSync, strToU8 } from 'fflate'
 import { createId } from '../src/shared/id.ts'
+import * as workflowFiles from '../src/workflow/core/files.ts'
 
 // Run the real App.vue setup logic with Vue's real reactivity. Editors and native
 // file dialogs are controlled doubles: these are shell-state regressions, not
@@ -39,7 +40,7 @@ function compile(source, require, extra = {}) {
 }
 
 
-function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], deckPrepareError, deckPrepare, deckWarnings = [], presentationSmokeError, presentationSmokeReport, presentationSmokeRun, sheetSmokeError, sheetSmokeReport, sheetSmokeRun, pdfPrepareError, pdfPrepare, pdfWarnings = [], pdfSmokeError, pdfSmokeReport, notebookSmokeError, notebookSmokeReport, notebookSmokeRun, workspaceSmokeError, workspaceSmokeReport, storedAppearance, storedAutosave, systemDark = false, storageUnavailable = false, browserUrl = 'http://127.0.0.1/', browserFetch, notebookDecodeError} = {}) {
+function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], deckPrepareError, deckPrepare, deckWarnings = [], presentationSmokeError, presentationSmokeReport, presentationSmokeRun, sheetSmokeError, sheetSmokeReport, sheetSmokeRun, pdfPrepareError, pdfPrepare, pdfWarnings = [], pdfSmokeError, pdfSmokeReport, notebookSmokeError, notebookSmokeReport, notebookSmokeRun, workflowSmokeError, workflowSmokeReport, workflowSmokeRun, workspaceSmokeError, workspaceSmokeReport, storedAppearance, storedAutosave, systemDark = false, storageUnavailable = false, browserUrl = 'http://127.0.0.1/', browserFetch, notebookDecodeError} = {}) {
   const rustPreparations = [], sheetPreparations = [], deckPreparations = [], pdfPreparations = []
   const calls = [], mounted = [], beforeUnmount = [], observers = [], native = {
     isTauri: () => nativeEnabled,
@@ -134,6 +135,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     if (name === './native') return native
     if (name === './smoke') return {smokeRequested:()=>smoke,smokeStage(){},smokeFeatures:()=>({}),smokeFailure:async(error,phase)=>{calls.push(['smoke-failure',phase,String(error)])},smokeAwait:async(_phase,action)=>action()}
     if (name === './shared/document') return helpers
+    if (name === './workflow/core/files') return workflowFiles
     if (name === './shared/id') return { createId }
     if (name === './shared/dialog-focus') return focus
     if (name === './shared/appearance') return appearance
@@ -199,6 +201,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     if (name === './word/rust/office-word-native-smoke') return {async runOfficeWordNativeSmoke(adapter){calls.push(['office-word-native-smoke']);if(wordSmokeError)throw Error(wordSmokeError);if(wordSmokeRun)return wordSmokeRun(adapter);return wordSmokeReport??{schemaVersion:1,ok:true,engine:'office-word-wasm'}}}
     if (name === './sheet/rust/office-sheet-native-smoke') return {async runOfficeSheetNativeSmoke(adapter){calls.push(['office-sheet-native-smoke']);if(sheetSmokeError)throw Error(sheetSmokeError);if(sheetSmokeRun)return sheetSmokeRun(adapter);return sheetSmokeReport??{schemaVersion:1,ok:true,engine:'office-sheet-wasm',reopenedXlsxBase64:'native-sheet-reopened'}}}
     if (name === './notes/native-smoke') return {async runNotebookNativeSmoke(...args){assert.equal(args.length,1);const [adapter]=args;calls.push(['notebook-native-smoke']);for(const method of ['open','bindTemporaryFile','state','autosaveEnabled','setAutosave','observeNativeSaves','close'])assert.equal(typeof adapter[method],'function');if(notebookSmokeError)throw Error(notebookSmokeError);if(notebookSmokeRun)return notebookSmokeRun(adapter);return notebookSmokeReport??{schemaVersion:1,kind:'notebook-native',ok:true}}}
+    if (name === './workflow/native-smoke') return {async runWorkflowNativeSmoke(...args){assert.equal(args.length,1);const [adapter]=args;calls.push(['workflow-native-smoke']);for(const method of ['open','bindTemporaryFile','state','autosaveEnabled','setAutosave','observeNativeSaves','close'])assert.equal(typeof adapter[method],'function');if(workflowSmokeError)throw Error(workflowSmokeError);if(workflowSmokeRun)return workflowSmokeRun(adapter);return workflowSmokeReport??{schemaVersion:1,kind:'workflow-native',ok:true}}}
     if (name === './shared/workspace-native-smoke') return {async runWorkspaceNativeSmoke(...args){assert.equal(args.length,1);const [adapter]=args;calls.push(['workspace-native-smoke']);assert.equal(typeof adapter.observeNativeSaves,'function');if(workspaceSmokeError)throw Error(workspaceSmokeError);return workspaceSmokeReport??{schemaVersion:1,kind:'workspace-native',ok:true}}}
     if (name === '@tauri-apps/api/core') return { invoke: async (command,args) => { calls.push(['invoke',command,args]) } }
     if (name.endsWith('.vue')) return {}
@@ -786,7 +789,9 @@ test('saving or exporting passes every other open file capability to the native 
     assert.equal(await h.state.saveActive(true,'pdf'),true)
     const requests=h.calls.filter(call=>call[0]==='save').map(call=>call[1])
     assert.equal(requests.length,2)
-    for(const request of requests)assert.deepEqual(Array.from(request.protectedDocumentIds),[other.fileId])
+    assert.deepEqual(Array.from(requests[0].protectedDocumentIds),[other.fileId])
+    // An exported copy must also protect its editable source from overwrite.
+    assert.deepEqual(Array.from(requests[1].protectedDocumentIds),[current.fileId,other.fileId])
     assert.equal(requests[0].documentId,'current-file');assert.equal(requests[1].documentId,undefined)
     assert.equal(h.state.tabs.value.length,3);assert.equal(other.fileId,'other-file')
   } finally {h.unmount()}
@@ -1587,14 +1592,15 @@ test('F5 starts the active presentation once and native close stops it before th
   assert.ok(!h.calls.some(call=>call[0]==='close'));h.unmount()
 })
 
-test('full native smoke requires four Rust editors, notebook and actual workspace persistence gates',async()=>{
+test('full native smoke requires four Rust editors, notebook, workflows and actual workspace persistence gates',async()=>{
   const h=shell({smoke:true});h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'})
   await h.mount()
   const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
   assert.equal(report.ok,true);assert.equal(report.word.ok,true);assert.equal(report.sheet.ok,true);assert.equal(report.presentation.ok,true)
-  assert.equal(report.pdf.reopened,true);assert.equal(report.pdf.removedOldText,true);assert.equal(report.pdf.newTextPresent,true);assert.equal(report.notebook.ok,true);assert.equal(report.workspace.ok,true)
-  assert.deepEqual(h.calls.filter(call=>call[0].endsWith('-native-smoke')).map(call=>call[0]),['office-word-native-smoke','office-sheet-native-smoke','office-presentation-native-smoke','pdf-native-smoke','notebook-native-smoke','workspace-native-smoke'])
+  assert.equal(report.pdf.reopened,true);assert.equal(report.pdf.removedOldText,true);assert.equal(report.pdf.newTextPresent,true);assert.equal(report.notebook.ok,true);assert.equal(report.workflow.ok,true);assert.equal(report.workspace.ok,true)
+  assert.deepEqual(h.calls.filter(call=>call[0].endsWith('-native-smoke')).map(call=>call[0]),['office-word-native-smoke','office-sheet-native-smoke','office-presentation-native-smoke','pdf-native-smoke','notebook-native-smoke','workflow-native-smoke','workspace-native-smoke'])
   assert.equal(h.calls.filter(call=>call[0]==='notebook-native-smoke').length,1)
+  assert.equal(h.calls.filter(call=>call[0]==='workflow-native-smoke').length,1)
   assert.equal(h.calls.filter(call=>call[0]==='workspace-native-smoke').length,1)
   assert.equal(report.pdf.engine,'office-pdf-wasm')
   for(const old of ['office','independentWordPackage','rustWordEngine','wordWorkbench','sheetWorkbench','presentationWorkbench'])assert.equal(Object.hasOwn(report,old),false)
@@ -1608,6 +1614,7 @@ test('full native smoke waits for notebook verification before shared workspace 
   const mounted=h.mount()
   await entered
   assert.equal(h.calls.some(call=>call[0]==='notebook-native-smoke'),true)
+  assert.equal(h.calls.some(call=>call[0]==='workflow-native-smoke'),false)
   assert.equal(h.calls.some(call=>call[0]==='workspace-native-smoke'),false)
   assert.equal(h.calls.some(call=>call[0]==='invoke'&&call[1]==='smoke_report'),false)
   finishNotebook({ok:true,kind:'notebook-native'});await mounted
@@ -1625,6 +1632,39 @@ for(const mode of ['report','throw','cleanup','missing'])test(`failed notebook $
   assert.equal(report.ok,false);assert.match(report.error,mode==='missing'?/Native notebook verification failed/:/Controlled notebook failure/)
   for(const engine of ['word','sheet','presentation','pdf'])assert.equal(report[engine].ok,true)
   assert.equal(h.calls.filter(call=>call[0]==='notebook-native-smoke').length,1)
+  assert.equal(h.calls.some(call=>call[0]==='workflow-native-smoke'),false)
+  assert.equal(Object.hasOwn(report,'workflow'),false)
+  assert.equal(h.calls.some(call=>call[0]==='workspace-native-smoke'),false)
+  assert.equal(Object.hasOwn(report,'workspace'),false)
+  h.unmount()
+})
+
+test('full native smoke waits for both workflow editors before shared workspace cleanup',async()=>{
+  let finishWorkflow,started
+  const waiting=new Promise(resolve=>{finishWorkflow=resolve}),entered=new Promise(resolve=>{started=resolve})
+  const h=shell({smoke:true,workflowSmokeRun:()=>{started();return waiting}});h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'})
+  const mounted=h.mount()
+  await entered
+  assert.equal(h.calls.some(call=>call[0]==='notebook-native-smoke'),true)
+  assert.equal(h.calls.some(call=>call[0]==='workflow-native-smoke'),true)
+  assert.equal(h.calls.some(call=>call[0]==='workspace-native-smoke'),false)
+  assert.equal(h.calls.some(call=>call[0]==='invoke'&&call[1]==='smoke_report'),false)
+  finishWorkflow({ok:true,kind:'workflow-native'});await mounted
+  assert.equal(h.calls.filter(call=>call[0]==='workspace-native-smoke').length,1)
+  const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
+  assert.equal(report.ok,true);assert.equal(report.workflow.ok,true)
+  h.unmount()
+})
+
+for(const mode of ['report','throw','cleanup','missing'])test(`failed workflow ${mode} prevents native success and subsequent workspace verification`,async()=>{
+  const failure='Controlled workflow failure'
+  const options=mode==='throw'?{workflowSmokeError:failure}:mode==='cleanup'?{workflowSmokeReport:{ok:false,cleanupError:failure}}:
+    mode==='missing'?{workflowSmokeReport:{}}:{workflowSmokeReport:{ok:false,error:failure}}
+  const h=shell({smoke:true,...options});h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'});await h.mount()
+  const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
+  assert.equal(report.ok,false);assert.match(report.error,mode==='missing'?/Native workflow verification failed/:/Controlled workflow failure/)
+  for(const engine of ['word','sheet','presentation','pdf','notebook'])assert.equal(report[engine].ok,true)
+  assert.equal(h.calls.filter(call=>call[0]==='workflow-native-smoke').length,1)
   assert.equal(h.calls.some(call=>call[0]==='workspace-native-smoke'),false)
   assert.equal(Object.hasOwn(report,'workspace'),false)
   h.unmount()
@@ -1635,7 +1675,7 @@ for(const mode of ['report','throw'])test(`failed workspace ${mode} prevents a f
   h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'});await h.mount()
   const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
   assert.equal(report.ok,false);assert.match(report.error,/Controlled workspace failure/)
-  assert.equal(report.word.ok,true);assert.equal(report.sheet.ok,true);assert.equal(report.presentation.ok,true);assert.equal(report.pdf.ok,true);assert.equal(report.notebook.ok,true)
+  assert.equal(report.word.ok,true);assert.equal(report.sheet.ok,true);assert.equal(report.presentation.ok,true);assert.equal(report.pdf.ok,true);assert.equal(report.notebook.ok,true);assert.equal(report.workflow.ok,true)
   assert.equal(h.calls.filter(call=>call[0]==='workspace-native-smoke').length,1)
   if(mode==='report')assert.equal(report.workspace.ok,false)
   h.unmount()

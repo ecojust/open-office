@@ -276,3 +276,125 @@ test('invalid timing configuration cannot start a hot retry loop', () => {
   }
   assert.throws(() => createAutosaveScheduler({ readState: () => editable(), save: async () => true, intervalMs: 30_000, maxBackoffMs: 1 }), RangeError)
 })
+
+test('countdown follows the existing deadline across edits and read-only inspections', async () => {
+  const clock = fakeClock(), state = editable(), calls = []
+  const scheduler = createAutosaveScheduler({ clock, readState: () => state,
+    async save() { calls.push(clock.now()); state.dirty = false; return true } })
+  assert.deepEqual(scheduler.inspectTiming(), { status: 'waiting', target: { key: 'tab-1', fileId: 'local-1' }, nextAttemptAt: 30_000, remainingMs: 30_000 })
+  for (let index = 0; index < 29; index++) {
+    await clock.advance(1_000)
+    scheduler.notify()
+    const timing = scheduler.inspectTiming()
+    assert.equal(timing.nextAttemptAt, 30_000)
+    assert.equal(timing.remainingMs, 30_000 - clock.now())
+    assert.equal(clock.pending, 1)
+  }
+  state.dirty = false
+  assert.deepEqual(scheduler.inspectTiming(), { status: 'idle' })
+  state.dirty = true
+  assert.equal(scheduler.inspectTiming().remainingMs, 1_000)
+  await clock.advance(1_000)
+  assert.deepEqual(calls, [30_000])
+  assert.deepEqual(scheduler.inspectTiming(), { status: 'idle' })
+  scheduler.dispose()
+  assert.deepEqual(scheduler.inspectTiming(), { status: 'disposed' })
+})
+
+test('countdown exposes due work without invoking a save or an error notification', () => {
+  let now = 0, calls = 0, errors = 0, timers = 0, unreadable = false
+  const state = editable()
+  const clock = { now: () => now, setTimeout() { timers++; return 1 }, clearTimeout() { timers-- } }
+  const scheduler = createAutosaveScheduler({ clock, readState() { if (unreadable) throw Error('不可读取'); return state },
+    async save() { calls++; return true }, onError() { errors++ } })
+  now = 30_000
+  assert.equal(scheduler.inspectTiming().status, 'due')
+  assert.equal(scheduler.inspectTiming().remainingMs, 0)
+  now = 30_700
+  assert.equal(scheduler.inspectTiming().remainingMs, 0)
+  unreadable = true
+  for (let index = 0; index < 20; index++) assert.deepEqual(scheduler.inspectTiming(), { status: 'idle' })
+  assert.equal(calls, 0); assert.equal(errors, 0); assert.equal(timers, 1)
+  scheduler.dispose()
+})
+
+test('countdown distinguishes typing deferral, unfinished drafts and a completed save', async () => {
+  const clock = fakeClock(), state = editable({ composing: true })
+  let draftPending = true
+  const scheduler = createAutosaveScheduler({ clock, readState: () => state,
+    async save() { if (draftPending) return 'deferred'; state.dirty = false; return true } })
+  assert.equal(scheduler.inspectTiming().status, 'waiting')
+  await clock.advance(30_000)
+  assert.deepEqual(scheduler.inspectTiming(), { status: 'deferred', target: { key: 'tab-1', fileId: 'local-1' }, nextAttemptAt: 31_200, remainingMs: 1_200 })
+  await clock.advance(500)
+  state.composing = false
+  assert.equal(scheduler.inspectTiming().remainingMs, 700)
+  await clock.advance(700)
+  assert.equal(scheduler.inspectTiming().status, 'deferred')
+  assert.equal(scheduler.inspectTiming().nextAttemptAt, 32_400)
+  state.key = 'tab-2'; state.fileId = 'local-2'
+  assert.equal(scheduler.inspectTiming().status, 'waiting', 'a deferral belongs to its original file')
+  state.key = 'tab-1'; state.fileId = 'local-1'; draftPending = false
+  await clock.advance(AUTOSAVE_DEFER_MS)
+  assert.deepEqual(scheduler.inspectTiming(), { status: 'idle' })
+  scheduler.dispose()
+})
+
+test('running timing retains the transaction target across tab and preference changes', async () => {
+  const clock = fakeClock(), state = editable(), pending = deferred()
+  const scheduler = createAutosaveScheduler({ clock, readState: () => state, save: () => pending.promise })
+  await clock.advance(30_000)
+  const timing = scheduler.inspectTiming()
+  assert.deepEqual(timing, { status: 'running', target: { key: 'tab-1', fileId: 'local-1' } })
+  assert.equal(Object.isFrozen(timing.target), true)
+  state.key = 'tab-2'; state.fileId = 'local-2'; state.enabled = false
+  scheduler.notify()
+  assert.deepEqual(scheduler.inspectTiming(), timing)
+  pending.resolve(true)
+  await settle()
+  assert.deepEqual(scheduler.inspectTiming(), { status: 'disabled' })
+  assert.equal(clock.pending, 0)
+  state.enabled = true
+  scheduler.notify()
+  assert.equal(scheduler.inspectTiming().nextAttemptAt, 60_000)
+  assert.deepEqual(scheduler.inspectTiming().target, { key: 'tab-2', fileId: 'local-2' })
+  scheduler.dispose()
+})
+
+test('retry countdown predicts the actual tick including non-aligned backoff caps and file changes', async () => {
+  const clock = fakeClock(), state = editable(), calls = []
+  const scheduler = createAutosaveScheduler({ clock, readState: () => state, maxBackoffMs: 45_000,
+    async save(target) { calls.push([clock.now(), target.fileId]); return false } })
+  await clock.advance(30_000)
+  assert.equal(scheduler.inspectTiming().status, 'retrying')
+  assert.equal(scheduler.inspectTiming().nextAttemptAt, 60_000)
+  await clock.advance(30_000)
+  // The second failure is eligible at 105s, but ticks occur at 90s and 120s.
+  assert.equal(scheduler.inspectTiming().nextAttemptAt, 120_000)
+  assert.equal(scheduler.inspectTiming().remainingMs, 60_000)
+  state.key = 'tab-2'; state.fileId = 'local-2'
+  assert.equal(scheduler.inspectTiming().status, 'waiting')
+  assert.equal(scheduler.inspectTiming().nextAttemptAt, 90_000)
+  state.key = 'tab-1'; state.fileId = 'local-1'
+  await clock.advance(30_000)
+  assert.equal(scheduler.inspectTiming().nextAttemptAt, 120_000)
+  assert.equal(scheduler.inspectTiming().remainingMs, 30_000)
+  await clock.advance(30_000)
+  assert.deepEqual(calls, [[30_000, 'local-1'], [60_000, 'local-1'], [120_000, 'local-1']])
+  scheduler.dispose()
+})
+
+test('ineligible or disabled documents expose no misleading automatic-save countdown', () => {
+  const clock = fakeClock(), state = editable()
+  const scheduler = createAutosaveScheduler({ clock, readState: () => state, save: async () => true })
+  for (const overrides of [{ dirty: false }, { native: false }, { ready: false }, { fileId: undefined }, { requiresSaveAs: true }, { canSaveDirectly: false }]) {
+    Object.assign(state, editable(), overrides)
+    assert.deepEqual(scheduler.inspectTiming(), { status: 'idle' })
+    assert.equal(clock.pending, 1)
+  }
+  Object.assign(state, editable({ enabled: false }))
+  assert.deepEqual(scheduler.inspectTiming(), { status: 'disabled' })
+  scheduler.notify()
+  assert.equal(clock.pending, 0)
+  scheduler.dispose()
+})

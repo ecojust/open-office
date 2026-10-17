@@ -10,13 +10,14 @@ import { pdfReport } from './helpers/pdf-smoke-report.mjs';
 import { presentationReport } from './helpers/office-presentation-smoke-report.mjs';
 import { workspaceReport } from './helpers/workspace-smoke-report.mjs';
 import { notebookReport } from './helpers/notebook-smoke-report.mjs';
+import { workflowReport } from './helpers/workflow-smoke-report.mjs';
 
 function completeReport() {
   return {
     ok: true, crossOriginIsolated: true, sharedArrayBuffer: true,
     userAgent: 'Native WebView contract test',
     word: wordReport(), sheet: sheetReport(), presentation: presentationReport(),
-    pdf: pdfReport(), workspace: workspaceReport(), notebook: notebookReport(),
+    pdf: pdfReport(), workspace: workspaceReport(), notebook: notebookReport(), workflow: workflowReport(),
   };
 }
 
@@ -67,6 +68,8 @@ test('release evidence requires four Rust canvases, PDF text replacement, and na
     'pdfOriginalTextReplacementRoundTrip', 'pdfDefaultCanvas', 'pdfUndoRedo', 'pdfFailureAtomicity', 'pdfSessionCleanup', 'crossOriginIsolated',
     'workspaceLocalAutosave', 'workspaceSavedFileReadback', 'workspaceSessionCleanup',
     'notebookDomInput', 'notebookSavedFileReadback', 'notebookSessionCleanup',
+    'canvasDomInput', 'canvasSavedFileReadback', 'canvasSessionCleanup',
+    'diagramDomInput', 'diagramSavedFileReadback', 'diagramSessionCleanup',
   ]) assert.equal(checks[required], true);
   assert.equal(Object.hasOwn(checks, 'sharedArrayBuffer'), false);
 });
@@ -75,6 +78,17 @@ test('successful four-engine and autosave evidence cannot substitute for native 
   for (const notebook of [undefined, null, {}, { ok: true, transport: 'browser' }]) {
     const report = completeReport(); report.notebook = notebook;
     assert.throws(() => validateFrontendReport(report), /Native notebook/);
+  }
+});
+
+test('other editors cannot substitute for native canvas and code diagram acceptance', () => {
+  for (const workflow of [undefined, null, {}, { ok: true, transport: 'browser' }]) {
+    const report = completeReport(); report.workflow = workflow;
+    assert.throws(() => validateFrontendReport(report), /Native workflow/);
+  }
+  for (const index of [0, 1]) {
+    const report = completeReport(); report.workflow.documents.splice(index, 1);
+    assert.throws(() => validateFrontendReport(report), /Native workflow/);
   }
 });
 

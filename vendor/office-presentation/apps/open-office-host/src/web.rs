@@ -66,6 +66,7 @@ fn json_string(value: &Value) -> Result<String, JsValue> {
 fn host_action(id: &str) -> Option<&'static str> {
     match id {
         "host.pasteClipboard" => Some("pasteClipboard"),
+        "host.toggleTemplates" => Some("toggleTemplates"),
         "file.new" => Some("new"),
         "file.open" | "ui.openFileDialog" | "app.openDialog" | "app.home" => Some("open"),
         "file.save" => Some("save"),

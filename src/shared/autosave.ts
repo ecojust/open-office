@@ -47,12 +47,23 @@ export interface AutosaveOptions {
   clock?: AutosaveClock
 }
 
+export interface AutosaveTiming {
+  readonly status: 'disabled' | 'idle' | 'waiting' | 'due' | 'deferred' | 'retrying' | 'running' | 'disposed'
+  /** The captured save target, including while another tab becomes active. */
+  readonly target?: AutosaveTarget
+  /** Earliest attempt on the existing timer cadence, including file backoff. */
+  readonly nextAttemptAt?: number
+  readonly remainingMs?: number
+}
+
 export interface AutosaveScheduler {
   /** Call after preference changes. Other state is also checked at each tick. */
   notify(): void
   /** Stops future work; an already started shell transaction is not cancelled. */
   dispose(): void
   readonly running: boolean
+  /** Read-only UI snapshot; polling never schedules work or postpones a tick. */
+  inspectTiming(): AutosaveTiming
 }
 
 const defaultClock: AutosaveClock = {
@@ -84,7 +95,10 @@ export function createAutosaveScheduler(options: AutosaveOptions): AutosaveSched
   const retries = new Map<string, { failures: number; notBefore: number }>()
   let timer: unknown
   let scheduled = false
+  let scheduledAt: number | undefined
   let running = false
+  let runningTarget: AutosaveTarget | undefined
+  let deferredId: string | undefined
   let disposed = false
 
   function report(error: unknown, target: AutosaveTarget | undefined, retryInMs: number) {
@@ -101,7 +115,27 @@ export function createAutosaveScheduler(options: AutosaveOptions): AutosaveSched
   function cancelTimer() {
     if (scheduled) clock.clearTimeout(timer)
     scheduled = false
+    scheduledAt = undefined
+    deferredId = undefined
     timer = undefined
+  }
+
+  function inspectTiming(): AutosaveTiming {
+    if (disposed) return { status: 'disposed' }
+    if (running) return { status: 'running', target: runningTarget }
+    let state: AutosaveState | undefined
+    // Inspecting the countdown must not trigger error callbacks or new timers.
+    try { state = options.readState() } catch { return { status: 'idle' } }
+    if (state.enabled === false) return { status: 'disabled' }
+    const target = eligibleTarget(state, true)
+    if (!target || !scheduled || scheduledAt === undefined) return { status: 'idle' }
+    const id = JSON.stringify([target.key, target.fileId]), retry = retries.get(id)
+    // Retry eligibility is checked at periodic ticks. With a custom backoff cap,
+    // its deadline may fall between ticks; show the actual following attempt.
+    const nextAttemptAt = scheduledAt + Math.max(0, Math.ceil(((retry?.notBefore ?? 0) - scheduledAt) / intervalMs)) * intervalMs
+    const remainingMs = Math.max(0, nextAttemptAt - clock.now())
+    const status = deferredId === id ? 'deferred' : retry ? 'retrying' : remainingMs === 0 ? 'due' : 'waiting'
+    return { status, target, nextAttemptAt, remainingMs }
   }
 
   function notify(delay = intervalMs) {
@@ -113,8 +147,10 @@ export function createAutosaveScheduler(options: AutosaveOptions): AutosaveSched
     // Poll transient busy/IME/modal states without requiring a renderer watcher
     // for every state transition. Notifications never postpone a pending tick.
     scheduled = true
+    scheduledAt = clock.now() + delay
     timer = clock.setTimeout(() => {
       scheduled = false
+      scheduledAt = undefined
       timer = undefined
       void attempt()
     }, delay)
@@ -127,10 +163,17 @@ export function createAutosaveScheduler(options: AutosaveOptions): AutosaveSched
     if (disposed) return
     // Once due, a short typing burst or dialog must not cost another full
     // interval. Keep drafts intact and retry as soon as the editor is ready.
-    if (!target) { notify(state && eligibleTarget(state, true) ? Math.min(intervalMs, AUTOSAVE_DEFER_MS) : intervalMs); return }
+    if (!target) {
+      const blocked = state && eligibleTarget(state, true)
+      deferredId = blocked && JSON.stringify([blocked.key, blocked.fileId])
+      notify(blocked ? Math.min(intervalMs, AUTOSAVE_DEFER_MS) : intervalMs)
+      return
+    }
     const id = JSON.stringify([target.key, target.fileId])
+    deferredId = undefined
     if ((retries.get(id)?.notBefore ?? 0) > clock.now()) { notify(); return }
     running = true
+    runningTarget = target
     let deferred = false
     try {
       const result = await options.save(target)
@@ -146,6 +189,8 @@ export function createAutosaveScheduler(options: AutosaveOptions): AutosaveSched
       }
     } finally {
       running = false
+      runningTarget = undefined
+      deferredId = deferred ? id : undefined
       notify(deferred ? Math.min(intervalMs, AUTOSAVE_DEFER_MS) : intervalMs)
     }
   }
@@ -154,6 +199,7 @@ export function createAutosaveScheduler(options: AutosaveOptions): AutosaveSched
     notify,
     dispose() { disposed = true; cancelTimer(); retries.clear() },
     get running() { return running },
+    inspectTiming,
   }
   notify()
   return scheduler

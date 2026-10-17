@@ -29,7 +29,22 @@ const ENCODED_LIMIT: usize = ((DOCUMENT_LIMIT as usize + 2) / 3) * 4;
 const HISTORY_LIMIT: u64 = 2 * 1024 * 1024;
 const MAX_RECENT: usize = 100;
 const EXTENSIONS: &[&str] = &[
-    "docx", "xlsx", "csv", "tsv", "pptx", "potx", "ppsx", "pdf", "oonote",
+    "docx",
+    "xlsx",
+    "csv",
+    "tsv",
+    "pptx",
+    "potx",
+    "ppsx",
+    "pdf",
+    "oonote",
+    "owflow",
+    "mmd",
+    "mermaid",
+    "drawio",
+    "xml",
+    "excalidraw",
+    "json",
 ];
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -54,6 +69,15 @@ pub enum DocExt {
     Ppt,
     Pdf,
     Oonote,
+    Owflow,
+    Mmd,
+    Mermaid,
+    Drawio,
+    Xml,
+    Excalidraw,
+    Json,
+    Svg,
+    Png,
 }
 
 impl DocExt {
@@ -75,6 +99,15 @@ impl DocExt {
             Self::Ppt => "ppt",
             Self::Pdf => "pdf",
             Self::Oonote => "oonote",
+            Self::Owflow => "owflow",
+            Self::Mmd => "mmd",
+            Self::Mermaid => "mermaid",
+            Self::Drawio => "drawio",
+            Self::Xml => "xml",
+            Self::Excalidraw => "excalidraw",
+            Self::Json => "json",
+            Self::Svg => "svg",
+            Self::Png => "png",
         }
     }
 
@@ -93,7 +126,16 @@ impl DocExt {
             "ppsx" => Ok(Self::Ppsx),
             "pdf" => Ok(Self::Pdf),
             "oonote" => Ok(Self::Oonote),
-            _ => Err("请选择 DOCX、XLSX、CSV、TSV、PPTX、POTX、PPSX、PDF 或 OONOTE 文件；其他格式请先转换为受支持的格式。".into()),
+            "owflow" => Ok(Self::Owflow),
+            "mmd" => Ok(Self::Mmd),
+            "mermaid" => Ok(Self::Mermaid),
+            "drawio" => Ok(Self::Drawio),
+            "xml" => Ok(Self::Xml),
+            "excalidraw" => Ok(Self::Excalidraw),
+            "json" => Ok(Self::Json),
+            _ => {
+                Err("请选择受支持的办公文档、笔记本、画布或代码图表文件；其他格式请先转换。".into())
+            }
         }
     }
 
@@ -106,17 +148,35 @@ impl DocExt {
             }
             Self::Pdf => DocumentKind::Pdf,
             Self::Oonote => DocumentKind::Note,
+            Self::Mmd | Self::Mermaid => DocumentKind::Diagram,
+            Self::Owflow
+            | Self::Drawio
+            | Self::Xml
+            | Self::Excalidraw
+            | Self::Json
+            | Self::Svg
+            | Self::Png => DocumentKind::Canvas,
         }
     }
 
     fn ensure_exportable(self) -> Result<(), String> {
         if !matches!(
             self,
-            Self::Docx | Self::Xlsx | Self::Csv | Self::Tsv | Self::Pptx | Self::Pdf | Self::Oonote
+            Self::Docx
+                | Self::Xlsx
+                | Self::Csv
+                | Self::Tsv
+                | Self::Pptx
+                | Self::Pdf
+                | Self::Oonote
+                | Self::Owflow
+                | Self::Mmd
+                | Self::Drawio
+                | Self::Excalidraw
+                | Self::Svg
+                | Self::Png
         ) {
-            return Err(
-                "此格式不能直接保存。演示模板和放映文件请另存为 PPTX 副本，原文件将保留。".into(),
-            );
+            return Err("此格式不能直接保存，请另存为可编辑格式；原文件将保留。".into());
         }
         Ok(())
     }
@@ -130,6 +190,8 @@ pub enum DocumentKind {
     Presentation,
     Pdf,
     Note,
+    Canvas,
+    Diagram,
 }
 
 #[derive(Debug, Serialize)]
@@ -202,6 +264,9 @@ struct StoredDocument {
     id: String,
     path: PathBuf,
     extension: DocExt,
+    /// Older records have no kind; the extension remains a compatible fallback.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    kind: Option<DocumentKind>,
     sha256: String,
     last_opened_at: u64,
 }
@@ -359,7 +424,8 @@ impl DocumentStore {
         validate_document_signature(&bytes, extension)?;
         let hash = hash_bytes(&bytes);
         let mut records = self.records()?;
-        let record = upsert_record(&mut records, path, extension, hash.clone())?;
+        let kind = document_kind(&bytes, extension);
+        let record = upsert_record_with_kind(&mut records, path, extension, hash.clone(), kind)?;
         let name = file_name(&record.path)?;
         let staged_history = self.stage_history(&records)?;
         staged_history
@@ -370,7 +436,7 @@ impl DocumentStore {
             id: record.id,
             name,
             extension,
-            kind: extension.kind(),
+            kind,
             base64: STANDARD.encode(&bytes),
             sha256: hash,
             size_bytes: bytes.len() as u64,
@@ -388,13 +454,28 @@ impl DocumentStore {
         let _operation = self.begin_operation()?;
         if !matches!(
             extension,
-            DocExt::Docx | DocExt::Xlsx | DocExt::Pptx | DocExt::Pdf | DocExt::Oonote
+            DocExt::Docx
+                | DocExt::Xlsx
+                | DocExt::Pptx
+                | DocExt::Pdf
+                | DocExt::Oonote
+                | DocExt::Owflow
         ) {
             return Err("Native smoke requires an editable document format.".into());
         }
         let bytes = decode_document(encoded)?;
         validate_document_signature(&bytes, extension)?;
-        let path = directory.join(format!("native-workspace.{}", extension.as_str()));
+        // Both workflow editors share an extension, but must have independent
+        // smoke files. Derive the suffix from validated bytes, never a caller path.
+        let stem = if extension == DocExt::Owflow {
+            match document_kind(&bytes, extension) {
+                DocumentKind::Diagram => "native-workspace-diagram",
+                _ => "native-workspace-canvas",
+            }
+        } else {
+            "native-workspace"
+        };
+        let path = directory.join(format!("{stem}.{}", extension.as_str()));
         let mut file = fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -419,6 +500,17 @@ impl DocumentStore {
     ) -> Result<SaveResult, String> {
         if extension != record.extension {
             return Err("变更文档格式时必须使用另存为。".into());
+        }
+        if matches!(
+            record.extension,
+            DocExt::Mmd
+                | DocExt::Mermaid
+                | DocExt::Drawio
+                | DocExt::Xml
+                | DocExt::Excalidraw
+                | DocExt::Json
+        ) {
+            return Err("导入的图形文件请另存为可编辑文档或导出副本；原文件将保留。".into());
         }
         let Some(expected) = expected_sha256 else {
             return Ok(SaveResult::Conflict {
@@ -473,9 +565,40 @@ impl DocumentStore {
         bytes: Vec<u8>,
     ) -> Result<SaveResult, String> {
         extension.ensure_exportable()?;
-        let mut records = self.records()?;
         let hash = hash_bytes(&bytes);
-        let record = upsert_record(&mut records, snapshot.path.clone(), extension, hash.clone())?;
+        let kind = document_kind(&bytes, extension);
+        // Images are export copies, not editable document capabilities. Keep them
+        // out of recents and never replace an active document's registered identity.
+        if matches!(extension, DocExt::Svg | DocExt::Png) {
+            let name = file_name(&snapshot.path)?;
+            let staged = stage_bytes(&snapshot.path, &bytes, snapshot.permissions.clone())?;
+            let id = new_id()?;
+            match replace_if_unchanged(staged, &snapshot) {
+                Ok(()) => {}
+                Err(ReplaceError::Conflict(message)) => {
+                    return Ok(SaveResult::Conflict { message })
+                }
+                Err(ReplaceError::Io(message)) => return Err(message),
+            }
+            return Ok(SaveResult::Saved {
+                document: SavedDocument {
+                    id,
+                    name,
+                    extension,
+                    kind,
+                    sha256: hash,
+                    size_bytes: bytes.len() as u64,
+                },
+            });
+        }
+        let mut records = self.records()?;
+        let record = upsert_record_with_kind(
+            &mut records,
+            snapshot.path.clone(),
+            extension,
+            hash.clone(),
+            kind,
+        )?;
         let name = file_name(&record.path)?;
         // Stage and sync BOTH writes first. A full/read-only app-data directory must
         // not alter the user's document merely because history could not be saved.
@@ -501,7 +624,7 @@ impl DocumentStore {
                 id: record.id,
                 name,
                 extension,
-                kind: extension.kind(),
+                kind,
                 sha256: hash,
                 size_bytes: bytes.len() as u64,
             },
@@ -544,8 +667,19 @@ fn upsert_record(
     extension: DocExt,
     sha256: String,
 ) -> Result<StoredDocument, String> {
+    upsert_record_with_kind(records, path, extension, sha256, extension.kind())
+}
+
+fn upsert_record_with_kind(
+    records: &mut Vec<StoredDocument>,
+    path: PathBuf,
+    extension: DocExt,
+    sha256: String,
+    kind: DocumentKind,
+) -> Result<StoredDocument, String> {
     if let Some(record) = records.iter_mut().find(|record| record.path == path) {
         record.extension = extension;
+        record.kind = Some(kind);
         record.sha256 = sha256;
         record.last_opened_at = now_millis();
         return Ok(record.clone());
@@ -554,6 +688,7 @@ fn upsert_record(
         id: new_id()?,
         path,
         extension,
+        kind: Some(kind),
         sha256,
         last_opened_at: now_millis(),
     };
@@ -598,7 +733,12 @@ fn validate_file_name(name: &str, extension: DocExt) -> Result<(), String> {
         || (device.len() == 4
             && (device.starts_with("COM") || device.starts_with("LPT"))
             && matches!(device.as_bytes()[3], b'1'..=b'9'))
-        || DocExt::from_path(Path::new(name))? != extension
+        || !Path::new(name)
+            .extension()
+            .and_then(|value| value.to_str())
+            .is_some_and(|value| value.eq_ignore_ascii_case(extension.as_str()))
+        || (!EXTENSIONS.contains(&extension.as_str())
+            && !matches!(extension, DocExt::Svg | DocExt::Png))
     {
         return Err("文件名或扩展名与保存类型不一致。".into());
     }
@@ -633,12 +773,13 @@ fn valid_notebook(bytes: &[u8]) -> bool {
                 .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
     };
     let mut ids = std::collections::HashSet::new();
-    let valid_node =
-        |node: &serde_json::Value, titled: bool, ids: &mut std::collections::HashSet<String>| {
-            let Some(id) = node.get("id").and_then(|value| value.as_str()) else {
-                return false;
-            };
-            valid_id(id)
+    let valid_node = |node: &serde_json::Value,
+                      titled: bool,
+                      ids: &mut std::collections::HashSet<String>| {
+        let Some(id) = node.get("id").and_then(|value| value.as_str()) else {
+            return false;
+        };
+        valid_id(id)
                 && ids.insert(id.to_owned())
                 && (!titled
                     || node
@@ -650,7 +791,7 @@ fn valid_notebook(bytes: &[u8]) -> bool {
                                     matches!(character, '\u{0}'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}')
                                 })
                         }))
-        };
+    };
     if !valid_node(&notebook, true, &mut ids) {
         return false;
     }
@@ -708,13 +849,18 @@ fn valid_notebook(bytes: &[u8]) -> bool {
                         return false;
                     }
                     let geometry = |name: &str, minimum: f64| {
-                        region.get(name).and_then(|value| value.as_f64()).filter(|value| {
-                            value.is_finite() && *value >= minimum && *value <= 20000.0
-                        })
+                        region
+                            .get(name)
+                            .and_then(|value| value.as_f64())
+                            .filter(|value| {
+                                value.is_finite() && *value >= minimum && *value <= 20000.0
+                            })
                     };
-                    let (Some(x), Some(y), Some(width)) =
-                        (geometry("x", 0.0), geometry("y", 0.0), geometry("width", 80.0))
-                    else {
+                    let (Some(x), Some(y), Some(width)) = (
+                        geometry("x", 0.0),
+                        geometry("y", 0.0),
+                        geometry("width", 80.0),
+                    ) else {
                         return false;
                     };
                     let height = if region.get("height").is_some() {
@@ -728,7 +874,8 @@ fn valid_notebook(bytes: &[u8]) -> bool {
                     if x + width > 20000.0 || y + height > 20000.0 {
                         return false;
                     }
-                    let Some(blocks) = region.get("blocks").and_then(|value| value.as_array()) else {
+                    let Some(blocks) = region.get("blocks").and_then(|value| value.as_array())
+                    else {
                         return false;
                     };
                     if blocks.iter().any(|block| {
@@ -749,7 +896,9 @@ fn valid_notebook(bytes: &[u8]) -> bool {
                     if !valid_node(block, false, &mut ids)
                         || !matches!(
                             block.get("type").and_then(|value| value.as_str()),
-                            Some("paragraph" | "heading" | "bullet" | "numbered" | "todo" | "image")
+                            Some(
+                                "paragraph" | "heading" | "bullet" | "numbered" | "todo" | "image"
+                            )
                         )
                     {
                         return false;
@@ -775,6 +924,150 @@ fn valid_notebook(bytes: &[u8]) -> bool {
     true
 }
 
+/// Screen the shared editable envelope before the full scene parser runs.
+/// Persisted type/format tokens are retained for file compatibility.
+fn workflow_json(bytes: &[u8]) -> Option<serde_json::Value> {
+    if bytes.len() > 50 * 1024 * 1024 {
+        return None;
+    }
+    let text = std::str::from_utf8(bytes)
+        .ok()?
+        .trim_start_matches('\u{feff}');
+    serde_json::from_str(text).ok()
+}
+
+fn valid_workflow_header(value: &serde_json::Value) -> bool {
+    value.get("format").and_then(|v| v.as_str()) == Some("open-workflow")
+        && value.get("version").and_then(|v| v.as_u64()) == Some(1)
+        && matches!(
+            value.get("kind").and_then(|v| v.as_str()),
+            Some("flow" | "board" | "mermaid")
+        )
+        && value
+            .pointer("/scene/elements")
+            .and_then(|v| v.as_array())
+            .is_some_and(|v| v.len() <= 5000)
+        && value
+            .get("source")
+            .and_then(|v| v.as_str())
+            .is_some_and(|v| v.chars().count() <= 500_000)
+}
+
+fn valid_board_header(value: &serde_json::Value) -> bool {
+    value.get("type").and_then(|v| v.as_str()) == Some("excalidraw")
+        && value
+            .get("elements")
+            .and_then(|v| v.as_array())
+            .is_some_and(|v| v.len() <= 5000)
+}
+
+fn document_kind(bytes: &[u8], extension: DocExt) -> DocumentKind {
+    if matches!(extension, DocExt::Owflow | DocExt::Json)
+        && workflow_json(bytes).is_some_and(|value| {
+            valid_workflow_header(&value)
+                && value.get("kind").and_then(|v| v.as_str()) == Some("mermaid")
+        })
+    {
+        return DocumentKind::Diagram;
+    }
+    extension.kind()
+}
+
+fn plain_text(bytes: &[u8]) -> Option<&str> {
+    let text = std::str::from_utf8(bytes)
+        .ok()?
+        .trim_start_matches('\u{feff}');
+    (!text
+        .chars()
+        .any(|c| c.is_control() && !matches!(c, '\t' | '\r' | '\n')))
+    .then_some(text)
+}
+
+fn without_xml_prolog(mut text: &str) -> &str {
+    text = text.trim_start();
+    loop {
+        let closing = if text.starts_with("<?xml") {
+            "?>"
+        } else if text.starts_with("<!--") {
+            "-->"
+        } else {
+            return text;
+        };
+        let Some(end) = text.find(closing) else {
+            return "";
+        };
+        text = text[end + closing.len()..].trim_start();
+    }
+}
+
+fn has_xml_root(text: &str, roots: &[&str]) -> bool {
+    let root = without_xml_prolog(text);
+    roots.iter().any(|name| {
+        root.strip_prefix('<')
+            .and_then(|value| value.strip_prefix(name))
+            .and_then(|value| value.chars().next())
+            .is_some_and(|c| c.is_whitespace() || matches!(c, '/' | '>'))
+    })
+}
+
+fn valid_graph_header(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    !lower.contains("<!doctype")
+        && !lower.contains("<!entity")
+        && has_xml_root(text, &["mxfile", "mxGraphModel"])
+}
+
+fn valid_code_header(text: &str) -> bool {
+    let first = text
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty() && !line.starts_with("%%"))
+        .unwrap_or("");
+    [
+        "flowchart",
+        "graph",
+        "sequenceDiagram",
+        "classDiagram",
+        "stateDiagram",
+        "stateDiagram-v2",
+        "erDiagram",
+        "gitGraph",
+        "requirementDiagram",
+        "C4Context",
+        "architecture",
+        "architecture-beta",
+        "pie",
+        "gantt",
+        "xychart",
+        "xychart-beta",
+        "quadrantChart",
+        "sankey",
+        "sankey-beta",
+        "radar",
+        "radar-beta",
+        "treemap",
+        "treemap-beta",
+        "mindmap",
+        "timeline",
+        "journey",
+        "kanban",
+        "block",
+        "block-beta",
+        "packet",
+        "packet-beta",
+    ]
+    .iter()
+    .any(|header| {
+        first.strip_prefix(header).is_some_and(|tail| {
+            tail.is_empty()
+                || tail
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_whitespace() || matches!(c, ':' | ';'))
+        })
+    })
+}
+
 /// Screen the container header or notebook envelope before passing local bytes
 /// to the active editor. Each editor must still fully validate its document and
 /// refuse encrypted or damaged payloads.
@@ -795,6 +1088,18 @@ fn validate_document_signature(bytes: &[u8], extension: DocExt) -> Result<(), St
             .windows(5)
             .any(|window| window == b"%PDF-"),
         DocExt::Oonote => valid_notebook(bytes),
+        DocExt::Owflow => workflow_json(bytes).is_some_and(|value| valid_workflow_header(&value)),
+        DocExt::Json => workflow_json(bytes)
+            .is_some_and(|value| valid_workflow_header(&value) || valid_board_header(&value)),
+        DocExt::Excalidraw => workflow_json(bytes).is_some_and(|value| valid_board_header(&value)),
+        DocExt::Mmd | DocExt::Mermaid => plain_text(bytes).is_some_and(valid_code_header),
+        DocExt::Drawio | DocExt::Xml => plain_text(bytes).is_some_and(valid_graph_header),
+        DocExt::Svg => plain_text(bytes).is_some_and(|text| has_xml_root(text, &["svg"])),
+        DocExt::Png => {
+            bytes.len() >= 33
+                && bytes.starts_with(b"\x89PNG\r\n\x1a\n")
+                && &bytes[12..16] == b"IHDR"
+        }
         DocExt::Odt
         | DocExt::Doc
         | DocExt::Rtf
@@ -1093,7 +1398,7 @@ pub fn list_recent_documents(
                 name: file_name(&record.path)?,
                 id: record.id,
                 extension: record.extension,
-                kind: record.extension.kind(),
+                kind: record.kind.unwrap_or_else(|| record.extension.kind()),
                 last_opened_at: record.last_opened_at,
             })
         })
@@ -1200,6 +1505,216 @@ mod tests {
             }]),
         );
         notebook
+    }
+
+    fn workflow_fixture(kind: &str) -> Vec<u8> {
+        serde_json::to_vec(&serde_json::json!({
+            "format": "open-workflow", "version": 1, "kind": kind,
+            "scene": { "elements": [] }, "source": "flowchart TD\n A-->B"
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn workflow_file_kind_survives_save_reopen_and_recent_history() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let store = DocumentStore::new(data.clone()).unwrap();
+        for (kind, expected) in [
+            ("flow", DocumentKind::Canvas),
+            ("board", DocumentKind::Canvas),
+            ("mermaid", DocumentKind::Diagram),
+        ] {
+            let path = directory.path().join(format!("中文方案-{kind}.owflow"));
+            fs::write(&path, workflow_fixture(kind)).unwrap();
+            let opened = store.register_open(path.clone()).unwrap();
+            assert_eq!(opened.kind, expected);
+            let mut update: serde_json::Value =
+                serde_json::from_slice(&workflow_fixture(kind)).unwrap();
+            update["source"] = "flowchart TD\n B-->C".into();
+            let bytes = serde_json::to_vec(&update).unwrap();
+            validate_document_signature(&bytes, DocExt::Owflow).unwrap();
+            let saved = store
+                .save_existing(
+                    &store.record(&opened.id).unwrap(),
+                    DocExt::Owflow,
+                    Some(&opened.sha256),
+                    bytes.clone(),
+                )
+                .unwrap();
+            let SaveResult::Saved { document } = saved else {
+                panic!("expected saved file")
+            };
+            assert_eq!(document.id, opened.id);
+            assert_eq!(document.kind, expected);
+            assert_eq!(fs::read(&path).unwrap(), bytes);
+            assert_eq!(store.register_open(path).unwrap().kind, expected);
+            let restored = DocumentStore::new(data.clone()).unwrap();
+            assert_eq!(restored.record(&opened.id).unwrap().kind, Some(expected));
+        }
+        // Existing histories from before kind metadata remain readable.
+        let history_path = data.join("recent-files.json");
+        let mut history: serde_json::Value =
+            serde_json::from_slice(&fs::read(&history_path).unwrap()).unwrap();
+        for record in history["documents"].as_array_mut().unwrap() {
+            record.as_object_mut().unwrap().remove("kind");
+        }
+        fs::write(history_path, serde_json::to_vec(&history).unwrap()).unwrap();
+        assert_eq!(
+            DocumentStore::new(data).unwrap().records().unwrap().len(),
+            3
+        );
+    }
+
+    #[test]
+    fn workflow_text_imports_and_images_have_distinct_open_and_export_contracts() {
+        for (extension, bytes) in [
+            (DocExt::Mmd, "%% 中文\nflowchart TD\n A-->B".as_bytes()),
+            (DocExt::Mermaid, "sequenceDiagram\n A->>B: text".as_bytes()),
+            (
+                DocExt::Drawio,
+                b"<?xml version=\"1.0\"?><!-- document --><mxfile><diagram/></mxfile>".as_slice(),
+            ),
+            (
+                DocExt::Xml,
+                b"<mxGraphModel><root/></mxGraphModel>".as_slice(),
+            ),
+            (
+                DocExt::Excalidraw,
+                br#"{"type":"excalidraw","elements":[]}"#.as_slice(),
+            ),
+            (
+                DocExt::Json,
+                br#"{"type":"excalidraw","elements":[]}"#.as_slice(),
+            ),
+        ] {
+            validate_document_signature(bytes, extension).unwrap();
+            assert_eq!(
+                DocExt::from_path(Path::new(&format!(
+                    "中文.{}",
+                    extension.as_str().to_ascii_uppercase()
+                )))
+                .unwrap(),
+                extension
+            );
+            assert!(validate_document_signature(b"<html>renamed</html>", extension).is_err());
+        }
+        for extension in [DocExt::Drawio, DocExt::Xml] {
+            for bytes in [
+                b"<mxfileFake/>".as_slice(),
+                b"<!-- <mxfile/> -->".as_slice(),
+                b"<!DOCTYPE mxfile><mxfile/>".as_slice(),
+            ] {
+                assert!(validate_document_signature(bytes, extension).is_err());
+            }
+        }
+        for extension in [DocExt::Owflow, DocExt::Json] {
+            for bytes in [b"{}".as_slice(), b"[]".as_slice(), br#"{"format":"open-workflow","version":2,"kind":"flow","scene":{"elements":[]},"source":""}"#.as_slice()] {
+                assert!(validate_document_signature(bytes, extension).is_err());
+            }
+        }
+        for extension in [DocExt::Svg, DocExt::Png] {
+            assert!(!EXTENSIONS.contains(&extension.as_str()));
+            assert!(
+                DocExt::from_path(Path::new(&format!("image.{}", extension.as_str()))).is_err()
+            );
+            validate_file_name(&format!("图表导出.{}", extension.as_str()), extension).unwrap();
+            extension.ensure_exportable().unwrap();
+        }
+    }
+
+    #[test]
+    fn workflow_compatibility_imports_cannot_be_overwritten_by_direct_save() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        for (extension, original, replacement) in [
+            (
+                DocExt::Mmd,
+                b"flowchart TD\n A-->B".as_slice(),
+                b"flowchart TD\n B-->C".as_slice(),
+            ),
+            (
+                DocExt::Drawio,
+                b"<mxfile><diagram/></mxfile>".as_slice(),
+                b"<mxfile/>".as_slice(),
+            ),
+            (
+                DocExt::Excalidraw,
+                br#"{"type":"excalidraw","elements":[]}"#.as_slice(),
+                br#"{"type":"excalidraw","elements":[],"appState":{}}"#.as_slice(),
+            ),
+        ] {
+            let path = directory
+                .path()
+                .join(format!("导入.{}", extension.as_str()));
+            fs::write(&path, original).unwrap();
+            let opened = store.register_open(path.clone()).unwrap();
+            let record = store.record(&opened.id).unwrap();
+            assert!(store
+                .save_existing(
+                    &record,
+                    extension,
+                    Some(&opened.sha256),
+                    replacement.to_vec()
+                )
+                .is_err());
+            assert_eq!(fs::read(&path).unwrap(), original);
+            let copy = directory
+                .path()
+                .join(format!("导出副本.{}", extension.as_str()));
+            assert!(matches!(
+                store
+                    .save_to_target(
+                        TargetSnapshot::capture(copy.clone()).unwrap(),
+                        extension,
+                        replacement.to_vec()
+                    )
+                    .unwrap(),
+                SaveResult::Saved { .. }
+            ));
+            assert_eq!(fs::read(copy).unwrap(), replacement);
+        }
+    }
+
+    #[test]
+    fn workflow_image_exports_preserve_document_capabilities_and_recent_history() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let store = DocumentStore::new(data.clone()).unwrap();
+        let source = directory.path().join("架构.owflow");
+        let original = workflow_fixture("mermaid");
+        fs::write(&source, &original).unwrap();
+        let opened = store.register_open(source.clone()).unwrap();
+        let history = fs::read(data.join("recent-files.json")).unwrap();
+        let png = STANDARD.decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAarVyFEAAAAASUVORK5CYII=").unwrap();
+        for (extension, bytes) in [
+            (
+                DocExt::Svg,
+                b"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\"/>".to_vec(),
+            ),
+            (DocExt::Png, png),
+        ] {
+            validate_document_signature(&bytes, extension).unwrap();
+            let path = directory
+                .path()
+                .join(format!("展示副本.{}", extension.as_str()));
+            let saved = store
+                .save_to_target(
+                    TargetSnapshot::capture(path.clone()).unwrap(),
+                    extension,
+                    bytes.clone(),
+                )
+                .unwrap();
+            let SaveResult::Saved { document } = saved else {
+                panic!("expected image export")
+            };
+            assert_ne!(document.id, opened.id);
+            assert!(store.record(&document.id).is_err());
+            assert_eq!(fs::read(path).unwrap(), bytes);
+            assert_eq!(fs::read(&source).unwrap(), original);
+            assert_eq!(fs::read(data.join("recent-files.json")).unwrap(), history);
+            assert_eq!(store.records().unwrap().len(), 1);
+        }
     }
 
     #[test]
@@ -1510,7 +2025,9 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .remove("height");
-        assert!(!valid_notebook(&serde_json::to_vec(&missing_height).unwrap()));
+        assert!(!valid_notebook(
+            &serde_json::to_vec(&missing_height).unwrap()
+        ));
         image["sections"][0]["pages"][0]["regions"][0]["blocks"]
             .as_array_mut()
             .unwrap()
@@ -1559,7 +2076,9 @@ mod tests {
             .as_array_mut()
             .unwrap()
             .push(serde_json::json!({"id": "section-2", "title": "其他分区", "pages": [child]}));
-        assert!(!valid_notebook(&serde_json::to_vec(&cross_section).unwrap()));
+        assert!(!valid_notebook(
+            &serde_json::to_vec(&cross_section).unwrap()
+        ));
     }
 
     #[test]
@@ -1597,6 +2116,36 @@ mod tests {
             .create_smoke_document(directory.path(), DocExt::Potx, &encoded)
             .is_err());
         assert!(!directory.path().join("native-workspace.potx").exists());
+    }
+
+    #[test]
+    fn workflow_smoke_files_are_separate_and_cannot_overwrite_each_other() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = DocumentStore::new(directory.path().join("store")).unwrap();
+        let mut ids = Vec::new();
+        for (model_kind, kind, stem) in [
+            ("board", DocumentKind::Canvas, "canvas"),
+            ("mermaid", DocumentKind::Diagram, "diagram"),
+        ] {
+            let bytes = workflow_fixture(model_kind);
+            let encoded = STANDARD.encode(&bytes);
+            let opened = store
+                .create_smoke_document(directory.path(), DocExt::Owflow, &encoded)
+                .unwrap();
+            assert_eq!(opened.name, format!("native-workspace-{stem}.owflow"));
+            assert_eq!(opened.kind, kind);
+            assert_eq!(opened.base64, encoded);
+            assert_eq!(opened.sha256, hash_bytes(&bytes));
+            assert!(store
+                .create_smoke_document(directory.path(), DocExt::Owflow, &encoded)
+                .is_err());
+            assert_eq!(
+                fs::read(directory.path().join(&opened.name)).unwrap(),
+                bytes
+            );
+            ids.push(opened.id);
+        }
+        assert_ne!(ids[0], ids[1]);
     }
 
     #[test]

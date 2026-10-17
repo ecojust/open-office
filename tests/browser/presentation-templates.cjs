@@ -32,6 +32,41 @@ async function createPresentation() {
   await page.getByTestId('shell-new-presentation').click();
   await ready();
 }
+const ribbonState = () => page.evaluate(async () => {
+  const app = document.querySelector('#app').__vue_app__._instance.setupState;
+  return app.rustPresentationHandles.get(app.activeKey).query('ui.inspect');
+});
+async function waitForEditor(predicate, timeout = 20000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    // Evaluate and await the query before checking its result. Passing an async
+    // predicate to the page poller would make the Promise itself truthy.
+    const value = await page.evaluate(predicate);
+    if (value) return value;
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+  }
+  throw Error('Timed out waiting for the presentation renderer state');
+}
+async function toggleTemplates() {
+  const { ui, canvas } = await waitForEditor(async () => {
+    const app = document.querySelector('#app').__vue_app__._instance.setupState;
+    const ui = await app.rustPresentationHandles.get(app.activeKey).query('ui.inspect');
+    const canvas = document.querySelector('[data-testid="office-presentation-canvas"]').getBoundingClientRect();
+    // Vue changes the canvas width when the gallery opens. Wait for the actual
+    // Rust frame, and capture both coordinate systems together: another await
+    // between them could combine an old frame with a freshly resized DOM box.
+    if (ui.ribbonTabs.some(tab => tab.name === 'Templates') &&
+      Math.abs(ui.window[0] - canvas.width) < 1 && Math.abs(ui.window[1] - canvas.height) < 1) return { ui, canvas: canvas.toJSON() };
+    return false;
+  });
+  const tabs = ui.ribbonTabs;
+  const index = tabs.findIndex(tab => tab.name === 'Templates'), button = tabs[index], view = tabs[index - 1];
+  assert.equal(view.name, 'View'); assert.equal(button.label, '模板');
+  assert.ok(button.rect[0] >= view.rect[0] + view.rect[2]);
+  assert.equal(button.rect[1], view.rect[1]);
+  const [x, y, width, height] = button.rect;
+  await page.mouse.click(canvas.x + (x + width / 2) * canvas.width / ui.window[0], canvas.y + (y + height / 2) * canvas.height / ui.window[1]);
+}
 async function exportDeck(format) {
   return page.evaluate(async format => {
     const app = document.querySelector('#app').__vue_app__._instance.setupState;
@@ -55,9 +90,25 @@ async function exportDeck(format) {
     page.on('pageerror', error => report.errors.push(error.message));
     await page.goto(origin, { waitUntil: 'domcontentloaded' });
     await createPresentation();
+    page.setDefaultTimeout(20000);
+    console.log('Presentation ready for ribbon pointer checks');
     const baseline = await state();
-    await page.getByTestId('shell-presentation-templates').click();
+    assert.equal(await page.getByTestId('global-toolbar').getByRole('button', { name: '演示模板' }).count(), 0);
+    const beforeRibbon = await ribbonState();
+    await toggleTemplates();
+    await page.getByRole('complementary', { name: '演示模板' }).waitFor({ timeout: 15000 });
+    await page.locator('.presentation-template-card').nth(9).waitFor({ state: 'attached' });
+    const openedRibbon = await ribbonState();
+    assert.equal(openedRibbon.templatePanelOpen, true);
+    assert.equal(openedRibbon.ui.tab, beforeRibbon.ui.tab);
+    assert.equal((await state()).snapshot.revision, baseline.snapshot.revision);
+    assert.equal((await state()).dirty, baseline.dirty);
+    await toggleTemplates();
+    await page.getByRole('complementary', { name: '演示模板' }).waitFor({ state: 'hidden' });
+    assert.equal((await ribbonState()).templatePanelOpen, false);
+    await toggleTemplates();
     await page.locator('.presentation-template-card').nth(9).waitFor();
+    check('Templates is immediately after View in the PPT ribbon; toggling preserves active ribbon, content and dirty state');
     const manifest = JSON.parse(fs.readFileSync(path.join(root, 'public/presentation-templates/manifest.json')));
     assert.equal(manifest.length, 10); assert.equal(await page.locator('.presentation-template-card').count(), 10);
     check('10 built-in templates are reachable in the gallery');
@@ -129,14 +180,31 @@ async function exportDeck(format) {
     await page.locator('.presentation-templates-list').evaluate(el => { el.scrollTop = 0; });
     await page.screenshot({ path: path.join(output, 'gallery-light.png') });
     await page.setViewportSize({ width: 850, height: 780 });
-    const viewport = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth, panel: document.querySelector('.template-panel').getBoundingClientRect().toJSON() }));
+    const viewport = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth, panel: document.querySelector('.template-panel').getBoundingClientRect().toJSON(), stage: document.querySelector('.editor-stage').getBoundingClientRect().toJSON() }));
     assert.ok(viewport.scrollWidth <= viewport.width + 1); assert.ok(viewport.panel.right <= viewport.width + 1);
+    assert.ok(viewport.panel.bottom <= viewport.stage.bottom + 1);
     await page.screenshot({ path: path.join(output, 'gallery-narrow.png') });
+    await toggleTemplates();
+    await page.getByRole('complementary', { name: '演示模板' }).waitFor({ state: 'hidden' });
+    await toggleTemplates();
+    await page.getByRole('complementary', { name: '演示模板' }).waitFor({ state: 'visible' });
+    await page.getByRole('button', { name: '关闭模板栏', exact: true }).click();
+    assert.equal((await ribbonState()).templatePanelOpen, false);
+    await toggleTemplates();
     await page.setViewportSize({ width: 1600, height: 1000 });
-    check('Gallery and confirmation render in light/dark themes; narrow window has no horizontal page overflow');
+    check('Gallery and confirmation render in light/dark themes; narrow window keeps ribbon toggle accessible and panel close clears its indicator');
+    await page.getByTestId('shell-new').click();
+    await page.getByTestId('shell-new-note').click(); await ready();
+    assert.equal(await page.getByRole('complementary', { name: '演示模板' }).count(), 0);
+    assert.equal(await page.getByTestId('global-toolbar').getByRole('button', { name: '演示模板' }).count(), 0);
+    await page.locator('.tab-name').filter({ hasText: baseline.name }).click(); await ready();
+    await page.getByRole('complementary', { name: '演示模板' }).waitFor({ state: 'visible' });
+    assert.equal((await ribbonState()).templatePanelOpen, true);
+    assert.deepEqual((await state()).slides, saved.slides);
+    check('Switching to Note hides PPT templates; returning restores the panel and presentation contents');
     page.once('dialog', dialog => dialog.accept());
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await createPresentation(); await page.getByTestId('shell-presentation-templates').click();
+    await createPresentation(); await toggleTemplates();
     await page.getByTestId(`presentation-template-${customId}`).click(); await confirm();
     const restored = await state();
     assert.deepEqual(restored.slides.map(slide => slide.shapes.map(shape => shape.text).filter(Boolean)), saved.slides.map(slide => slide.shapes.map(shape => shape.text).filter(Boolean)));
@@ -148,8 +216,44 @@ async function exportDeck(format) {
     assert.equal(await page.getByTestId(`presentation-template-${customId}`).count(), 0);
     assert.deepEqual((await state()).slides, restored.slides);
     check('Deleting a custom template requires confirmation and does not alter the open presentation');
+    await page.getByRole('button', { name: '关闭模板栏', exact: true }).click();
+    const beforeDuplicate = await state(), thumbnailUi = await ribbonState();
+    const thumbWidth = thumbnailUi.ui.thumbsWidth ?? thumbnailUi.ui.thumbs_width ?? thumbnailUi.canvasRect[0];
+    const thumbHeight = (thumbWidth - 40) * 540 / 960;
+    const canvas = await page.getByTestId('office-presentation-canvas').boundingBox();
+    const thumbY = thumbnailUi.canvasRect[1] + 8 + (thumbHeight + 20) + (thumbHeight + 16) / 2;
+    await page.mouse.click(canvas.x + thumbWidth / 2 * canvas.width / thumbnailUi.window[0], canvas.y + thumbY * canvas.height / thumbnailUi.window[1]);
+    await waitForEditor(async () => {
+      const app = document.querySelector('#app').__vue_app__._instance.setupState;
+      return (await app.rustPresentationHandles.get(app.activeKey).inspect()).activeSlide === 1;
+    });
+    await page.keyboard.press('Enter');
+    await waitForEditor(async () => {
+      const app = document.querySelector('#app').__vue_app__._instance.setupState;
+      return (await app.rustPresentationHandles.get(app.activeKey).inspect()).slides.length === 4;
+    });
+    const duplicated = await state();
+    assert.equal(duplicated.snapshot.activeSlide, 2);
+    assert.notEqual(duplicated.slides[1].id, duplicated.slides[2].id);
+    const content = slide => slide.shapes.map(({ id, ...shape }) => shape);
+    assert.deepEqual(content(duplicated.slides[2]), content(beforeDuplicate.slides[1]));
+    assert.equal(duplicated.snapshot.slides[3].id, beforeDuplicate.snapshot.slides[2].id);
+    await page.getByRole('button', { name: '撤销', exact: true }).click(); await ready();
+    assert.deepEqual((await state()).slides, beforeDuplicate.slides);
+    check('Selecting the content thumbnail and pressing Enter duplicates its editable content immediately after it; one undo restores the deck');
     assert.deepEqual(report.errors, []); report.ok = true;
-  } catch (error) { report.error = error.stack; process.exitCode = 1; console.error(error); }
+  } catch (error) {
+    report.error = error.stack; process.exitCode = 1; console.error(error);
+    if (page) {
+      await page.screenshot({ path: path.join(output, 'failure.png') }).catch(() => {});
+      report.failureState = await page.evaluate(async () => {
+        const app = document.querySelector('#app')?.__vue_app__?._instance.setupState;
+        return { panel: app?.templatePanelOpen, error: app?.error, status: app?.status,
+          canvas: document.querySelector('[data-testid="office-presentation-canvas"]')?.getBoundingClientRect().toJSON(),
+          ui: await app?.rustPresentationHandles.get(app.activeKey)?.query('ui.inspect') };
+      }).catch(() => null);
+    }
+  }
   finally {
     fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
     await browser?.close(); await server?.close();

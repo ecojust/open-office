@@ -65,6 +65,7 @@ function harness(kind = 'presentation') {
         return JSON.stringify({ ok: true, result: { faces: 1 }, snapshot: JSON.parse(snapshot(id)) })
       }
       if (commandId === 'text.set') edit(id, value.text)
+      else if (commandId === 'host.setTemplatePanelOpen') doc.ui = { ...doc.ui, templatePanelOpen: value.open }
       else if (commandId === 'edit.undo' && doc.undo.length) { doc.redo.push(doc.text); doc.text = doc.undo.pop(); doc.revision++; doc.dirty = true; doc.canRedo = true }
       else if (commandId === 'edit.redo' && doc.redo.length) { doc.undo.push(doc.text); doc.text = doc.redo.pop(); doc.revision++; doc.dirty = true }
       return JSON.stringify({ ok: true, snapshot: JSON.parse(snapshot(id)), result: { text: doc.text } })
@@ -93,7 +94,7 @@ function harness(kind = 'presentation') {
   const source = (name = `document.${format}`, base64 = '') => ({ id: randomUUID(), name, base64, extension: name.split('.').at(-1) })
   async function open(input = source()) { const prepared = await (word ? client.prepareRustWordDocument : client.prepareRustPresentationDocument)(input); return prepared.take(input) }
   function component(input = source()) {
-    const props = vue.reactive({ document: input, active: false, disabled: false, theme: 'system' }), events = [], unmount = []
+    const props = vue.reactive({ document: input, active: false, disabled: false, theme: 'system', templatesOpen: false }), events = [], unmount = []
     let exposed
     const scope = vue.effectScope()
     scope.run(() => evaluate(word ? wordEditorSource : editorSource, name => {
@@ -229,6 +230,45 @@ test('Deck sessions isolate edits and file actions while theme changes retain dr
   assert.equal(events.length, 1)
   await first.close(true); await second.close(true)
   assert.equal(h.calls.filter(call => call[0] === 'destroy').length, 1)
+})
+
+test('Deck template actions only reach the active interactive presentation', async () => {
+  const h = harness(), first = await h.open(), second = await h.open(), events = []
+  first.onEvent(event => events.push(event)); second.onEvent(event => events.push(event))
+  await first.attach(new h.Element(), true)
+  h.notify({ type: 'action', sessionId: first.id, action: 'toggleTemplates' })
+  h.notify({ type: 'action', sessionId: second.id, action: 'toggleTemplates' })
+  assert.deepEqual(events.map(event => [event.type, event.sessionId]), [['toggle-templates', first.id]])
+  first.setInteractive(false)
+  h.notify({ type: 'action', sessionId: first.id, action: 'toggleTemplates' })
+  assert.equal(events.length, 1)
+  await second.attach(new h.Element(), true)
+  h.notify({ type: 'action', sessionId: first.id, action: 'toggleTemplates' })
+  h.notify({ type: 'action', sessionId: second.id, action: 'toggleTemplates' })
+  assert.deepEqual(events.map(event => [event.type, event.sessionId]), [['toggle-templates', first.id], ['toggle-templates', second.id]])
+  second.deactivate()
+  h.notify({ type: 'action', sessionId: second.id, action: 'toggleTemplates' })
+  assert.equal(events.length, 2)
+  await first.close(true); await second.close(true)
+})
+
+test('Deck template panel state preserves pending input and save receipts', async () => {
+  const h = harness(), session = await h.open()
+  await session.attach(new h.Element(), true)
+  h.pending(session.id, '输入中的文字')
+  const flushes = h.calls.filter(call => call[0] === 'flush').length
+  for (const open of [true, false]) {
+    await session.setTemplatePanelOpen(open)
+    const current = await session.inspect()
+    assert.equal(current.ui.templatePanelOpen, open)
+    assert.equal(current.dirty, false)
+    assert.equal(current.revision, 0)
+    assert.deepEqual(h.state.get(session.id).undo, [])
+    assert.equal(h.calls.filter(call => call[0] === 'flush').length, flushes)
+  }
+  await session.settled()
+  assert.equal((await session.query('text.get')).text, '输入中的文字')
+  await session.close(true)
 })
 
 test('Deck latest attach wins when another tab deactivates during renderer start', async () => {

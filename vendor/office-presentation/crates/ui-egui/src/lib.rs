@@ -444,6 +444,10 @@ struct AnimPreview {
 
 pub struct SlideApp {
     host_ime_active: bool,
+    /// Session-only host panel state, deliberately excluded from saved documents and UI preferences.
+    pub(crate) template_panel_open: bool,
+    /// Geometry of the last rendered ribbon row, for UI inspection and interaction automation.
+    pub(crate) ribbon_tabs: Vec<ribbon::TabGeometry>,
     /// Table Design's border pen (`color`, `width`, `dash` for `table.borders`).
     pub table_pen: serde_json::Value,
     pub session: Session,
@@ -543,6 +547,8 @@ impl SlideApp {
         let audio_out = services.audio_out.take();
         SlideApp {
             host_ime_active: false,
+            template_panel_open: false,
+            ribbon_tabs: Vec::new(),
             table_pen: serde_json::json!({"width": 1.0}),
             session,
             services,
@@ -689,6 +695,9 @@ impl SlideApp {
     /// status bar and are returned.
     pub fn run(&mut self, id: &str, params: Value) -> Result<Value, String> {
         let _language = i18n::scope(self.services.embedded_editor);
+        if id == "host.setTemplatePanelOpen" {
+            return self.set_host_template_panel_open(&params);
+        }
         if let Some(result) = self.services.host_command.as_mut().and_then(|host| host(id, &params)) {
             if let Err(error) = &result {
                 self.set_status(error.clone());
@@ -1132,6 +1141,32 @@ impl SlideApp {
     /// thumbnail pane has been clicked.
     pub(crate) fn slides_list_focused(&self) -> bool {
         self.ui.view == ViewMode::Sorter || (self.ui.view == ViewMode::Normal && self.slides_focused)
+    }
+
+    /// Enter on a selected thumbnail copies that page. Text, tool gestures and other views
+    /// keep their existing keyboard handling; the engine itself does not own pane focus.
+    pub(crate) fn thumbnail_enter(&mut self, key: &str, mods: Mods) -> Option<Result<Value, String>> {
+        if !matches!(key, "Enter" | "enter" | "Return" | "return")
+            || mods.cmd
+            || mods.shift
+            || mods.alt
+            || self.ui.view != ViewMode::Normal
+            || !self.slides_focused
+            || self.host_ime_active
+            || self.session.tool.drawing_freeform()
+            || self.session.tool.edit_points.is_some()
+        {
+            return None;
+        }
+        let doc = self.session.active()?;
+        if doc.selection.target != Target::Slides || doc.selection.text.is_some() || !doc.selection.shapes.is_empty() || doc.composition.is_some() {
+            return None;
+        }
+        let index = doc.selection.slide;
+        Some(
+            self.run("slide.duplicate", json!({"index": index}))
+                .map(|result| json!({"handled": true, "command": "slide.duplicate", "result": result})),
+        )
     }
 
     /// First slide Play from Start should open: the custom show or range, skipping hidden slides.
@@ -1830,6 +1865,9 @@ impl SlideApp {
                         continue;
                     }
                     let mods = Mods { shift: modifiers.shift, alt: modifiers.alt, cmd: modifiers.command || modifiers.ctrl };
+                    if self.thumbnail_enter(key_name(key), mods).is_some() {
+                        continue;
+                    }
                     if !self.session.tool.drawing_freeform() && menus::ui_shortcut(self, key, mods) {
                         continue;
                     }
@@ -2124,6 +2162,8 @@ mod replacefonts_tests;
 mod slide_size_tests;
 #[cfg(test)]
 mod texture_limit_tests;
+#[cfg(test)]
+mod thumbnail_key_tests;
 #[cfg(test)]
 mod ui_soak_tests;
 

@@ -160,10 +160,17 @@ fn contextual(app: &SlideApp) -> Vec<&'static str> {
 
 const TABS: [&str; 10] = ["Home", "Insert", "Draw", "Design", "Transitions", "Animations", "Slide Show", "Record", "Review", "View"];
 
+pub(crate) struct TabGeometry {
+    pub name: &'static str,
+    pub label: String,
+    pub rect: Rect,
+}
+
 /// Tab row and the ribbon card.
 pub fn show(app: &mut SlideApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     let ctx_tabs = contextual(app);
+    app.ribbon_tabs.clear();
     if !TABS.contains(&app.ui.tab.as_str()) && !ctx_tabs.contains(&app.ui.tab.as_str()) {
         app.ui.tab = "Home".into();
     }
@@ -188,15 +195,27 @@ pub fn show(app: &mut SlideApp, ui: &mut Ui) {
             }
             x += w + 2.0;
         }
-        let all: Vec<(&str, bool)> = TABS.iter().map(|s| (*s, false)).chain(ctx_tabs.iter().map(|s| (*s, true))).collect();
+        // Templates belongs beside View in the presentation ribbon. It opens the host panel
+        // without replacing this ribbon's active tab or changing its collapsed state.
+        let templates = (app.services.embedded_editor && app.services.host_command.is_some()).then_some(("Templates", false));
+        let all: Vec<(&str, bool)> = TABS.iter().map(|s| (*s, false)).chain(templates).chain(ctx_tabs.iter().map(|s| (*s, true))).collect();
         for (name, contextual) in all {
             let display_name = tr(name);
             let font = theme::font(13.0);
             let w = ui.fonts_mut(|f| f.layout_no_wrap(display_name.to_string(), font.clone(), t.text).size().x) + 18.0;
             let r = Rect::from_min_size(pos2(x, y), vec2(w, 24.0));
+            app.ribbon_tabs.push(TabGeometry { name, label: display_name.to_owned(), rect: r });
             let resp = ui.interact(r, ui.id().with(("tab", name)), Sense::click());
-            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, display_name));
-            let active = app.ui.tab == name;
+            let is_templates = name == "Templates";
+            let active = if is_templates { app.template_panel_open } else { app.ui.tab == name };
+            resp.widget_info(|| {
+                egui::WidgetInfo::selected(
+                    egui::WidgetType::Button,
+                    true,
+                    active,
+                    if is_templates { tr("Presentation templates") } else { display_name },
+                )
+            });
             if resp.hovered() && !active {
                 ui.painter().rect_filled(r.shrink2(vec2(2.0, 2.0)), CornerRadius::same(4), t.hover);
             }
@@ -206,6 +225,13 @@ pub fn show(app: &mut SlideApp, ui: &mut Ui) {
             if active {
                 let uw = (w - 20.0).max(16.0);
                 ui.painter().rect_filled(Rect::from_center_size(pos2(r.center().x, r.max.y - 1.0), vec2(uw, 3.0)), CornerRadius::same(1), t.accent);
+            }
+            if is_templates {
+                if resp.on_hover_text(tr("Choose a template or save this presentation as a template")).clicked() {
+                    let _ = app.run("host.toggleTemplates", json!({}));
+                }
+                x += w + 2.0;
+                continue;
             }
             if resp.clicked() {
                 if active {
@@ -3560,6 +3586,10 @@ mod tests {
 #[cfg(test)]
 #[path = "effects_tests.rs"]
 mod effects_tests;
+
+#[cfg(test)]
+#[path = "template_ribbon_tests.rs"]
+mod template_ribbon_tests;
 
 #[cfg(test)]
 #[path = "master_layout_tests.rs"]

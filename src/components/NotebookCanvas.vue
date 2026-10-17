@@ -4,15 +4,18 @@ import Icon from './Icon.vue'
 import { blankRegion, noteId, validateImage, type NoteBlock, type NotePage, type NoteRegion } from '../notes/model'
 import { blocksFromDom, blocksFromHtml, renderBlocks } from '../notes/dom'
 import { moveRegion, nextRegionPosition, resizeRegion } from '../notes/layout'
+import { canvasPoint, NOTE_GRID_SIZE, snapRegionPosition, type SnapGuide, type SnapRect, type SnapState } from '../notes/snapping'
 import { createNoteSearchHighlighter, noteSearchMatches, noteSearchRanges, searchSegments } from '../notes/search'
 import { bytesToBase64 } from '../shared/document'
 
-const props = defineProps<{ page: NotePage; editable: boolean; query: string; commit: (regions: NoteRegion[]) => boolean }>()
+const props = withDefaults(defineProps<{ page: NotePage; editable: boolean; query: string; smartAlignment?: boolean; snapToGrid?: boolean; commit: (regions: NoteRegion[]) => boolean }>(), { smartAlignment: true, snapToGrid: true })
 const emit = defineEmits<{ error: [message: string]; status: [message: string]; busy: [value: boolean]; composing: [value: boolean]; pending: [value: boolean]; 'request-delete': [regionId: string]; history: [action: 'undo' | 'redo'] }>()
 const surface = ref<HTMLElement>(), imageInput = ref<HTMLInputElement>()
 const regions = shallowRef<NoteRegion[]>([]), selected = ref(''), busy = ref(false), composing = ref(false)
 const bodies = new Map<string, HTMLElement>(), elements = new Map<string, HTMLElement>(), rendered = new Map<string, string>(), dirtyBodies = new Set<string>()
 const measuredHeights = shallowRef<ReadonlyMap<string, number>>(new Map())
+const alignmentGuides = shallowRef<SnapGuide[]>([])
+const gestureExtent = shallowRef<{ width: number; height: number }>()
 const resizeObserver = new ResizeObserver(entries => {
  const next = new Map(measuredHeights.value)
  let changed = false
@@ -30,9 +33,9 @@ function highlight() {
  highlightQueued = true
  nextTick(() => { highlightQueued = false; if (!disposed) highlighter.refresh([...bodies.values()], props.query) })
 }
-let gesture: { pointerId: number; id: string; kind: 'move' | 'resize'; x: number; y: number; original: NoteRegion; element: HTMLElement } | undefined
+let gesture: { pointerId: number; id: string; kind: 'move' | 'resize'; origin: { x: number; y: number }; client: { x: number; y: number }; original: NoteRegion; element: HTMLElement; bounds: SnapRect; neighbours: SnapRect[]; state: SnapState; moved: boolean; bypass: boolean } | undefined
 const imageOf = (region: NoteRegion) => region.blocks.length === 1 && region.blocks[0].type === 'image' ? region.blocks[0] : undefined
-const extent = computed(() => ({ width: Math.max(780, ...regions.value.map(region => region.x + region.width + 64)), height: Math.max(700, ...regions.value.map(region => region.y + Math.max(region.height ?? 40, measuredHeights.value.get(region.id) ?? 140) + 180)) }))
+const extent = computed(() => ({ width: Math.max(780, gestureExtent.value?.width ?? 0, ...regions.value.map(region => region.x + region.width + 64)), height: Math.max(700, gestureExtent.value?.height ?? 0, ...regions.value.map(region => region.y + Math.max(region.height ?? 40, measuredHeights.value.get(region.id) ?? 140) + 180)) }))
 function report(error: unknown) { if (!disposed) emit('error', error instanceof Error ? error.message : String(error)) }
 function setBusy(value: boolean) { busy.value = value; emit('busy', value) }
 function markPending() { emit('pending', dirtyBodies.size > 0) }
@@ -127,8 +130,8 @@ function addText(position?: { x: number; y: number }) {
 }
 function doubleClick(event: MouseEvent) {
  if (event.target !== surface.value) return
- const rect = surface.value.getBoundingClientRect()
- addText({ x: event.clientX - rect.left, y: event.clientY - rect.top })
+ const { rect, zoom } = canvasGeometry()
+ addText(canvasPoint({ x: event.clientX, y: event.clientY }, rect, zoom))
 }
 function clearSelection() {
  if (gesture || busy.value || composing.value) return
@@ -237,25 +240,57 @@ function startGesture(event: PointerEvent, region: NoteRegion, kind: 'move' | 'r
  if (event.button !== 0 || !props.editable || busy.value || composing.value || !flush()) return
  event.preventDefault(); rememberSelection(); selected.value = region.id
  const element = event.currentTarget as HTMLElement
- gesture = { pointerId: event.pointerId, id: region.id, kind, x: event.clientX, y: event.clientY, original: structuredClone(region), element }
- element.setPointerCapture(event.pointerId); document.addEventListener('keydown', globalKey, true); setBusy(true)
+ const { rect, zoom } = canvasGeometry(), client = { x: event.clientX, y: event.clientY }
+ const bounds = (region: NoteRegion): SnapRect => ({ id: region.id, x: region.x, y: region.y, width: region.width, height: Math.max(region.height ?? 40, elements.get(region.id)?.offsetHeight ?? 40) })
+ gestureExtent.value = { ...extent.value }
+ gesture = { pointerId: event.pointerId, id: region.id, kind, origin: canvasPoint(client, rect, zoom), client, original: structuredClone(region), element, bounds: bounds(region), neighbours: regions.value.map(bounds), state: {}, moved: false, bypass: event.altKey }
+ alignmentGuides.value = []
+ element.setPointerCapture(event.pointerId); document.addEventListener('keydown', globalKey, true); document.addEventListener('keyup', gestureModifier, true); setBusy(true)
+}
+function canvasGeometry() {
+ const canvas = surface.value!, rect = canvas.getBoundingClientRect()
+ return { rect, zoom: canvas.offsetWidth ? rect.width / canvas.offsetWidth : 1 }
 }
 function pointerMove(event: PointerEvent) {
  if (!gesture || gesture.pointerId !== event.pointerId) return
- const original = gesture.original, dx = event.clientX - gesture.x, dy = event.clientY - gesture.y
- const updated = gesture.kind === 'move' ? moveRegion(original, dx, dy) : resizeRegion(original, imageOf(original) && Math.abs(dy) > Math.abs(dx) ? dy * original.width / (original.height ?? original.width) : dx)
+ gesture.client = { x: event.clientX, y: event.clientY }; gesture.bypass = event.altKey
+ updateGesture()
+}
+function updateGesture() {
+ if (!gesture) return
+ const { rect, zoom } = canvasGeometry(), point = canvasPoint(gesture.client, rect, zoom)
+ const original = gesture.original, dx = point.x - gesture.origin.x, dy = point.y - gesture.origin.y
+ // Scrolling beneath a held pointer is also a drag, while a plain handle click
+ // must not snap the block. Measure displacement against the current viewport.
+ if (!gesture.moved && Math.hypot(dx * zoom, dy * zoom) < 2) return
+ gesture.moved = true
+ let updated: NoteRegion
+ if (gesture.kind === 'move') {
+  const result = snapRegionPosition(gesture.bounds, { x: original.x + dx, y: original.y + dy }, gesture.neighbours, { grid: props.snapToGrid, align: props.smartAlignment, zoom, previous: gesture.state, bypass: gesture.bypass })
+  updated = { ...original, x: result.x, y: result.y }; gesture.state = result.state; alignmentGuides.value = result.guides
+ } else updated = resizeRegion(original, imageOf(original) && Math.abs(dy) > Math.abs(dx) ? dy * original.width / (original.height ?? original.width) : dx)
  regions.value = regions.value.map(region => region.id === gesture!.id ? updated : region)
+ // Preserve the largest drag extent, avoiding automatic scroll clamping feeding
+ // back into another move as the last region is pulled inward from the edge.
+ gestureExtent.value = { ...extent.value }
  highlight()
 }
+function gestureModifier(event: KeyboardEvent) { if (event.key === 'Alt' && gesture) { gesture.bypass = event.type === 'keydown'; updateGesture() } }
 function finishGesture(cancel = false) {
  const current = gesture; if (!current) return
- gesture = undefined
+ gesture = undefined; alignmentGuides.value = []; gestureExtent.value = undefined
  document.removeEventListener('keydown', globalKey, true)
+ document.removeEventListener('keyup', gestureModifier, true)
  if (current.element.hasPointerCapture(current.pointerId)) current.element.releasePointerCapture(current.pointerId)
- if (cancel || !apply(regions.value)) regions.value = regions.value.map(region => region.id === current.id ? current.original : region)
+ if (cancel || (current.moved && !apply(regions.value))) regions.value = regions.value.map(region => region.id === current.id ? current.original : region)
  setBusy(false)
 }
-function pointerEnd(event: PointerEvent, cancel = false) { if (gesture?.pointerId === event.pointerId) finishGesture(cancel) }
+function pointerEnd(event: PointerEvent, cancel = false) {
+ if (gesture?.pointerId !== event.pointerId) return
+ // A final scroll or pointer displacement may arrive before the next move event.
+ if (!cancel) { gesture.client = { x: event.clientX, y: event.clientY }; gesture.bypass = event.altKey; updateGesture() }
+ finishGesture(cancel)
+}
 function controlKey(event: KeyboardEvent, region: NoteRegion, kind: 'move' | 'resize') {
  if (event.key === 'Escape' && gesture) { event.preventDefault(); finishGesture(true); return }
  if (!props.editable || busy.value || composing.value || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key) || !flush()) return
@@ -266,6 +301,7 @@ function controlKey(event: KeyboardEvent, region: NoteRegion, kind: 'move' | 're
 }
 function removeRegion(region: NoteRegion) { if (props.editable && !busy.value && !composing.value && flush()) emit('request-delete', region.id) }
 function globalKey(event: KeyboardEvent) {
+ if (gesture && event.key === 'Alt') { gestureModifier(event); return }
  if (event.key !== 'Escape' || event.isComposing || composing.value) return
  if (gesture) { event.preventDefault(); finishGesture(true) }
  else if (selected.value) { event.preventDefault(); clearSelection() }
@@ -298,18 +334,19 @@ defineExpose({ format, todo, chooseImage, addText, rememberSelection, focus, flu
 </script>
 
 <template>
- <div class="note-canvas-container" @keydown="globalKey" @click="clickCanvas">
-  <p class="note-canvas-hint"><Icon name="info" :size="16" />双击空白处添加文字区域 · 选中后可移动和缩放 · 点击空白处取消选择</p>
-  <div ref="surface" class="note-canvas" data-testid="notebook-canvas" :style="{ minWidth: `${extent.width}px`, minHeight: `${extent.height}px` }" @dblclick="doubleClick" @pointermove="pointerMove" @pointerup="pointerEnd($event)" @pointercancel="pointerEnd($event, true)" @lostpointercapture="pointerEnd($event, true)">
+ <div class="note-canvas-container" @keydown="globalKey" @click="clickCanvas" @scroll="updateGesture">
+  <p class="note-canvas-hint"><Icon name="info" :size="16" />双击添加文字 · 拖动时按住 Alt / Option 自由移动 · 点击空白取消选择</p>
+  <div ref="surface" class="note-canvas" :class="{ 'grid-enabled': snapToGrid }" data-testid="notebook-canvas" :style="{ minWidth: `${extent.width}px`, minHeight: `${extent.height}px`, '--note-grid-size': `${NOTE_GRID_SIZE}px` }" @dblclick="doubleClick" @pointermove="pointerMove" @pointerup="pointerEnd($event)" @pointercancel="pointerEnd($event, true)" @lostpointercapture="pointerEnd($event, true)">
    <section v-for="(region, index) in regions" :key="region.id" :ref="element => bindRegion(region.id, element)" class="note-region" :class="{ selected: selected === region.id, 'image-region': !!imageOf(region) }" :style="{ left: `${region.x}px`, top: `${region.y}px`, width: `${region.width}px`, minHeight: region.height ? `${region.height}px` : '40px' }" :data-region-id="region.id" :data-region-kind="imageOf(region) ? 'image' : 'text'" :tabindex="imageOf(region) ? 0 : undefined" @pointerdown="selected = region.id" @click="selected = region.id" @focusin="selected = region.id">
     <div class="note-region-controls">
-     <button type="button" class="note-region-move" :aria-label="`移动${imageOf(region) ? '图片' : '文字'}区域 ${index + 1}`" title="拖动移动；方向键微调，Shift 加速" :disabled="!editable" @pointerdown="startGesture($event, region, 'move')" @keydown="controlKey($event, region, 'move')"><svg class="ui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01" /></svg><span>{{ imageOf(region) ? '图片' : '文字区域' }}</span></button>
+     <button type="button" class="note-region-move" :aria-label="`移动${imageOf(region) ? '图片' : '文字'}区域 ${index + 1}`" title="拖动对齐和吸附；Alt / Option 自由移动；方向键微调，Shift 加速" :disabled="!editable" @pointerdown="startGesture($event, region, 'move')" @keydown="controlKey($event, region, 'move')"><svg class="ui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01" /></svg><span>{{ imageOf(region) ? '图片' : '文字区域' }}</span></button>
      <button type="button" class="note-region-delete" :aria-label="imageOf(region) ? `删除图片${imageOf(region)!.alt ? `：${imageOf(region)!.alt}` : ''}` : `删除文字区域 ${index + 1}`" title="删除区域" :disabled="!editable || busy" @click="removeRegion(region)"><Icon name="trash" :size="16" /></button>
     </div>
     <template v-if="imageOf(region)"><img class="note-region-image" :src="imageOf(region)!.dataUrl" :alt="imageOf(region)!.alt" :style="{ height: `${region.height ?? region.width}px` }" draggable="false" /><div v-if="query.trim() && searchSegments(imageOf(region)!.alt, query).some(part => part.match)" class="note-image-caption"><template v-for="(part, partIndex) in searchSegments(imageOf(region)!.alt, query)" :key="partIndex"><mark v-if="part.match">{{ part.text }}</mark><span v-else>{{ part.text }}</span></template></div></template>
     <div v-else :ref="element => bindBody(region.id, element)" class="note-region-body" data-testid="notebook-content" role="textbox" :aria-label="`文字区域 ${index + 1}`" aria-multiline="true" :contenteditable="editable && !busy" spellcheck="true" @input="input(region.id)" @beforeinput="beforeInput" @compositionstart="composition(region.id, true)" @compositionend="composition(region.id, false)" @paste="paste($event, region.id)" @drop.prevent @dragover.prevent @click="clickBody(region.id, $event)" @focus="selected = region.id" @keyup="rememberSelection" @mouseup="rememberSelection" @blur="rememberSelection" />
     <button type="button" class="note-region-resize" :aria-label="imageOf(region) ? `调整图片大小 ${index + 1}` : `调整文字区域宽度 ${index + 1}`" :title="imageOf(region) ? '拖动等比缩放；方向键微调，Shift 加速' : '拖动调整宽度；方向键微调，Shift 加速'" :disabled="!editable" @pointerdown="startGesture($event, region, 'resize')" @keydown="controlKey($event, region, 'resize')"><svg class="ui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M12 17h5v-5" /></svg></button>
    </section>
+   <div v-for="guide in alignmentGuides" :key="guide.axis" class="note-alignment-guide" :class="`guide-${guide.axis}`" :data-axis="guide.axis" :data-position="guide.position" aria-hidden="true" :style="guide.axis === 'x' ? { left: `${guide.position}px`, top: `${guide.start}px`, height: `${guide.end - guide.start}px` } : { top: `${guide.position}px`, left: `${guide.start}px`, width: `${guide.end - guide.start}px` }" />
   </div>
   <input ref="imageInput" class="note-image-input" type="file" accept="image/png,image/jpeg" aria-label="插入图片文件" @change="imageChosen" @cancel="cancelImage" />
  </div>
@@ -317,4 +354,6 @@ defineExpose({ format, todo, chooseImage, addText, rememberSelection, focus, flu
 
 <style scoped>
 .note-canvas-container{position:relative;min-width:0;min-height:0;overflow:auto;flex:1}.note-canvas-hint{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--note-muted);padding:0 24px;margin:4px 0 24px;white-space:nowrap}.note-canvas{position:relative;box-sizing:border-box;background-image:radial-gradient(var(--note-line) .7px,transparent .7px);background-size:20px 20px}.note-region{position:absolute;box-sizing:border-box;border:1px solid transparent;border-radius:5px;background:transparent;outline:none}.note-region.selected{border-color:color-mix(in srgb,var(--note-accent) 36%,var(--note-line));background:var(--note-surface)}.note-region-controls{position:absolute;left:-1px;right:-1px;bottom:100%;height:25px;display:flex;justify-content:space-between;align-items:center;opacity:0;visibility:hidden;pointer-events:none;border:1px solid var(--note-line);border-radius:6px 6px 0 0;background:var(--note-surface)}.note-region.selected .note-region-controls{opacity:1;visibility:visible;pointer-events:auto}.note-region-controls button,.note-region-resize{display:inline-flex;align-items:center;justify-content:center;gap:5px;font:11px var(--ui-font);color:var(--note-muted);padding:2px 6px;border:0;background:transparent;border-radius:4px;cursor:pointer;box-sizing:border-box}.note-region-controls button:focus-visible,.note-region-resize:focus-visible{outline:2px solid var(--note-accent);outline-offset:2px}.note-region-controls button:hover,.note-region-resize:hover{color:var(--note-accent);background:color-mix(in srgb,var(--note-accent) 10%,transparent)}.note-region-controls .note-region-move{cursor:grab;touch-action:none;flex:1;justify-content:flex-start;height:23px}.note-region-controls .note-region-move:active{cursor:grabbing}.note-region-delete{height:23px;width:28px}.note-region-resize{position:absolute;right:-8px;bottom:-8px;width:22px;height:22px;cursor:nwse-resize;touch-action:none;background:var(--note-surface);border:1px solid var(--note-line);color:var(--note-accent);opacity:0;visibility:hidden;pointer-events:none}.note-region.selected .note-region-resize{opacity:1;visibility:visible;pointer-events:auto}.note-region-body{font-family:var(--document-font);font-synthesis:weight style;min-height:40px;box-sizing:border-box;padding:10px 12px;outline:none;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.85}.note-region-body :deep(div){min-height:1.85em}.note-region-body :deep(h1){font-size:27px;margin:14px 0 8px;line-height:1.4}.note-region-body :deep(h2){font-size:22px;margin:12px 0 6px}.note-region-body :deep(h3){font-size:18px;margin:10px 0 5px}.note-region-body :deep(ul),.note-region-body :deep(ol){padding-left:26px;margin:8px 0}.note-region-body :deep(code){background:color-mix(in srgb,var(--note-muted) 12%,transparent);padding:2px 5px;border-radius:4px;font:14px/1.6 ui-monospace,monospace}.note-region-body :deep(input[type=checkbox]){accent-color:var(--note-accent);margin:0 10px 0 0;vertical-align:middle;width:15px;height:15px}.note-region-body :deep([data-note-type=todo]:has(input:checked)){color:var(--note-muted);text-decoration:line-through}.note-region-image{display:block;width:100%;object-fit:contain;user-select:none;border-radius:4px}.note-image-caption{font:11px/1.5 var(--ui-font);padding:4px 6px;overflow-wrap:anywhere}.note-image-caption mark{background:#ffd761;color:#312408;border-radius:2px}.note-image-input{display:none}.note-region-controls button:disabled,.note-region-resize:disabled{cursor:default;opacity:.4}
+.note-canvas{background-image:none}.note-canvas.grid-enabled{background-image:radial-gradient(var(--note-line) .7px,transparent .7px);background-size:var(--note-grid-size) var(--note-grid-size);background-position:-5px -5px}
+.note-alignment-guide{position:absolute;z-index:3;pointer-events:none;background:var(--note-accent);box-shadow:0 0 0 1px color-mix(in srgb,var(--note-surface) 60%,transparent)}.guide-x{width:1px}.guide-y{height:1px}.note-alignment-guide::before,.note-alignment-guide::after{content:'';position:absolute;width:5px;height:5px;border:1px solid var(--note-accent);background:var(--note-surface);box-sizing:border-box;transform:translate(-2px,-2px)}.guide-x::after{bottom:0}.guide-y::after{right:0}
 </style>
