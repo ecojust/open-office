@@ -198,7 +198,7 @@ async function component() {
  const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
  vm.runInNewContext(output,{
   module,exports:module.exports,structuredClone,TextEncoder,TextDecoder,Uint8Array,console,
-  require(id){if(id==='vue')return {...vue,onBeforeUnmount:fn=>unmount.push(fn)};if(id==='./Icon.vue'||id==='./NotebookCanvas.vue')return {};if(id.includes('shared/document'))return documentHelpers;if(id.includes('shared/dialog-focus'))return {useDialogFocus:()=>{}};if(id.includes('notes/model'))return model;if(id.includes('notes/session'))return {NotebookSession};if(id.includes('notes/dom'))return dom;if(id.includes('notes/search'))return searchHelpers;throw Error(id)},
+  require(id){if(id==='vue')return {...vue,onBeforeUnmount:fn=>unmount.push(fn)};if(id==='./Icon.vue'||id==='./NotebookCanvas.vue')return {};if(id.includes('shared/document'))return documentHelpers;if(id==='../shared/printing')return {printHtml:()=>assert.fail('Unexpected printing in a non-printing notebook component test')};if(id.includes('shared/dialog-focus'))return {useDialogFocus:()=>{}};if(id.includes('notes/model'))return model;if(id.includes('notes/session'))return {NotebookSession};if(id.includes('notes/dom'))return dom;if(id.includes('notes/search'))return searchHelpers;throw Error(id)},
   defineProps:()=>props,withDefaults:value=>value,defineEmits:()=> (...args)=>emitted.push(args),defineExpose:value=>Object.assign(exposed,value),
   document:{get activeElement(){throw Error('Background operations must not inspect/move focus')},createElement(){throw Error('Background operations must not rebuild DOM')}},
  })

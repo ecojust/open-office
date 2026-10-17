@@ -1,8 +1,8 @@
 import type { ElementStyle, Point, Scene, SceneElement, ShapeElement, StrokeElement } from './types.ts'
-import { edgePoints, pathMidpoint, pointsPath, sceneBounds, shapeOutline, isBraceShape, bracePath, braceTextBounds } from './geometry.ts'
+import { edgePoints, pathMidpoint, pointsPath, sceneBounds, shapeOutline, isBraceShape, bracePath, braceTextBounds, rectangleCornerRadius } from './geometry.ts'
 import { anchoredPolygon, sketchEllipse, sketchPolyline } from './sketch.ts'
 import { resolveStrokePattern } from './appearance.ts'
-import { brushOutlinePath, brushPolyline, brushRadiusAt, rainbowSegments } from './brushes.ts'
+import { brushOutlinePath, brushPaintPasses, brushPolyline, brushRadiusAt, rainbowSegments } from './brushes.ts'
 
 export function escapeXml(value: unknown): string { return String(value).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff\ufffe\uffff]/gu, '\uFFFD').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]!) }
 export function safeImageData(value: unknown): value is string {
@@ -24,24 +24,56 @@ function strokeMarkup(points: Point[], id: string, style: ElementStyle, closed =
   return isSketch(style) && points.length <= 2048 ? sketchMarkup(sketchPolyline(points, id, style.strokeWidth, closed), style)
     : `<path d="${pointsPath(points)}${closed ? ' Z' : ''}" ${styleAttrs(style, 'none')}/>`
 }
+// Geometry is part of the ID: independently open documents can contain the same
+// element ID with different ink, and SVG fragment references share a DOM scope.
+function inkClipId(path: string): string {
+  let first = 2166136261, second = 5381
+  for (let index = 0; index < path.length; index++) {
+    const code = path.charCodeAt(index)
+    first = Math.imul(first ^ code, 16777619)
+    second = Math.imul(second, 33) ^ code
+  }
+  return `ink-${(first >>> 0).toString(36)}-${(second >>> 0).toString(36)}`
+}
 function brushMarkup(element: StrokeElement): string {
   const brush = element.brush ?? 'pen', opacity = Math.max(0, Math.min(1, element.style.opacity)), ink = color(element.style.stroke), width = Math.max(0, Math.min(100, element.style.strokeWidth))
   if (!element.points.length || !width) return ''
-  let markup: string
-  if (brush === 'pencil') {
-    markup = `<path data-pencil-grain="base" d="${brushOutlinePath(element)}" fill="${ink}" fill-rule="evenodd" stroke="none" opacity=".16"/>` + [0, 1, 2].map(pass => {
-      const points = element.points.map((point, index) => {
-        const radius = brushRadiusAt(element, index), noise = Math.sin(index * 12.9898 + pass * 41.73) * .13
-        return { x: point.x + (pass - 1 + noise) * radius * .36, y: point.y + (1 - pass + noise) * radius * .36 }
-      })
-      if (points.length === 1) points.push({ x: points[0]!.x + .01, y: points[0]!.y + .01 })
-      return `<path data-pencil-pass="${pass + 1}" d="${brushPolyline(points)}${element.closed ? ' Z' : ''}" fill="none" stroke="${ink}" stroke-width="${width * .22}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${pass === 1 ? '1.7 .35' : '.7 .6'}" stroke-dashoffset="${pass * .37}" opacity="${pass === 1 ? .72 : .42}"/>`
-    }).join('')
-  } else if (brush === 'rainbow') {
-    if (element.points.length === 1) markup = `<circle cx="${element.points[0]!.x}" cy="${element.points[0]!.y}" r="${brushRadiusAt(element, 0)}" fill="hsl(0 85% 55%)"/>`
-    else markup = rainbowSegments(element).map(segment => `<path d="${brushOutlinePath({ ...element, brush: 'pen', points: segment.points, pressures: segment.pressures, closed: false })}" fill="hsl(${segment.hue} 85% 55%)" stroke="none"/>`).join('')
-  } else markup = `<path d="${brushOutlinePath(element)}" fill="${ink}" fill-rule="evenodd" stroke="none"/>`
-  return `<g data-brush="${escapeXml(brush)}" opacity="${opacity}">${brush === 'highlighter' ? `<g opacity=".32">${markup}</g>` : markup}</g>`
+  const passes = brushPaintPasses(element), count = element.points.length
+  const points = element.closed ? [...element.points, element.points[0]!] : element.points
+  const distances = [0]
+  if (brush === 'rainbow') for (let index = 1; index < points.length; index++) distances.push(distances[index - 1]! + Math.hypot(points[index]!.x - points[index - 1]!.x, points[index]!.y - points[index - 1]!.y))
+  const total = distances.at(-1) || 1
+  const markup = passes.map(({ path, start, end }) => {
+    let paint: string
+    if (brush === 'pencil') {
+      paint = `<path data-pencil-grain="base" d="${path}" fill="${ink}" fill-rule="nonzero" stroke="none" opacity=".16"/>` + [0, 1, 2].map(pass => {
+        const grain = points.slice(start, end + 1).map((point, offset) => {
+          const index = (start + offset) % count
+          const radius = brushRadiusAt(element, index), noise = Math.sin(index * 12.9898 + pass * 41.73) * .13
+          return { x: point.x + (pass - 1 + noise) * radius * .36, y: point.y + (1 - pass + noise) * radius * .36 }
+        })
+        if (grain.length === 1) grain.push({ x: grain[0]!.x + .01, y: grain[0]!.y + .01 })
+        return `<path data-pencil-pass="${pass + 1}" d="${brushPolyline(grain)}${element.closed && passes.length === 1 ? ' Z' : ''}" fill="none" stroke="${ink}" stroke-width="${width * .22}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${pass === 1 ? '1.7 .35' : '.7 .6'}" stroke-dashoffset="${pass * .37}" opacity="${pass === 1 ? .72 : .42}"/>`
+      }).join('')
+    } else if (brush === 'rainbow') {
+      const local = { ...element, points: points.slice(start, end + 1), pressures: points.slice(start, end + 1).map((_, offset) => element.pressures?.[(start + offset) % count] ?? .5), closed: false }
+      if (local.points.length === 1) paint = `<path d="${path}" fill="hsl(0 85% 55%)"/>`
+      else paint = rainbowSegments(local).map(segment => {
+        const hue = (distances[start]! + segment.hue / 300 * (distances[end]! - distances[start]!)) / total * 300
+        return `<path d="${brushOutlinePath({ ...local, brush: 'pen', points: segment.points, pressures: segment.pressures })}" fill="hsl(${hue} 85% 55%)" fill-rule="nonzero" stroke="none"/>`
+      }).join('')
+    } else paint = `<path d="${path}" fill="${ink}" fill-rule="nonzero" stroke="none"/>`
+    // Clip textured/color passes to the same shared cross-section as plain ink;
+    // their round caps must not introduce dark dots at an internal split.
+    if (passes.length > 1 && (brush === 'pencil' || brush === 'rainbow')) {
+      const clip = inkClipId(path)
+      paint = `<defs><clipPath id="${clip}" clipPathUnits="userSpaceOnUse"><path d="${path}" clip-rule="nonzero"/></clipPath></defs><g clip-path="url(#${clip})">${paint}</g>`
+    }
+    // Each visit deposits ink separately. An outer group opacity would flatten
+    // self-overlap back into a single translucent layer.
+    return `<g opacity="${opacity * (brush === 'highlighter' ? .32 : 1)}">${paint}</g>`
+  }).join('')
+  return `<g data-brush="${escapeXml(brush)}">${markup}</g>`
 }
 function boundAnchors(node: ShapeElement, scene: Scene): Point[] {
   const anchors: Point[] = []
@@ -54,11 +86,11 @@ function boundAnchors(node: ShapeElement, scene: Scene): Point[] {
 }
 function sketchShape(node: ShapeElement, scene: Scene, hitTargets: boolean): string {
   const { x, y, width: w, height: h } = node
-  const vertices = shapeOutline(node)
-  const geometry = node.shape === 'ellipse' ? `ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}"` : `path d="${pointsPath(vertices)} Z"`
+  const anchors = boundAnchors(node, scene), vertices = shapeOutline(node, anchors), radius = rectangleCornerRadius(node)
+  const geometry = node.shape === 'ellipse' ? `ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}"` : radius ? `rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${radius}" ry="${radius}"` : `path d="${pointsPath(vertices)} Z"`
   const fill = node.shape === 'frame' ? '' : `<${geometry} fill="${color(node.style.fill)}" stroke="none" opacity="${Math.max(0, Math.min(1, node.style.opacity))}"/>`
   const hit = hitTargets ? `<${geometry} fill="${node.shape === 'frame' ? 'none' : 'transparent'}" stroke="transparent" stroke-width="${Math.max(16, node.style.strokeWidth)}" pointer-events="${node.shape === 'frame' ? 'stroke' : 'all'}"/>` : ''
-  const anchors = boundAnchors(node, scene), paths = node.shape === 'ellipse' ? sketchEllipse(node, anchors, node.id) : sketchPolyline(anchoredPolygon(vertices, anchors), node.id, node.style.strokeWidth, true)
+  const paths = node.shape === 'ellipse' ? sketchEllipse(node, anchors, node.id) : sketchPolyline(anchoredPolygon(vertices, anchors), node.id, node.style.strokeWidth, true)
   return fill + hit + sketchMarkup(paths, node.style)
 }
 function cylinderSeam(node: ShapeElement): string {
@@ -139,7 +171,7 @@ export function elementToSvg(element: SceneElement, scene: Scene, hitTargets = f
   else if (['triangle', 'hexagon', 'star', 'parallelogram', 'cylinder', 'cloud'].includes(shape)) markup = `<path d="${pointsPath(shapeOutline(element))} Z" ${attrs}/>`
   else if (shape === 'image' && safeImageData(element.imageData)) markup = `<image x="${x}" y="${y}" width="${w}" height="${h}" href="${escapeXml(element.imageData)}" preserveAspectRatio="xMidYMid meet" opacity="${element.style.opacity}"/>`
   else if (shape === 'text') markup = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="transparent"/>`
-  else markup = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${shape === 'note' ? 2 : 9}" ${attrs}/>${shape === 'note' ? `<path d="M${x + w - 18} ${y + h} L${x + w - 18} ${y + h - 18} L${x + w} ${y + h - 18}" fill="#0000000b" stroke="${color(element.style.stroke)}" stroke-opacity=".2"/>` : ''}`
+  else markup = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${shape === 'note' ? 2 : rectangleCornerRadius(element)}" ry="${shape === 'note' ? 2 : rectangleCornerRadius(element)}" ${attrs}/>${shape === 'note' ? `<path d="M${x + w - 18} ${y + h} L${x + w - 18} ${y + h - 18} L${x + w} ${y + h - 18}" fill="#0000000b" stroke="${color(element.style.stroke)}" stroke-opacity=".2"/>` : ''}`
   return markup + (shape === 'cylinder' ? cylinderSeam(element) : '') + textMarkup(element)
 }
 export function sceneToSvg(scene: Scene, options: { background?: boolean } = {}): string {

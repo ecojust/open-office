@@ -1,4 +1,4 @@
-export const AUTOSAVE_INTERVAL_MS = 30_000
+export const AUTOSAVE_INTERVAL_MS = 10_000
 export const AUTOSAVE_DEFER_MS = 1_200
 export const AUTOSAVE_MAX_BACKOFF_MS = 300_000
 

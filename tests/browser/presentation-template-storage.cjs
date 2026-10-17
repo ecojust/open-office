@@ -66,9 +66,9 @@ async function records() {
     page.on('pageerror', error => report.errors.push(error.message));
     await page.goto(`${origin}/__template-storage-test`); await importModule();
     let first, second;
-    await check('ten-packaged-builtins-load-without-editor-or-network-dependencies', async () => {
+    await check('hundred-packaged-builtins-load-without-editor-or-network-dependencies', async () => {
       const templates = await page.evaluate(() => window.templates.listPresentationTemplates());
-      assert.equal(templates.length, 10); assert.ok(templates.every(item => item.source === 'builtin' && item.slideCount === 3));
+      assert.equal(templates.length, 100); assert.ok(templates.every(item => item.source === 'builtin' && item.slideCount === 3));
       for (const template of templates) {
         const loaded = await page.evaluate(value => window.templates.loadPresentationTemplate(value), template);
         const entry = manifest.find(item => item.id === template.id);

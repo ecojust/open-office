@@ -18,7 +18,7 @@ const scenarios = (process.env.WORD_AUTOSAVE_SCENARIOS || 'typing,ime,dialog').s
 assert.ok(scenarios.length && scenarios.every(value => ['typing', 'ime', 'dialog'].includes(value)));
 const report = {
   ok: false, startedAt: new Date().toISOString(),
-  runtime: 'Real Vue App, real existing OfficeWord WASM, real 30-second scheduler in Chromium; src/native.ts save receipt stub',
+  runtime: 'Real Vue App, real existing OfficeWord WASM, real 10-second scheduler in Chromium; src/native.ts save receipt stub',
   limitations: [
     'No native file write, Tauri IPC, native file dialog or WebView verification; src/native.ts is stubbed in this browser only.',
     'Existing public/office-word WASM is used without rebuilding; this does not validate new Rust dialog styling.',
@@ -99,7 +99,7 @@ async function screenshot(name) {
 async function acknowledgeSaved(count, text, stoppedAt, scenario) {
   await page.waitForFunction(count => window.__autosaveEvidence.saves.length === count && document.querySelector('[data-testid="global-save-state"]')?.textContent?.trim() === '已自动保存', count, { timeout: 6500 });
   const elapsedMs = Date.now() - stoppedAt;
-  assert.ok(elapsedMs < 6500, 'Deferred autosave resumes promptly instead of waiting another 30 seconds');
+  assert.ok(elapsedMs < 6500, 'Deferred autosave resumes promptly instead of waiting another 10 seconds');
   assert.equal((await inspect()).dirty, false);
   assert.equal(await editor().getAttribute('data-dirty'), 'false');
   assert.equal(await page.locator('[data-testid="global-save-state"] .dirty-dot').count(), 0);
@@ -184,15 +184,15 @@ async function endComposition(text) {
     let savedCount = 1;
 
     if (scenarios.includes('typing')) {
-    console.log('PHASE actual typing across the real 30-second deadline');
+    console.log('PHASE actual typing across the real 10-second deadline');
     const typingStarted = await toggle(true);
     await focusDocument(); expected += ' typing'; await page.keyboard.insertText(' typing'); await textIs(expected);
     assert.equal((await label().textContent()).trim(), '等待自动保存');
     assert.equal(await page.locator('[data-testid="global-save-state"] .dirty-dot').count(), 1);
-    await until(typingStarted + 28000);
+    await until(typingStarted + 8000);
     let typingStopped;
     let index = 0;
-    while (Date.now() < typingStarted + 32500) {
+    while (Date.now() < typingStarted + 12500) {
       const character = String(index++ % 10);
       expected += character; await page.keyboard.insertText(character);
       typingStopped = Date.now();
@@ -201,13 +201,13 @@ async function endComposition(text) {
     assert.equal(await saveCount(), savedCount, 'No automatic save occurs while typing across the deadline');
     await textIs(expected);
     assert.equal((await inspect()).dirty, true);
-    pass('typing-at-30-seconds-defers-without-clearing-dirty', { elapsedMs: Date.now() - typingStarted });
+    pass('typing-at-10-seconds-defers-without-clearing-dirty', { elapsedMs: Date.now() - typingStarted });
     await screenshot('typing-deferred');
     await acknowledgeSaved(++savedCount, expected, typingStopped, 'typing');
     }
 
     if (scenarios.includes('ime')) {
-    console.log('PHASE unfinished IME composition across the real 30-second deadline');
+    console.log('PHASE unfinished IME composition across the real 10-second deadline');
     await toggle(false);
     const imeStarted = await toggle(true);
     await focusDocument(); expected += ' IME'; await page.keyboard.insertText(' IME'); await textIs(expected);
@@ -217,30 +217,30 @@ async function endComposition(text) {
     assert.equal(report.composition.preedit.text, expected, 'IME preedit preserves all previously committed text');
     assert.equal(report.composition.preedit.dirty, true, 'IME preedit preserves the real engine dirty state');
     await page.waitForFunction(() => document.querySelector('[data-testid="global-save-state"]')?.textContent?.trim() === '等待输入完成');
-    await until(imeStarted + 30900);
+    await until(imeStarted + 10900);
     assert.equal(await saveCount(), savedCount, 'Unfinished IME is not exported or marked saved');
     report.composition.due = await inspect(); persist();
     assert.equal(report.composition.due.text, expected);
     assert.equal(report.composition.due.dirty, true);
     assert.equal(await page.locator('[data-testid="global-save-state"] .dirty-dot').count(), 1);
-    pass('ime-at-30-seconds-shows-waiting-and-preserves-unsaved-input', { elapsedMs: Date.now() - imeStarted });
+    pass('ime-at-10-seconds-shows-waiting-and-preserves-unsaved-input', { elapsedMs: Date.now() - imeStarted });
     await screenshot('ime-deferred');
     const imeStopped = Date.now(); await endComposition('中文输入'); expected += '中文输入'; await textIs(expected);
     await acknowledgeSaved(++savedCount, expected, imeStopped, 'ime');
     }
 
     if (scenarios.includes('dialog')) {
-    console.log('PHASE real Rust command dialog across the real 30-second deadline');
+    console.log('PHASE real Rust command dialog across the real 10-second deadline');
     await toggle(false);
     const dialogStarted = await toggle(true);
     await focusDocument(); expected += ' dialog'; await page.keyboard.insertText(' dialog'); await textIs(expected);
     await page.keyboard.press('Alt+q');
     await waitForState(value => value.ui.dialog?.dialog === 'commands', 'Real Rust command-search dialog opens');
-    await until(dialogStarted + 30900);
+    await until(dialogStarted + 10900);
     assert.equal(await saveCount(), savedCount, 'Unfinished real Rust dialog is not exported');
     assert.equal((await label().textContent()).trim(), '等待完成编辑');
     assert.equal((await inspect()).dirty, true);
-    pass('rust-dialog-at-30-seconds-defers-with-visible-explanation', { elapsedMs: Date.now() - dialogStarted });
+    pass('rust-dialog-at-10-seconds-defers-with-visible-explanation', { elapsedMs: Date.now() - dialogStarted });
     await screenshot('dialog-deferred');
     const dialogClosed = Date.now(); await page.keyboard.press('Escape');
     await waitForState(value => value.ui.dialog === null, 'Escape closes the actual Rust dialog');

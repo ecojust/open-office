@@ -21,6 +21,7 @@ const appearanceSource = await readFile(new URL('../src/shared/appearance.ts', i
 const autosaveSource = await readFile(new URL('../src/shared/autosave.ts', import.meta.url), 'utf8')
 const names = 'tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,rustPdfEntries,rustPdfHandles,setRustPdfHandle,rustWordEntries,rustWordHandles,setRustWordHandle,rustSheetEntries,rustSheetHandles,setRustSheetHandle,rustPresentationEntries,rustPresentationHandles,setRustPresentationHandle,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,browserFile,saveActive,closeTab,closeAllTabs,closeWindow,resolveClose,removeTab,removeTabs,task,editorTransaction,nativeTransactionalEditor,appearance,currentDocument,globalActionsBlocked,documentActionsDisabled,globalFileAction,globalNewDocument,keydown,rustEditorFileAction,previewSlides'
   + ',autosaveEnabled,autosave,autosaveWaiting,saveStateLabel,saveStateTitle,backgroundSaving,editorInputBlocked,noteEntries,noteHandles,setNoteHandle,activeNote'
+  + ',printDisabled,status'
 
 
 // Every shell still receives a fresh VM context and fresh Vue state. Reuse only
@@ -354,13 +355,13 @@ test('mounted shell runs the real autosave scheduler and releases input listener
   await h.mount()
   assert.equal(h.state.autosaveEnabled.value,true)
   for(const event of ['input','keydown','pointerdown','compositionstart','compositionend'])assert.equal(h.documentListeners.get(event)?.size,1)
-  await h.fireTimeout(30000)
+  await h.fireTimeout(10000)
   assert.equal(h.calls.filter(call=>call[0]==='save').length,1)
   assert.equal(h.calls.find(call=>call[0]==='save')[1].documentId,'selected-local-file')
   assert.equal(tab.dirty,false)
   h.state.autosaveEnabled.value=false;await vue.nextTick()
   assert.equal(h.storage.get('open-office-autosave'),'false')
-  assert.equal([...h.timers.values()].filter(timer=>timer.milliseconds===30000).length,0)
+  assert.equal([...h.timers.values()].filter(timer=>timer.milliseconds===10000).length,0)
   h.unmount()
   assert.equal(h.intervals.size,0)
   assert.equal([...h.documentListeners.values()].reduce((count,listeners)=>count+listeners.size,0),0)
@@ -375,7 +376,7 @@ test('autosave resumes after IME confirmation without waiting for another full i
     h.state.dirtyFor(tab.key,true)
     assert.equal(h.state.saveStateLabel.value,'等待自动保存')
     h.dispatchDocument('compositionstart',{target})
-    await h.fireTimeout(30000)
+    await h.fireTimeout(10000)
     assert.equal(h.calls.filter(call=>call[0]==='save').length,0)
     assert.equal(h.state.saveStateLabel.value,'等待输入完成')
     assert.equal(tab.autoSavedAt,undefined)
@@ -396,7 +397,7 @@ test('autosave explains missing save destinations and never reports a failed nat
     assert.match(h.state.saveStateTitle.value,/选择保存位置/)
     tab.fileId='selected-original'
     h.native.saveDocument=async()=>{throw Error('Original file is read-only')}
-    await h.mount();await h.fireTimeout(30000);await h.idle();await settleShell()
+    await h.mount();await h.fireTimeout(10000);await h.idle();await settleShell()
     assert.equal(tab.dirty,true)
     assert.equal(tab.autoSavedAt,undefined)
     assert.equal(h.state.saveStateLabel.value,'自动保存待重试')
@@ -412,7 +413,7 @@ test('autosave rechecks shell interruptions after awaiting engine readiness',asy
     const ready=new Promise(resolve=>{resume=resolve})
     h.rustWordHandle.canBackgroundExport=()=>ready
     try {
-      await h.mount();await h.fireTimeout(30000)
+      await h.mount();await h.fireTimeout(10000)
       if(interrupted==='disabled')h.state.autosaveEnabled.value=false
       if(interrupted==='dialog')h.state.help.value=true
       if(interrupted==='busy')h.state.busy.value='正在处理另一份文件'
@@ -463,7 +464,7 @@ test('autosave leaves unfinished input focused and promptly retries only after e
     }
     handle.markSaved=async(bytes,options)=>{assert.equal(bytes,'TkVX');assert.equal(options.background,true);receipts++}
     try {
-      await h.mount();await h.fireTimeout(30000)
+      await h.mount();await h.fireTimeout(10000)
       assert.equal(blurCount,0);assert.equal(pending,true);assert.equal(exports,0);assert.equal(receipts,0)
       assert.equal(h.calls.filter(call=>call[0]==='save').length,0);assert.equal(tab.dirty,true)
       assert.equal(h.browser.document.activeElement,focused)
@@ -500,7 +501,7 @@ test('autosave input guards survive drafts arriving after eligibility or before 
     const save=h.native.saveDocument
     h.native.saveDocument=async request=>{const result=await save(request);pending=true;return result}
     try {
-      await h.mount();await h.fireTimeout(30000);await h.idle();await settleShell()
+      await h.mount();await h.fireTimeout(10000);await h.idle();await settleShell()
       assert.equal(pending,true);assert.equal(blurCount,0);assert.equal(tab.dirty,true)
       assert.equal(exports,phase==='before-export'?0:1)
       assert.equal(receipts,phase==='receipt'?1:0)
@@ -527,7 +528,7 @@ test('autosave keeps the editor interactive during a native write and rejects a 
     if(revision!==exportedRevision)throw Error('The saved revision predates the latest input')
   }
   try {
-    await h.mount();await h.fireTimeout(30000)
+    await h.mount();await h.fireTimeout(10000)
     assert.equal(writeStarted,true);assert.equal(h.state.backgroundSaving.value,true)
     assert.ok(h.state.busy.value);assert.equal(h.state.globalActionsBlocked.value,true)
     assert.equal(h.state.documentActionsDisabled.value,true);assert.equal(h.state.editorInputBlocked.value,false)
@@ -1143,6 +1144,51 @@ test('a failed Rust saved-revision acknowledgement cannot mark the shell tab cle
 function sheetSource(id='source',extension='xlsx') {
   return {id,kind:'sheet',extension,name:`${id}.${extension}`,base64:'T0xE',sha256:'source-hash',sizeBytes:3}
 }
+
+test('printing availability follows the visible editor and pending print blocks repeated requests', async () => {
+  const h=shell(), tab=h.tab('print-document',{dirty:true})
+  let finish, prints=0
+  h.rustWordHandle.print=()=>{prints++;return new Promise(resolve=>{finish=resolve})}
+  h.active(tab)
+  assert.equal(h.state.printDisabled.value,true,'Retained home document cannot print')
+  h.state.home.value=false
+  assert.equal(h.state.printDisabled.value,false)
+  h.state.globalFileAction('print')
+  for (let i=0;i<10&&!prints;i++) {await Promise.resolve();await vue.nextTick()}
+  assert.equal(prints,1)
+  assert.equal(h.state.printDisabled.value,true)
+  h.state.globalFileAction('print')
+  h.state.rustEditorFileAction('print')
+  assert.equal(prints,1)
+  finish({status:'cancelled'});await h.idle()
+  assert.equal(h.state.status.value,'已取消打印')
+  assert.equal(h.state.printDisabled.value,false)
+  assert.equal(tab.dirty,true,'Printing must not acknowledge an on-disk save')
+  assert.equal(h.calls.filter(call=>call[0]==='save').length,0)
+  h.unmount()
+})
+
+test('printing failures surface to the shell and never silently export or mark a document saved', async () => {
+  const h=shell(), tab=h.tab('failed-print',{dirty:true})
+  h.rustWordHandle.print=async()=>{throw Error('系统打印窗口未能启动')}
+  h.active(tab);h.state.home.value=false
+  h.state.globalFileAction('print');await h.idle()
+  assert.match(h.state.error.value,/系统打印窗口未能启动/)
+  assert.equal(tab.dirty,true)
+  assert.equal(h.calls.filter(call=>['save','download','marked'].includes(call[0])).length,0)
+  h.unmount()
+})
+
+test('a ready editor without printing disables the button and explains keyboard requests', async () => {
+  const h=shell(), tab=h.tab('unsupported-print')
+  h.active(tab);h.state.home.value=false
+  assert.equal(h.state.documentActionsDisabled.value,false)
+  assert.equal(h.state.printDisabled.value,true)
+  h.state.rustEditorFileAction('print');await h.idle()
+  assert.match(h.state.error.value,/当前文档尚不能打印/)
+  assert.equal(h.calls.filter(call=>['save','download'].includes(call[0])).length,0)
+  h.unmount()
+})
 
 function mountSheetHandle(h,tab,overrides={}) {
   const handle={canBackgroundExport:async()=>true,prepareDeactivate:async()=>({documentId:1,revision:0,dirty:tab.dirty}),exportFile:async({format})=>({base64:'U0hFRVQ=',extension:format,dirty:true}),

@@ -1,3 +1,5 @@
+import type { PrintOutcome } from './printing'
+
 export type Kind = 'word'|'sheet'|'presentation'|'pdf'|'note'|'canvas'|'diagram'
 export type Extension = 'docx'|'xlsx'|'csv'|'tsv'|'pptx'|'potx'|'ppsx'|'pdf'|'oonote'|'owflow'|'mmd'|'mermaid'|'drawio'|'xml'|'excalidraw'|'json'|'svg'|'png'
 export type SaveExtension = Exclude<Extension,'potx'|'ppsx'|'mermaid'|'xml'|'json'>
@@ -39,7 +41,7 @@ export type EditorHandle = {
  undo?():void|Promise<void>;
  redo?():void|Promise<void>;
  search?(value:string):void|Promise<void>;
- print?():void|Promise<void>;
+ print?():Promise<PrintOutcome>;
 }
 const supportedExtensions = ['docx','xlsx','csv','tsv','pptx','potx','ppsx','pdf','oonote','owflow','mmd','mermaid','drawio','xml','excalidraw','json'] as const
 const workflowImports = ['mmd','mermaid','drawio','xml','excalidraw','json'] as const

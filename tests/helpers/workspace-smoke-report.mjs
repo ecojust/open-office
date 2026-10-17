@@ -18,7 +18,7 @@ export function workspaceReport() {
   return {
     schemaVersion: 2, kind: 'workspace-native', transport: 'native-webview-ipc', ok: true,
     native: { tauri: true, origin: 'http://127.0.0.1:31415' }, checks: [...WORKSPACE_NATIVE_CHECKS], limitations: [...WORKSPACE_NATIVE_LIMITATIONS],
-    autosave: { intervalMs: 30_000, elapsedMs: 30_200, targetId, initialBase64: baseline, initialSha256: initial.sha256, initialSizeBytes: initial.sizeBytes,
+    autosave: { intervalMs: 10_000, elapsedMs: 10_200, targetId, initialBase64: baseline, initialSha256: initial.sha256, initialSizeBytes: initial.sizeBytes,
       finalSha256: final.sha256, finalSizeBytes: final.sizeBytes, readbackBase64: saved, beforeRevision: 3, afterRevision: 3,
       beforeDirty: true, afterDirty: false, focusRetained: true, blurEvents: 0, dialogObserved: false,
       reopenedText: WORKSPACE_SAVED_TEXT, expectedText: WORKSPACE_SAVED_TEXT,

@@ -6,6 +6,7 @@ import type { NativeDocument } from '../types'
 import type { Appearance } from '../shared/appearance'
 import { useDialogFocus } from '../shared/dialog-focus'
 import { base64ToBytes, bytesToBase64, type EditorExport, type Extension } from '../shared/document'
+import { printHtml, type PrintOutcome } from '../shared/printing'
 import { blankPage, blankRegion, descendantPageIds, noteId, noteTitle, pageHierarchy, pageText, NOTE_MAX_PAGE_DEPTH, type Notebook, type NoteRegion } from '../notes/model'
 import { NotebookSession } from '../notes/session'
 import { renderBlocks } from '../notes/dom'
@@ -26,7 +27,7 @@ const titleDraft = ref<string>()
 const dialog = ref<{ title: string; message?: string; value: string; destructive: boolean; apply: (value: string) => void }>()
 const pageMenu = ref<{ sectionId: string; pageId: string; x: number; y: number }>()
 let menuTrigger: HTMLElement | undefined
-let session: NotebookSession | undefined, disposed = false, token = 0, printFrame: HTMLIFrameElement | undefined
+let session: NotebookSession | undefined, disposed = false, token = 0
 let lastExport: { token: number; base64: string; revision: number } | undefined
 const section = computed(() => model.value?.sections.find(item => item.id === currentSection.value))
 const page = computed(() => section.value?.pages.find(item => item.id === currentPage.value))
@@ -211,27 +212,31 @@ async function discardChanges(options: { force?: boolean } = {}) {
  if ((await prepareDeactivate()).dirty) throw Error('笔记还有未保存的修改，请先保存或确认不保存后关闭。')
 }
 async function search(value: string) { query.value = value; navigation.value = true; await nextTick(); searchInput.value?.focus() }
-async function print() {
- requireReady(); if (!page.value || !model.value) return
- printFrame?.remove()
- const frame = document.createElement('iframe'); frame.title = '打印笔记'; frame.style.cssText = 'position:fixed;left:-10000px;width:1px;height:1px;'; document.body.append(frame); printFrame = frame
- const output = frame.contentDocument
- if (!output) throw Error('无法创建打印页面。')
- const title = output.createElement('title'); title.textContent = page.value.title || '无标题页面'; output.head.append(title)
- const style = output.createElement('style'); style.textContent = 'body{font:15px/1.85 system-ui,sans-serif;color:#111;margin:24px}main{position:relative;transform-origin:top left}section{position:absolute;box-sizing:border-box;white-space:pre-wrap;overflow-wrap:anywhere;padding:8px 12px}img{display:block;width:100%;height:100%;object-fit:contain}figure{margin:0;width:100%;height:100%}h1{font-size:27px;line-height:1.4}h2{font-size:22px}h3{font-size:18px}input{margin-right:10px}code{background:#eee;padding:2px 5px}'; output.head.append(style)
- const heading = output.createElement('h1'); heading.textContent = page.value.title || '无标题页面'
- const content = output.createElement('main'), width = Math.max(720,...page.value.regions.map(region=>region.x+region.width+24))
- content.style.width = `${width}px`
- for(const region of page.value.regions) {
-  const element = output.createElement('section'); element.style.cssText = `left:${region.x}px;top:${region.y}px;width:${region.width}px;${region.height ? `height:${region.height}px;` : ''}`
-  if(region.blocks[0]?.type==='image') element.style.padding='0'
-  element.append(renderBlocks(output,region.blocks,false)); content.append(element)
- }
- output.body.append(heading,content)
- await Promise.all([...output.images].map(image => image.decode?.().catch(() => undefined)))
- const height = Math.max(100,...[...content.children].map(element=>{const node=element as HTMLElement;return node.offsetTop+node.offsetHeight+24}))
- const scale = Math.min(1,720/width); content.style.height=`${height}px`; content.style.zoom=String(scale)
- frame.contentWindow?.print()
+async function print(): Promise<PrintOutcome> {
+ await prepareDeactivate()
+ if (!page.value) throw Error('请先选择要打印的笔记页面。')
+ const current = structuredClone(page.value), owner = token
+ const width = Math.max(720,...current.regions.map(region=>region.x+region.width+24))
+ return await printHtml({
+  title: current.title || '无标题页面',
+  css: '@media print{@page{size:A4 portrait;margin:12mm}}#office-print-root{font:15px/1.85 system-ui,sans-serif;color:#111;box-sizing:border-box;padding:24px}#office-print-root .note-print-page{position:relative;transform-origin:top left}#office-print-root section{position:absolute;box-sizing:border-box;white-space:pre-wrap;overflow-wrap:anywhere;padding:8px 12px}#office-print-root img{display:block;width:100%;height:100%;object-fit:contain}#office-print-root figure{margin:0;width:100%;height:100%}#office-print-root h1{font-size:27px;line-height:1.4}#office-print-root h2{font-size:22px}#office-print-root h3{font-size:18px}#office-print-root input{margin-right:10px}#office-print-root code{background:#eee;padding:2px 5px}',
+  render(output, container) {
+   const heading = output.createElement('h1'); heading.textContent = current.title || '无标题页面'
+   const content = output.createElement('main'); content.className = 'note-print-page'; content.style.width = `${width}px`
+   for(const region of current.regions) {
+    const element = output.createElement('section'); element.style.cssText = `left:${region.x}px;top:${region.y}px;width:${region.width}px;${region.height ? `height:${region.height}px;` : ''}`
+    if(region.blocks[0]?.type==='image') element.style.padding='0'
+    element.append(renderBlocks(output,region.blocks,false)); content.append(element)
+   }
+   container.append(heading,content)
+  },
+  prepare(container) {
+   if (disposed || owner !== token || current.id !== currentPage.value) throw Error('笔记页面已切换，请重新打印。')
+   const content = container.querySelector<HTMLElement>('.note-print-page')!
+   const height = Math.max(100,...[...content.children].map(element=>{const node=element as HTMLElement;return node.offsetTop+node.offsetHeight+24}))
+   content.style.height=`${height}px`; content.style.zoom=String(Math.min(1,720/width))
+  },
+ })
 }
 function focus() { canvas.value?.focus() }
 watch(()=>[props.active,props.disabled],()=>{if(!controlsReady.value)closePageMenu()})
@@ -245,7 +250,7 @@ watch(() => props.document.id, async () => {
   await nextTick(); render(); emit('ready')
  } catch (cause) { report(cause) } finally { if (owner === token) loading.value = false }
 }, { immediate: true })
-onBeforeUnmount(() => { disposed = true; token++; printFrame?.remove() })
+onBeforeUnmount(() => { disposed = true; token++ })
 defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, inspect, syncRevision: inspect, canBackgroundExport, undo, redo, search, print, focus })
 </script>
 

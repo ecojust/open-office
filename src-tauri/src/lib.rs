@@ -1,8 +1,10 @@
+mod clipboard;
 mod files;
 #[cfg(target_os = "macos")]
 mod macos_diagnostics;
 #[cfg(target_os = "macos")]
 mod macos_webview;
+mod print;
 mod server;
 mod smoke;
 
@@ -174,6 +176,9 @@ pub fn run() {
             files::list_recent_documents,
             files::save_document,
             files::pick_image,
+            clipboard::clipboard_images,
+            print::print_pdf,
+            print::print_html,
             smoke_prepare_document,
             smoke_cleanup_autosave,
         ])
@@ -235,7 +240,10 @@ pub fn run() {
                 .permission("allow-open-recent")
                 .permission("allow-list-recent-documents")
                 .permission("allow-save-document")
-                .permission("allow-pick-image");
+                .permission("allow-pick-image")
+                .permission("allow-clipboard-images")
+                .permission("allow-print-pdf")
+                .permission("allow-print-html");
             let capability = if diagnostic.is_some() {
                 capability
                     .permission("allow-smoke-prepare-document")
@@ -298,10 +306,12 @@ pub fn run() {
                     }
                 }
             }
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if !window.state::<Closing>().0.load(Ordering::Acquire) {
-                    api.prevent_close();
-                    let _ = window.emit("app-close-requested", ());
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    if !window.state::<Closing>().0.load(Ordering::Acquire) {
+                        api.prevent_close();
+                        let _ = window.emit("app-close-requested", ());
+                    }
                 }
             }
         })

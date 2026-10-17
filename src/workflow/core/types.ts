@@ -23,6 +23,8 @@ export interface ShapeElement {
   y: number
   width: number
   height: number
+  /** Rectangle corner radius in canvas units; omitted means square corners. */
+  cornerRadius?: number
   text: string
   imageData?: string
   style: ElementStyle

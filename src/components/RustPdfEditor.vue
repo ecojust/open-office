@@ -3,6 +3,7 @@ import { nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import type { NativeDocument } from '../types'
 import type { Appearance } from '../shared/appearance'
 import { bytesToBase64, type EditorExport, type Extension } from '../shared/document'
+import { printPdf, type PrintOutcome } from '../shared/printing'
 import { prepareRustPdfDocument, setRustPdfTheme, isPdfPendingDecisionCommand, type PreparedRustPdfDocument, type RustPdfSession } from '../pdf/rust/client'
 import type { OfficePdfFileAction, OfficePdfSnapshot } from '../pdf/rust/types'
 import { normalizePdfAuthor, pdfAuthorPreference } from '../pdf/author'
@@ -20,7 +21,6 @@ const unlistenAuthor = pdfAuthorPreference.subscribe(value => { author.value = v
 let session: RustPdfSession | undefined, unsubscribe: (() => void) | undefined, unlisten: (() => void) | undefined
 let disposed = false, generation = 0, opening: Promise<void> = Promise.resolve()
 let lastExport: { generation: number; documentId: number; revision: number; base64: string } | undefined
-let printUrl: string | undefined, printFrame: HTMLIFrameElement | undefined
 function report(cause: unknown) {
   if (disposed) return
   problem.value = cause instanceof Error ? cause.message : String(cause)
@@ -133,25 +133,11 @@ async function command(id: string, params: Record<string, unknown> = {}) {
 }
 async function query(id: string, params: Record<string, unknown> = {}) { await opening; if (!session) throw Error('请等待 PDF 文档打开。'); return session.query(id, params) }
 function focus() { session?.focus() }
-async function print() {
+async function print(): Promise<PrintOutcome> {
   await flush()
   const token = generation, current = session!, result = await current.export('pdf')
   if (disposed || token !== generation || current !== session) throw Error('PDF 文档已切换，请重新打印。')
-  printFrame?.remove()
-  if (printUrl) URL.revokeObjectURL(printUrl)
-  const bytes = result.bytes.slice()
-  printUrl = URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' }))
-  printFrame = document.createElement('iframe')
-  printFrame.title = 'PDF 文档打印预览'
-  Object.assign(printFrame.style, { position: 'fixed', width: '1px', height: '1px', opacity: '0', pointerEvents: 'none' })
-  const frame = printFrame
-  frame.onload = () => {
-    if (disposed || frame !== printFrame) return
-    try { frame.contentWindow?.print() }
-    catch { emit('status', '此浏览器未能打开打印对话框，请导出 PDF 后打印。') }
-  }
-  frame.src = printUrl
-  document.body.append(frame)
+  return await printPdf(result.bytes, props.document.name)
 }
 async function load() {
   const token = ++generation, source = { ...props.document }, previous = session
@@ -198,7 +184,6 @@ onBeforeUnmount(() => {
   unlistenAuthor()
   session?.deactivate()
   void session?.close(true).catch(cause => console.error('PDF session cleanup failed', cause))
-  printFrame?.remove(); if (printUrl) URL.revokeObjectURL(printUrl)
 })
 defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, syncRevision, canBackgroundExport, command, query })
 </script>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import Icon from './Icon.vue'
 import type { PresentationTemplate } from '../presentation/templates'
 
@@ -20,16 +20,28 @@ const emit = defineEmits<{
 
 type TemplateFilter = 'all' | 'builtin' | 'custom'
 const filter = ref<TemplateFilter>('all')
+const query = ref(''), searchInput = ref<HTMLInputElement>(), templateList = ref<HTMLElement>()
+const searchTerm = computed(() => query.value.normalize('NFKC').trim().toLocaleLowerCase())
+const matchingTemplates = computed(() => {
+  const terms = searchTerm.value.split(/\s+/)
+  return props.templates.filter(template => {
+    const name = template.name.normalize('NFKC').toLocaleLowerCase()
+    return terms.every(term => name.includes(term))
+  })
+})
 const filters: { value: TemplateFilter; label: string }[] = [
   { value: 'all', label: '全部' },
   { value: 'builtin', label: '内置模板' },
   { value: 'custom', label: '我的模板' },
 ]
 const groups = computed(() => [
-  { source: 'builtin' as const, label: '内置模板', items: props.templates.filter(template => template.source === 'builtin') },
-  { source: 'custom' as const, label: '我的模板', items: props.templates.filter(template => template.source === 'custom') },
-].filter(group => filter.value === 'all' || filter.value === group.source))
+  { source: 'builtin' as const, label: '内置模板', items: matchingTemplates.value.filter(template => template.source === 'builtin') },
+  { source: 'custom' as const, label: '我的模板', items: matchingTemplates.value.filter(template => template.source === 'custom') },
+].filter(group => (filter.value === 'all' || filter.value === group.source) && (!searchTerm.value || group.items.length)))
+const resultCount = computed(() => groups.value.reduce((count, group) => count + group.items.length, 0))
 const unavailable = computed(() => props.disabled || props.loading)
+function clearSearch() { query.value = ''; searchInput.value?.focus() }
+watch([query, filter], () => { void nextTick(() => { if (templateList.value) templateList.value.scrollTop = 0 }) })
 </script>
 
 <template>
@@ -49,12 +61,17 @@ const unavailable = computed(() => props.disabled || props.loading)
         <Icon name="plus" :size="15" />
       </button>
       <p>保留喜欢的设计，下次直接使用。</p>
+      <div class="presentation-templates-search">
+        <Icon name="search" :size="15" />
+        <input ref="searchInput" v-model="query" type="search" aria-label="搜索模板名称" placeholder="搜索模板名称" @keydown.esc.stop.prevent="clearSearch" />
+        <button v-if="query" type="button" class="presentation-templates-icon-button" aria-label="清空模板搜索" title="清空搜索" @click="clearSearch"><Icon name="close" :size="14" /></button>
+      </div>
       <div class="presentation-templates-filters" role="group" aria-label="筛选演示模板">
         <button v-for="item in filters" :key="item.value" type="button" :aria-pressed="filter === item.value" @click="filter = item.value">{{ item.label }}</button>
       </div>
     </div>
 
-    <div class="presentation-templates-list" tabindex="0" aria-label="模板列表">
+    <div ref="templateList" class="presentation-templates-list" tabindex="0" aria-label="模板列表">
       <div v-if="error" class="presentation-templates-error" role="alert">
         <p>{{ error }}</p>
         <button type="button" :disabled="unavailable" @click="emit('retry')">重新加载</button>
@@ -62,6 +79,14 @@ const unavailable = computed(() => props.disabled || props.loading)
       <div v-if="loading" class="presentation-templates-loading" role="status">
         <span class="presentation-templates-spinner" aria-hidden="true" />正在加载模板…
       </div>
+      <template v-if="searchTerm && !loading && !error">
+        <p class="presentation-templates-results" role="status">找到 {{ resultCount }} 个模板</p>
+        <div v-if="!resultCount" class="presentation-templates-empty">
+          <Icon name="search" :size="24" />
+          <strong>没有匹配的模板</strong>
+          <p>试试其他名称，或清空搜索查看全部模板。</p>
+        </div>
+      </template>
 
       <section v-for="group in groups" :key="group.source" class="presentation-template-group" :aria-label="group.label">
         <div class="presentation-template-group-heading"><h3>{{ group.label }}</h3><span>{{ group.items.length }}</span></div>
@@ -129,6 +154,13 @@ const unavailable = computed(() => props.disabled || props.loading)
 .presentation-templates-save > span { flex: 1; text-align: left; }
 .presentation-templates-save:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-accent) 12%, var(--ui-surface)); border-color: color-mix(in srgb, var(--ui-accent) 50%, var(--ui-line)); }
 .presentation-templates-actions > p { margin: 7px 1px 12px; font-size: 11px; color: var(--ui-muted); }
+.presentation-templates-search { display: flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 8px; margin-bottom: 10px; border: 1px solid var(--ui-line); border-radius: 7px; color: var(--ui-muted); background: var(--ui-surface); }
+.presentation-templates-search:focus-within { border-color: var(--ui-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent) 12%, transparent); }
+.presentation-templates-search input { flex: 1; min-width: 0; width: 100%; padding: 7px 0; border: 0; outline: none; background: transparent; color: var(--ui-text); font: inherit; }
+.presentation-templates-search input::placeholder { color: var(--ui-muted); }
+.presentation-templates-search input::-webkit-search-cancel-button { display: none; }
+.presentation-templates-search .presentation-templates-icon-button { flex: none; width: 24px; height: 24px; }
+.presentation-templates-results { margin: 0 0 12px; color: var(--ui-muted); font-size: 11px; }
 .presentation-templates-filters { display: flex; padding: 3px; gap: 2px; border-radius: 7px; background: var(--ui-surface-muted); }
 .presentation-templates-filters button { flex: 1; padding: 5px 2px; border: 0; border-radius: 5px; background: transparent; color: var(--ui-muted); }
 .presentation-templates-filters button[aria-pressed="true"] { background: var(--ui-surface); color: var(--ui-text); font-weight: 550; box-shadow: 0 1px 3px #10182810; }

@@ -3,6 +3,7 @@ import { nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import type { NativeDocument } from '../types'
 import type { Appearance } from '../shared/appearance'
 import { bytesToBase64, type EditorExport, type Extension } from '../shared/document'
+import { printPdf, type PrintOutcome } from '../shared/printing'
 import { prepareRustSheetDocument, setRustSheetTheme, type PreparedRustSheetDocument, type RustSheetSession } from '../sheet/rust/client'
 import type { OfficeSheetEvent, OfficeSheetFileAction, OfficeSheetSnapshot } from '../sheet/rust/office-sheet-types'
 
@@ -14,7 +15,6 @@ const loading = ref(true), problem = ref('')
 let session: RustSheetSession | undefined, unsubscribe: (() => void) | undefined, unlisten: (() => void) | undefined
 let disposed = false, generation = 0, opening: Promise<void> = Promise.resolve()
 let lastExport: { generation: number; documentId: number; revision: number; base64: string } | undefined
-let printUrl: string | undefined, printFrame: HTMLIFrameElement | undefined
 let pictureRequest: { session: RustSheetSession; generation: number; expected: Extract<OfficeSheetEvent, { type: 'pick-file' }> } | undefined
 function report(cause: unknown) {
   if (disposed) return
@@ -109,25 +109,11 @@ async function insertPicture(event: Event) {
     }
   }
 }
-async function print() {
+async function print(): Promise<PrintOutcome> {
   await flush()
   const token = generation, current = session!, result = await current.export('pdf')
   if (disposed || token !== generation || current !== session) throw Error('工作簿已切换，请重新打印。')
-  printFrame?.remove()
-  if (printUrl) URL.revokeObjectURL(printUrl)
-  const bytes = result.bytes.slice()
-  printUrl = URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' }))
-  printFrame = document.createElement('iframe')
-  printFrame.title = '工作簿打印预览'
-  Object.assign(printFrame.style, { position: 'fixed', width: '1px', height: '1px', opacity: '0', pointerEvents: 'none' })
-  const frame = printFrame
-  frame.onload = () => {
-    if (disposed || frame !== printFrame) return
-    try { frame.contentWindow?.print() }
-    catch { emit('status', '此浏览器未能打开打印对话框，请导出 PDF 后打印。') }
-  }
-  frame.src = printUrl
-  document.body.append(frame)
+  return await printPdf(result.bytes, props.document.name)
 }
 async function load() {
   const token = ++generation, source = { ...props.document }, previous = session
@@ -166,7 +152,6 @@ onBeforeUnmount(() => {
   disposed = true; generation++; pictureRequest = undefined; unsubscribe?.(); unlisten?.(); props.prepared?.discard()
   session?.deactivate()
   void session?.close(true).catch(cause => console.error('OfficeSheet session cleanup failed', cause))
-  printFrame?.remove(); if (printUrl) URL.revokeObjectURL(printUrl)
 })
 defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, syncRevision, canBackgroundExport, command, query })
 </script>

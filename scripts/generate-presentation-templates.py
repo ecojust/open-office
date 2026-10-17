@@ -27,6 +27,7 @@ from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
 from pptx.oxml.xmlchemy import OxmlElement
 from pptx.util import Inches, Pt
+from presentation_template_catalog import industry_templates
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -495,6 +496,7 @@ TEMPLATES = [
     ("electric-launch", "活力发布", "荧光黄与阶梯版式，适合产品发布和行动倡议。", "#A9BE31", electric_launch),
     ("clear-space", "清透留白", "清透蓝绿与充足留白，适合简洁汇报和专注表达。", "#438B92", clear_space),
 ]
+TEMPLATES += industry_templates(Canvas)
 
 
 def canonical_package(raw: bytes) -> bytes:
@@ -567,6 +569,9 @@ def verify(path: Path):
 
 
 def main():
+    assert len(TEMPLATES) == 100, "The built-in gallery must contain exactly 100 templates"
+    assert len({entry[0] for entry in TEMPLATES}) == len(TEMPLATES), "Template IDs must be unique"
+    assert len({entry[1] for entry in TEMPLATES}) == len(TEMPLATES), "Template names must be unique"
     OUT.mkdir(parents=True, exist_ok=True)
     manifest, reports = [], []
     for ident, name, description, accent, draw in TEMPLATES:

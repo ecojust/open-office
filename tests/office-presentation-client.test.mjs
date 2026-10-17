@@ -100,6 +100,7 @@ function harness(kind = 'presentation') {
     scope.run(() => evaluate(word ? wordEditorSource : editorSource, name => {
       if (name === 'vue') return { ...vue, onBeforeUnmount(callback) { unmount.push(callback) } }
       if (name === '../shared/document') return { bytesToBase64 }
+      if (name === '../shared/printing') return { printPdf: () => assert.fail('Unexpected printing in a non-printing presentation component test') }
       if (name === `../${kind}/rust/client`) return client
       if (name === '../presentation/rust/media') return mediaValidation
       throw Error(`Unexpected component import ${name}`)

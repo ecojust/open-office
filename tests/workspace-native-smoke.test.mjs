@@ -43,8 +43,8 @@ test('native autosave acceptance binds initial file bytes and requires temporary
 
 test('autosave cannot use an accelerated timer, another target, stale bytes, dialogs, or a changed revision', () => {
   for (const mutate of [
-    r => { r.autosave.intervalMs = 10; }, r => { r.autosave.elapsedMs = 29_999; },
-    r => { r.autosave.elapsedMs = 50_001; }, r => { r.autosave.targetId = ''; },
+    r => { r.autosave.intervalMs = 10; }, r => { r.autosave.elapsedMs = 9_999; },
+    r => { r.autosave.elapsedMs = 30_001; }, r => { r.autosave.targetId = ''; },
     r => { r.autosave.initialSha256 = 'a'.repeat(64); }, r => { r.autosave.initialSizeBytes++; },
     r => { r.autosave.finalSha256 = r.autosave.initialSha256; }, r => { r.autosave.finalSizeBytes++; },
     r => { r.autosave.afterRevision++; }, r => { r.autosave.beforeDirty = false; },

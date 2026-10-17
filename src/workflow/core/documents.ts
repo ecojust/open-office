@@ -59,7 +59,8 @@ export function validateScene(value: unknown): Scene {
       const shape = choice(e.shape, SHAPES, '图形')
       if (shape.startsWith('brace-')) base.style.fill = 'none'
       if (shape === 'image' && !safeImage(e.imageData)) throw new Error('图片必须是内嵌 PNG、JPEG 或 WebP（不超过 10 MB）。')
-      return { ...base, type: 'shape', shape, x: number(e.x, 'X'), y: number(e.y, 'Y'), width: number(e.width, '宽度', 1, 100000), height: number(e.height, '高度', 1, 100000), text: string(e.text ?? '', '文本'), ...(e.imageData && shape === 'image' ? { imageData: e.imageData } : {}) }
+      const cornerRadius = shape === 'rectangle' && e.cornerRadius !== undefined ? number(e.cornerRadius, '圆角', 0, Number.MAX_VALUE) : 0
+      return { ...base, type: 'shape', shape, x: number(e.x, 'X'), y: number(e.y, 'Y'), width: number(e.width, '宽度', 1, 100000), height: number(e.height, '高度', 1, 100000), text: string(e.text ?? '', '文本'), ...(cornerRadius ? { cornerRadius } : {}), ...(e.imageData && shape === 'image' ? { imageData: e.imageData } : {}) }
     }
     if (e.type === 'edge') {
       const endpoint = (value: unknown) => {
@@ -118,7 +119,7 @@ export function contentKey(doc: WorkflowDocument): string {
   const styleKey = (s: ElementStyle) => [s.stroke, s.fill, s.strokeWidth, s.fontSize, s.textAlign, s.opacity, resolveStrokePattern(s), s.roughness ?? 'clean']
   const elements = doc.scene.elements.map(element => {
     const base = [element.id, element.type, element.locked, styleKey(element.style), ...(element.groupId ? [element.groupId] : [])]
-    if (element.type === 'shape') return [...base, element.shape, element.x, element.y, element.width, element.height, element.text, element.imageData ?? null]
+    if (element.type === 'shape') return [...base, element.shape, element.x, element.y, element.width, element.height, element.text, element.imageData ?? null, ...(element.shape === 'rectangle' && element.cornerRadius ? [{ cornerRadius: element.cornerRadius }] : [])]
     if (element.type === 'edge') return [...base, [element.from.x, element.from.y, element.from.nodeId ?? null], [element.to.x, element.to.y, element.to.nodeId ?? null], element.label, element.arrow, element.route]
     return [...base, element.points.map(point => [point.x, point.y]), ...(element.closed ? [true] : []), ...(element.brush !== undefined || element.pressures !== undefined ? [{ brush: element.brush ?? null, pressures: element.pressures ?? null }] : [])]
   })
@@ -128,11 +129,15 @@ export function contentKey(doc: WorkflowDocument): string {
   if (diagramStyle !== 'classic') identity.push(diagramStyle)
   return JSON.stringify(identity)
 }
-export const CODE_DIAGRAM_SAMPLE = `flowchart TD
-  start([开始]) --> idea[整理想法]
-  idea --> review{准备好了吗？}
-  review -->|是| done([发布])
-  review -->|再完善| idea`
+export const CODE_DIAGRAM_SAMPLE = `sequenceDiagram
+  actor User as 用户
+  participant App as 应用
+  participant Data as 数据服务
+  autonumber
+  User->>+App: 提交请求
+  App->>+Data: 读取数据
+  Data-->>-App: 返回结果
+  App-->>-User: 展示结果`
 
 export function createDocument(kind: DocumentKind, template = false): WorkflowDocument {
   const time = new Date().toISOString()

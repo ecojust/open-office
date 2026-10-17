@@ -1331,7 +1331,7 @@ pub async fn open_recent(
     .map_err(|error| format!("打开最近文件操作异常：{error}"))?
 }
 
-fn image_mime_type(path: &Path, bytes: &[u8]) -> Result<&'static str, String> {
+pub(crate) fn image_mime_type(path: &Path, bytes: &[u8]) -> Result<&'static str, String> {
     if bytes.len() as u64 > IMAGE_LIMIT {
         return Err("图片超过 20 MB 大小上限。".into());
     }

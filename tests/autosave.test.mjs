@@ -39,20 +39,20 @@ function deferred() {
   return { promise, resolve, reject }
 }
 
-test('automatic saves wait 30 seconds and only repeat for a dirty local document', async () => {
-  assert.equal(AUTOSAVE_INTERVAL_MS, 30_000)
+test('automatic saves wait 10 seconds and only repeat for a dirty local document', async () => {
+  assert.equal(AUTOSAVE_INTERVAL_MS, 10_000)
   assert.equal(AUTOSAVE_MAX_BACKOFF_MS, 300_000)
   const clock = fakeClock(), state = editable(), calls = []
   const scheduler = createAutosaveScheduler({ clock, readState: () => state,
     async save(target) { calls.push(target); state.dirty = false; return true } })
-  await clock.advance(29_999)
+  await clock.advance(9_999)
   assert.equal(calls.length, 0)
   await clock.advance(1)
   assert.deepEqual(calls, [{ key: 'tab-1', fileId: 'local-1' }])
-  await clock.advance(90_000)
+  await clock.advance(30_000)
   assert.equal(calls.length, 1)
   state.dirty = true
-  await clock.advance(30_000)
+  await clock.advance(10_000)
   assert.equal(calls.length, 2)
   scheduler.dispose()
   assert.equal(clock.pending, 0)
@@ -77,10 +77,10 @@ for (const [name, overrides] of Object.entries({
     const clock = fakeClock(), state = editable(overrides), calls = []
     const scheduler = createAutosaveScheduler({ clock, readState: () => state,
       async save(target) { calls.push(target); state.dirty = false; return true } })
-    await clock.advance(90_000)
+    await clock.advance(30_000)
     assert.equal(calls.length, 0, 'the file-saving callback must not be entered')
     Object.assign(state, editable())
-    await clock.advance(30_000)
+    await clock.advance(10_000)
     assert.equal(calls.length, 1, 'transient conditions recover without a renderer notification')
     scheduler.dispose()
   })
@@ -92,33 +92,33 @@ test('preference changes cancel pending ticks and repeated notifications cannot 
   assert.equal(clock.pending, 0)
   state.enabled = true
   scheduler.notify()
-  for (let i = 0; i < 5; i++) { await clock.advance(5_000); scheduler.notify() }
-  await clock.advance(5_000)
-  assert.deepEqual(calls, [30_000])
+  for (let i = 0; i < 9; i++) { await clock.advance(1_000); scheduler.notify() }
+  await clock.advance(1_000)
+  assert.deepEqual(calls, [10_000])
   state.enabled = false
   scheduler.notify()
   assert.equal(clock.pending, 0)
-  await clock.advance(60_000)
-  assert.deepEqual(calls, [30_000])
+  await clock.advance(20_000)
+  assert.deepEqual(calls, [10_000])
   state.enabled = true
   scheduler.notify()
-  await clock.advance(30_000)
-  assert.deepEqual(calls, [30_000, 120_000])
+  await clock.advance(10_000)
+  assert.deepEqual(calls, [10_000, 40_000])
   scheduler.dispose()
 })
 
-test('a due save resumes shortly after typing stops instead of missing another thirty-second interval', async () => {
+test('a due save resumes shortly after typing stops instead of missing another ten-second interval', async () => {
   const clock = fakeClock(), state = editable(), calls = []
   const scheduler = createAutosaveScheduler({ clock, readState: () => state,
     async save() { calls.push(clock.now()); state.dirty = false; return true } })
-  await clock.advance(29_900)
+  await clock.advance(9_900)
   state.composing = true
   await clock.advance(100)
   assert.deepEqual(calls, [])
   await clock.advance(500)
   state.composing = false
   await clock.advance(AUTOSAVE_DEFER_MS - 500)
-  assert.deepEqual(calls, [31_200])
+  assert.deepEqual(calls, [11_200])
   scheduler.dispose()
 })
 
@@ -128,15 +128,15 @@ test('unfinished editor drafts defer without false success or exponential failur
   const scheduler = createAutosaveScheduler({ clock, readState: () => state,
     async save() { calls.push(clock.now()); if (pending) return 'deferred'; state.dirty = false; return true },
     onError(error) { errors.push(error) } })
-  await clock.advance(30_000 + AUTOSAVE_DEFER_MS * 3)
-  assert.deepEqual(calls, [30_000, 31_200, 32_400, 33_600])
+  await clock.advance(10_000 + AUTOSAVE_DEFER_MS * 3)
+  assert.deepEqual(calls, [10_000, 11_200, 12_400, 13_600])
   assert.deepEqual(errors, [])
   assert.equal(state.dirty, true)
   pending = false
   await clock.advance(AUTOSAVE_DEFER_MS)
-  assert.equal(calls.at(-1), 34_800)
+  assert.equal(calls.at(-1), 14_800)
   assert.equal(state.dirty, false)
-  await clock.advance(90_000)
+  await clock.advance(30_000)
   assert.equal(calls.length, 5)
   scheduler.dispose()
 })
@@ -144,13 +144,13 @@ test('unfinished editor drafts defer without false success or exponential failur
 test('eligibility is read at the deadline, not captured when the timer was created', async () => {
   const clock = fakeClock(), state = editable(), calls = []
   const scheduler = createAutosaveScheduler({ clock, readState: () => state, async save(target) { calls.push(target); return true } })
-  await clock.advance(29_999)
+  await clock.advance(9_999)
   state.composing = true
   await clock.advance(1)
   assert.equal(calls.length, 0)
   state.composing = false
   state.key = 'tab-2'; state.fileId = 'local-2'
-  await clock.advance(30_000)
+  await clock.advance(10_000)
   assert.deepEqual(calls, [{ key: 'tab-2', fileId: 'local-2' }])
   scheduler.dispose()
 })
@@ -159,7 +159,7 @@ test('one in-flight save holds an immutable target across notifications and tab 
   const clock = fakeClock(), state = editable(), pending = deferred(), calls = []
   const scheduler = createAutosaveScheduler({ clock, readState: () => state,
     save(target) { calls.push(target); scheduler.notify(); return calls.length === 1 ? pending.promise : Promise.resolve(true) } })
-  await clock.advance(30_000)
+  await clock.advance(10_000)
   assert.equal(scheduler.running, true)
   assert.equal(clock.pending, 0)
   state.key = 'tab-2'; state.fileId = 'local-2'
@@ -170,7 +170,7 @@ test('one in-flight save holds an immutable target across notifications and tab 
   pending.resolve(true)
   await settle()
   assert.equal(scheduler.running, false)
-  await clock.advance(30_000)
+  await clock.advance(10_000)
   assert.deepEqual(calls, [{ key: 'tab-1', fileId: 'local-1' }, { key: 'tab-2', fileId: 'local-2' }])
   scheduler.dispose()
 })
@@ -180,15 +180,15 @@ test('false results and exceptions back off exponentially, cap at five minutes, 
   const scheduler = createAutosaveScheduler({ clock, readState: () => state,
     async save() {
       calls.push(clock.now())
-      if (calls.length === 6) return true
+      if (calls.length === 7) return true
       if (calls.length % 2) throw Error('本地文件暂时不可写')
       return false
     },
     onError(error, target, retryInMs) { failures.push({ error, target, retryInMs }); scheduler.notify() },
   })
-  await clock.advance(810_000)
-  assert.deepEqual(calls, [30_000, 60_000, 120_000, 240_000, 480_000, 780_000, 810_000])
-  assert.deepEqual(failures.map(item => item.retryInMs), [30_000, 60_000, 120_000, 240_000, 300_000, 30_000])
+  await clock.advance(630_000)
+  assert.deepEqual(calls, [10_000, 20_000, 40_000, 80_000, 160_000, 320_000, 620_000, 630_000])
+  assert.deepEqual(failures.map(item => item.retryInMs), [10_000, 20_000, 40_000, 80_000, 160_000, 300_000, 10_000])
   assert.ok(failures.every(item => item.error instanceof Error && item.target.fileId === 'local-1'))
   scheduler.dispose()
 })
@@ -199,16 +199,16 @@ test('one document failure does not delay another file, and switching back prese
     async save(target) { calls.push([clock.now(), target.fileId]); return target.fileId === 'local-2' },
     onError(_error, target, retryInMs) { retries.push([target.fileId, retryInMs]) },
   })
-  await clock.advance(60_000)
+  await clock.advance(20_000)
   state.key = 'tab-2'; state.fileId = 'local-2'
   scheduler.notify()
-  await clock.advance(30_000)
+  await clock.advance(10_000)
   state.key = 'tab-1'; state.fileId = 'local-1'
-  await clock.advance(30_000)
+  await clock.advance(10_000)
   state.fileId = 'local-1-saved-as'
-  await clock.advance(30_000)
-  assert.deepEqual(calls, [[30_000, 'local-1'], [60_000, 'local-1'], [90_000, 'local-2'], [120_000, 'local-1'], [150_000, 'local-1-saved-as']])
-  assert.deepEqual(retries, [['local-1', 30_000], ['local-1', 60_000], ['local-1', 120_000], ['local-1-saved-as', 30_000]])
+  await clock.advance(10_000)
+  assert.deepEqual(calls, [[10_000, 'local-1'], [20_000, 'local-1'], [30_000, 'local-2'], [40_000, 'local-1'], [50_000, 'local-1-saved-as']])
+  assert.deepEqual(retries, [['local-1', 10_000], ['local-1', 20_000], ['local-1', 40_000], ['local-1-saved-as', 10_000]])
   scheduler.dispose()
 })
 
@@ -217,7 +217,7 @@ test('disposing a pending save suppresses later error callbacks and all reschedu
   let calls = 0
   const scheduler = createAutosaveScheduler({ clock, readState: () => state,
     save() { calls++; return pending.promise }, onError: error => errors.push(error) })
-  await clock.advance(30_000)
+  await clock.advance(10_000)
   scheduler.dispose()
   scheduler.notify()
   pending.reject(Error('保存失败'))
@@ -244,7 +244,7 @@ test('disposal inside an error notification prevents the finally block from sche
 test('turning the preference off during a save prevents any following timer', async () => {
   const clock = fakeClock(), state = editable(), pending = deferred()
   const scheduler = createAutosaveScheduler({ clock, readState: () => state, save: () => pending.promise })
-  await clock.advance(30_000)
+  await clock.advance(10_000)
   state.enabled = false
   scheduler.notify()
   pending.resolve(true)
@@ -262,10 +262,10 @@ test('state and error-notification exceptions fail closed without killing the ti
     async save() { calls++; return true },
     onError() { throw Error('通知暂不可用') },
   })
-  await clock.advance(60_000)
+  await clock.advance(20_000)
   assert.equal(calls, 0)
   stateUnavailable = false
-  await clock.advance(30_000)
+  await clock.advance(10_000)
   assert.equal(calls, 1)
   scheduler.dispose()
 })
@@ -274,20 +274,20 @@ test('invalid timing configuration cannot start a hot retry loop', () => {
   for (const intervalMs of [0, -1, NaN, Infinity, 2_147_483_648]) {
     assert.throws(() => createAutosaveScheduler({ readState: () => editable(), save: async () => true, intervalMs }), RangeError)
   }
-  assert.throws(() => createAutosaveScheduler({ readState: () => editable(), save: async () => true, intervalMs: 30_000, maxBackoffMs: 1 }), RangeError)
+  assert.throws(() => createAutosaveScheduler({ readState: () => editable(), save: async () => true, intervalMs: 10_000, maxBackoffMs: 1 }), RangeError)
 })
 
 test('countdown follows the existing deadline across edits and read-only inspections', async () => {
   const clock = fakeClock(), state = editable(), calls = []
   const scheduler = createAutosaveScheduler({ clock, readState: () => state,
     async save() { calls.push(clock.now()); state.dirty = false; return true } })
-  assert.deepEqual(scheduler.inspectTiming(), { status: 'waiting', target: { key: 'tab-1', fileId: 'local-1' }, nextAttemptAt: 30_000, remainingMs: 30_000 })
-  for (let index = 0; index < 29; index++) {
+  assert.deepEqual(scheduler.inspectTiming(), { status: 'waiting', target: { key: 'tab-1', fileId: 'local-1' }, nextAttemptAt: 10_000, remainingMs: 10_000 })
+  for (let index = 0; index < 9; index++) {
     await clock.advance(1_000)
     scheduler.notify()
     const timing = scheduler.inspectTiming()
-    assert.equal(timing.nextAttemptAt, 30_000)
-    assert.equal(timing.remainingMs, 30_000 - clock.now())
+    assert.equal(timing.nextAttemptAt, 10_000)
+    assert.equal(timing.remainingMs, 10_000 - clock.now())
     assert.equal(clock.pending, 1)
   }
   state.dirty = false
@@ -295,7 +295,7 @@ test('countdown follows the existing deadline across edits and read-only inspect
   state.dirty = true
   assert.equal(scheduler.inspectTiming().remainingMs, 1_000)
   await clock.advance(1_000)
-  assert.deepEqual(calls, [30_000])
+  assert.deepEqual(calls, [10_000])
   assert.deepEqual(scheduler.inspectTiming(), { status: 'idle' })
   scheduler.dispose()
   assert.deepEqual(scheduler.inspectTiming(), { status: 'disposed' })
@@ -307,10 +307,10 @@ test('countdown exposes due work without invoking a save or an error notificatio
   const clock = { now: () => now, setTimeout() { timers++; return 1 }, clearTimeout() { timers-- } }
   const scheduler = createAutosaveScheduler({ clock, readState() { if (unreadable) throw Error('不可读取'); return state },
     async save() { calls++; return true }, onError() { errors++ } })
-  now = 30_000
+  now = 10_000
   assert.equal(scheduler.inspectTiming().status, 'due')
   assert.equal(scheduler.inspectTiming().remainingMs, 0)
-  now = 30_700
+  now = 10_700
   assert.equal(scheduler.inspectTiming().remainingMs, 0)
   unreadable = true
   for (let index = 0; index < 20; index++) assert.deepEqual(scheduler.inspectTiming(), { status: 'idle' })
@@ -324,14 +324,14 @@ test('countdown distinguishes typing deferral, unfinished drafts and a completed
   const scheduler = createAutosaveScheduler({ clock, readState: () => state,
     async save() { if (draftPending) return 'deferred'; state.dirty = false; return true } })
   assert.equal(scheduler.inspectTiming().status, 'waiting')
-  await clock.advance(30_000)
-  assert.deepEqual(scheduler.inspectTiming(), { status: 'deferred', target: { key: 'tab-1', fileId: 'local-1' }, nextAttemptAt: 31_200, remainingMs: 1_200 })
+  await clock.advance(10_000)
+  assert.deepEqual(scheduler.inspectTiming(), { status: 'deferred', target: { key: 'tab-1', fileId: 'local-1' }, nextAttemptAt: 11_200, remainingMs: 1_200 })
   await clock.advance(500)
   state.composing = false
   assert.equal(scheduler.inspectTiming().remainingMs, 700)
   await clock.advance(700)
   assert.equal(scheduler.inspectTiming().status, 'deferred')
-  assert.equal(scheduler.inspectTiming().nextAttemptAt, 32_400)
+  assert.equal(scheduler.inspectTiming().nextAttemptAt, 12_400)
   state.key = 'tab-2'; state.fileId = 'local-2'
   assert.equal(scheduler.inspectTiming().status, 'waiting', 'a deferral belongs to its original file')
   state.key = 'tab-1'; state.fileId = 'local-1'; draftPending = false
@@ -343,7 +343,7 @@ test('countdown distinguishes typing deferral, unfinished drafts and a completed
 test('running timing retains the transaction target across tab and preference changes', async () => {
   const clock = fakeClock(), state = editable(), pending = deferred()
   const scheduler = createAutosaveScheduler({ clock, readState: () => state, save: () => pending.promise })
-  await clock.advance(30_000)
+  await clock.advance(10_000)
   const timing = scheduler.inspectTiming()
   assert.deepEqual(timing, { status: 'running', target: { key: 'tab-1', fileId: 'local-1' } })
   assert.equal(Object.isFrozen(timing.target), true)
@@ -356,31 +356,31 @@ test('running timing retains the transaction target across tab and preference ch
   assert.equal(clock.pending, 0)
   state.enabled = true
   scheduler.notify()
-  assert.equal(scheduler.inspectTiming().nextAttemptAt, 60_000)
+  assert.equal(scheduler.inspectTiming().nextAttemptAt, 20_000)
   assert.deepEqual(scheduler.inspectTiming().target, { key: 'tab-2', fileId: 'local-2' })
   scheduler.dispose()
 })
 
 test('retry countdown predicts the actual tick including non-aligned backoff caps and file changes', async () => {
   const clock = fakeClock(), state = editable(), calls = []
-  const scheduler = createAutosaveScheduler({ clock, readState: () => state, maxBackoffMs: 45_000,
+  const scheduler = createAutosaveScheduler({ clock, readState: () => state, maxBackoffMs: 15_000,
     async save(target) { calls.push([clock.now(), target.fileId]); return false } })
-  await clock.advance(30_000)
+  await clock.advance(10_000)
   assert.equal(scheduler.inspectTiming().status, 'retrying')
-  assert.equal(scheduler.inspectTiming().nextAttemptAt, 60_000)
-  await clock.advance(30_000)
-  // The second failure is eligible at 105s, but ticks occur at 90s and 120s.
-  assert.equal(scheduler.inspectTiming().nextAttemptAt, 120_000)
-  assert.equal(scheduler.inspectTiming().remainingMs, 60_000)
+  assert.equal(scheduler.inspectTiming().nextAttemptAt, 20_000)
+  await clock.advance(10_000)
+  // The second failure is eligible at 35s, but ticks occur at 30s and 40s.
+  assert.equal(scheduler.inspectTiming().nextAttemptAt, 40_000)
+  assert.equal(scheduler.inspectTiming().remainingMs, 20_000)
   state.key = 'tab-2'; state.fileId = 'local-2'
   assert.equal(scheduler.inspectTiming().status, 'waiting')
-  assert.equal(scheduler.inspectTiming().nextAttemptAt, 90_000)
+  assert.equal(scheduler.inspectTiming().nextAttemptAt, 30_000)
   state.key = 'tab-1'; state.fileId = 'local-1'
-  await clock.advance(30_000)
-  assert.equal(scheduler.inspectTiming().nextAttemptAt, 120_000)
-  assert.equal(scheduler.inspectTiming().remainingMs, 30_000)
-  await clock.advance(30_000)
-  assert.deepEqual(calls, [[30_000, 'local-1'], [60_000, 'local-1'], [120_000, 'local-1']])
+  await clock.advance(10_000)
+  assert.equal(scheduler.inspectTiming().nextAttemptAt, 40_000)
+  assert.equal(scheduler.inspectTiming().remainingMs, 10_000)
+  await clock.advance(10_000)
+  assert.deepEqual(calls, [[10_000, 'local-1'], [20_000, 'local-1'], [40_000, 'local-1']])
   scheduler.dispose()
 })
 

@@ -170,6 +170,7 @@ const globalActionsBlocked = computed(() => !!busy.value || !!saveAsDraft.value 
 const editorInputBlocked = computed(() => (!!busy.value && !backgroundSaving.value) || !!saveAsDraft.value || !!templateDraft.value || !!closeTarget.value || help.value)
 const currentDocument = computed(() => home.value ? undefined : active.value)
 const documentActionsDisabled = computed(() => globalActionsBlocked.value || !currentDocument.value?.ready)
+const printDisabled = computed(() => documentActionsDisabled.value || typeof editor()?.print !== 'function')
 const newMenu = ref<HTMLDetailsElement>()
 function closeNewMenu(restoreFocus = false) {
   newMenu.value?.removeAttribute('open')
@@ -666,7 +667,17 @@ async function resolveClose(action:'save'|'discard') {
     }
   })
 }
-function editCommand(command:'undo'|'redo'|'print') {void task('正在处理',async()=>{const fn=editor()?.[command];if(fn)await fn();else if(command==='print'&&await saveActive(true,'pdf'))status.value='已导出 PDF；请在系统 PDF 阅读器中打开并打印。'})}
+function editCommand(command:'undo'|'redo'|'print') {
+  if (documentActionsDisabled.value) return
+  void task(command === 'print' ? '正在准备打印' : '正在处理', async () => {
+    const current = editor()
+    if (command === 'print') {
+      if (typeof current?.print !== 'function') throw Error('当前文档尚不能打印，请等待编辑器准备完成后重试。')
+      const result = await current.print()
+      status.value = result.status === 'cancelled' ? '已取消打印' : result.status === 'completed' ? '打印已提交给系统' : '已打开打印窗口'
+    } else await current?.[command]?.()
+  })
+}
 function rustEditorFileAction(action:string) {
   if(globalActionsBlocked.value)return
   if(action==='save')save()
@@ -727,7 +738,7 @@ function handleFor(tab: Tab) {
 }
 const autosaveEnabled=ref((()=>{try{return localStorage.getItem('open-office-autosave')==='true'}catch{return false}})())
 const autosaveWaiting=ref<{key:string;reason:string}>()
-const autosaveTitle=computed(()=>native.isTauri()?'每 30 秒将修改保存回当前文件；输入或弹窗期间暂缓，完成编辑后自动继续。新建文件请先选择保存位置。':'浏览器编辑请使用保存按钮下载；桌面版支持直接保存原文件。')
+const autosaveTitle=computed(()=>native.isTauri()?'每 10 秒将修改保存回当前文件；输入或弹窗期间暂缓，完成编辑后自动继续。新建文件请先选择保存位置。':'浏览器编辑请使用保存按钮下载；桌面版支持直接保存原文件。')
 const saveStateLabel=computed(()=>{
   const tab=currentDocument.value
   if(!tab)return '本地办公'
@@ -1166,7 +1177,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
           <button data-testid="shell-autosave" class="autosave-toggle" role="switch" :aria-checked="native.isTauri()&&autosaveEnabled" :disabled="!native.isTauri()" :title="autosaveTitle" aria-label="自动保存" :aria-describedby="autosaveCountdown ? 'autosave-timing' : undefined" @click="autosaveEnabled=!autosaveEnabled"><span class="autosave-track" :class="{enabled:native.isTauri()&&autosaveEnabled}"><i/></span><span class="autosave-label">自动保存</span><span v-if="autosaveCountdown" id="autosave-timing" data-testid="autosave-countdown" class="autosave-countdown" role="timer" aria-live="off">{{autosaveCountdown}}</span></button>
           <button data-testid="shell-save-as" :disabled="documentActionsDisabled" @click="globalFileAction('saveAs')" title="当前文档另存为 · Ctrl / ⌘ Shift S" aria-label="当前文档另存为"><Icon name="save-as" :size="18"/><span class="file-action-label">另存为</span></button>
           <button data-testid="shell-export-pdf" :disabled="documentActionsDisabled||currentDocument?.document.kind==='pdf'||!formatsFor(currentDocument).some(option=>option.extension==='pdf')" @click="globalFileAction('exportPdf')" title="导出当前文档为 PDF" aria-label="导出当前文档为 PDF"><Icon name="download" :size="18"/><span class="file-action-label">导出 PDF</span></button>
-          <button data-testid="shell-print" :disabled="documentActionsDisabled" @click="globalFileAction('print')" title="打印当前文档 · Ctrl / ⌘ P" aria-label="打印当前文档"><Icon name="print" :size="18"/><span class="file-action-label">打印</span></button>
+          <button data-testid="shell-print" :disabled="printDisabled" @click="globalFileAction('print')" :title="printDisabled ? '请等待可打印的文档就绪' : '打印当前文档 · Ctrl / ⌘ P'" aria-label="打印当前文档"><Icon name="print" :size="18"/><span class="file-action-label">打印</span></button>
           <span class="separator"/>
           <button :disabled="documentActionsDisabled" @click="globalFileAction('undo')" title="撤销" aria-label="撤销"><Icon name="undo" :size="18"/></button>
           <button :disabled="documentActionsDisabled" @click="globalFileAction('redo')" title="重做" aria-label="重做"><Icon name="redo" :size="18"/></button>
@@ -1277,7 +1288,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <div class="modal-actions"><button data-testid="close-cancel" :disabled="!!busy" @click="closeTarget=null">取消</button><button data-testid="close-discard" :disabled="!!busy" @click="resolveClose('discard')">{{closeTarget==='window'?'全部不保存并退出':closeTarget==='all'?'全部不保存并关闭':'不保存并关闭'}}</button><button class="primary" data-testid="close-save" :disabled="!!busy" @click="resolveClose('save')">{{closeTarget==='window'?'全部保存并退出':closeTarget==='all'?'全部保存并关闭':'保存并关闭'}}</button></div>
       </section>
     </div>
-    <div v-if="help" class="modal-backdrop" @click.self="help=false" @keydown.esc.stop.prevent="help=false"><section ref="helpDialog" class="modal help-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>提供中文文字排版、表格与公式、数据分析、幻灯片编排及 PDF 导出。文字、表格、演示与 PDF 均使用本地 Rust 文档引擎。支持 DOCX、XLSX、CSV、TSV、PPTX、POTX 与 PPSX；模板与放映文稿另存为 PPTX。旧 DOC、RTF、ODT、XLS、ODS、PPT 与 ODP 请先转换为支持的格式。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持 PDF 阅读、文字编辑、批注、页面整理与书签导航。编辑、排版和保存均由本地 Rust 引擎处理。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件可能使原签名失效，请先核对签名状态。演示文稿支持幻灯片编排、对象编辑、备注与放映。复杂转场、动画、SmartArt 与媒体兼容性请以导出结果为准。复杂文档的兼容性仍需逐步完善：复杂排版、最新函数、宏与插件仍有差异。请检查导出结果；宏不自动执行。</p><p class="help-note"><strong>永久本地范围：</strong>不提供账户、云盘、云协作或云 AI，也不将这些服务列入后续功能计划。安装包内的编辑引擎在本机处理文档。</p><p class="help-note"><strong>原文件与自动保存：</strong>打开本机文件后直接编辑，保存会写回原路径；另存为和格式转换才会创建新文件。自动保存开关位于保存按钮旁，每 30 秒保存当前文件，并显示倒计时；输入或弹窗操作未完成时暂缓。新建文件请先选择保存位置。笔记本使用本地 .oonote 格式，支持分区、页面、富文本和待办。画布支持图形、连线、手绘与模板；代码图表支持源码实时预览和风格切换。两者以 .owflow 保存完整编辑内容，也可导出 SVG 和 PNG。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 {{appVersion}} · 构建 {{buildVersion}} · 使用本地 Rust 文档引擎。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
+    <div v-if="help" class="modal-backdrop" @click.self="help=false" @keydown.esc.stop.prevent="help=false"><section ref="helpDialog" class="modal help-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="help-heading"><button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button><span class="eyebrow">OPEN OFFICE</span><h2 id="help-heading">为本地工作而设计</h2><div class="help-grid"><article><Icon name="file"/><h3>文字、表格与演示</h3><p>提供中文文字排版、表格与公式、数据分析、幻灯片编排及 PDF 导出。文字、表格、演示与 PDF 均使用本地 Rust 文档引擎。支持 DOCX、XLSX、CSV、TSV、PPTX、POTX 与 PPSX；模板与放映文稿另存为 PPTX。旧 DOC、RTF、ODT、XLS、ODS、PPT 与 ODP 请先转换为支持的格式。</p></article><article><Icon name="pdf"/><h3>PDF 工作室</h3><p>支持 PDF 阅读、文字编辑、批注、页面整理与书签导航。编辑、排版和保存均由本地 Rust 引擎处理。</p></article></div><p class="help-note">PDF 原文编辑针对可提取的文字，不包含扫描件 OCR。受密码或编辑权限保护的文件需要相应授权。修改数字签名文件可能使原签名失效，请先核对签名状态。演示文稿支持幻灯片编排、对象编辑、备注与放映。复杂转场、动画、SmartArt 与媒体兼容性请以导出结果为准。复杂文档的兼容性仍需逐步完善：复杂排版、最新函数、宏与插件仍有差异。请检查导出结果；宏不自动执行。</p><p class="help-note"><strong>永久本地范围：</strong>不提供账户、云盘、云协作或云 AI，也不将这些服务列入后续功能计划。安装包内的编辑引擎在本机处理文档。</p><p class="help-note"><strong>原文件与自动保存：</strong>打开本机文件后直接编辑，保存会写回原路径；另存为和格式转换才会创建新文件。自动保存开关位于保存按钮旁，每 10 秒保存当前文件，并显示倒计时；输入或弹窗操作未完成时暂缓。新建文件请先选择保存位置。笔记本使用本地 .oonote 格式，支持分区、页面、富文本和待办。画布支持图形、连线、手绘与模板；代码图表支持源码实时预览和风格切换。两者以 .owflow 保存完整编辑内容，也可导出 SVG 和 PNG。</p><p class="help-shortcuts">打开 <kbd>Ctrl / ⌘ O</kbd>　保存 <kbd>Ctrl / ⌘ S</kbd>　另存为 <kbd>Ctrl / ⌘ ⇧ S</kbd></p><small>版本 {{appVersion}} · 构建 {{buildVersion}} · 使用本地 Rust 文档引擎。第三方许可随应用提供。</small><button class="primary" @click="help=false">开始工作</button></section></div>
   </div>
 </template>
 

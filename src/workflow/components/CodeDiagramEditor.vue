@@ -16,7 +16,9 @@ const interactive = computed(() => props.active && !props.disabled)
 const draft = ref(props.source), sourceInput = ref<HTMLTextAreaElement>(), error = ref(''), errorLine = ref(0)
 const compiled = ref<CodeDiagramResult | null>(null), parsing = ref(false), scrollTop = ref(0), zoom = ref(1)
 const compiledSource = ref(''), selection = ref({ start: 0, end: 0, head: 0 })
-const previewScroll = ref<HTMLElement>(), sourceOverlay = ref<SVGSVGElement>()
+const previewScroll = ref<HTMLElement>(), previewPage = ref<HTMLElement>(), sourceOverlay = ref<SVGSVGElement>()
+const minPreviewZoom = .4, maxPreviewZoom = 3
+let zoomRequest = 0, pinchZoom: number | undefined
 type LibraryTemplate = DiagramTemplate & { kind: DiagramKind }
 const templatesOpen = ref(false), templateCategory = ref('all'), templateSearch = ref('')
 const pendingTemplate = ref<LibraryTemplate>(), templateDialog = ref<HTMLElement>(), templateSearchInput = ref<HTMLInputElement>(), templateButton = ref<HTMLButtonElement>()
@@ -274,6 +276,57 @@ function locateCurrent() {
   const screen = point.matrixTransform(transform), viewport = container.getBoundingClientRect()
   container.scrollTo({ left: container.scrollLeft + screen.x - viewport.left - container.clientWidth / 2, top: container.scrollTop + screen.y - viewport.top - container.clientHeight / 2, behavior: 'auto' })
 }
+function zoomPreview(next: number, pointer?: { clientX: number; clientY: number }) {
+  if (!interactive.value || modalOpen.value || !Number.isFinite(next)) return
+  const nextZoom = Math.max(minPreviewZoom, Math.min(maxPreviewZoom, next))
+  if (nextZoom === zoom.value) return
+  const container = previewScroll.value, page = previewPage.value
+  if (!container || !page) { zoom.value = nextZoom; return }
+  const viewport = container.getBoundingClientRect(), before = page.getBoundingClientRect()
+  if (!before.width || !before.height) return
+  const anchor = pointer || { clientX: viewport.left + container.clientWidth / 2, clientY: viewport.top + container.clientHeight / 2 }
+  const x = (anchor.clientX - before.left) / before.width, y = (anchor.clientY - before.top) / before.height
+  const request = ++zoomRequest
+  zoom.value = nextZoom
+  // Measure after Vue updates the page size. Keep the same diagram point under
+  // the pointer; the browser clamps at the preview edges when zooming out.
+  void nextTick(() => {
+    if (request !== zoomRequest || previewScroll.value !== container || previewPage.value !== page || !interactive.value) return
+    const after = page.getBoundingClientRect()
+    container.scrollLeft += after.left + x * after.width - anchor.clientX
+    container.scrollTop += after.top + y * after.height - anchor.clientY
+  })
+}
+function previewWheel(event: WheelEvent) {
+  if (!interactive.value || modalOpen.value || pinchZoom !== undefined) return
+  // Wheel devices may report pixels, lines or whole pages. Ctrl+wheel is also
+  // emitted by trackpad pinch gestures in Chromium-based WebViews.
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? previewScroll.value?.clientHeight || 600 : 1
+  const delta = event.deltaY * unit
+  if (Number.isFinite(delta) && delta) zoomPreview(zoom.value * Math.exp(-Math.max(-600, Math.min(600, delta)) * .002), event)
+}
+function previewGesture(event: Event) {
+  if (!interactive.value || modalOpen.value) return
+  event.preventDefault()
+  event.stopPropagation()
+  if (event.type === 'gesturestart') { pinchZoom = zoom.value; return }
+  if (event.type === 'gestureend') { pinchZoom = undefined; return }
+  const gesture = event as Event & { scale?: number; clientX?: number; clientY?: number }
+  if (pinchZoom === undefined || !Number.isFinite(gesture.scale) || gesture.scale! <= 0) return
+  const anchor = Number.isFinite(gesture.clientX) && Number.isFinite(gesture.clientY)
+    ? { clientX: gesture.clientX!, clientY: gesture.clientY! } : undefined
+  zoomPreview(pinchZoom * gesture.scale!, anchor)
+}
+watch(previewScroll, (container, _, onCleanup) => {
+  if (!container) return
+  // Safari / macOS WKWebView sends GestureEvents instead of Ctrl+wheel.
+  for (const name of ['gesturestart', 'gesturechange', 'gestureend']) container.addEventListener(name, previewGesture, { passive: false })
+  onCleanup(() => {
+    pinchZoom = undefined
+    zoomRequest++
+    for (const name of ['gesturestart', 'gesturechange', 'gestureend']) container.removeEventListener(name, previewGesture)
+  })
+}, { flush: 'post' })
 function locateError() {
   if (!sourceInput.value || !errorLine.value) return
   const start = sourcePositions.value.lineStarts[errorLine.value - 1] ?? sourceInput.value.value.length
@@ -294,7 +347,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', closeExportO
 function hasDirtyDraft() { return composing.value || draft.value !== props.source }
 function hasPendingEdits() { return hasDirtyDraft() || modalOpen.value }
 watch([draft, composing, () => props.source], () => emit('pending', hasDirtyDraft()), { flush: 'sync' })
-watch(() => props.active, value => { if (!value) { closeExportMenu(); stylesOpen.value = false; templatesOpen.value = false; pendingTemplate.value = undefined } })
+watch(() => props.active, value => { if (!value) { closeExportMenu(); stylesOpen.value = false; templatesOpen.value = false; pendingTemplate.value = undefined; pinchZoom = undefined; zoomRequest++ } })
 defineExpose({ flush, hasPendingEdits, hasDirtyDraft, focus: () => sourceInput.value?.focus() })
 parse()
 </script>
@@ -327,14 +380,14 @@ parse()
         </details>
       </div>
       <div class="diagram-preview-panel">
-        <div class="diagram-panel-title"><span>预览 <span v-if="compiled" class="diagram-preview-kind"><AppIcon :name="compiled.kind" :size="12"/>{{ kindLabel }}</span></span><div class="diagram-zoom"><button type="button" aria-label="缩小预览" :disabled="zoom <= .4" @click="zoom = Math.max(.4, zoom - .2)"><AppIcon name="minus" :size="13"/></button><button type="button" aria-label="重置预览缩放" @click="zoom = 1">{{ Math.round(zoom * 100) }}%</button><button type="button" aria-label="放大预览" :disabled="zoom >= 3" @click="zoom = Math.min(3, zoom + .2)"><AppIcon name="plus" :size="13"/></button></div></div>
+        <div class="diagram-panel-title"><span>预览 <span v-if="compiled" class="diagram-preview-kind"><AppIcon :name="compiled.kind" :size="12"/>{{ kindLabel }}</span></span><div class="diagram-zoom"><span class="diagram-zoom-hint">滚轮 / 捏合缩放</span><button type="button" aria-label="缩小预览" :disabled="zoom <= minPreviewZoom" @click="zoomPreview(zoom - .2)"><AppIcon name="minus" :size="13"/></button><button type="button" aria-label="重置预览缩放" title="重置为 100% · 在预览中滚轮或捏合缩放" @click="zoomPreview(1)">{{ Math.round(zoom * 100) }}%</button><button type="button" aria-label="放大预览" :disabled="zoom >= maxPreviewZoom" @click="zoomPreview(zoom + .2)"><AppIcon name="plus" :size="13"/></button></div></div>
         <div v-if="parsing" class="diagram-parsing" role="status"><span class="diagram-spinner" />正在解析…</div>
         <div v-if="error && !parsing" :id="errorId" class="diagram-error" role="alert" data-testid="diagram-error">
           <strong><AppIcon name="alert" :size="16"/>源码需要修正</strong><p>{{ error }}</p><button v-if="errorLine" type="button" @click="locateError"><AppIcon name="search" :size="14"/>定位到第 {{ errorLine }} 行</button>
         </div>
-        <div v-if="compiled" ref="previewScroll" class="diagram-preview-scroll" :aria-busy="parsing">
+        <div v-if="compiled" ref="previewScroll" class="diagram-preview-scroll" :aria-busy="parsing" aria-label="图表预览，滚轮或捏合缩放" data-testid="diagram-preview-viewport" @wheel.prevent.stop="previewWheel">
           <div class="diagram-preview" :style="{ width: `${zoom * 100}%`, minWidth: `${zoom * 100}%` }">
-            <div class="diagram-preview-page">
+            <div ref="previewPage" class="diagram-preview-page">
               <div class="diagram-preview-art" data-testid="diagram-preview" v-html="svg"/>
               <svg v-if="sourceHighlights.length" ref="sourceOverlay" class="diagram-source-overlay" data-testid="diagram-source-overlay" :viewBox="previewViewBox" aria-hidden="true">
                 <g v-for="highlight in sourceHighlights" :key="highlight.id" :data-source-element-id="highlight.id">
@@ -381,7 +434,7 @@ parse()
 </template>
 
 <style scoped>
-.diagram-editor{position:relative;height:100%;min-height:0;display:flex;flex-direction:column;color:var(--ui-text,#273449);background:var(--ui-bg,#f4f6fa);font-family:var(--ui-font);font-size:13px}.diagram-toolbar{min-height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 16px;border-bottom:1px solid var(--ui-line,#e2e8f0);background:var(--ui-surface,#fff)}.diagram-title{display:flex;align-items:center;gap:10px;white-space:nowrap}.diagram-title strong{font-size:14px}.diagram-badge{color:var(--ui-muted,#64748b);font-size:11px}.diagram-editor button{font:inherit;cursor:pointer;border:1px solid var(--ui-line,#dce3ed);color:var(--ui-text,#273449);background:var(--ui-surface,#fff);border-radius:7px;padding:6px 10px}.diagram-editor button:hover:not(:disabled){border-color:var(--ui-accent,#3577e5);color:var(--ui-accent,#3577e5)}.diagram-editor button:disabled{opacity:.45;cursor:default}.diagram-editor button:focus-visible,.diagram-editor summary:focus-visible{outline:2px solid var(--ui-accent,#3577e5);outline-offset:2px}.diagram-convert{display:flex;align-items:center;gap:7px;white-space:nowrap}.diagram-convert svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.5}.diagram-workspace{display:grid;grid-template-columns:minmax(260px,37%) minmax(0,1fr);flex:1;min-height:0;overflow:hidden}.diagram-source-panel,.diagram-preview-panel{min-width:0;min-height:0;display:flex;flex-direction:column;position:relative}.diagram-source-panel{background:var(--ui-surface,#fff);border-right:1px solid var(--ui-line,#e2e8f0)}.diagram-panel-title{height:37px;flex-shrink:0;padding:0 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--ui-muted,#64748b);font-size:11px;border-bottom:1px solid var(--ui-line,#e2e8f0);background:var(--ui-surface,#fff)}.diagram-panel-title>span:first-child{font-weight:600;color:var(--ui-text,#273449)}.diagram-code{flex:1;min-height:180px;display:flex;overflow:hidden;position:relative}.diagram-gutter{flex:0 0 43px;overflow:hidden;text-align:right;padding:16px 10px 0 0;color:var(--ui-muted,#94a3b8);background:var(--ui-bg,#f8fafc);user-select:none}.diagram-gutter pre{margin:0;font:13px/23px ui-monospace,SFMono-Regular,Consolas,monospace}.diagram-code textarea{display:block;border:0;border-radius:0;outline:0;resize:none;width:100%;min-width:0;height:100%;min-height:180px;box-sizing:border-box;padding:16px 16px 32px 12px;font:13px/23px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--ui-text,#273449);background:var(--ui-surface,#fff);tab-size:2;white-space:pre;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--ui-line,#cbd5e1) transparent}.diagram-code textarea:focus{box-shadow:inset 2px 0 var(--ui-accent,#3577e5)}.diagram-help{padding:11px 14px;border-top:1px solid var(--ui-line,#e2e8f0);font-size:11px;color:var(--ui-muted,#64748b);max-height:38%;overflow:auto;scrollbar-width:thin}.diagram-help summary{cursor:pointer;color:var(--ui-text,#273449)}.diagram-help p{margin:10px 0 0;line-height:1.8}.diagram-help code{font-size:10px;background:var(--ui-bg,#f4f6fa);border-radius:3px;padding:2px 3px}.diagram-preview-kind{font-weight:400;font-size:10px;padding-left:8px;color:var(--ui-muted,#64748b)}.diagram-zoom{display:flex;align-items:center;gap:3px}.diagram-zoom button{border:0;font-size:11px;padding:2px 6px;min-width:24px}.diagram-preview-scroll{flex:1;min-height:0;overflow:auto;scrollbar-width:thin;padding:24px;box-sizing:border-box;background-image:radial-gradient(var(--ui-line,#d6dfe9) .7px,transparent .7px);background-size:16px 16px}.diagram-preview{min-height:100%;display:flex;align-items:flex-start;justify-content:center;transition:width .12s;box-sizing:border-box}.diagram-preview-art :deep(svg){display:block;width:100%;height:auto;max-height:none;box-shadow:0 4px 24px #1e293b0b;border:1px solid var(--ui-line,#e2e8f0);border-radius:5px}.diagram-parsing{position:absolute;top:48px;left:50%;transform:translateX(-50%);z-index:2;display:flex;align-items:center;gap:7px;background:var(--ui-surface,#fff);padding:7px 12px;border:1px solid var(--ui-line,#e2e8f0);border-radius:20px;font-size:11px;box-shadow:0 2px 10px #00000009}.diagram-spinner{width:11px;height:11px;border:2px solid var(--ui-line,#e2e8f0);border-top-color:var(--ui-accent,#3577e5);border-radius:50%;animation:diagram-spin .8s linear infinite}.diagram-error{margin:24px;padding:18px;border:1px solid #f3bbbb;border-radius:9px;background:#fff3f3;color:#9b2b2b;line-height:1.6}.diagram-error strong{font-size:14px}.diagram-error p{margin:8px 0 14px;overflow-wrap:anywhere}.diagram-error button{background:#fff;color:#9b2b2b;border-color:#f3bbbb;font-size:12px}.diagram-warnings{padding:8px 15px;background:var(--ui-surface,#fff);border-top:1px solid var(--ui-line,#e2e8f0);color:var(--ui-muted,#64748b);font-size:11px;max-height:100px;overflow:auto}.diagram-warnings p{margin:3px 0;line-height:1.5}.diagram-empty{display:grid;place-items:center;flex:1;color:var(--ui-muted,#64748b);padding:24px;text-align:center}.is-dark .diagram-error{background:#3a242b;color:#ffc1c1;border-color:#75414a}.is-dark .diagram-error button{background:#3a242b;color:#ffc1c1;border-color:#75414a}@keyframes diagram-spin{to{transform:rotate(360deg)}}@media(max-width:760px){.diagram-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(210px,43%) minmax(200px,1fr);overflow:auto}.diagram-source-panel{border-right:0;border-bottom:1px solid var(--ui-line,#e2e8f0)}.diagram-code{min-height:100px}.diagram-code textarea{min-height:100px}.diagram-gutter{flex-basis:34px;padding-right:7px}.diagram-toolbar{padding:7px 10px;gap:6px}.diagram-badge{display:none}.diagram-convert{font-size:11px!important;padding:6px 7px!important}.diagram-help{padding:8px 10px;max-height:45%}.diagram-preview-scroll{padding:12px}.diagram-error{margin:12px;padding:12px}}@media(prefers-reduced-motion:reduce){.diagram-preview{transition:none}.diagram-spinner{animation:none}}
+.diagram-editor{position:relative;height:100%;min-height:0;display:flex;flex-direction:column;color:var(--ui-text,#273449);background:var(--ui-bg,#f4f6fa);font-family:var(--ui-font);font-size:13px}.diagram-toolbar{min-height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 16px;border-bottom:1px solid var(--ui-line,#e2e8f0);background:var(--ui-surface,#fff)}.diagram-title{display:flex;align-items:center;gap:10px;white-space:nowrap}.diagram-title strong{font-size:14px}.diagram-badge{color:var(--ui-muted,#64748b);font-size:11px}.diagram-editor button{font:inherit;cursor:pointer;border:1px solid var(--ui-line,#dce3ed);color:var(--ui-text,#273449);background:var(--ui-surface,#fff);border-radius:7px;padding:6px 10px}.diagram-editor button:hover:not(:disabled){border-color:var(--ui-accent,#3577e5);color:var(--ui-accent,#3577e5)}.diagram-editor button:disabled{opacity:.45;cursor:default}.diagram-editor button:focus-visible,.diagram-editor summary:focus-visible{outline:2px solid var(--ui-accent,#3577e5);outline-offset:2px}.diagram-convert{display:flex;align-items:center;gap:7px;white-space:nowrap}.diagram-convert svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.5}.diagram-workspace{display:grid;grid-template-columns:minmax(260px,37%) minmax(0,1fr);flex:1;min-height:0;overflow:hidden}.diagram-source-panel,.diagram-preview-panel{min-width:0;min-height:0;display:flex;flex-direction:column;position:relative}.diagram-source-panel{background:var(--ui-surface,#fff);border-right:1px solid var(--ui-line,#e2e8f0)}.diagram-panel-title{height:37px;flex-shrink:0;padding:0 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--ui-muted,#64748b);font-size:11px;border-bottom:1px solid var(--ui-line,#e2e8f0);background:var(--ui-surface,#fff)}.diagram-panel-title>span:first-child{font-weight:600;color:var(--ui-text,#273449)}.diagram-code{flex:1;min-height:180px;display:flex;overflow:hidden;position:relative}.diagram-gutter{flex:0 0 43px;overflow:hidden;text-align:right;padding:16px 10px 0 0;color:var(--ui-muted,#94a3b8);background:var(--ui-bg,#f8fafc);user-select:none}.diagram-gutter pre{margin:0;font:13px/23px ui-monospace,SFMono-Regular,Consolas,monospace}.diagram-code textarea{display:block;border:0;border-radius:0;outline:0;resize:none;width:100%;min-width:0;height:100%;min-height:180px;box-sizing:border-box;padding:16px 16px 32px 12px;font:13px/23px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--ui-text,#273449);background:var(--ui-surface,#fff);tab-size:2;white-space:pre;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--ui-line,#cbd5e1) transparent}.diagram-code textarea:focus{box-shadow:inset 2px 0 var(--ui-accent,#3577e5)}.diagram-help{padding:11px 14px;border-top:1px solid var(--ui-line,#e2e8f0);font-size:11px;color:var(--ui-muted,#64748b);max-height:38%;overflow:auto;scrollbar-width:thin}.diagram-help summary{cursor:pointer;color:var(--ui-text,#273449)}.diagram-help p{margin:10px 0 0;line-height:1.8}.diagram-help code{font-size:10px;background:var(--ui-bg,#f4f6fa);border-radius:3px;padding:2px 3px}.diagram-preview-kind{font-weight:400;font-size:10px;padding-left:8px;color:var(--ui-muted,#64748b)}.diagram-zoom{display:flex;align-items:center;gap:3px}.diagram-zoom button{border:0;font-size:11px;padding:2px 6px;min-width:24px}.diagram-preview-scroll{flex:1;min-height:0;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain;overflow-anchor:none;padding:24px;box-sizing:border-box;background-image:radial-gradient(var(--ui-line,#d6dfe9) .7px,transparent .7px);background-size:16px 16px}.diagram-preview{min-height:100%;display:flex;align-items:flex-start;justify-content:center;box-sizing:border-box}.diagram-preview-art :deep(svg){display:block;width:100%;height:auto;max-height:none;box-shadow:0 4px 24px #1e293b0b;border:1px solid var(--ui-line,#e2e8f0);border-radius:5px}.diagram-parsing{position:absolute;top:48px;left:50%;transform:translateX(-50%);z-index:2;display:flex;align-items:center;gap:7px;background:var(--ui-surface,#fff);padding:7px 12px;border:1px solid var(--ui-line,#e2e8f0);border-radius:20px;font-size:11px;box-shadow:0 2px 10px #00000009}.diagram-spinner{width:11px;height:11px;border:2px solid var(--ui-line,#e2e8f0);border-top-color:var(--ui-accent,#3577e5);border-radius:50%;animation:diagram-spin .8s linear infinite}.diagram-error{margin:24px;padding:18px;border:1px solid #f3bbbb;border-radius:9px;background:#fff3f3;color:#9b2b2b;line-height:1.6}.diagram-error strong{font-size:14px}.diagram-error p{margin:8px 0 14px;overflow-wrap:anywhere}.diagram-error button{background:#fff;color:#9b2b2b;border-color:#f3bbbb;font-size:12px}.diagram-warnings{padding:8px 15px;background:var(--ui-surface,#fff);border-top:1px solid var(--ui-line,#e2e8f0);color:var(--ui-muted,#64748b);font-size:11px;max-height:100px;overflow:auto}.diagram-warnings p{margin:3px 0;line-height:1.5}.diagram-empty{display:grid;place-items:center;flex:1;color:var(--ui-muted,#64748b);padding:24px;text-align:center}.is-dark .diagram-error{background:#3a242b;color:#ffc1c1;border-color:#75414a}.is-dark .diagram-error button{background:#3a242b;color:#ffc1c1;border-color:#75414a}@keyframes diagram-spin{to{transform:rotate(360deg)}}@media(max-width:760px){.diagram-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(210px,43%) minmax(200px,1fr);overflow:auto}.diagram-source-panel{border-right:0;border-bottom:1px solid var(--ui-line,#e2e8f0)}.diagram-code{min-height:100px}.diagram-code textarea{min-height:100px}.diagram-gutter{flex-basis:34px;padding-right:7px}.diagram-toolbar{padding:7px 10px;gap:6px}.diagram-badge{display:none}.diagram-convert{font-size:11px!important;padding:6px 7px!important}.diagram-help{padding:8px 10px;max-height:45%}.diagram-preview-scroll{padding:12px}.diagram-error{margin:12px;padding:12px}}@media(prefers-reduced-motion:reduce){.diagram-preview{transition:none}.diagram-spinner{animation:none}}
 </style>
 
 <style scoped>
@@ -418,6 +471,8 @@ parse()
 .diagram-style-toggle > svg:first-child { color: var(--ui-accent, #3577e5); }
 .diagram-title > svg { color: var(--ui-accent, #3577e5); }
 .diagram-preview-kind { display: inline-flex; align-items: center; gap: 4px; }
+.diagram-zoom-hint { margin-right: 7px; color: var(--ui-muted, #64748b); font-size: 10px; white-space: nowrap; }
+@media (max-width: 1040px) { .diagram-zoom-hint { display: none; } }
 .diagram-zoom button { display: inline-flex; align-items: center; justify-content: center; min-height: 24px; }
 .diagram-help summary { list-style: none; display: flex; align-items: center; gap: 6px; min-height: 20px; }
 .diagram-help summary::-webkit-details-marker { display: none; }

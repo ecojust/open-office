@@ -71,8 +71,8 @@ export function validateNativeWorkspaceReport(report) {
   check(report.error === undefined && report.cleanupError === undefined, 'operation or cleanup failed');
 
   const autosave = report.autosave; object(autosave, 'real autosave observations');
-  check(autosave.intervalMs === 30_000 && Number.isSafeInteger(autosave.elapsedMs) && autosave.elapsedMs >= 30_000 && autosave.elapsedMs <= 50_000,
-    'autosave must use the ordinary 30-second timer within its bounded wait');
+  check(autosave.intervalMs === 10_000 && Number.isSafeInteger(autosave.elapsedMs) && autosave.elapsedMs >= 10_000 && autosave.elapsedMs <= 30_000,
+    'autosave must use the ordinary 10-second timer within its bounded wait');
   check(typeof autosave.targetId === 'string' && autosave.targetId.length > 0 && autosave.targetId.length <= 256, 'missing approved native file identity');
   const baselineBytes = documentBytes(autosave.initialBase64, autosave.initialSha256, autosave.initialSizeBytes, 'approved initial file');
   check(autosave.finalSha256 !== autosave.initialSha256, 'autosave did not change the file');

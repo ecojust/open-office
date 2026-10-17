@@ -110,8 +110,8 @@ async function exportDeck(format) {
     await page.locator('.presentation-template-card').nth(9).waitFor();
     check('Templates is immediately after View in the PPT ribbon; toggling preserves active ribbon, content and dirty state');
     const manifest = JSON.parse(fs.readFileSync(path.join(root, 'public/presentation-templates/manifest.json')));
-    assert.equal(manifest.length, 10); assert.equal(await page.locator('.presentation-template-card').count(), 10);
-    check('10 built-in templates are reachable in the gallery');
+    assert.equal(manifest.length, 100); assert.equal(await page.locator('.presentation-template-card').count(), 100);
+    check('100 built-in templates are reachable in the gallery');
     await page.getByTestId('presentation-template-blueprint').click();
     assert.equal(await page.getByTestId('global-toolbar').evaluate(el => el.inert), true);
     assert.equal(await page.locator('.editor-workspace').evaluate(el => el.inert), true);
@@ -152,7 +152,7 @@ async function exportDeck(format) {
       }
       console.log(`Rendered and reopened ${template.id}`);
     }
-    check('All 10 templates apply, export PPTX/PDF, and reopen with 30 editable slides; document identity is retained');
+    check('All 100 templates apply, export PPTX/PDF, and reopen with 300 editable slides; document identity is retained');
     const beforeSave = await state();
     await page.getByTestId('presentation-template-save').click();
     await page.getByTestId('presentation-template-name').fill('  ');

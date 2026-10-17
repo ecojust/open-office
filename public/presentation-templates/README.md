@@ -1,6 +1,6 @@
 # 内置演示模板
 
-这里的 10 套模板为 Open Office 原创设计，采用项目根目录的 MIT 许可证。
+这里的 100 套模板为 Open Office 原创设计，采用项目根目录的 MIT 许可证。
 每套包含封面、内容、结尾三页；文字和矢量图形均可编辑，没有外链资源、下载素材或嵌入字体。
 
 运行 `python scripts/generate-presentation-templates.py` 可重新生成全部 PPTX、对应封面 SVG 和 `manifest.json`。需要安装 `python-pptx` 和 `fonttools`。

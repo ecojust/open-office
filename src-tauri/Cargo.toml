@@ -1,6 +1,6 @@
 [package]
 name = "open-office"
-version = "0.15.0"
+version = "0.16.0"
 description = "Local document, spreadsheet, presentation, PDF and notebook editing"
 edition = "2021"
 rust-version = "1.90"
@@ -27,5 +27,10 @@ percent-encoding = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.5"
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSView", "NSWindow", "NSScreen"] }
-objc2-web-kit = { version = "0.3.2", default-features = false, features = ["std", "WKWebView", "WKWebViewConfiguration", "WKWebpagePreferences"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSView", "NSWindow", "NSScreen", "NSPasteboard", "NSPasteboardItem", "NSPrintInfo", "NSPrintOperation"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSString", "NSObject"] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = ["std", "objc2-app-kit", "WKWebView", "WKWebViewConfiguration", "WKWebpagePreferences"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+webview2-com = "0.39"
+windows-core = "0.62"

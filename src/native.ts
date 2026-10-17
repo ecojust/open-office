@@ -1,6 +1,7 @@
 import { invoke, isTauri as detectTauri } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { AppBootstrap, NativeDocument, NativeImage, RecentDocument, SaveDocumentRequest, SaveResult } from './types'
+import type { PrintOutcome } from './shared/printing'
 
 export const isTauri = (): boolean => detectTauri()
 export const bootstrap = (): Promise<AppBootstrap> => invoke('bootstrap')
@@ -9,6 +10,9 @@ export const openRecent = (documentId: string): Promise<NativeDocument> => invok
 export const listRecentDocuments = (): Promise<RecentDocument[]> => invoke('list_recent_documents')
 export const saveDocument = (request: SaveDocumentRequest): Promise<SaveResult> => invoke('save_document', { request })
 export const pickImage = (): Promise<NativeImage | null> => invoke('pick_image')
+export const clipboardImages = (): Promise<NativeImage[]> => invoke('clipboard_images')
+export const printPdf = (base64: string, title: string): Promise<PrintOutcome> => invoke('print_pdf', { base64, title })
+export const printHtml = (): Promise<PrintOutcome> => invoke('print_html')
 export const confirmClose = (): Promise<void> => invoke('confirm_close')
 export const onCloseRequested = (callback: () => void): Promise<UnlistenFn> => listen('app-close-requested', callback)
 

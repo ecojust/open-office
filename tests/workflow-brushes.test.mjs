@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DOMParser } from '@xmldom/xmldom'
 import { DEFAULT_STYLE } from '../src/workflow/core/types.ts'
-import { BRUSH_PRESETS, brushPreset, brushRadiusAt, brushOutlinePath, rainbowSegments, readBrushData, normalizedPressure } from '../src/workflow/core/brushes.ts'
+import { BRUSH_PRESETS, brushPreset, brushRadiusAt, brushOutlinePath, brushPaintPasses, rainbowSegments, readBrushData, normalizedPressure } from '../src/workflow/core/brushes.ts'
 import { createDocument, serializeDocument, parseDocument, validateScene, contentKey, DocumentHistory } from '../src/workflow/core/documents.ts'
 import { elementToSvg, sceneToSvg } from '../src/workflow/core/svg.ts'
 import { elementBounds } from '../src/workflow/core/geometry.ts'
@@ -30,9 +30,9 @@ test('six brush presets have distinct real geometry and paint, with bounded posi
   const pencil = xml(markup(stroke('pencil')))
   assert.equal([...pencil.getElementsByTagName('path')].filter(path => path.hasAttribute('data-pencil-pass')).length, 3)
   assert.ok(pencil.getElementsByTagName('path')[0].getAttribute('d').endsWith(' Z'))
-  assert.ok(markup(stroke('marker')).includes('fill-rule="evenodd"'))
+  assert.ok(markup(stroke('marker')).includes('fill-rule="nonzero"'))
   assert.ok(!brushOutlinePath(stroke('marker')).includes('A'))
-  assert.ok(markup(stroke('highlighter')).includes('<g opacity=".32">'))
+  assert.ok(markup(stroke('highlighter')).includes('<g opacity="0.32">'))
   assert.ok(markup(stroke('rainbow')).includes('fill="hsl('))
 })
 
@@ -40,6 +40,46 @@ test('round caps bulge outward at both endpoints, while flat nibs retain straigh
   const horizontal = stroke('pen', { points: [{ x: 0, y: 0 }, { x: 100, y: 0 }], pressures: [.5, .5] })
   assert.equal(brushOutlinePath(horizontal), 'M0 10 L100 10 A10 10 0 0 0 100 -10 L0 -10 A10 10 0 0 0 0 10 Z')
   assert.ok(!brushOutlinePath({ ...horizontal, brush: 'marker' }).includes('A'))
+})
+
+test('self-crossings and returns deposit separate ink passes without changing the saved gesture', () => {
+  const points = [{ x: 0, y: 0 }, { x: 200, y: 200 }, { x: 0, y: 200 }, { x: 200, y: 0 }]
+  for (const { id } of BRUSH_PRESETS) {
+    const ink = stroke(id, { points, pressures: [.2, .6, 1, .4], style: { ...DEFAULT_STYLE, strokeWidth: 12, opacity: .5 } })
+    const before = structuredClone(ink), passes = brushPaintPasses(ink), painted = xml(markup(ink))
+    assert.ok(passes.length >= 2, id)
+    assert.equal(passes[0].start, 0)
+    assert.equal(passes.at(-1).end, points.length - 1)
+    for (let index = 1; index < passes.length; index++) assert.equal(passes[index - 1].end, passes[index].start)
+    const root = painted.getElementsByTagName('g')[0]
+    assert.equal(root.hasAttribute('opacity'), false, 'The whole stroke must not flatten its ink opacity')
+    const layers = [...root.childNodes].filter(node => node.nodeType === 1)
+    assert.equal(layers.length, passes.length)
+    for (const layer of layers) assert.equal(Number(layer.getAttribute('opacity')), id === 'highlighter' ? .16 : .5)
+    assert.deepEqual(ink, before, 'Painting must preserve points, pressures and content identity')
+    assert.ok(!markup(ink).includes('fill-rule="evenodd"'))
+  }
+  const retraced = stroke('highlighter', { points: [{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 0, y: 0 }], pressures: [.5, .5, .5] })
+  assert.equal(brushPaintPasses(retraced).length, 2)
+})
+
+test('dense samples, duplicate samples and ordinary closed loops stay a single application of ink', () => {
+  const sparse = [{ x: 0, y: 0 }, { x: 200, y: 0 }]
+  const dense = Array.from({ length: 1001 }, (_, index) => ({ x: index / 5, y: 0 }))
+  const closed = Array.from({ length: 360 }, (_, index) => ({ x: 200 + Math.cos(index * Math.PI / 180) * 150, y: 200 + Math.sin(index * Math.PI / 180) * 150 }))
+  for (const { id } of BRUSH_PRESETS) {
+    for (const points of [sparse, dense, dense.flatMap(point => [point, point])]) {
+      const ink = stroke(id, { points, pressures: points.map(() => .5) })
+      assert.equal(brushPaintPasses(ink).length, 1, `${id} must not accumulate alpha at every sample`)
+    }
+    const ink = stroke(id, { points: closed, pressures: closed.map(() => .5), closed: true })
+    assert.equal(brushPaintPasses(ink).length, 1, `${id} closed seam`)
+  }
+})
+
+test('broad remote returns accumulate ink even when their centre lines do not cross', () => {
+  const ink = stroke('highlighter', { points: [{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 12 }, { x: 0, y: 12 }], pressures: [.5, .5, .5, .5], style: { ...DEFAULT_STYLE, strokeWidth: 30 } })
+  assert.ok(brushPaintPasses(ink).length >= 2)
 })
 
 test('pressure changes actual widths; brush tips taper and a zero-pressure sample remains visible', () => {

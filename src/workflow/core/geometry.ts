@@ -19,6 +19,39 @@ export function combineBounds(bounds: Bounds[]): Bounds {
   return { x, y, width: Math.max(...bounds.map(b => b.x + b.width)) - x, height: Math.max(...bounds.map(b => b.y + b.height)) - y }
 }
 export function center(node: ShapeElement): Point { return { x: node.x + node.width / 2, y: node.y + node.height / 2 } }
+/** Keep the stored preference when resizing, but never draw past half the short side. */
+export function rectangleCornerRadius(node: ShapeElement): number {
+  if (node.shape !== 'rectangle' || !Number.isFinite(node.cornerRadius) || !Number.isFinite(node.width) || !Number.isFinite(node.height)) return 0
+  return Math.max(0, Math.min(node.cornerRadius ?? 0, node.width / 2, node.height / 2))
+}
+function roundedRectangleDistance(node: ShapeElement, point: Point, radius: number): number {
+  const qx = Math.abs(point.x - node.x - node.width / 2) - (node.width / 2 - radius)
+  const qy = Math.abs(point.y - node.y - node.height / 2) - (node.height / 2 - radius)
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - radius
+}
+function roundedRectangleOutline(node: ShapeElement, radius: number, anchors: Point[]): Point[] {
+  const { x, y, width: w, height: h } = node
+  const corners = [{ x: x + w - radius, y: y + radius }, { x: x + w - radius, y: y + h - radius }, { x: x + radius, y: y + h - radius }, { x: x + radius, y: y + radius }]
+  const points: Point[] = []
+  for (let corner = 0; corner < 4; corner++) {
+    const c = corners[corner]!, start = (corner - 1) * Math.PI / 2
+    const arc = Array.from({ length: 17 }, (_, index) => { const angle = start + index * Math.PI / 32; return { angle, point: { x: c.x + Math.cos(angle) * radius, y: c.y + Math.sin(angle) * radius } } })
+    // Insert exact circular boundary anchors before sketching. Projecting them
+    // onto the sampled chords would leave visible gaps at a diagonal connector.
+    for (const anchor of anchors) {
+      if (Math.abs(Math.hypot(anchor.x - c.x, anchor.y - c.y) - radius) > 1e-6) continue
+      let angle = Math.atan2(anchor.y - c.y, anchor.x - c.x)
+      if (angle < start - 1e-8) angle += Math.PI * 2
+      if (angle < start - 1e-8 || angle > start + Math.PI / 2 + 1e-8) continue
+      const existing = arc.find(item => Math.abs(item.angle - angle) < 1e-8)
+      if (existing) existing.point = anchor
+      else arc.push({ angle, point: anchor })
+    }
+    arc.sort((a, b) => a.angle - b.angle)
+    points.push(...arc.map(item => item.point))
+  }
+  return points
+}
 export function distanceToSegment(point: Point, from: Point, to: Point): number {
   const dx = to.x - from.x, dy = to.y - from.y, squared = dx * dx + dy * dy
   const t = squared ? Math.max(0, Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / squared)) : 0
@@ -94,9 +127,11 @@ function nearestOnPolyline(points: Point[], point: Point): Point {
 }
 
 /** One shared outline is used for rendering, binding, and pointer hit testing. */
-export function shapeOutline(node: ShapeElement): Point[] {
+export function shapeOutline(node: ShapeElement, anchors: Point[] = []): Point[] {
   const { x, y, width: w, height: h } = node
   if (isBraceShape(node.shape)) return braceOutline(node)
+  const radius = rectangleCornerRadius(node)
+  if (radius) return roundedRectangleOutline(node, radius, anchors)
   let points: Point[]
   if (node.shape === 'ellipse') return Array.from({ length: 64 }, (_, index) => { const angle = index * Math.PI / 32; return { x: x + w / 2 + Math.cos(angle) * w / 2, y: y + h / 2 + Math.sin(angle) * h / 2 } })
   if (node.shape === 'diamond') points = [{ x: .5, y: 0 }, { x: 1, y: .5 }, { x: .5, y: 1 }, { x: 0, y: .5 }]
@@ -130,12 +165,16 @@ export function shapeOutline(node: ShapeElement): Point[] {
 }
 export function shapeContainsPoint(node: ShapeElement, point: Point): boolean {
   if (node.width <= 0 || node.height <= 0) return false
+  const radius = rectangleCornerRadius(node)
+  if (radius) return roundedRectangleDistance(node, point, radius) <= 1e-10
   if (isBraceShape(node.shape)) return outlineDistance(node, point) <= Math.max(0.25, node.style.strokeWidth / 2)
   if (node.shape === 'ellipse') return ((point.x - node.x - node.width / 2) / (node.width / 2)) ** 2 + ((point.y - node.y - node.height / 2) / (node.height / 2)) ** 2 <= 1 + 1e-10
   return pointInPolygon(point, shapeOutline(node))
 }
 /** Exterior distance; a frame's empty interior deliberately is not an attachment target. */
 export function outlineDistance(node: ShapeElement, point: Point): number {
+  const radius = rectangleCornerRadius(node)
+  if (radius) return Math.max(0, roundedRectangleDistance(node, point, radius))
   if (node.shape !== 'frame' && !isBraceShape(node.shape) && shapeContainsPoint(node, point)) return 0
   if (node.shape === 'ellipse') {
     const rx = node.width / 2, ry = node.height / 2, x = Math.abs(point.x - node.x - rx), y = Math.abs(point.y - node.y - ry), xx = rx * rx, yy = ry * ry
@@ -157,6 +196,17 @@ export function shapeAnchor(node: ShapeElement, toward: Point): Point {
   if (isBraceShape(node.shape)) return nearestOnPolyline(shapeOutline(node), toward)
   const c = center(node), dx = toward.x - c.x, dy = toward.y - c.y
   if (!dx && !dy) return shapeAnchor(node, { x: c.x, y: c.y + 1 })
+  const radius = rectangleCornerRadius(node)
+  if (radius) {
+    const length = Math.hypot(dx, dy), vx = Math.abs(dx) / length, vy = Math.abs(dy) / length
+    const rx = node.width / 2, ry = node.height / 2, cx = rx - radius, cy = ry - radius
+    let distance = Math.min(vx ? rx / vx : Infinity, vy ? ry / vy : Infinity)
+    if (vx * distance > cx && vy * distance > cy) {
+      const projection = vx * cx + vy * cy, perpendicular = vx * cy - vy * cx
+      distance = projection + Math.sqrt(Math.max(0, radius * radius - perpendicular * perpendicular))
+    }
+    return { x: c.x + dx / length * distance, y: c.y + dy / length * distance }
+  }
   if (!['rectangle', 'ellipse', 'diamond', 'note', 'text', 'image', 'frame'].includes(node.shape)) {
     const points = shapeOutline(node)
     let distance = Infinity

@@ -11,6 +11,7 @@ import { clone, type Scene, type WorkflowDocument } from '../workflow/core/types
 import type { DiagramStyleId } from '../workflow/core/diagram-appearance'
 import type { NativeDocument } from '../types'
 import { base64ToBytes, bytesToBase64, type EditorExport, type Extension } from '../shared/document'
+import { printHtml, type PrintOutcome } from '../shared/printing'
 
 const props = withDefaults(defineProps<{ document: NativeDocument; active?: boolean; disabled?: boolean; theme?: 'light' | 'dark' }>(), { active: true, disabled: false, theme: 'light' })
 const emit = defineEmits<{
@@ -23,7 +24,7 @@ const model = shallowRef<WorkflowDocument>(), loading = ref(true), problem = ref
 const canUndo = ref(false), canRedo = ref(false)
 const interactive = computed(() => props.active && !props.disabled && !loading.value)
 const diagram = computed(() => model.value?.kind === 'mermaid')
-let session: WorkflowSession | undefined, disposed = false, token = 0, printFrame: HTMLIFrameElement | undefined
+let session: WorkflowSession | undefined, disposed = false, token = 0
 let lastExport: { token: number; base64: string } | undefined
 
 function report(cause: unknown) {
@@ -124,23 +125,20 @@ async function exportImage(format: 'svg' | 'png', selection?: Scene) {
   emit('export', { base64: bytesToBase64(output.bytes), extension: format, name: output.name, saveAs: true, dirty: snapshot.dirty, revision: `${snapshot.documentId}:${snapshot.revision}` })
  } catch (cause) { report(cause) }
 }
-async function print() {
+async function print(): Promise<PrintOutcome> {
  await flush()
- const current = clone(requireLoaded().model), svg = sceneToSvg(documentScene(current), { background: true })
- printFrame?.remove()
- const frame = document.createElement('iframe')
- frame.title = '打印画布与图表'; frame.style.cssText = 'position:fixed;left:-10000px;width:1px;height:1px;border:0'
- document.body.append(frame); printFrame = frame
- const output = frame.contentDocument
- if (!output) throw Error('无法创建打印页面。')
- const title = output.createElement('title'); title.textContent = current.title; output.head.append(title)
- const style = output.createElement('style')
- style.textContent = '@page{size:landscape;margin:12mm}body{margin:0}svg{display:block;width:100%;height:auto;max-height:180mm}*{print-color-adjust:exact;-webkit-print-color-adjust:exact}'
- output.head.append(style)
- const art = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement
- output.body.append(output.importNode(art, true))
- await output.fonts.ready
- frame.contentWindow?.focus(); frame.contentWindow?.print()
+ const owner = token, current = clone(requireLoaded().model), svg = sceneToSvg(documentScene(current), { background: true })
+ return await printHtml({
+  title: current.title,
+  css: '@media print{@page{size:landscape;margin:12mm}}#office-print-root{padding:0}#office-print-root svg{display:block;width:100%;height:auto;max-height:180mm}#office-print-root,#office-print-root *{print-color-adjust:exact;-webkit-print-color-adjust:exact}',
+  render(output, container) {
+   const art = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement
+   container.append(output.importNode(art, true))
+  },
+  prepare() {
+   if (disposed || owner !== token) throw Error('文档已切换，请重新打印。')
+  },
+ })
 }
 async function inspectModel() { return clone(requireLoaded().model) }
 function focus() { if (diagram.value) codeEditor.value?.focus() }
@@ -166,7 +164,7 @@ watch(() => props.document.id, async () => {
   await nextTick(); emit('ready')
  } catch (cause) { report(cause) } finally { if (owner === token) loading.value = false }
 }, { immediate: true })
-onBeforeUnmount(() => { disposed = true; token++; printFrame?.remove() })
+onBeforeUnmount(() => { disposed = true; token++ })
 defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, inspect, inspectModel, syncRevision: inspect, canBackgroundExport, undo, redo, print, focus })
 </script>
 

@@ -21,6 +21,7 @@ const region = id => note().locator(`[data-region-id="${id}"]`);
 const guides = () => note().locator('.note-alignment-guide');
 const toggle = label => note().getByRole('button', { name: label, exact: true });
 async function frame() { await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))); }
+async function gridVisible() { return canvas().evaluate(element => getComputedStyle(element).backgroundImage !== 'none'); }
 async function capture(name) { const file = `${report.screenshots.length + 1}-${name}.png`; await page.screenshot({ path: path.join(output, file), fullPage: true }); report.screenshots.push(file); persist(); }
 async function check(name, fn) { report.stage = name; persist(); await fn(); report.checks.push(name); persist(); }
 async function settings(smart, grid) {
@@ -46,7 +47,7 @@ async function beginDrag(id, dx, dy, kind = 'move') {
   await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + dx, y + dy, { steps: 8 }); await frame();
   return { x: x + dx, y: y + dy };
 }
-async function endDrag() { await page.mouse.up(); await frame(); assert.equal(await guides().count(), 0, 'Guides disappear when the move finishes'); }
+async function endDrag() { await page.mouse.up(); await frame(); assert.equal(await guides().count(), 0, 'Guides disappear when the move finishes'); assert.equal(await gridVisible(), false, 'Grid disappears when the move finishes'); }
 async function undoTo(expected) { await note().getByRole('button', { name: '撤销', exact: true }).click(); assert.deepEqual(await regions(), expected, 'One undo restores every region exactly'); }
 async function livePosition(id) { return region(id).evaluate(element => ({ x: parseFloat(element.style.left), y: parseFloat(element.style.top) })); }
 async function scrollPosition() { return viewport().evaluate(element => ({ x: element.scrollLeft, y: element.scrollTop })); }
@@ -89,10 +90,12 @@ const fixture = { format: 'open-office-notebook', version: 2, id: 'alignment_boo
       assert.equal(await toggle('智能对齐').getAttribute('aria-pressed'), 'true');
       assert.equal(await toggle('网格吸附').getAttribute('aria-pressed'), 'true');
       await settings(false, false); await settings(true, true);
+      assert.equal(await gridVisible(), false, 'Enabling snapping does not display a grid while idle');
       const after = await state(); assert.equal(after.revision, before.revision); assert.equal(after.dirty, before.dirty); assert.deepEqual(await regions(), initial);
     });
     await check('pointer-drag-snaps-to-ten-pixel-grid-and-undo-restores-layout', async () => {
       await settings(false, true); await beginDrag('moving_region', 23, 36);
+      assert.equal(await gridVisible(), true, 'The grid appears while moving a region');
       assert.deepEqual(await livePosition('moving_region'), { x: 440, y: 290 });
       await endDrag(); const moved = await regions();
       assert.equal(moved[1].x, 440); assert.equal(moved[1].y, 290); assert.deepEqual(moved[0], initial[0]); assert.deepEqual(moved[2], initial[2]);
@@ -106,6 +109,7 @@ const fixture = { format: 'open-office-notebook', version: 2, id: 'alignment_boo
     });
     await check('center-alignment-works-between-regions-of-different-widths', async () => {
       await settings(true, false); await beginDrag('moving_region', -324, 80);
+      assert.equal(await gridVisible(), false, 'Disabling snapping keeps the grid hidden during movement');
       assert.deepEqual(await livePosition('moving_region'), { x: 93, y: 330 }); await xGuide(183); await capture('center-alignment');
       await endDrag(); const moved = await regions(); assert.equal(moved[1].x, 93); assert.deepEqual(moved[0], initial[0]); assert.deepEqual(moved[2], initial[2]); await undoTo(initial);
     });
@@ -118,15 +122,17 @@ const fixture = { format: 'open-office-notebook', version: 2, id: 'alignment_boo
     await check('escape-cancels-a-snapped-move-without-adding-history', async () => {
       await settings(true, true); const before = await state();
       await beginDrag('moving_region', -353, 27); await xGuide(63); await page.keyboard.press('Escape'); await page.mouse.up(); await frame();
+      assert.equal(await gridVisible(), false, 'Cancelling a move hides the grid');
       assert.equal(await guides().count(), 0); assert.deepEqual(await regions(), initial); const after = await state(); assert.equal(after.revision, before.revision); assert.equal(after.canUndo, before.canUndo);
     });
     await check('stationary-alt-toggle-updates-preview-and-handle-click-does-not-snap', async () => {
       await settings(true, true); const before = await state();
-      await beginDrag('moving_region', 0, 0); await endDrag(); assert.deepEqual(await regions(), initial); assert.equal((await state()).revision, before.revision);
+      await beginDrag('moving_region', 0, 0); assert.equal(await gridVisible(), false, 'A stationary handle press does not display the grid'); await endDrag(); assert.deepEqual(await regions(), initial); assert.equal((await state()).revision, before.revision);
       await beginDrag('moving_region', -353, 27); await xGuide(63);
       await page.keyboard.down('Alt'); await frame(); assert.deepEqual(await livePosition('moving_region'), { x: 67, y: 277 }); assert.equal(await guides().count(), 0);
       await page.keyboard.up('Alt'); await frame(); assert.deepEqual(await livePosition('moving_region'), { x: 63, y: 280 }); await xGuide(63);
       await endDrag(); await undoTo(initial);
+      await beginDrag('moving_region', 20, 0, 'resize'); assert.equal(await gridVisible(), false, 'Resizing a region does not show the movement grid'); await endDrag(); await undoTo(initial);
     });
     await check('scaled-canvas-translates-screen-pointer-movement-to-document-coordinates', async () => {
       await settings(false, false);

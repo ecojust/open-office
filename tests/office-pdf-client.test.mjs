@@ -90,6 +90,7 @@ function harness(kind = 'pdf') {
     scope.run(() => evaluate(sheet ? sheetEditorSource : editorSource, name => {
       if (name === 'vue') return { ...vue, onBeforeUnmount(callback) { unmount.push(callback) } }
       if (name === '../shared/document') return { bytesToBase64 }
+      if (name === '../shared/printing') return { printPdf: () => assert.fail('Unexpected printing in a non-printing PDF component test') }
       if (name === '../pdf/author') return author
       if (name === '../shared/dialog-focus') return { useDialogFocus() {} }
       if (name === `../${kind}/rust/client`) return client

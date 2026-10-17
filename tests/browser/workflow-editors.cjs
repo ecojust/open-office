@@ -10,7 +10,7 @@ const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
 const output = path.resolve(process.env.OFFICE_WORKFLOW_OUTPUT || path.join(root, 'test-results/workflow-editors'));
 fs.mkdirSync(output, { recursive: true });
-const report = { ok: false, runtime: 'Real Vue shell, canvas and code diagram editors in Chromium; native save receipt stub', checks: [], screenshots: [], errors: [], consoleErrors: [], externalRequests: [], limitations: ['Native file dialogs, filesystem writes and platform WebViews are not exercised.', 'Composition events are synthetic and do not claim physical operating-system IME validation.'] };
+const report = { ok: false, runtime: 'Real Vue shell, canvas and code diagram editors in Chromium; native save receipt stub', checks: [], screenshots: [], errors: [], consoleErrors: [], externalRequests: [], limitations: ['Native file dialogs, filesystem writes and platform WebViews are not exercised.', 'Composition events are synthetic and do not claim physical operating-system IME validation.', 'macOS gesture events and Ctrl+wheel pinch are synthetic; plain mouse wheel uses browser input.'] };
 const persist = () => fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
 let server, browser, page;
 const nativeStub = `
@@ -142,6 +142,7 @@ async function saveAs(format, name) {
     });
     await check('code-editor-preview-and-source-tab-isolation', async () => {
       await goHome(); await page.getByTestId('home-new-diagram').click(); await ready('diagram'); firstDiagram = await active(); originalSource = await source().inputValue();
+      assert.match(originalSource, /^sequenceDiagram\n/); assert.equal(await editor().locator('.diagram-preview-kind').textContent(), '时序图');
       const edited = 'flowchart LR\n  A[本地文档] --> B[共享工具栏]\n  B --> C[独立标签]';
       await source().fill(edited);
       await switchTab(firstCanvas.name); await ready('canvas'); assert.equal((await model()).scene.elements[0].text, '季度计划与执行');
@@ -150,6 +151,46 @@ async function saveAs(format, name) {
       assert.equal(await editor().getByTestId('diagram-error').count(), 0);
       await undo(); assert.equal(await source().inputValue(), originalSource); await redo(); assert.equal(await source().inputValue(), edited);
       diagramSaved = await save(); firstDiagram = await active(); assert.equal(JSON.parse(Buffer.from(diagramSaved.request.base64, 'base64')).source, edited);
+    });
+    await check('code-preview-mouse-zoom-pinch-limits-and-clean-document', async () => {
+      const previousSource = await source().inputValue();
+      await source().fill('flowchart TD\n' + Array.from({ length: 8 }, (_, index) => ` N${index}[步骤 ${index + 1}] --> N${index + 1}[步骤 ${index + 2}]`).join('\n'));
+      await save(); await frame();
+      const before = await state(), beforeModel = await model(), rootScroll = await page.evaluate(() => ({ x: scrollX, y: scrollY, scale: visualViewport.scale }));
+      const viewport = editor().getByTestId('diagram-preview-viewport'), pageContent = editor().locator('.diagram-preview-page');
+      const zoomValue = editor().getByRole('button', { name: '重置预览缩放', exact: true });
+      const box = await viewport.boundingBox(); assert.ok(box);
+      const anchor = { x: box.x + box.width * .53, y: box.y + box.height * .32 };
+      const initialPage = await pageContent.boundingBox(); assert.ok(initialPage);
+      const point = { x: (anchor.x - initialPage.x) / initialPage.width, y: (anchor.y - initialPage.y) / initialPage.height };
+      await page.mouse.move(anchor.x, anchor.y); await page.mouse.wheel(0, -140);
+      await poll(async () => parseInt(await zoomValue.textContent()) > 100, 'plain mouse wheel zooms in'); await frame();
+      const enlarged = await pageContent.boundingBox(); assert.ok(enlarged);
+      assert.ok(Math.abs(enlarged.x + point.x * enlarged.width - anchor.x) < 2, 'horizontal diagram point stays under pointer');
+      assert.ok(Math.abs(enlarged.y + point.y * enlarged.height - anchor.y) < 2, 'vertical diagram point stays under pointer');
+      const enlargedZoom = parseInt(await zoomValue.textContent());
+      await page.mouse.wheel(0, 100); await poll(async () => parseInt(await zoomValue.textContent()) < enlargedZoom, 'mouse wheel zooms out');
+      const reducedZoom = parseInt(await zoomValue.textContent());
+      async function syntheticWheel(deltaY, options = {}) {
+        return viewport.evaluate((element, input) => { const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: input.anchor.x, clientY: input.anchor.y, deltaY: input.deltaY, ...input.options }); element.dispatchEvent(event); return event.defaultPrevented; }, { deltaY, options, anchor });
+      }
+      assert.equal(await syntheticWheel(-70, { ctrlKey: true }), true, 'Ctrl+wheel pinch is consumed by preview'); await frame();
+      assert.ok(parseInt(await zoomValue.textContent()) > reducedZoom);
+      for (let index = 0; index < 4; index++) { await syntheticWheel(-1000, { deltaMode: 1 }); await frame(); }
+      assert.equal(await zoomValue.textContent(), '300%'); assert.equal(await editor().getByRole('button', { name: '放大预览', exact: true }).isDisabled(), true);
+      for (let index = 0; index < 4; index++) { await syntheticWheel(10, { deltaMode: 2 }); await frame(); }
+      assert.equal(await zoomValue.textContent(), '40%'); assert.equal(await editor().getByRole('button', { name: '缩小预览', exact: true }).isDisabled(), true);
+      await zoomValue.click(); await frame(); assert.equal(await zoomValue.textContent(), '100%');
+      for (const [type, scale] of [['gesturestart', 1], ['gesturechange', 1.5], ['gestureend', 1.5]]) {
+        assert.equal(await viewport.evaluate((element, input) => { const event = new Event(input.type, { bubbles: true, cancelable: true }); Object.assign(event, { scale: input.scale, clientX: input.anchor.x, clientY: input.anchor.y }); element.dispatchEvent(event); return event.defaultPrevented; }, { type, scale, anchor }), true);
+        await frame();
+      }
+      assert.equal(await zoomValue.textContent(), '150%', 'macOS WebView gesture path updates preview zoom');
+      const sourceBox = await source().boundingBox(); await page.mouse.move(sourceBox.x + 20, sourceBox.y + 20); await page.mouse.wheel(0, 100); await frame();
+      assert.equal(await zoomValue.textContent(), '150%', 'source scrolling does not zoom preview');
+      assert.deepEqual(await page.evaluate(() => ({ x: scrollX, y: scrollY, scale: visualViewport.scale })), rootScroll, 'preview zoom does not scroll or zoom the application');
+      assert.deepEqual(await state(), before, 'zoom does not dirty document or add undo entries'); assert.deepEqual(await model(), beforeModel);
+      await zoomValue.click(); await source().fill(previousSource); diagramSaved = await save(); await frame();
     });
     await check('code-template-and-style-galleries-with-undo', async () => {
       const before = await source().inputValue();
@@ -219,7 +260,7 @@ async function saveAs(format, name) {
       const remaining = await poll(async () => { const text = await page.getByTestId('autosave-countdown').textContent(); return /^\d+ 秒$/.test(text) ? parseInt(text) : false; }, 'visible autosave countdown');
       await poll(async () => { const text = await page.getByTestId('autosave-countdown').textContent(); return /^\d+ 秒$/.test(text) && parseInt(text) < remaining; }, 'countdown decreases from the scheduler deadline', 4000);
       await capture('autosave-countdown');
-      await poll(async () => (await saves()).length > count && !(await active()).dirty, 'real 30-second autosave', 38000);
+      await poll(async () => (await saves()).length > count && !(await active()).dirty, 'real 10-second autosave', 18000);
       const record = (await saves()).at(-1); assert.equal(record.request.documentId, before.fileId); assert.equal(record.request.saveAs, false); assert.match(record.request.expectedSha256, /^[0-9a-f]{64}$/);
       assert.equal(JSON.parse(Buffer.from(record.request.base64, 'base64')).source, edited); assert.equal(await page.getByTestId('global-save-state').textContent(), '已自动保存');
       await poll(async () => await page.getByTestId('autosave-countdown').textContent() === '已保存', 'countdown acknowledges completed scheduler task', 2500); await page.getByTestId('shell-autosave').click(); assert.equal(await page.getByTestId('autosave-countdown').count(), 0);

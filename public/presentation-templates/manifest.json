@@ -88,5 +88,815 @@
     "slideCount": 3,
     "file": "clear-space.pptx",
     "preview": "clear-space.svg"
+  },
+  {
+    "id": "software-strategy",
+    "name": "软件科技·数字化战略",
+    "description": "软件科技 · 战略规划；让技术连接业务价值。",
+    "accent": "#5468CE",
+    "slideCount": 3,
+    "file": "software-strategy.pptx",
+    "preview": "software-strategy.svg"
+  },
+  {
+    "id": "software-proposal",
+    "name": "软件科技·产品发布",
+    "description": "软件科技 · 产品与服务提案；从用户问题到产品答案。",
+    "accent": "#5468CE",
+    "slideCount": 3,
+    "file": "software-proposal.pptx",
+    "preview": "software-proposal.svg"
+  },
+  {
+    "id": "software-report",
+    "name": "软件科技·增长复盘",
+    "description": "软件科技 · 数据与成果汇报；用数据看见产品成长。",
+    "accent": "#5468CE",
+    "slideCount": 3,
+    "file": "software-report.pptx",
+    "preview": "software-report.svg"
+  },
+  {
+    "id": "software-process",
+    "name": "软件科技·系统架构",
+    "description": "软件科技 · 流程与方法；构建可靠的服务体系。",
+    "accent": "#5468CE",
+    "slideCount": 3,
+    "file": "software-process.pptx",
+    "preview": "software-process.svg"
+  },
+  {
+    "id": "software-roadmap",
+    "name": "软件科技·研发路线",
+    "description": "软件科技 · 计划与路线图；把产品愿景变成里程碑。",
+    "accent": "#5468CE",
+    "slideCount": 3,
+    "file": "software-roadmap.pptx",
+    "preview": "software-roadmap.svg"
+  },
+  {
+    "id": "health-strategy",
+    "name": "医疗健康·服务规划",
+    "description": "医疗健康 · 战略规划；以患者为中心的服务。",
+    "accent": "#168985",
+    "slideCount": 3,
+    "file": "health-strategy.pptx",
+    "preview": "health-strategy.svg"
+  },
+  {
+    "id": "health-proposal",
+    "name": "医疗健康·诊疗方案",
+    "description": "医疗健康 · 产品与服务提案；让诊疗路径更加清晰。",
+    "accent": "#168985",
+    "slideCount": 3,
+    "file": "health-proposal.pptx",
+    "preview": "health-proposal.svg"
+  },
+  {
+    "id": "health-report",
+    "name": "医疗健康·质量汇报",
+    "description": "医疗健康 · 数据与成果汇报；用质量指标推动改善。",
+    "accent": "#168985",
+    "slideCount": 3,
+    "file": "health-report.pptx",
+    "preview": "health-report.svg"
+  },
+  {
+    "id": "health-process",
+    "name": "医疗健康·就诊流程",
+    "description": "医疗健康 · 流程与方法；连接每一次就诊体验。",
+    "accent": "#168985",
+    "slideCount": 3,
+    "file": "health-process.pptx",
+    "preview": "health-process.svg"
+  },
+  {
+    "id": "health-roadmap",
+    "name": "医疗健康·专科建设",
+    "description": "医疗健康 · 计划与路线图；构建可持续的健康服务。",
+    "accent": "#168985",
+    "slideCount": 3,
+    "file": "health-roadmap.pptx",
+    "preview": "health-roadmap.svg"
+  },
+  {
+    "id": "education-strategy",
+    "name": "教育培训·课程规划",
+    "description": "教育培训 · 战略规划；为每一段成长设计路径。",
+    "accent": "#DD8A30",
+    "slideCount": 3,
+    "file": "education-strategy.pptx",
+    "preview": "education-strategy.svg"
+  },
+  {
+    "id": "education-proposal",
+    "name": "教育培训·课程介绍",
+    "description": "教育培训 · 产品与服务提案；让知识连接真实生活。",
+    "accent": "#DD8A30",
+    "slideCount": 3,
+    "file": "education-proposal.pptx",
+    "preview": "education-proposal.svg"
+  },
+  {
+    "id": "education-report",
+    "name": "教育培训·教学成果",
+    "description": "教育培训 · 数据与成果汇报；让学习成果清晰可见。",
+    "accent": "#DD8A30",
+    "slideCount": 3,
+    "file": "education-report.pptx",
+    "preview": "education-report.svg"
+  },
+  {
+    "id": "education-process",
+    "name": "教育培训·课堂设计",
+    "description": "教育培训 · 流程与方法；从学习目标到课堂行动。",
+    "accent": "#DD8A30",
+    "slideCount": 3,
+    "file": "education-process.pptx",
+    "preview": "education-process.svg"
+  },
+  {
+    "id": "education-roadmap",
+    "name": "教育培训·学习计划",
+    "description": "教育培训 · 计划与路线图；循序渐进，走向新的能力。",
+    "accent": "#DD8A30",
+    "slideCount": 3,
+    "file": "education-roadmap.pptx",
+    "preview": "education-roadmap.svg"
+  },
+  {
+    "id": "finance-strategy",
+    "name": "金融服务·年度策略",
+    "description": "金融服务 · 战略规划；稳健经营，持续创造价值。",
+    "accent": "#AB8540",
+    "slideCount": 3,
+    "file": "finance-strategy.pptx",
+    "preview": "finance-strategy.svg"
+  },
+  {
+    "id": "finance-proposal",
+    "name": "金融服务·客户方案",
+    "description": "金融服务 · 产品与服务提案；让金融服务贴近客户。",
+    "accent": "#AB8540",
+    "slideCount": 3,
+    "file": "finance-proposal.pptx",
+    "preview": "finance-proposal.svg"
+  },
+  {
+    "id": "finance-report",
+    "name": "金融服务·经营分析",
+    "description": "金融服务 · 数据与成果汇报；用经营数据看清方向。",
+    "accent": "#AB8540",
+    "slideCount": 3,
+    "file": "finance-report.pptx",
+    "preview": "finance-report.svg"
+  },
+  {
+    "id": "finance-process",
+    "name": "金融服务·风控框架",
+    "description": "金融服务 · 流程与方法；建立全流程风险管理。",
+    "accent": "#AB8540",
+    "slideCount": 3,
+    "file": "finance-process.pptx",
+    "preview": "finance-process.svg"
+  },
+  {
+    "id": "finance-roadmap",
+    "name": "金融服务·业务规划",
+    "description": "金融服务 · 计划与路线图；以长期视角规划增长。",
+    "accent": "#AB8540",
+    "slideCount": 3,
+    "file": "finance-roadmap.pptx",
+    "preview": "finance-roadmap.svg"
+  },
+  {
+    "id": "manufacturing-strategy",
+    "name": "智能制造·工厂规划",
+    "description": "智能制造 · 战略规划；让生产更智能、更可靠。",
+    "accent": "#34749B",
+    "slideCount": 3,
+    "file": "manufacturing-strategy.pptx",
+    "preview": "manufacturing-strategy.svg"
+  },
+  {
+    "id": "manufacturing-proposal",
+    "name": "智能制造·设备方案",
+    "description": "智能制造 · 产品与服务提案；以装备升级释放产能。",
+    "accent": "#34749B",
+    "slideCount": 3,
+    "file": "manufacturing-proposal.pptx",
+    "preview": "manufacturing-proposal.svg"
+  },
+  {
+    "id": "manufacturing-report",
+    "name": "智能制造·产线复盘",
+    "description": "智能制造 · 数据与成果汇报；用现场数据驱动改善。",
+    "accent": "#34749B",
+    "slideCount": 3,
+    "file": "manufacturing-report.pptx",
+    "preview": "manufacturing-report.svg"
+  },
+  {
+    "id": "manufacturing-process",
+    "name": "智能制造·生产流程",
+    "description": "智能制造 · 流程与方法；打通从原料到交付的链路。",
+    "accent": "#34749B",
+    "slideCount": 3,
+    "file": "manufacturing-process.pptx",
+    "preview": "manufacturing-process.svg"
+  },
+  {
+    "id": "manufacturing-roadmap",
+    "name": "智能制造·转型路线",
+    "description": "智能制造 · 计划与路线图；从自动化迈向协同制造。",
+    "accent": "#34749B",
+    "slideCount": 3,
+    "file": "manufacturing-roadmap.pptx",
+    "preview": "manufacturing-roadmap.svg"
+  },
+  {
+    "id": "energy-strategy",
+    "name": "能源环保·低碳战略",
+    "description": "能源环保 · 战略规划；以绿色行动连接未来。",
+    "accent": "#35926A",
+    "slideCount": 3,
+    "file": "energy-strategy.pptx",
+    "preview": "energy-strategy.svg"
+  },
+  {
+    "id": "energy-proposal",
+    "name": "能源环保·项目方案",
+    "description": "能源环保 · 产品与服务提案；让清洁能源走进场景。",
+    "accent": "#35926A",
+    "slideCount": 3,
+    "file": "energy-proposal.pptx",
+    "preview": "energy-proposal.svg"
+  },
+  {
+    "id": "energy-report",
+    "name": "能源环保·能效报告",
+    "description": "能源环保 · 数据与成果汇报；用能效数据验证改变。",
+    "accent": "#35926A",
+    "slideCount": 3,
+    "file": "energy-report.pptx",
+    "preview": "energy-report.svg"
+  },
+  {
+    "id": "energy-process",
+    "name": "能源环保·碳管理流程",
+    "description": "能源环保 · 流程与方法；建立可追踪的减排闭环。",
+    "accent": "#35926A",
+    "slideCount": 3,
+    "file": "energy-process.pptx",
+    "preview": "energy-process.svg"
+  },
+  {
+    "id": "energy-roadmap",
+    "name": "能源环保·绿色转型",
+    "description": "能源环保 · 计划与路线图；规划下一步绿色增长。",
+    "accent": "#35926A",
+    "slideCount": 3,
+    "file": "energy-roadmap.pptx",
+    "preview": "energy-roadmap.svg"
+  },
+  {
+    "id": "agriculture-strategy",
+    "name": "农业食品·乡村规划",
+    "description": "农业食品 · 战略规划；让土地孕育新的可能。",
+    "accent": "#7C9441",
+    "slideCount": 3,
+    "file": "agriculture-strategy.pptx",
+    "preview": "agriculture-strategy.svg"
+  },
+  {
+    "id": "agriculture-proposal",
+    "name": "农业食品·农产品推介",
+    "description": "农业食品 · 产品与服务提案；从产地讲好产品故事。",
+    "accent": "#7C9441",
+    "slideCount": 3,
+    "file": "agriculture-proposal.pptx",
+    "preview": "agriculture-proposal.svg"
+  },
+  {
+    "id": "agriculture-report",
+    "name": "农业食品·丰收报告",
+    "description": "农业食品 · 数据与成果汇报；让丰收与品质有据可循。",
+    "accent": "#7C9441",
+    "slideCount": 3,
+    "file": "agriculture-report.pptx",
+    "preview": "agriculture-report.svg"
+  },
+  {
+    "id": "agriculture-process",
+    "name": "农业食品·溯源流程",
+    "description": "农业食品 · 流程与方法；连接田间与消费者餐桌。",
+    "accent": "#7C9441",
+    "slideCount": 3,
+    "file": "agriculture-process.pptx",
+    "preview": "agriculture-process.svg"
+  },
+  {
+    "id": "agriculture-roadmap",
+    "name": "农业食品·种植计划",
+    "description": "农业食品 · 计划与路线图；顺应时节，规划每一季。",
+    "accent": "#7C9441",
+    "slideCount": 3,
+    "file": "agriculture-roadmap.pptx",
+    "preview": "agriculture-roadmap.svg"
+  },
+  {
+    "id": "architecture-strategy",
+    "name": "建筑空间·城市规划",
+    "description": "建筑空间 · 战略规划；让空间回应生活方式。",
+    "accent": "#9C7967",
+    "slideCount": 3,
+    "file": "architecture-strategy.pptx",
+    "preview": "architecture-strategy.svg"
+  },
+  {
+    "id": "architecture-proposal",
+    "name": "建筑空间·设计提案",
+    "description": "建筑空间 · 产品与服务提案；从场地故事到空间表达。",
+    "accent": "#9C7967",
+    "slideCount": 3,
+    "file": "architecture-proposal.pptx",
+    "preview": "architecture-proposal.svg"
+  },
+  {
+    "id": "architecture-report",
+    "name": "建筑空间·项目汇报",
+    "description": "建筑空间 · 数据与成果汇报；以节点回顾项目进展。",
+    "accent": "#9C7967",
+    "slideCount": 3,
+    "file": "architecture-report.pptx",
+    "preview": "architecture-report.svg"
+  },
+  {
+    "id": "architecture-process",
+    "name": "建筑空间·施工组织",
+    "description": "建筑空间 · 流程与方法；让设计与施工有效协同。",
+    "accent": "#9C7967",
+    "slideCount": 3,
+    "file": "architecture-process.pptx",
+    "preview": "architecture-process.svg"
+  },
+  {
+    "id": "architecture-roadmap",
+    "name": "建筑空间·建设进度",
+    "description": "建筑空间 · 计划与路线图；把蓝图变为可达的现场。",
+    "accent": "#9C7967",
+    "slideCount": 3,
+    "file": "architecture-roadmap.pptx",
+    "preview": "architecture-roadmap.svg"
+  },
+  {
+    "id": "logistics-strategy",
+    "name": "交通物流·网络规划",
+    "description": "交通物流 · 战略规划；让连接更加高效可靠。",
+    "accent": "#3574B4",
+    "slideCount": 3,
+    "file": "logistics-strategy.pptx",
+    "preview": "logistics-strategy.svg"
+  },
+  {
+    "id": "logistics-proposal",
+    "name": "交通物流·运输方案",
+    "description": "交通物流 · 产品与服务提案；为每一次交付设计路线。",
+    "accent": "#3574B4",
+    "slideCount": 3,
+    "file": "logistics-proposal.pptx",
+    "preview": "logistics-proposal.svg"
+  },
+  {
+    "id": "logistics-report",
+    "name": "交通物流·运营分析",
+    "description": "交通物流 · 数据与成果汇报；从运营数据发现改善点。",
+    "accent": "#3574B4",
+    "slideCount": 3,
+    "file": "logistics-report.pptx",
+    "preview": "logistics-report.svg"
+  },
+  {
+    "id": "logistics-process",
+    "name": "交通物流·履约流程",
+    "description": "交通物流 · 流程与方法；打通履约中的每个环节。",
+    "accent": "#3574B4",
+    "slideCount": 3,
+    "file": "logistics-process.pptx",
+    "preview": "logistics-process.svg"
+  },
+  {
+    "id": "logistics-roadmap",
+    "name": "交通物流·运力计划",
+    "description": "交通物流 · 计划与路线图；以协同运力应对新需求。",
+    "accent": "#3574B4",
+    "slideCount": 3,
+    "file": "logistics-roadmap.pptx",
+    "preview": "logistics-roadmap.svg"
+  },
+  {
+    "id": "retail-strategy",
+    "name": "零售电商·品牌策略",
+    "description": "零售电商 · 战略规划；以用户价值驱动生意。",
+    "accent": "#CA6A64",
+    "slideCount": 3,
+    "file": "retail-strategy.pptx",
+    "preview": "retail-strategy.svg"
+  },
+  {
+    "id": "retail-proposal",
+    "name": "零售电商·新品上架",
+    "description": "零售电商 · 产品与服务提案；让产品亮点被看见。",
+    "accent": "#CA6A64",
+    "slideCount": 3,
+    "file": "retail-proposal.pptx",
+    "preview": "retail-proposal.svg"
+  },
+  {
+    "id": "retail-report",
+    "name": "零售电商·销售复盘",
+    "description": "零售电商 · 数据与成果汇报；从销售表现找到增长点。",
+    "accent": "#CA6A64",
+    "slideCount": 3,
+    "file": "retail-report.pptx",
+    "preview": "retail-report.svg"
+  },
+  {
+    "id": "retail-process",
+    "name": "零售电商·会员旅程",
+    "description": "零售电商 · 流程与方法；连接每一次消费体验。",
+    "accent": "#CA6A64",
+    "slideCount": 3,
+    "file": "retail-process.pptx",
+    "preview": "retail-process.svg"
+  },
+  {
+    "id": "retail-roadmap",
+    "name": "零售电商·大促计划",
+    "description": "零售电商 · 计划与路线图；让关键战役有清晰节奏。",
+    "accent": "#CA6A64",
+    "slideCount": 3,
+    "file": "retail-roadmap.pptx",
+    "preview": "retail-roadmap.svg"
+  },
+  {
+    "id": "tourism-strategy",
+    "name": "文旅酒店·目的地规划",
+    "description": "文旅酒店 · 战略规划；让远方成为值得抵达的地方。",
+    "accent": "#3D959C",
+    "slideCount": 3,
+    "file": "tourism-strategy.pptx",
+    "preview": "tourism-strategy.svg"
+  },
+  {
+    "id": "tourism-proposal",
+    "name": "文旅酒店·旅行推介",
+    "description": "文旅酒店 · 产品与服务提案；从一段故事开始旅行。",
+    "accent": "#3D959C",
+    "slideCount": 3,
+    "file": "tourism-proposal.pptx",
+    "preview": "tourism-proposal.svg"
+  },
+  {
+    "id": "tourism-report",
+    "name": "文旅酒店·运营月报",
+    "description": "文旅酒店 · 数据与成果汇报；用运营细节提升体验。",
+    "accent": "#3D959C",
+    "slideCount": 3,
+    "file": "tourism-report.pptx",
+    "preview": "tourism-report.svg"
+  },
+  {
+    "id": "tourism-process",
+    "name": "文旅酒店·服务旅程",
+    "description": "文旅酒店 · 流程与方法；设计旅程中的每一次相遇。",
+    "accent": "#3D959C",
+    "slideCount": 3,
+    "file": "tourism-process.pptx",
+    "preview": "tourism-process.svg"
+  },
+  {
+    "id": "tourism-roadmap",
+    "name": "文旅酒店·活动日程",
+    "description": "文旅酒店 · 计划与路线图；把美好安排在每一天。",
+    "accent": "#3D959C",
+    "slideCount": 3,
+    "file": "tourism-roadmap.pptx",
+    "preview": "tourism-roadmap.svg"
+  },
+  {
+    "id": "hospitality-strategy",
+    "name": "餐饮服务·门店规划",
+    "description": "餐饮服务 · 战略规划；让好味道连接好生意。",
+    "accent": "#BD703B",
+    "slideCount": 3,
+    "file": "hospitality-strategy.pptx",
+    "preview": "hospitality-strategy.svg"
+  },
+  {
+    "id": "hospitality-proposal",
+    "name": "餐饮服务·菜单提案",
+    "description": "餐饮服务 · 产品与服务提案；把每一道用心端上餐桌。",
+    "accent": "#BD703B",
+    "slideCount": 3,
+    "file": "hospitality-proposal.pptx",
+    "preview": "hospitality-proposal.svg"
+  },
+  {
+    "id": "hospitality-report",
+    "name": "餐饮服务·经营周报",
+    "description": "餐饮服务 · 数据与成果汇报；以经营细节改善门店表现。",
+    "accent": "#BD703B",
+    "slideCount": 3,
+    "file": "hospitality-report.pptx",
+    "preview": "hospitality-report.svg"
+  },
+  {
+    "id": "hospitality-process",
+    "name": "餐饮服务·出餐流程",
+    "description": "餐饮服务 · 流程与方法；从备料到出品保持一致。",
+    "accent": "#BD703B",
+    "slideCount": 3,
+    "file": "hospitality-process.pptx",
+    "preview": "hospitality-process.svg"
+  },
+  {
+    "id": "hospitality-roadmap",
+    "name": "餐饮服务·开店筹备",
+    "description": "餐饮服务 · 计划与路线图；为一场好开业做好准备。",
+    "accent": "#BD703B",
+    "slideCount": 3,
+    "file": "hospitality-roadmap.pptx",
+    "preview": "hospitality-roadmap.svg"
+  },
+  {
+    "id": "culture-strategy",
+    "name": "文化传媒·传播策略",
+    "description": "文化传媒 · 战略规划；让好故事遇见更多人。",
+    "accent": "#9B639E",
+    "slideCount": 3,
+    "file": "culture-strategy.pptx",
+    "preview": "culture-strategy.svg"
+  },
+  {
+    "id": "culture-proposal",
+    "name": "文化传媒·内容提案",
+    "description": "文化传媒 · 产品与服务提案；用创意讲述独特表达。",
+    "accent": "#9B639E",
+    "slideCount": 3,
+    "file": "culture-proposal.pptx",
+    "preview": "culture-proposal.svg"
+  },
+  {
+    "id": "culture-report",
+    "name": "文化传媒·传播报告",
+    "description": "文化传媒 · 数据与成果汇报；让传播效果清晰可见。",
+    "accent": "#9B639E",
+    "slideCount": 3,
+    "file": "culture-report.pptx",
+    "preview": "culture-report.svg"
+  },
+  {
+    "id": "culture-process",
+    "name": "文化传媒·制作流程",
+    "description": "文化传媒 · 流程与方法；把创意变成完整作品。",
+    "accent": "#9B639E",
+    "slideCount": 3,
+    "file": "culture-process.pptx",
+    "preview": "culture-process.svg"
+  },
+  {
+    "id": "culture-roadmap",
+    "name": "文化传媒·项目排期",
+    "description": "文化传媒 · 计划与路线图；为每一个精彩安排节奏。",
+    "accent": "#9B639E",
+    "slideCount": 3,
+    "file": "culture-roadmap.pptx",
+    "preview": "culture-roadmap.svg"
+  },
+  {
+    "id": "nonprofit-strategy",
+    "name": "公益组织·行动倡议",
+    "description": "公益组织 · 战略规划；让微小行动汇聚改变。",
+    "accent": "#C0776D",
+    "slideCount": 3,
+    "file": "nonprofit-strategy.pptx",
+    "preview": "nonprofit-strategy.svg"
+  },
+  {
+    "id": "nonprofit-proposal",
+    "name": "公益组织·项目介绍",
+    "description": "公益组织 · 产品与服务提案；为真实需求设计公益行动。",
+    "accent": "#C0776D",
+    "slideCount": 3,
+    "file": "nonprofit-proposal.pptx",
+    "preview": "nonprofit-proposal.svg"
+  },
+  {
+    "id": "nonprofit-report",
+    "name": "公益组织·影响力报告",
+    "description": "公益组织 · 数据与成果汇报；把每一份善意变成可见成效。",
+    "accent": "#C0776D",
+    "slideCount": 3,
+    "file": "nonprofit-report.pptx",
+    "preview": "nonprofit-report.svg"
+  },
+  {
+    "id": "nonprofit-process",
+    "name": "公益组织·志愿服务",
+    "description": "公益组织 · 流程与方法；让志愿力量有序协作。",
+    "accent": "#C0776D",
+    "slideCount": 3,
+    "file": "nonprofit-process.pptx",
+    "preview": "nonprofit-process.svg"
+  },
+  {
+    "id": "nonprofit-roadmap",
+    "name": "公益组织·筹款计划",
+    "description": "公益组织 · 计划与路线图；用透明计划赢得持续支持。",
+    "accent": "#C0776D",
+    "slideCount": 3,
+    "file": "nonprofit-roadmap.pptx",
+    "preview": "nonprofit-roadmap.svg"
+  },
+  {
+    "id": "public-strategy",
+    "name": "公共服务·发展规划",
+    "description": "公共服务 · 战略规划；让公共服务更可及。",
+    "accent": "#447D9C",
+    "slideCount": 3,
+    "file": "public-strategy.pptx",
+    "preview": "public-strategy.svg"
+  },
+  {
+    "id": "public-proposal",
+    "name": "公共服务·服务指南",
+    "description": "公共服务 · 产品与服务提案；把服务事项说明白。",
+    "accent": "#447D9C",
+    "slideCount": 3,
+    "file": "public-proposal.pptx",
+    "preview": "public-proposal.svg"
+  },
+  {
+    "id": "public-report",
+    "name": "公共服务·工作报告",
+    "description": "公共服务 · 数据与成果汇报；以务实成果回应期待。",
+    "accent": "#447D9C",
+    "slideCount": 3,
+    "file": "public-report.pptx",
+    "preview": "public-report.svg"
+  },
+  {
+    "id": "public-process",
+    "name": "公共服务·办事流程",
+    "description": "公共服务 · 流程与方法；让每一步办理更加清楚。",
+    "accent": "#447D9C",
+    "slideCount": 3,
+    "file": "public-process.pptx",
+    "preview": "public-process.svg"
+  },
+  {
+    "id": "public-roadmap",
+    "name": "公共服务·民生项目",
+    "description": "公共服务 · 计划与路线图；把民生目标落实到项目。",
+    "accent": "#447D9C",
+    "slideCount": 3,
+    "file": "public-roadmap.pptx",
+    "preview": "public-roadmap.svg"
+  },
+  {
+    "id": "research-strategy",
+    "name": "科研创新·课题开题",
+    "description": "科研创新 · 战略规划；从关键问题开启探索。",
+    "accent": "#6678A5",
+    "slideCount": 3,
+    "file": "research-strategy.pptx",
+    "preview": "research-strategy.svg"
+  },
+  {
+    "id": "research-proposal",
+    "name": "科研创新·技术方案",
+    "description": "科研创新 · 产品与服务提案；让研究方法服务于问题。",
+    "accent": "#6678A5",
+    "slideCount": 3,
+    "file": "research-proposal.pptx",
+    "preview": "research-proposal.svg"
+  },
+  {
+    "id": "research-report",
+    "name": "科研创新·研究成果",
+    "description": "科研创新 · 数据与成果汇报；以证据呈现新的发现。",
+    "accent": "#6678A5",
+    "slideCount": 3,
+    "file": "research-report.pptx",
+    "preview": "research-report.svg"
+  },
+  {
+    "id": "research-process",
+    "name": "科研创新·实验设计",
+    "description": "科研创新 · 流程与方法；构建可复核的实验路径。",
+    "accent": "#6678A5",
+    "slideCount": 3,
+    "file": "research-process.pptx",
+    "preview": "research-process.svg"
+  },
+  {
+    "id": "research-roadmap",
+    "name": "科研创新·研究计划",
+    "description": "科研创新 · 计划与路线图；让探索过程有清晰里程碑。",
+    "accent": "#6678A5",
+    "slideCount": 3,
+    "file": "research-roadmap.pptx",
+    "preview": "research-roadmap.svg"
+  },
+  {
+    "id": "legal-strategy",
+    "name": "法律咨询·合规策略",
+    "description": "法律咨询 · 战略规划；以专业判断守护稳健发展。",
+    "accent": "#8A7754",
+    "slideCount": 3,
+    "file": "legal-strategy.pptx",
+    "preview": "legal-strategy.svg"
+  },
+  {
+    "id": "legal-proposal",
+    "name": "法律咨询·服务建议",
+    "description": "法律咨询 · 产品与服务提案；让复杂问题拥有清晰路径。",
+    "accent": "#8A7754",
+    "slideCount": 3,
+    "file": "legal-proposal.pptx",
+    "preview": "legal-proposal.svg"
+  },
+  {
+    "id": "legal-report",
+    "name": "法律咨询·案件复盘",
+    "description": "法律咨询 · 数据与成果汇报；从事实与证据总结经验。",
+    "accent": "#8A7754",
+    "slideCount": 3,
+    "file": "legal-report.pptx",
+    "preview": "legal-report.svg"
+  },
+  {
+    "id": "legal-process",
+    "name": "法律咨询·审查流程",
+    "description": "法律咨询 · 流程与方法；建立有据可循的审查机制。",
+    "accent": "#8A7754",
+    "slideCount": 3,
+    "file": "legal-process.pptx",
+    "preview": "legal-process.svg"
+  },
+  {
+    "id": "legal-roadmap",
+    "name": "法律咨询·治理计划",
+    "description": "法律咨询 · 计划与路线图；将治理目标落到具体行动。",
+    "accent": "#8A7754",
+    "slideCount": 3,
+    "file": "legal-roadmap.pptx",
+    "preview": "legal-roadmap.svg"
+  },
+  {
+    "id": "people-strategy",
+    "name": "人力组织·人才战略",
+    "description": "人力组织 · 战略规划；让个人成长与组织同频。",
+    "accent": "#8C6A9B",
+    "slideCount": 3,
+    "file": "people-strategy.pptx",
+    "preview": "people-strategy.svg"
+  },
+  {
+    "id": "people-proposal",
+    "name": "人力组织·雇主介绍",
+    "description": "人力组织 · 产品与服务提案；让人才看见共同的未来。",
+    "accent": "#8C6A9B",
+    "slideCount": 3,
+    "file": "people-proposal.pptx",
+    "preview": "people-proposal.svg"
+  },
+  {
+    "id": "people-report",
+    "name": "人力组织·团队盘点",
+    "description": "人力组织 · 数据与成果汇报；用团队洞察支持发展决策。",
+    "accent": "#8C6A9B",
+    "slideCount": 3,
+    "file": "people-report.pptx",
+    "preview": "people-report.svg"
+  },
+  {
+    "id": "people-process",
+    "name": "人力组织·入职旅程",
+    "description": "人力组织 · 流程与方法；陪伴每一位伙伴顺利启程。",
+    "accent": "#8C6A9B",
+    "slideCount": 3,
+    "file": "people-process.pptx",
+    "preview": "people-process.svg"
+  },
+  {
+    "id": "people-roadmap",
+    "name": "人力组织·培养计划",
+    "description": "人力组织 · 计划与路线图；把潜力培养成可持续能力。",
+    "accent": "#8C6A9B",
+    "slideCount": 3,
+    "file": "people-roadmap.pptx",
+    "preview": "people-roadmap.svg"
   }
 ]

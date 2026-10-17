@@ -1,6 +1,6 @@
 import { Inflate, strFromU8 } from 'fflate'
 import { DEFAULT_STYLE, type ElementStyle, type Endpoint, type ImportedScene, type Scene, type SceneElement, type ShapeElement } from '../core/types.ts'
-import { edgePoints, isBraceShape, shapeOutline, braceTextBounds } from '../core/geometry.ts'
+import { edgePoints, isBraceShape, shapeOutline, braceTextBounds, rectangleCornerRadius } from '../core/geometry.ts'
 import { resolveStrokePattern, sceneDefaultStyle } from '../core/appearance.ts'
 import { validateElementStyle } from '../core/documents.ts'
 import { readBrushData } from '../core/brushes.ts'
@@ -23,6 +23,11 @@ function finite(value: string | null, fallback = 0): number {
   if (value === null || value === '') return fallback
   const result = Number(value)
   if (!Number.isFinite(result) || Math.abs(result) > 1e7) throw new Error('图形包含无效或过大的坐标。')
+  return result
+}
+function cornerRadius(value: string): number {
+  const result = Number(value)
+  if (!value.trim() || !Number.isFinite(result) || result < 0) throw new Error('图形包含无效的圆角数值。')
   return result
 }
 
@@ -70,11 +75,11 @@ function color(value: string | undefined, fallback: string, warnings: Set<string
 }
 
 function readStyle(map: Record<string, string>, warnings: Set<string>): ElementStyle {
-  const supported = new Set(['shape', 'ellipse', 'rhombus', 'text', 'group', 'strokeColor', 'fillColor', 'fontColor', 'strokeWidth', 'fontSize', 'align', 'opacity', 'dashed', 'dashPattern', 'sketch', 'rotation', 'gradientColor', 'shadow', 'rounded', 'fontStyle', 'image', 'movable', 'exitX', 'exitY', 'entryX', 'entryY', 'edgeStyle', 'curved', 'startArrow', 'endArrow', 'html', 'whiteSpace'])
+  const supported = new Set(['shape', 'ellipse', 'rhombus', 'text', 'group', 'strokeColor', 'fillColor', 'fontColor', 'strokeWidth', 'fontSize', 'align', 'opacity', 'dashed', 'dashPattern', 'sketch', 'rotation', 'gradientColor', 'shadow', 'rounded', 'arcSize', 'absoluteArcSize', 'fontStyle', 'image', 'movable', 'exitX', 'exitY', 'entryX', 'entryY', 'edgeStyle', 'curved', 'startArrow', 'endArrow', 'html', 'whiteSpace'])
   const unknown = Object.keys(map).filter(key => !supported.has(key))
   if (unknown.length) warnings.add(`部分样式暂不支持，已简化：${unknown.slice(0, 8).join('、')}${unknown.length > 8 ? '等' : ''}。`)
   if (Number(map.rotation || 0)) warnings.add('旋转图形已转为未旋转的图形，位置可能与原图不同。')
-  if (map.gradientColor || map.shadow === '1' || map.rounded === '1' || Number(map.fontStyle || 0)) warnings.add('渐变、阴影、圆角及特殊字体样式已简化。')
+  if (map.gradientColor || map.shadow === '1' || Number(map.fontStyle || 0)) warnings.add('渐变、阴影及特殊字体样式已简化。')
   if (map.fontColor && map.strokeColor && map.fontColor !== map.strokeColor) warnings.add('独立的文字颜色已与图形线条颜色统一。')
   const pattern = map.dashPattern?.trim().split(/\s+/).map(Number)
   const dotted = pattern?.length === 2 && pattern.every(Number.isFinite) && pattern[0]! >= 0 && pattern[0]! <= 1 && pattern[1]! > 0
@@ -178,6 +183,12 @@ function importModel(model: Element, title: string): ImportedScene {
     const label = cell.getAttribute('value') || (wrapper?.tagName !== 'root' ? wrapper?.getAttribute('label') : '') || ''
     const bounds = isBraceShape(braceShape) ? { x: finite(cell.getAttribute('openWorkflowX')), y: finite(cell.getAttribute('openWorkflowY')), width: Math.max(1, finite(cell.getAttribute('openWorkflowWidth'), 160)), height: Math.max(1, finite(cell.getAttribute('openWorkflowHeight'), 180)) } : position(id)
     const node: ShapeElement = { id: idMap.get(id)!, type: 'shape', shape, ...bounds, text: plainLabel(label, warnings, map.html === '1'), style, ...(cell.getAttribute('openWorkflowGroup') ? { groupId: cell.getAttribute('openWorkflowGroup')! } : {}), locked: cell.getAttribute('openWorkflowLocked') === '1' || map.movable === '0', ...(shape === 'image' ? { imageData } : {}) }
+    if (shape === 'rectangle') {
+      const native = cell.getAttribute('openWorkflowCornerRadius')
+      const radius = native !== null ? cornerRadius(native) : map.rounded === '1'
+        ? map.absoluteArcSize === '1' ? cornerRadius(map.arcSize ?? '20') / 2 : Math.min(node.width, node.height) * Math.min(50, cornerRadius(map.arcSize ?? '15')) / 100 : 0
+      if (radius) node.cornerRadius = radius
+    } else if (map.rounded === '1' && !['ellipse', 'image', 'text'].includes(shape)) warnings.add('非矩形的圆角样式暂不支持，已保留原形状。')
     nodes.set(id, node); elements.push(node)
   }
   for (const [id, cell] of cellMap) {
@@ -268,7 +279,9 @@ export function exportGraphXml(scene: Scene, title: string): string {
       const imageData = element.shape === 'image' ? safeImage(element.imageData) : undefined
       if (element.shape === 'image' && !imageData) throw new Error('导出图片必须为不超过 10 MB 的内嵌 PNG/JPEG/WebP。')
       const image = imageData ? `image=${imageData.replace(';base64,', ',')};` : ''
-      return `<mxCell ${attributes} vertex="1" value="${xml(element.text)}" style="${xml(`shape=${shape};${writeStyle(element.style)}${image}`)}"><mxGeometry x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" as="geometry"/></mxCell>`
+      const radius = rectangleCornerRadius(element), rounded = radius ? `rounded=1;absoluteArcSize=1;arcSize=${radius * 2};` : ''
+      const radiusMetadata = element.shape === 'rectangle' && element.cornerRadius ? ` openWorkflowCornerRadius="${cornerRadius(String(element.cornerRadius))}"` : ''
+      return `<mxCell ${attributes}${radiusMetadata} vertex="1" value="${xml(element.text)}" style="${xml(`shape=${shape};${writeStyle(element.style)}${image}${rounded}`)}"><mxGeometry x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" as="geometry"/></mxCell>`
     }
     if (element.type === 'stroke') {
       if (!element.points.length) throw new Error('笔迹没有坐标，无法导出。')

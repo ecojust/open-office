@@ -1,5 +1,5 @@
 import { DEFAULT_STYLE, type ElementStyle, type Endpoint, type ImportedScene, type Scene, type SceneElement, type ShapeElement } from '../core/types.ts'
-import { edgePoints, elementBounds, isBraceShape, shapeOutline, braceTextBounds } from '../core/geometry.ts'
+import { edgePoints, elementBounds, isBraceShape, shapeOutline, braceTextBounds, rectangleCornerRadius } from '../core/geometry.ts'
 import { resolveStrokePattern, sceneDefaultStyle } from '../core/appearance.ts'
 import { validateElementStyle } from '../core/documents.ts'
 import { readBrushData } from '../core/brushes.ts'
@@ -17,6 +17,10 @@ const safeText = (value: unknown): string => typeof value === 'string' ? value.s
 function finite(value: unknown, fallback = 0): number {
   if (value === undefined || value === null) return fallback
   if (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) > 1e7) throw new Error('白板 JSON 图形包含无效或过大的坐标。')
+  return value
+}
+function cornerRadius(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new Error('白板 JSON 图形包含无效的圆角数值。')
   return value
 }
 
@@ -38,7 +42,8 @@ function styleOf(element: Json, warnings: Set<string>): ElementStyle {
   const strokePattern = element.strokeStyle === 'dashed' || element.strokeStyle === 'dotted' ? element.strokeStyle : 'solid'
   if (roughness === 'sketch') warnings.add('手绘线条已保留，抖动强度和具体笔迹可能与原图不同。')
   if (element.fillStyle && element.fillStyle !== 'solid') warnings.add('纹理填充已转换为纯色填充。')
-  if (element.roundness || element.fontFamily) warnings.add('圆角和字体外观可能与原图不同。')
+  if (element.fontFamily) warnings.add('字体外观可能与原图不同。')
+  if (element.roundness && element.type !== 'rectangle') warnings.add('非矩形的圆角外观可能与原图不同。')
   if (element.strokeStyle && !['solid', 'dashed', 'dotted'].includes(String(element.strokeStyle))) warnings.add('不支持的线型已转换为实线。')
   return {
     stroke: color(element.strokeColor, DEFAULT_STYLE.stroke, warnings),
@@ -139,6 +144,18 @@ export function importBoardJson(text: string): ImportedScene {
       if (kind === 'rectangle' && typeof native?.shape === 'string' && ['note', 'triangle', 'hexagon', 'star', 'parallelogram', 'cylinder', 'cloud', 'frame'].includes(native.shape)) shape = native.shape as ShapeElement['shape']
       if (shape === 'frame') { style.fill = 'none'; warnings.add('frame 已转换为可编辑分区框架，裁剪关系不保留。') }
       result = { id, type: 'shape', shape, x: finite(element.x), y: finite(element.y), width: Math.max(1, finite(element.width, 120)), height: Math.max(1, finite(element.height, 70)), text: shape === 'text' ? safeText(element.text) : shape === 'frame' ? safeText(element.name) : '', style, locked, ...(imageData ? { imageData } : {}) }
+      if (shape === 'rectangle') {
+        let radius = 0
+        if (native?.cornerRadius !== undefined) radius = cornerRadius(native.cornerRadius)
+        else if (isObject(element.roundness)) {
+          const shortSide = Math.min(result.width, result.height)
+          if (element.roundness.type === 3) radius = Math.min(shortSide / 4, cornerRadius(element.roundness.value ?? 32))
+          else if (element.roundness.type === 1 || element.roundness.type === 2) radius = shortSide / 4
+          else warnings.add('无法识别的外部圆角样式已转换为直角。')
+          if (radius) warnings.add('外部文件的圆角已转换为固定半径，缩放后的圆角外观可能与原图不同。')
+        }
+        if (radius) result.cornerRadius = radius
+      }
     }
     if (groupIds.length) result.groupId = groupIds.at(-1)
     elements.push(result); mapped.set(id, result)
@@ -197,6 +214,12 @@ export function exportBoardJson(scene: Scene): string {
       if (element.shape === 'text') { elements.push(textElement(element.id, element.text, element.x, element.y, element.width, element.height, element, null)); continue }
       Object.assign(result, { type: ['rectangle', 'ellipse', 'diamond', 'image', 'frame'].includes(element.shape) ? element.shape : 'rectangle', x: element.x, y: element.y, width: element.width, height: element.height, boundElements: [...(bindings.get(element.id) || [])] })
       if (!['rectangle', 'ellipse', 'diamond', 'image', 'frame'].includes(element.shape)) result.customData = { openWorkflow: { shape: element.shape } }
+      if (element.shape === 'rectangle' && element.cornerRadius) {
+        // External adaptive rounding can cap the radius at a quarter of the
+        // short side; native metadata retains the exact user setting on return.
+        result.roundness = { type: 3, value: rectangleCornerRadius(element) }
+        result.customData = { openWorkflow: { cornerRadius: cornerRadius(element.cornerRadius) } }
+      }
       if (element.shape === 'frame') Object.assign(result, { name: element.text })
       if (element.shape === 'image') {
         if (!safeImage(element.imageData)) throw new Error('导出图片必须为内嵌 PNG/JPEG/WebP。')
