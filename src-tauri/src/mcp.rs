@@ -485,6 +485,9 @@ struct HttpRequest {
 }
 
 fn read_request(stream: &mut TcpStream, session: &Session) -> Result<HttpRequest, u16> {
+    // Windows may inherit the listener's nonblocking mode on accepted sockets.
+    // Request workers use bounded blocking reads, including split HTTP bodies.
+    stream.set_nonblocking(false).map_err(|_| 503u16)?;
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
     let _ = stream.set_write_timeout(Some(Duration::from_secs(5)));
     let deadline = Instant::now() + Duration::from_secs(5);
@@ -1421,5 +1424,44 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "damaged");
         service.save_config(config()).unwrap();
         assert!(service.get_config().is_ok());
+    }
+
+    #[test]
+    fn accepted_connections_wait_for_delayed_headers_and_body() {
+        let (_, service) = service();
+        let config = config();
+        service
+            .start(config.clone(), document("a"), tools(), Arc::new(|_| Ok(())))
+            .unwrap();
+        let mut stream = TcpStream::connect(("127.0.0.1", config.port)).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        // Ensure accept runs before any bytes arrive; a nonblocking accepted
+        // socket would return WouldBlock here instead of honoring its timeout.
+        thread::sleep(Duration::from_millis(50));
+        let body = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26"}}"#;
+        write!(
+            stream,
+            "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nAuthorization: Bearer {}\r\n",
+            config.port, config.token
+        )
+        .unwrap();
+        thread::sleep(Duration::from_millis(20));
+        write!(
+            stream,
+            "Content-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+            body.len()
+        )
+        .unwrap();
+        thread::sleep(Duration::from_millis(20));
+        stream.write_all(&body.as_bytes()[..20]).unwrap();
+        thread::sleep(Duration::from_millis(20));
+        stream.write_all(&body.as_bytes()[20..]).unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 200 OK\r\n"), "{response}");
+        let json: Value = serde_json::from_str(response.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert_eq!(json["result"]["protocolVersion"], "2025-03-26");
     }
 }
