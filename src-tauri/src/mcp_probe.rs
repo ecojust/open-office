@@ -109,12 +109,18 @@ pub fn probe_stopped(port: u16) -> Result<Value, String> {
         return Err("Native MCP probe port is invalid.".into());
     }
     let address = SocketAddr::from(([127, 0, 0, 1], port));
-    match TcpStream::connect_timeout(&address, Duration::from_secs(1)) {
+    // Windows can report a refused loopback connection after its first SYN
+    // retry, which can exceed one second under parallel native tests. Allow
+    // that bounded delay, but never treat a timeout as evidence of shutdown.
+    match TcpStream::connect_timeout(&address, Duration::from_secs(5)) {
         Err(error) if error.kind() == std::io::ErrorKind::ConnectionRefused => {
             Ok(json!({"port":port,"closed":true}))
         }
         Ok(_) => Err("Native MCP listener still accepts connections after deactivation.".into()),
-        Err(_) => Err("Native MCP listener closure could not be verified.".into()),
+        Err(error) => Err(format!(
+            "Native MCP listener closure could not be verified: {error} ({:?}).",
+            error.kind()
+        )),
     }
 }
 
