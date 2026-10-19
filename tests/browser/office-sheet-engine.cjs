@@ -117,7 +117,7 @@ async function control(id) {
   report.clickedControls ||= []; report.clickedControls.push({ id, label: item.label, rect: item.rect });
 }
 async function newWorkbook() {
-  const home = page.getByRole('button', { name: '工作台', exact: true });
+  const home = page.locator('.home-tab');
   if (await home.isVisible()) await home.click();
   await page.locator('.create-card.sheet').click(); await idle();
 }
@@ -286,7 +286,7 @@ async function checks() {
   phase('word-and-sheet-session-isolation');
   const sheetName = await page.locator('.document-tab.active .tab-name').innerText();
   const sheetId = (await inspect()).sessionId;
-  await page.getByRole('button', { name: '工作台', exact: true }).click();
+  await page.locator('.home-tab').click();
   await page.locator('.create-card.word').click();
   const wordEditor = page.getByTestId('rust-word-editor').filter({ visible: true });
   await until(() => wordEditor.getAttribute('data-ready'), value => value === 'true', 'Word editor mounts alongside retained spreadsheet');

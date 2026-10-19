@@ -94,7 +94,7 @@ async function idle({ allowError = false } = {}) {
   assert.equal(await page.locator('iframe').count(), 0, 'The editor must mount local OfficeWord directly without an Office iframe');
 }
 async function newDocument() {
-  const home = page.getByRole('button', { name: '工作台', exact: true });
+  const home = page.locator('.home-tab');
   if (await home.isVisible()) await home.click();
   await page.locator('.create-card.word').click();
   await idle();
