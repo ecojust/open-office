@@ -99,6 +99,28 @@ async function setTheme(kind, preference, resolved) {
   await page.getByTestId('theme-' + preference).click();
   return expectedTheme(kind, preference, resolved);
 }
+async function assertAppearance() {
+  const header = page.getByTestId('global-toolbar');
+  const appearance = page.getByTestId('global-appearance');
+  assert.equal(await appearance.count(), 1, 'One global appearance area serves home and every editor');
+  const box = await appearance.boundingBox(), headerBox = await header.boundingBox(), viewport = page.viewportSize();
+  assert.ok(box && box.width > 0 && box.height > 0, 'Global appearance controls remain visible');
+  assert.ok(box.x >= -1 && box.x + box.width <= headerBox.x + 1,
+    'Global appearance controls stay in the left sidebar, outside the file toolbar');
+  assert.ok(box.y >= viewport.height / 2 && box.y + box.height <= viewport.height + 1,
+    'Global appearance controls stay at the bottom left within the viewport');
+  assert.equal(await page.getByRole('button', { name: '返回工作台', exact: true }).count(), 1, 'One application brand returns home');
+  assert.equal(await header.getByRole('button', { name: '返回工作台', exact: true }).count(), 0, 'The file toolbar does not repeat the application brand');
+  assert.equal(await page.getByRole('button', { name: '使用说明', exact: true }).count(), 1, 'One global information control');
+  assert.equal(await appearance.getByRole('button', { name: '使用说明', exact: true }).isVisible(), true);
+  for (const preference of ['light', 'dark', 'system']) {
+    assert.equal(await page.getByTestId('theme-' + preference).count(), 1, 'One global theme control ' + preference);
+    const button = appearance.getByTestId('theme-' + preference);
+    assert.equal(await button.isVisible(), true);
+    assert.equal(await button.locator('svg').count(), 1, 'Theme choice is an SVG icon');
+    assert.ok(await button.getAttribute('aria-label'), 'Theme choice has an accessible label');
+  }
+}
 async function assertChrome(kind) {
   const header = page.getByTestId('global-toolbar'), headerBox = await header.boundingBox();
   assert.ok(headerBox.y <= 2, 'File toolbar is the top application row');
@@ -106,11 +128,7 @@ async function assertChrome(kind) {
     assert.equal(await page.getByTestId(id).count(), 1, 'One global control ' + id);
     assert.equal(await header.getByTestId(id).isVisible(), true);
   }
-  for (const preference of ['light', 'dark', 'system']) {
-    const button = header.getByTestId('theme-' + preference);
-    assert.equal(await button.locator('svg').count(), 1, 'Theme choice is an SVG icon');
-    assert.ok(await button.getAttribute('aria-label'), 'Theme choice has an accessible label');
-  }
+  await assertAppearance();
   const state = await snapshot(kind), drawn = state.ui?.drawnChrome || [];
   assert.ok(drawn.length > 0, 'Actual renderer exposes drawn controls');
   assert.ok(!drawn.some(item => ['view.theme', 'interfaceTheme'].includes(item.id)), 'Embedded canvas does not draw a second theme selector');
@@ -136,6 +154,7 @@ async function download(kind, name, trigger) {
 async function checks() {
   phase('home-global-controls');
   const toolbar = page.getByTestId('global-toolbar'); await toolbar.waitFor();
+  await assertAppearance();
   for (const id of ['shell-save', 'shell-save-as', 'shell-export-pdf', 'shell-print']) assert.equal(await page.getByTestId(id).isDisabled(), true);
   assert.equal(await toolbar.getByRole('button', { name: '撤销', exact: true }).isDisabled(), true);
   assert.equal(await page.getByTestId('shell-open').isEnabled(), true);
@@ -187,7 +206,7 @@ async function checks() {
   await until(() => cell('A1'), state => state.value === 42, 'Global Redo restores the same history entry');
   // Redo becomes disabled after restoring the only edit. Give an enabled shell
   // control actual DOM focus before testing the canvas's native focus handoff.
-  const focusedShellButton = toolbar.getByTestId('theme-dark');
+  const focusedShellButton = page.getByTestId('global-appearance').getByTestId('theme-dark');
   await focusedShellButton.click();
   assert.equal(await focusedShellButton.evaluate(button => document.activeElement === button), true,
     'A real shell click holds DOM focus before returning to the grid');
@@ -200,7 +219,7 @@ async function checks() {
   await selectCell('A2');
   await until(() => snapshot('sheet'), state => state.selection?.active?.col === 0 && state.selection?.active?.row === 1,
     'A real canvas click restores A2 for the remaining checks');
-  pass('A single grid click recovers keyboard navigation from a focused global toolbar button');
+  pass('A single grid click recovers keyboard navigation from a focused global appearance button');
   await switchTab(word, 'word');
   const wordBefore = await expectedTheme('word', 'dark', 'dark');
   assert.equal(wordBefore.text, text); assert.equal(wordBefore.dirty, true);

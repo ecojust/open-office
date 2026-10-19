@@ -1170,8 +1170,22 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 <template>
   <div class="app-shell" :class="{'editing':!home}">
     <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.xlsx,.csv,.tsv,.pptx,.potx,.ppsx,.pdf,.oonote,.owflow,.mmd,.mermaid,.drawio,.xml,.excalidraw,.json" @change="browserFile" />
+    <aside class="sidebar" aria-label="全局导航" :inert="globalActionsBlocked">
+      <button class="primary open-sidebar" @click="openFile" aria-label="打开文件" title="打开文件 · Ctrl / ⌘ O"><Icon name="folder"/><span>打开文件</span><kbd>⌘ / Ctrl O</kbd></button>
+      <nav aria-label="工作区"><button :class="{selected:home}" :aria-current="home ? 'page' : undefined" aria-label="工作台" title="工作台" @click="home=true"><Icon name="home"/><span>工作台</span></button></nav>
+      <div v-if="tabs.length" v-show="home" class="sidebar-documents"><div class="sidebar-documents-heading"><span class="eyebrow">正在编辑 · {{tabs.length}}</span><button data-testid="home-close-all" @click="closeAllTabs" title="关闭所有打开的文档">全部关闭</button></div><button v-for="tab in tabs" :key="tab.key" :title="tab.document.name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button></div>
+      <div class="sidebar-bottom" data-testid="global-appearance">
+        <button class="brand" @click="home=true" aria-label="返回工作台" title="Open Office · 返回工作台"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
+        <span class="sidebar-version" :title="'版本 '+appVersion+' · 构建 '+buildVersion">v{{appVersion}} · {{buildVersion}}</span>
+        <div class="sidebar-controls" role="group" aria-label="外观与信息">
+          <div class="theme-switch" role="group" aria-label="界面主题">
+            <button v-for="option in appearanceOptions" :key="option.value" :data-testid="'theme-'+option.value" :aria-label="option.label" :title="option.value==='system' && appearance==='system' ? '跟随系统（当前为'+(effectiveAppearance==='dark'?'深色':'浅色')+'）' : option.label" :aria-pressed="appearance===option.value" @click="appearance=option.value"><Icon :name="option.icon" :size="18"/></button>
+          </div>
+          <button class="icon-button" @click="help=true" aria-label="使用说明" :title="'使用说明 · '+buildVersion" aria-haspopup="dialog" :aria-expanded="help"><Icon name="info" :size="18"/></button>
+        </div>
+      </div>
+    </aside>
     <header class="titlebar" data-testid="global-toolbar" :inert="globalActionsBlocked">
-      <button class="brand" @click="home=true" aria-label="返回工作台"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
       <nav class="global-file-toolbar" aria-label="全局文件操作">
         <details ref="newMenu" class="new-document-menu" @keydown.esc.stop.prevent="closeNewMenu(true)">
           <summary data-testid="shell-new" aria-label="新建文档" title="新建文档 · Ctrl / ⌘ N"><Icon name="plus" :size="18"/><span class="file-action-label">新建</span><Icon name="chevron-down" :size="12"/></summary>
@@ -1195,19 +1209,9 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       <span class="titlebar-context" :title="currentDocument?.document.name">{{currentDocument?.document.name || '工作台'}}</span>
       <div class="titlebar-right">
         <span class="save-state" data-testid="global-save-state" role="status" aria-live="polite" :title="saveStateTitle"><i v-if="currentDocument?.dirty" class="dirty-dot"/>{{saveStateLabel}}</span>
-        <div class="theme-switch" role="group" aria-label="界面主题">
-          <button v-for="option in appearanceOptions" :key="option.value" :data-testid="'theme-'+option.value" :aria-label="option.label" :title="option.label" :aria-pressed="appearance===option.value" @click="appearance=option.value"><Icon :name="option.icon" :size="18"/></button>
-        </div>
-        <button class="icon-button" @click="help=true" aria-label="使用说明" :title="'使用说明 · '+buildVersion"><Icon name="info" :size="18"/></button>
       </div>
     </header>
     <div v-show="home" class="workspace" :inert="globalActionsBlocked">
-      <aside class="sidebar">
-        <button class="primary open-sidebar" @click="openFile" aria-label="打开文件" title="打开文件 · Ctrl / ⌘ O"><Icon name="folder"/><span>打开文件</span><kbd>⌘ / Ctrl O</kbd></button>
-        <nav aria-label="工作区"><button class="selected" aria-current="page" aria-label="工作台" title="工作台" @click="home=true"><Icon name="home"/><span>工作台</span></button></nav>
-        <div v-if="tabs.length" class="sidebar-documents"><div class="sidebar-documents-heading"><span class="eyebrow">正在编辑 · {{tabs.length}}</span><button data-testid="home-close-all" @click="closeAllTabs" title="关闭所有打开的文档">全部关闭</button></div><button v-for="tab in tabs" :key="tab.key" :title="tab.document.name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button></div>
-        <div class="sidebar-bottom"><Icon name="shield"/><strong>文件保存在本机</strong><p>打开、编辑与保存，都在本地完成。</p></div>
-      </aside>
       <main class="home-main">
         <div class="home-heading"><div><span class="eyebrow">本地工作空间</span><h1>工作台</h1><p>新建一份文档，或继续编辑本机文件。</p></div></div>
         <section class="create-grid" aria-label="新建文件">

@@ -2,7 +2,7 @@
 
 当前应用使用四个本地 Rust/WASM 编辑器：`vendor/office-word`、`vendor/office-sheet`、`vendor/office-presentation`、`vendor/office-pdf`。各自的 `apps/open-office-host` 提供文档会话、命令、查询与导出；Vue/Tauri 提供文件和多标签工作台。PDF 的解析、页面渲染和编辑由本地 Rust 引擎完成。
 
-笔记本采用 `src/notes/` 中的本地 TypeScript 结构化模型，由 `NotebookEditor.vue` 和 `NotebookCanvas.vue` 提供编辑界面，以 `.oonote` 保存。它不增加第五套 WASM 引擎。格式和限制见[笔记本说明](notebook.md)，当前变更见[0.16.0 更新说明](releases/0.16.0.md)。Server、共享快照和局域网同步接口已移除；`src-tauri/src/server.rs` 仍为桌面 WebView 提供本机资源，不是共享文档服务。
+笔记本采用 `src/notes/` 中的本地 TypeScript 结构化模型，由 `NotebookEditor.vue` 和 `NotebookCanvas.vue` 提供编辑界面，以 `.oonote` 保存。它不增加第五套 WASM 引擎。格式和限制见[笔记本说明](notebook.md)，当前变更见[0.17.0 更新说明](releases/0.17.0.md)。Server、共享快照和局域网同步接口已移除；`src-tauri/src/server.rs` 仍为桌面 WebView 提供本机资源，不是共享文档服务。
 
 画布与代码图表使用 `src/workflow/` 中的 TypeScript 文档模型、SVG 渲染器和编辑组件，以 `.owflow` 保存；格式导入与导出说明见[画布与代码图表](workflow.md)。两个工作区共享顶部文件操作、主题、标签生命周期和自动保存。
 

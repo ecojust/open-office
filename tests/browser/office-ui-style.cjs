@@ -99,13 +99,14 @@ async function inspectDom() {
       return node.checkVisibility({ visibilityProperty: true }) && box.width > 0 && box.height > 0;
     };
     const rect = node => { const box = node.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width, height: box.height }; };
-    const controlSelectors = '[data-testid="global-toolbar"] button, [data-testid="global-toolbar"] summary, .create-card, .sidebar button, .note-toolbar button, .note-toolbar select, .note-sidebar button, .note-sidebar input';
+    const controlSelectors = '[data-testid="global-toolbar"] button, [data-testid="global-toolbar"] summary, [data-testid="global-appearance"] button, .create-card, .sidebar button, .note-toolbar button, .note-toolbar select, .note-sidebar button, .note-sidebar input';
+    const controlContainers = '[data-testid="global-toolbar"], [data-testid="global-appearance"], .note-toolbar';
     const controls = [...document.querySelectorAll(controlSelectors)].filter(visible).map(node => ({
       label: node.getAttribute('aria-label') || node.getAttribute('title') || node.textContent.trim(),
       fontFamily: getComputedStyle(node).fontFamily, fontSize: getComputedStyle(node).fontSize, fontSynthesis: getComputedStyle(node).fontSynthesis, rect: rect(node),
-      parent: node.closest('[data-testid="global-toolbar"], .note-toolbar') ? rect(node.closest('[data-testid="global-toolbar"], .note-toolbar')) : null,
+      parent: node.closest(controlContainers) ? rect(node.closest(controlContainers)) : null,
     }));
-    const icons = [...document.querySelectorAll('[data-testid="global-toolbar"] svg, .create-card svg, .note-toolbar svg, .note-sidebar svg')].filter(visible).map(node => ({
+    const icons = [...document.querySelectorAll('[data-testid="global-toolbar"] svg, [data-testid="global-appearance"] svg, .create-card svg, .note-toolbar svg, .note-sidebar svg')].filter(visible).map(node => ({
       viewBox: node.getAttribute('viewBox'), strokeWidth: node.getAttribute('stroke-width'),
       linecap: node.getAttribute('stroke-linecap'), linejoin: node.getAttribute('stroke-linejoin'),
       width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height,
@@ -115,7 +116,24 @@ async function inspectDom() {
       label: node.querySelector('strong').textContent, rect: rect(node),
       icon: rect(node.querySelector('.document-art')), title: rect(node.querySelector('strong')),
     }));
-    return { bodyFontFamily: getComputedStyle(document.body).fontFamily, bodyFontSynthesis: getComputedStyle(document.body).fontSynthesis, controls, icons, cards,
+    const appearanceNodes = [...document.querySelectorAll('[data-testid="global-appearance"]')];
+    const appearance = appearanceNodes[0];
+    const globalChrome = {
+      appearanceCount: appearanceNodes.length,
+      appearanceVisible: !!appearance && visible(appearance),
+      appearance: appearance ? rect(appearance) : null,
+      toolbar: rect(document.querySelector('[data-testid="global-toolbar"]')),
+      brands: document.querySelectorAll('button[aria-label="返回工作台"]').length,
+      toolbarBrands: document.querySelectorAll('[data-testid="global-toolbar"] button[aria-label="返回工作台"]').length,
+      themes: ['light', 'dark', 'system'].map(theme => ({
+        theme,
+        count: document.querySelectorAll(`[data-testid="theme-${theme}"]`).length,
+        visibleInAppearance: !!appearance && [...appearance.querySelectorAll(`[data-testid="theme-${theme}"]`)].some(visible),
+      })),
+      informationCount: document.querySelectorAll('button[aria-label="使用说明"]').length,
+      informationVisibleInAppearance: !!appearance && [...appearance.querySelectorAll('button[aria-label="使用说明"]')].some(visible),
+    };
+    return { bodyFontFamily: getComputedStyle(document.body).fontFamily, bodyFontSynthesis: getComputedStyle(document.body).fontSynthesis, controls, icons, cards, globalChrome,
       fonts: [...document.fonts].map(font => ({ family: font.family, weight: font.weight, status: font.status })),
       fontReady: document.fonts.check(`13px "${expectedFamily}"`, '打开 保存 字体 ABC 123'),
       horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth,
@@ -127,6 +145,21 @@ async function verifyLayout(theme, width) {
   await page.setViewportSize({ width, height: 1000 }); await frames(); await frames();
   const dom = await inspectDom();
   assert.equal(dom.iframes, 0, 'No iframe-based editor');
+  const chrome = dom.globalChrome;
+  assert.equal(chrome.appearanceCount, 1, 'One global appearance area');
+  assert.ok(chrome.appearanceVisible, 'Global appearance controls remain visible at every tested viewport');
+  assert.equal(chrome.brands, 1, 'One application brand');
+  assert.equal(chrome.toolbarBrands, 0, 'The file toolbar does not repeat the application brand');
+  assert.equal(chrome.informationCount, 1, 'One global information control');
+  assert.ok(chrome.informationVisibleInAppearance, 'Information is available beside the bottom-left theme controls');
+  assert.ok(chrome.appearance.x >= -1 && chrome.appearance.x + chrome.appearance.width <= chrome.toolbar.x + 1,
+    'Appearance controls occupy the left sidebar, outside the file toolbar');
+  assert.ok(chrome.appearance.y >= dom.viewport.height / 2 && chrome.appearance.y + chrome.appearance.height <= dom.viewport.height + 1,
+    'Appearance controls remain at the bottom left without escaping the viewport');
+  for (const themeControl of chrome.themes) {
+    assert.equal(themeControl.count, 1, 'One theme control ' + themeControl.theme);
+    assert.ok(themeControl.visibleInAppearance, 'Theme control remains visible in the global appearance area: ' + themeControl.theme);
+  }
   assert.ok(dom.controls.length > 8, 'Actual interface controls are visible');
   assert.ok(dom.fontReady, 'Shared UI font has loaded');
   assert.ok(dom.fonts.some(font => font.family.replaceAll('"', '') === fontFamily && font.status === 'loaded'), 'Bundled font face is actually loaded, not an implicit system fallback');
