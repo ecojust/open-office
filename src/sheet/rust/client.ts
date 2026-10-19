@@ -225,12 +225,15 @@ export class RustSheetSession {
       return this.backgroundExportReady(await getHost())
     })
   }
-  command(commandId: string, params: Record<string, unknown> = {}, expected?: Pick<OfficeSheetSnapshot, 'documentId' | 'revision' | 'selection'>): Promise<OfficeSheetSnapshot> {
+  command(commandId: string, params: Record<string, unknown> = {}, expected?: Pick<OfficeSheetSnapshot, 'documentId' | 'revision' | 'selection'>, assertCurrent?: () => void): Promise<OfficeSheetSnapshot> {
     return serialize(async () => {
+      assertCurrent?.()
       this.assertOpen()
       const api = await getHost()
+      assertCurrent?.()
       await this.flushInput(api)
       if (expected && (expected.documentId !== this.snapshot.documentId || expected.revision !== this.snapshot.revision || JSON.stringify(expected.selection) !== JSON.stringify(this.snapshot.selection))) throw Error('选择文件期间工作簿或选区已有变化，请重新选择插入位置。')
+      assertCurrent?.()
       const result = JSON.parse(api.command(this.id, commandId, JSON.stringify(params))) as { ok: boolean; snapshot?: OfficeSheetSnapshot; error?: string }
       this.accept(snapshotOf(result.snapshot ? JSON.stringify(result.snapshot) : api.inspect(this.id), this.id))
       if (!result.ok) throw Error(result.error || '工作簿操作失败。')

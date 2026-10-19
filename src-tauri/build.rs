@@ -2,6 +2,15 @@ fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
             "bootstrap",
+            "mcp_get_config",
+            "mcp_save_config",
+            "mcp_start",
+            "mcp_stop",
+            "mcp_status",
+            "mcp_heartbeat",
+            "mcp_claim",
+            "mcp_complete",
+            "mcp_smoke_probe",
             "confirm_close",
             "smoke_report",
             "open_document",

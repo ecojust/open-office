@@ -15,9 +15,11 @@ import { inspectInstalledOfficePresentation, validateNativeOfficePresentationEvi
 import { validateNativeWorkspaceReport } from './workspace-native-smoke.mjs';
 import { validateNativeNotebookReport } from './notebook-native-smoke.mjs';
 import { validateNativeWorkflowReport } from './workflow-native-smoke.mjs';
+import { validateNativeMcpReport } from './mcp-native-smoke.mjs';
 export { validateNativeWorkspaceReport } from './workspace-native-smoke.mjs';
 export { validateNativeNotebookReport } from './notebook-native-smoke.mjs';
 export { validateNativeWorkflowReport } from './workflow-native-smoke.mjs';
+export { validateNativeMcpReport } from './mcp-native-smoke.mjs';
 
 // This launches the final packaged GUI, not a source executable or an isolated
 // engine substitute. A native desktop session is required on the CI runner.
@@ -135,6 +137,7 @@ export function validateFrontendReport(report) {
   const workspaceChecks = validateNativeWorkspaceReport(report.workspace);
   const notebookChecks = validateNativeNotebookReport(report.notebook, report.workspace);
   const workflowChecks = validateNativeWorkflowReport(report.workflow, report.workspace);
+  const mcpChecks = validateNativeMcpReport(report.mcp);
 
   return {
     wordDefaultCanvas: true, wordDomInput: true, wordDocxReadback: true,
@@ -149,6 +152,7 @@ export function validateFrontendReport(report) {
     ...workspaceChecks,
     ...notebookChecks,
     ...workflowChecks,
+    ...mcpChecks,
   };
 }
 

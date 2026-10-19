@@ -153,7 +153,19 @@ onBeforeUnmount(() => {
   session?.deactivate()
   void session?.close(true).catch(cause => console.error('OfficeWord session cleanup failed', cause))
 })
-defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, syncRevision, canBackgroundExport, command })
+async function mcpExecute(name: string, args: Record<string, unknown>, assertCurrent: () => void): Promise<unknown> {
+  const owner = generation
+  const guard = () => { assertCurrent(); if (disposed || owner !== generation || !props.active) throw Error('MCP 文档已切换，请重新开启服务。') }
+  guard(); await opening; guard()
+  const current = session
+  if (!current || loading.value) throw Error('请等待文档打开。')
+  if (name === 'document_inspect') { const result = await current.inspect(); guard(); return result }
+  if (name === 'document_undo' || name === 'document_redo') return current.command(name === 'document_undo' ? 'edit.undo' : 'edit.redo', {}, undefined, guard)
+  if (name === 'word_read') { const value = await current.inspect(); guard(); return { text: (value.text ?? '').slice(0, 100000), totalCharacters: (value.text ?? '').length, truncated: (value.text ?? '').length > 100000 } }
+  if (name === 'word_insert_text') return current.command('text.insert', { text: args.text, raw: true }, undefined, guard)
+  throw Error('当前编辑器不支持此 MCP 工具。')
+}
+defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, syncRevision, canBackgroundExport, command })
 </script>
 
 <template>

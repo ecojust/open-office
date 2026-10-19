@@ -14,6 +14,7 @@ import { inspectInstalledPdf } from '../scripts/office-pdf-native-smoke.mjs';
 import { workspaceReport } from './helpers/workspace-smoke-report.mjs';
 import { notebookReport } from './helpers/notebook-smoke-report.mjs';
 import { workflowReport } from './helpers/workflow-smoke-report.mjs';
+import { mcpReport } from './helpers/mcp-smoke-report.mjs';
 import { installPdfFixture, pdfReport } from './helpers/pdf-smoke-report.mjs';
 import { wordReport } from './helpers/office-word-smoke-report.mjs';
 import { sheetReport } from './helpers/office-sheet-smoke-report.mjs';
@@ -112,7 +113,7 @@ function installation(t) {
       frontend: scenario.frontend, nativeDiagnostics: scenario.diagnostics, actions: scenario.sent } };
   const frontend = { ok: true, crossOriginIsolated: true, sharedArrayBuffer: false, userAgent: 'Native WebView contract test',
     word: wordReport(), sheet: sheetReport(), presentation: presentationReport(),
-    pdf: pdfReport(inspectInstalledPdf(resourceRoot, { root })), workspace: workspaceReport(), notebook: notebookReport(), workflow: workflowReport() };
+    pdf: pdfReport(inspectInstalledPdf(resourceRoot, { root })), workspace: workspaceReport(), notebook: notebookReport(), workflow: workflowReport(), mcp: mcpReport() };
   const installed = { word: inspectInstalledOfficeWord(resourceRoot, { root }), sheet: inspectInstalledOfficeSheet(resourceRoot, { root }),
     presentation: inspectInstalledOfficePresentation(resourceRoot, { root }), pdf: inspectInstalledPdf(resourceRoot, { root }) };
   for (const [engine, evidence] of Object.entries(installed)) {

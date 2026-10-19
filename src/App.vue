@@ -2,6 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import Icon from './components/Icon.vue'
+import McpSettingsDialog from './components/McpSettingsDialog.vue'
+import { createDefaultMcpConfig, loadMcpConfig, saveMcpConfig as storeBrowserMcpConfig, type McpConfig } from './mcp/config'
+import { createMcpService, type McpServiceState } from './mcp/service'
+import { getMcpConfig, saveMcpConfig as storeNativeMcpConfig, mcpTransport } from './mcp/native'
+import { catalogForKind, executeDocumentTool } from './mcp/document-tools'
 import NotebookEditor from './components/NotebookEditor.vue'
 import WorkflowEditor from './components/WorkflowEditor.vue'
 import { importText as importWorkflowText, documentBytes as workflowBytes } from './workflow/core/files'
@@ -155,6 +160,11 @@ let appDisposed = false
 onBeforeUnmount(() => { appDisposed = true; setRustWordDocument(); setRustSheetDocument(); setRustPresentationDocument(); setRustPdfDocument(); setNoteDocument(); setWorkflowDocument() })
 const recents = ref<RecentDocument[]>([]), busy = ref(''), error = ref(''), status = ref('所有文件，仅在你的设备上处理')
 const help = ref(false), search = ref(''), closeTarget = ref<Tab | 'window' | 'all' | null>(null)
+const mcpSettingsOpen = ref(false), mcpSettingsBusy = ref(false), mcpSettingsError = ref(''), mcpWorking = ref(false)
+const mcpMutating = ref(false)
+const mcpConfig = shallowRef<McpConfig>(createDefaultMcpConfig())
+const mcpConfigReady = ref(false)
+const mcpState = shallowRef<McpServiceState>({ phase: 'stopped' })
 const recentList = ref<HTMLElement>()
 watch(search, () => { if(recentList.value) recentList.value.scrollTop = 0 }, { flush: 'post' })
 const saveAsDraft = ref<{ key:string; kind:Kind; format:SaveExtension; name:string; error:string } | null>(null)
@@ -166,8 +176,8 @@ let templateListRequest = 0
 useDialogFocus(templateDialog)
 watch([templatePanelOpen, activeRustPresentation, home], () => nextTick(() => window.dispatchEvent(new Event('resize'))))
 const composing = ref(false), backgroundSaving = ref(false)
-const globalActionsBlocked = computed(() => !!busy.value || !!saveAsDraft.value || !!templateDraft.value || !!closeTarget.value || help.value)
-const editorInputBlocked = computed(() => (!!busy.value && !backgroundSaving.value) || !!saveAsDraft.value || !!templateDraft.value || !!closeTarget.value || help.value)
+const globalActionsBlocked = computed(() => !!busy.value || !!saveAsDraft.value || !!templateDraft.value || !!closeTarget.value || help.value || mcpSettingsOpen.value || mcpWorking.value)
+const editorInputBlocked = computed(() => (!!busy.value && !backgroundSaving.value) || !!saveAsDraft.value || !!templateDraft.value || !!closeTarget.value || help.value || mcpSettingsOpen.value || mcpMutating.value)
 const currentDocument = computed(() => home.value ? undefined : active.value)
 const documentActionsDisabled = computed(() => globalActionsBlocked.value || !currentDocument.value?.ready)
 const printDisabled = computed(() => documentActionsDisabled.value || typeof editor()?.print !== 'function')
@@ -220,6 +230,78 @@ const helpTools: { kind: Kind; name: string; description: string }[] = [
 ]
 const filteredRecents = computed(() => recents.value.filter(r => r.name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase())))
 const message = (e:unknown) => e instanceof Error ? e.message : String(e)
+const mcpService = createMcpService({
+  transport: mcpTransport,
+  currentDocument: () => currentDocument.value ? { id:currentDocument.value.key, kind:currentDocument.value.document.kind, title:currentDocument.value.document.name } : undefined,
+  changed: value => { mcpState.value = value },
+  async execute(request, assertCurrent) {
+    if (globalActionsBlocked.value || composing.value) throw Error('当前文档正在编辑或处理其他操作，请稍后重试。')
+    const tab = currentDocument.value
+    if (!tab?.ready || tab.key !== request.documentId) throw Error('当前文档尚未准备好。')
+    const handle = requireEditor(tab)
+    if (!await handle.canBackgroundExport?.()) throw Error('请先完成当前输入、拖动或弹窗操作，再调用 MCP。')
+    assertCurrent()
+    if (globalActionsBlocked.value || composing.value) throw Error('当前文档正在处理其他操作，请稍后重试。')
+    const mutating = catalogForKind(tab.document.kind).find(tool => tool.name === request.toolName)?.annotations.readOnlyHint !== true
+    mcpWorking.value = true
+    mcpMutating.value = mutating
+    try {
+      if (mutating && document.activeElement instanceof HTMLElement) document.activeElement.blur()
+      await nextTick()
+      assertCurrent()
+      return await executeDocumentTool(tab.document.kind, handle, request.toolName, request.arguments, assertCurrent)
+    } finally { mcpWorking.value = false; mcpMutating.value = false }
+  },
+})
+let mcpSettingsLoading:Promise<void>|undefined
+function readMcpSettings():Promise<void> {
+  if (mcpSettingsLoading) return mcpSettingsLoading
+  mcpSettingsBusy.value = true
+  mcpSettingsLoading = (async () => {
+    try {
+      const config = await (native.isTauri() ? getMcpConfig() : Promise.resolve(loadMcpConfig()))
+      if (appDisposed) return
+      mcpConfig.value = config; mcpConfigReady.value = true; mcpSettingsError.value = ''
+    } catch (cause) { mcpSettingsError.value = `无法读取 MCP 设置：${message(cause)}` }
+    finally { mcpSettingsBusy.value = false; mcpSettingsLoading = undefined }
+  })()
+  return mcpSettingsLoading
+}
+function openMcpSettings() {
+  mcpSettingsOpen.value = true
+  if (!mcpConfigReady.value) void readMcpSettings()
+}
+async function saveMcpSettings(config:McpConfig) {
+  if (mcpSettingsBusy.value) return
+  mcpSettingsBusy.value = true; mcpSettingsError.value = ''
+  try {
+    await mcpService.stop()
+    if (native.isTauri()) mcpConfig.value = await storeNativeMcpConfig(config)
+    else { storeBrowserMcpConfig(config); mcpConfig.value = config }
+    mcpConfigReady.value = true; mcpSettingsOpen.value = false
+    status.value = 'MCP 设置已保存；请在当前文档中开启服务。'
+  } catch (cause) { mcpSettingsError.value = message(cause) }
+  finally { mcpSettingsBusy.value = false }
+}
+async function toggleMcp() {
+  try {
+    if (mcpState.value.phase !== 'stopped' && mcpState.value.phase !== 'error') { await mcpService.stop(); return }
+    if (!native.isTauri()) { openMcpSettings(); return }
+    if (documentActionsDisabled.value || !currentDocument.value) return
+    if (!mcpConfigReady.value) await readMcpSettings()
+    if (!mcpConfigReady.value) { openMcpSettings(); return }
+    const tab = currentDocument.value
+    if (!tab?.ready || globalActionsBlocked.value) return
+    await mcpService.start(mcpConfig.value, { id:tab.key,kind:tab.document.kind,title:tab.document.name }, catalogForKind(tab.document.kind))
+  } catch (cause) { error.value = message(cause) }
+}
+watch([activeKey, home], () => { void mcpService.contextChanged().catch(cause => { error.value = message(cause) }) }, { flush:'sync' })
+let mcpHeartbeatTimer:ReturnType<typeof setInterval>|undefined
+onMounted(() => {
+  void readMcpSettings()
+  mcpHeartbeatTimer = setInterval(() => { void mcpService.heartbeat() }, 5000)
+})
+onBeforeUnmount(() => { clearInterval(mcpHeartbeatTimer); void mcpService.dispose().catch(() => undefined) })
 async function editorTransaction<T>(label:string, work:()=>Promise<T>, preserveInput=false):Promise<T> {
   if (busy.value) throw Error('正在处理另一项文档操作，请等待完成。')
   backgroundSaving.value=preserveInput
@@ -647,6 +729,7 @@ async function closeAllTabs() {
   })
 }
 async function closeWindow() {
+  await mcpService.stop().catch(cause => { error.value = message(cause) })
   if(busy.value) {pendingWindowClose=true;return}
   saveAsDraft.value=null
   templateDraft.value=null
@@ -773,8 +856,8 @@ const autosave=createAutosaveScheduler({
   readState(){const tab=active.value;return {enabled:autosaveEnabled.value,native:native.isTauri(),key:tab?.key,fileId:tab?.fileId,
     dirty:!!tab?.dirty,ready:!!tab?.ready,requiresSaveAs:!!tab?.requiresSaveAs,
     canSaveDirectly:!!tab&&!!handleFor(tab)&&!isImportOnly(tab.document.extension)&&defaultSaveExtension(tab.document.extension)===tab.document.extension,
-    busy:!!busy.value,modal:!!saveAsDraft.value||!!templateDraft.value||!!closeTarget.value||help.value,
-    composing:composing.value||Date.now()-lastInputAt.value<1200,remoteEditing:false}},
+    busy:!!busy.value,modal:!!saveAsDraft.value||!!templateDraft.value||!!closeTarget.value||help.value||mcpSettingsOpen.value,
+    composing:composing.value||Date.now()-lastInputAt.value<1200,remoteEditing:mcpWorking.value}},
   async save(target){
     const tab=active.value
     // A pause inside an unfinished cell, text box or form is not confirmation.
@@ -1116,6 +1199,39 @@ onMounted(async()=>{
           report.workflow=workflow
           if(!workflow.ok)throw Error(workflow.error||workflow.cleanupError||'Native workflow verification failed')
           smokeStage('workflow-native','complete')
+          smokeStage('mcp-native','starting native HTTP document tool verification')
+          const {runMcpNativeSmoke}=await import('./mcp/native-smoke')
+          const savedMcpConfig=mcpConfig.value
+          const mcp=await runMcpNativeSmoke({
+            openWord:async source=>{
+              const tab=await editorTransaction('正在验证本机 MCP',()=>addDocument(source))
+              if(!tab)throw Error('Native MCP smoke tab missing')
+              await nextTick();await awaitReady(tab)
+              const editor=rustWordHandles.get(tab.key) as OfficeWordSmokeEditor|undefined
+              if(!editor?.inspect||!editor.command)throw Error('Native MCP Word editor unavailable')
+              return {key:tab.key,editor}
+            },
+            start:async key=>{
+              const tab=currentDocument.value
+              if(!tab||tab.key!==key||tab.document.kind!=='word')throw Error('Native MCP target is not active')
+              // Ephemeral smoke permissions never overwrite the user's saved settings.
+              mcpConfig.value={...createDefaultMcpConfig(),allowEdits:true}
+              await mcpService.start(mcpConfig.value,{id:tab.key,kind:tab.document.kind,title:tab.document.name},catalogForKind(tab.document.kind))
+              await nextTick()
+            },
+            state:()=>mcpService.inspect(),
+            stop:async()=>{try{await mcpService.stop()}finally{mcpConfig.value=savedMcpConfig;await nextTick()}},
+            close:async key=>{
+              const tab=tabs.value.find(item=>item.key===key)
+              if(!tab)throw Error('Native MCP cleanup tab missing')
+              const sessionId=(await (rustWordHandles.get(key) as OfficeWordSmokeEditor|undefined)?.inspect())?.sessionId
+              await removeTab(tab,true);await nextTick()
+              if(sessionId){let closed=false;try{await inspectOfficeWordSession(sessionId)}catch{closed=true};if(!closed)throw Error('Native MCP Word session survived cleanup')}
+            },
+          })
+          report.mcp=mcp
+          if(!mcp.ok)throw Error(mcp.error||mcp.cleanupError||'Native MCP verification failed')
+          smokeStage('mcp-native','complete')
           smokeStage('workspace-native','starting scheduled native file persistence verification')
           const {runWorkspaceNativeSmoke}=await import('./shared/workspace-native-smoke')
           const workspace=await runWorkspaceNativeSmoke({
@@ -1177,10 +1293,11 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       <div class="sidebar-bottom" data-testid="global-appearance">
         <button class="brand" @click="home=true" aria-label="返回工作台" title="Open Office · 返回工作台"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
         <span class="sidebar-version" :title="'版本 '+appVersion+' · 构建 '+buildVersion">v{{appVersion}} · {{buildVersion}}</span>
-        <div class="sidebar-controls" role="group" aria-label="外观与信息">
+        <div class="sidebar-controls" role="group" aria-label="外观与设置">
           <div class="theme-switch" role="group" aria-label="界面主题">
             <button v-for="option in appearanceOptions" :key="option.value" :data-testid="'theme-'+option.value" :aria-label="option.label" :title="option.value==='system' && appearance==='system' ? '跟随系统（当前为'+(effectiveAppearance==='dark'?'深色':'浅色')+'）' : option.label" :aria-pressed="appearance===option.value" @click="appearance=option.value"><Icon :name="option.icon" :size="18"/></button>
           </div>
+          <button class="icon-button" data-testid="mcp-settings" @click="openMcpSettings" aria-label="MCP 设置" title="全局 MCP 设置" aria-haspopup="dialog" :aria-expanded="mcpSettingsOpen"><Icon name="link" :size="18"/></button>
           <button class="icon-button" @click="help=true" aria-label="使用说明" :title="'使用说明 · '+buildVersion" aria-haspopup="dialog" :aria-expanded="help"><Icon name="info" :size="18"/></button>
         </div>
       </div>
@@ -1241,6 +1358,14 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <button class="new-tab" @click="home=true" aria-label="新建文档" title="新建文档"><Icon name="plus" :size="18"/></button>
         <button class="close-all-tabs" data-testid="tabs-close-all" :disabled="globalActionsBlocked||!tabs.length" @click="closeAllTabs" title="批量关闭所有文档"><Icon name="close" :size="15"/><span>全部关闭</span></button>
       </div>
+      <div v-if="currentDocument" class="document-mcp-bar" role="toolbar" :aria-label="kindNames[currentDocument.document.kind]+' MCP 服务'">
+        <span class="document-mcp-kind"><Icon :name="icons[currentDocument.document.kind]" :size="14"/>{{kindNames[currentDocument.document.kind]}}<small>当前文档</small></span>
+        <span v-if="mcpState.phase==='running'" class="document-mcp-detail">{{mcpConfig.allowEdits?'可读取和编辑':'只读'}} · 切换文档后关闭</span>
+        <button data-testid="document-mcp-toggle" class="document-mcp-toggle" :class="{running:mcpState.phase==='running'}" :aria-pressed="mcpState.phase==='running'" :aria-label="mcpState.phase==='running'?'停止当前文档 MCP 服务':'开启当前文档 MCP 服务'" :disabled="mcpState.phase==='stopping'||documentActionsDisabled" :title="!native.isTauri()?'请在桌面版开启本机 MCP 服务':mcpState.error||mcpState.endpoint||'根据全局设置开启当前文档的 MCP 服务；切换文档后自动关闭'" @click="toggleMcp">
+          <i v-if="mcpState.phase==='running'" class="mcp-running-dot"/><Icon v-else name="link" :size="15"/>
+          <span>MCP</span><strong v-if="mcpState.phase==='running'">Running</strong><span v-else-if="mcpState.phase==='starting'">启动中…</span><span v-else-if="mcpState.phase==='stopping'">停止中…</span><span v-else-if="mcpState.phase==='error'">重试</span>
+        </button>
+      </div>
       <div v-if="active?.importWarnings?.length" class="import-review-notice" role="note" data-testid="import-review-notice"><Icon name="info" :size="16"/><div><p v-for="warning in active.importWarnings" :key="warning">{{warning}}</p><strong>请核对文档内容与排版。</strong></div></div>
       <div class="editor-stage">
       <div class="editor-content" :inert="editorInputBlocked">
@@ -1255,6 +1380,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       </div>
       <footer class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · {{activeRustWord?'文字编辑':activeRustSheet?'表格编辑':activeRustPresentation?'演示编辑':activeRustPdf?'PDF 编辑':activeNote?'笔记编辑':active?.document.kind==='canvas'?'画布编辑':'代码图表'}}</span></footer>
     </section>
+    <McpSettingsDialog v-if="mcpSettingsOpen" :config="mcpConfig" :running="mcpState.phase==='running'" :native-available="native.isTauri()" :saving="mcpSettingsBusy" :error="mcpSettingsError" @save="saveMcpSettings" @close="!mcpSettingsBusy&&(mcpSettingsOpen=false)"/>
     <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{error}}</span><button @click="error=''" aria-label="关闭错误提示"><Icon name="close" :size="16"/></button></div>
     <div v-if="busy&&!backgroundSaving" class="busy-overlay" role="status"><span class="busy-pill"><i/>{{busy}}</span></div>
     <div v-if="saveAsDraft" class="modal-backdrop" @click.self="cancelSaveAs" @keydown.esc.stop.prevent="cancelSaveAs">

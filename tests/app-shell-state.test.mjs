@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, webcrypto } from 'node:crypto'
 import ts from 'typescript'
 import * as vue from 'vue'
 import { baseParse } from '@vue/compiler-dom'
@@ -19,9 +19,13 @@ const utilities = await readFile(new URL('../src/shared/document.ts', import.met
 const dialogFocus = await readFile(new URL('../src/shared/dialog-focus.ts', import.meta.url), 'utf8')
 const appearanceSource = await readFile(new URL('../src/shared/appearance.ts', import.meta.url), 'utf8')
 const autosaveSource = await readFile(new URL('../src/shared/autosave.ts', import.meta.url), 'utf8')
+const mcpSources = Object.fromEntries(await Promise.all(['config', 'service', 'document-tools'].map(async name =>
+  [`./mcp/${name}`, await readFile(new URL(`../src/mcp/${name}.ts`, import.meta.url), 'utf8')]
+)))
 const names = 'tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,rustPdfEntries,rustPdfHandles,setRustPdfHandle,rustWordEntries,rustWordHandles,setRustWordHandle,rustSheetEntries,rustSheetHandles,setRustSheetHandle,rustPresentationEntries,rustPresentationHandles,setRustPresentationHandle,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,browserFile,saveActive,closeTab,closeAllTabs,closeWindow,resolveClose,removeTab,removeTabs,task,editorTransaction,nativeTransactionalEditor,appearance,currentDocument,globalActionsBlocked,documentActionsDisabled,globalFileAction,globalNewDocument,keydown,rustEditorFileAction,previewSlides'
   + ',autosaveEnabled,autosave,autosaveWaiting,saveStateLabel,saveStateTitle,backgroundSaving,editorInputBlocked,noteEntries,noteHandles,setNoteHandle,activeNote'
   + ',printDisabled,status'
+  + ',mcpConfig,mcpSettingsOpen,mcpSettingsBusy,mcpSettingsError,mcpState,mcpWorking,mcpMutating,mcpService,toggleMcp,saveMcpSettings,openMcpSettings,workflowEntries,workflowHandles,setWorkflowHandle,composing'
 
 
 // Every shell still receives a fresh VM context and fresh Vue state. Reuse only
@@ -35,13 +39,13 @@ function compile(source, require, extra = {}) {
     compiledSources.set(source, output)
   }
   const module = { exports: {} }
-  vm.runInNewContext(output, { module, exports: module.exports, require, console, URL, setTimeout, clearTimeout,
-    crypto: { randomUUID }, btoa, atob, TextEncoder, TextDecoder, __BUILD_VERSION__: 'test', __APP_VERSION__: 'test', HTMLElement: class {}, document: { baseURI: 'http://127.0.0.1/' }, ...extra })
+  vm.runInNewContext(output, { module, exports: module.exports, require, console, URL, setTimeout, clearTimeout, structuredClone,
+    crypto: { randomUUID, getRandomValues: webcrypto.getRandomValues.bind(webcrypto) }, btoa, atob, TextEncoder, TextDecoder, __BUILD_VERSION__: 'test', __APP_VERSION__: 'test', HTMLElement: class {}, document: { baseURI: 'http://127.0.0.1/' }, ...extra })
   return module.exports
 }
 
 
-function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], deckPrepareError, deckPrepare, deckWarnings = [], presentationSmokeError, presentationSmokeReport, presentationSmokeRun, sheetSmokeError, sheetSmokeReport, sheetSmokeRun, pdfPrepareError, pdfPrepare, pdfWarnings = [], pdfSmokeError, pdfSmokeReport, notebookSmokeError, notebookSmokeReport, notebookSmokeRun, workflowSmokeError, workflowSmokeReport, workflowSmokeRun, workspaceSmokeError, workspaceSmokeReport, storedAppearance, storedAutosave, systemDark = false, storageUnavailable = false, browserUrl = 'http://127.0.0.1/', browserFetch, notebookDecodeError} = {}) {
+function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], deckPrepareError, deckPrepare, deckWarnings = [], presentationSmokeError, presentationSmokeReport, presentationSmokeRun, sheetSmokeError, sheetSmokeReport, sheetSmokeRun, pdfPrepareError, pdfPrepare, pdfWarnings = [], pdfSmokeError, pdfSmokeReport, notebookSmokeError, notebookSmokeReport, notebookSmokeRun, workflowSmokeError, workflowSmokeReport, workflowSmokeRun, workspaceSmokeError, workspaceSmokeReport, storedAppearance, storedAutosave, systemDark = false, storageUnavailable = false, browserUrl = 'http://127.0.0.1/', browserFetch, notebookDecodeError, mcpSmokeError, mcpSmokeReport, mcpSmokeRun} = {}) {
   const rustPreparations = [], sheetPreparations = [], deckPreparations = [], pdfPreparations = []
   const calls = [], mounted = [], beforeUnmount = [], observers = [], native = {
     isTauri: () => nativeEnabled,
@@ -124,6 +128,38 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
   }, browser)
   const helpers = compile(utilities, () => { throw Error('Unexpected helper import') })
   const modules = new Map()
+  const mcpCalls = [], mcpResults = []
+  let mcpListener, mcpSession, mcpSerial = 0, mcpStoredConfig
+  const mcpStopped = () => ({ running: false, sessionId: null, documentId: null, endpoint: null, port: null })
+  // Native MCP transport is controlled; the App and service lifecycle remain real.
+  const mcpNative = {
+    async getMcpConfig() { mcpCalls.push(['get-config']); return mcpStoredConfig ?? mcpModule('./mcp/config').createDefaultMcpConfig() },
+    async saveMcpConfig(config) { mcpCalls.push(['save-config', config]); mcpStoredConfig = { ...config }; return mcpStoredConfig },
+    mcpTransport: {
+      async start(config, document, tools) {
+        mcpCalls.push(['start', config, document, tools])
+        mcpSession = { running: true, sessionId: `controlled-mcp-${++mcpSerial}`, documentId: document.id, endpoint: `http://127.0.0.1:${config.port}/mcp`, port: config.port }
+        return mcpSession
+      },
+      async stop(sessionId) { mcpCalls.push(['stop', sessionId]); mcpSession = undefined; return mcpStopped() },
+      async heartbeat(sessionId) { mcpCalls.push(['heartbeat', sessionId]); return mcpSession ?? mcpStopped() },
+      async claim(sessionId, requestId) { mcpCalls.push(['claim', sessionId, requestId]); return true },
+      async complete(sessionId, requestId, result) { mcpResults.push({ sessionId, requestId, result }) },
+      async listen(callback) { mcpCalls.push(['listen']); mcpListener = callback; return () => { mcpCalls.push(['unlisten']); mcpListener = undefined } },
+    },
+  }
+  function mcpModule(name) {
+    if (modules.has(name)) return modules.get(name)
+    const source = mcpSources[name]
+    if (!source) throw Error(`Unexpected MCP module import ${name}`)
+    const result = compile(source, dependency => {
+      if (dependency === '../shared/document') return helpers
+      if (dependency.startsWith('./')) return mcpModule(dependency.replace(/^\.\//, './mcp/'))
+      throw Error(`Unexpected MCP dependency ${dependency}`)
+    }, browser)
+    modules.set(name, result)
+    return result
+  }
   function sharedModule(name) {
     if (modules.has(name)) return modules.get(name)
     const source = {'./shared/autosave':autosaveSource}[name]
@@ -134,6 +170,15 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
   const state = scope.run(() => compile(`${app}\nexport const state={${names}}`, name => {
     if (name === 'vue') return lifecycle
     if (name === './native') return native
+    if (name === './mcp/native') return mcpNative
+    if (name === './mcp/native-smoke') return { async runMcpNativeSmoke(adapter) {
+      calls.push(['mcp-native-smoke'])
+      for (const method of ['openWord', 'start', 'state', 'stop', 'close']) assert.equal(typeof adapter[method], 'function')
+      if (mcpSmokeError) throw Error(mcpSmokeError)
+      if (mcpSmokeRun) return mcpSmokeRun(adapter)
+      return mcpSmokeReport ?? { schemaVersion: 1, kind: 'mcp-native', ok: true }
+    } }
+    if (name.startsWith('./mcp/')) return mcpModule(name)
     if (name === './smoke') return {smokeRequested:()=>smoke,smokeStage(){},smokeFeatures:()=>({}),smokeFailure:async(error,phase)=>{calls.push(['smoke-failure',phase,String(error)])},smokeAwait:async(_phase,action)=>action()}
     if (name === './shared/document') return helpers
     if (name === './workflow/core/files') return workflowFiles
@@ -226,24 +271,30 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     for(const entry of state.rustWordEntries.value)if(!state.rustWordHandles.has(entry.document.id))state.setRustWordHandle(entry.document.id,rustWordHandle)
     for(const entry of state.rustSheetEntries.value)if(!state.rustSheetHandles.has(entry.document.id))state.setRustSheetHandle(entry.document.id,Object.create(handle))
     for(const entry of state.rustPresentationEntries.value)if(!state.rustPresentationHandles.has(entry.document.id))state.setRustPresentationHandle(entry.document.id,presentationHandle)
+    for(const entry of state.workflowEntries.value)if(!state.workflowHandles.has(entry.document.id))state.setWorkflowHandle(entry.document.id,Object.create(handle))
   }
-  scope.run(()=>vue.watch([state.rustWordEntries,state.rustSheetEntries,state.rustPresentationEntries,state.rustPdfEntries,state.noteEntries],attachHandles,{flush:'sync'}))
+  scope.run(()=>vue.watch([state.rustWordEntries,state.rustSheetEntries,state.rustPresentationEntries,state.rustPdfEntries,state.noteEntries,state.workflowEntries],attachHandles,{flush:'sync'}))
   function tab(id, { ready = true, dirty = false, fileId = id, kind = 'word' } = {}) {
-    const extension = {word:'docx',sheet:'xlsx',presentation:'pptx',pdf:'pdf',note:'oonote'}[kind]
+    const extension = {word:'docx',sheet:'xlsx',presentation:'pptx',pdf:'pdf',note:'oonote',canvas:'owflow',diagram:'owflow'}[kind]
     state.tabs.value.push({ key: id, ready, dirty, fileId, document: { id, kind, extension,
       name: `${id}.${extension}`, base64: 'T0xE', sha256: 'old-hash', sizeBytes: 3 } })
     return state.tabs.value.at(-1)
   }
   function active(tab) {
     state.activeKey.value = tab.key
-    const entries={word:state.rustWordEntries,sheet:state.rustSheetEntries,presentation:state.rustPresentationEntries,pdf:state.rustPdfEntries,note:state.noteEntries}[tab.document.kind]
+    const entries={word:state.rustWordEntries,sheet:state.rustSheetEntries,presentation:state.rustPresentationEntries,pdf:state.rustPdfEntries,note:state.noteEntries,canvas:state.workflowEntries,diagram:state.workflowEntries}[tab.document.kind]
     if(entries&&!entries.value.some(entry=>entry.document.id===tab.key))entries.value=[...entries.value,{document:tab.document}]
   }
   async function idle() {
     for (let n = 0; n < 50 && state.busy.value; n++) { await Promise.resolve(); await vue.nextTick() }
     assert.equal(state.busy.value, '', 'The shell task should finish')
   }
-  return { state, native, calls, rustPreparations, sheetPreparations, deckPreparations, pdfPreparations, handle, presentationHandle, rustWordHandle, tab, active, idle, browser, observers, storage, windowListeners, documentListeners, mediaListeners, timers, intervals,
+  return { state, native, calls, rustPreparations, sheetPreparations, deckPreparations, pdfPreparations, handle, presentationHandle, rustWordHandle, tab, active, idle, browser, observers, storage, windowListeners, documentListeners, mediaListeners, timers, intervals, mcpNative, mcpCalls, mcpResults,
+    emitMcp(fields = {}) {
+      assert.ok(mcpListener, 'MCP event transport should be registered')
+      mcpListener({ sessionId: state.mcpState.value.sessionId, requestId: `controlled-request-${++mcpSerial}`, documentId: state.activeKey.value,
+        toolName: 'document_read', arguments: {}, deadlineAt: now + 1000, ...fields })
+    },
     setSystemDark(value) { media.matches = value; for (const listener of mediaListeners) listener({ matches: value }) },
     dispatchWindow(type, event) { for (const listener of windowListeners.get(type) ?? []) listener(event) },
     dispatchDocument(type, event) { for (const listener of documentListeners.get(type) ?? []) listener({...event,type}) },
@@ -1638,13 +1689,14 @@ test('F5 starts the active presentation once and native close stops it before th
   assert.ok(!h.calls.some(call=>call[0]==='close'));h.unmount()
 })
 
-test('full native smoke requires four Rust editors, notebook, workflows and actual workspace persistence gates',async()=>{
+test('full native smoke requires four Rust editors, notebook, workflows, MCP and actual workspace persistence gates',async()=>{
   const h=shell({smoke:true});h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'})
   await h.mount()
   const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
   assert.equal(report.ok,true);assert.equal(report.word.ok,true);assert.equal(report.sheet.ok,true);assert.equal(report.presentation.ok,true)
   assert.equal(report.pdf.reopened,true);assert.equal(report.pdf.removedOldText,true);assert.equal(report.pdf.newTextPresent,true);assert.equal(report.notebook.ok,true);assert.equal(report.workflow.ok,true);assert.equal(report.workspace.ok,true)
-  assert.deepEqual(h.calls.filter(call=>call[0].endsWith('-native-smoke')).map(call=>call[0]),['office-word-native-smoke','office-sheet-native-smoke','office-presentation-native-smoke','pdf-native-smoke','notebook-native-smoke','workflow-native-smoke','workspace-native-smoke'])
+  assert.equal(report.mcp.ok,true)
+  assert.deepEqual(h.calls.filter(call=>call[0].endsWith('-native-smoke')).map(call=>call[0]),['office-word-native-smoke','office-sheet-native-smoke','office-presentation-native-smoke','pdf-native-smoke','notebook-native-smoke','workflow-native-smoke','mcp-native-smoke','workspace-native-smoke'])
   assert.equal(h.calls.filter(call=>call[0]==='notebook-native-smoke').length,1)
   assert.equal(h.calls.filter(call=>call[0]==='workflow-native-smoke').length,1)
   assert.equal(h.calls.filter(call=>call[0]==='workspace-native-smoke').length,1)
@@ -1714,6 +1766,20 @@ for(const mode of ['report','throw','cleanup','missing'])test(`failed workflow $
   assert.equal(h.calls.some(call=>call[0]==='workspace-native-smoke'),false)
   assert.equal(Object.hasOwn(report,'workspace'),false)
   h.unmount()
+})
+
+for (const mode of ['report', 'throw']) test(`failed native MCP ${mode} prevents a successful full native acceptance report`, async () => {
+  const options = mode === 'report' ? { mcpSmokeReport: { ok: false, error: 'Controlled MCP verification failure' } } : { mcpSmokeError: 'Controlled MCP verification failure' }
+  const h = shell({ smoke: true, ...options })
+  try {
+    h.native.bootstrap = async () => ({ smokeMode: true, smokeScope: 'full' })
+    await h.mount()
+    const report = h.calls.find(call => call[0] === 'invoke' && call[1] === 'smoke_report')[2].report
+    assert.equal(report.ok, false)
+    assert.match(report.error, /Controlled MCP verification failure/)
+    assert.equal(h.calls.filter(call => call[0] === 'mcp-native-smoke').length, 1)
+    assert.equal(h.calls.some(call => call[0] === 'workspace-native-smoke'), false)
+  } finally { h.unmount() }
 })
 
 for(const mode of ['report','throw'])test(`failed workspace ${mode} prevents a full native release pass after editor verification`,async()=>{
@@ -2002,4 +2068,308 @@ for (const replaceHandle of [false,true]) test(`switching rejects a ${replaceHan
     assert.equal(first.dirty,false,'A late result from a retired lifecycle cannot be applied to the old tab')
     assert.equal(first.document.base64,'T0xE');assert.equal(first.document.sha256,'old-hash')
   } finally {h.unmount()}
+})
+
+for (const kind of ['word', 'sheet', 'presentation', 'pdf', 'note', 'canvas', 'diagram']) test(`${kind} shell starts MCP only for its ready active document and advertises its own tools`, async () => {
+  const h = shell(), tab = h.tab(`mcp-${kind}`, { kind })
+  try {
+    h.active(tab)
+    await h.state.toggleMcp()
+    assert.equal(h.mcpCalls.some(call => call[0] === 'start'), false, 'The workbench must not expose a background document')
+    h.state.home.value = false
+    await h.state.toggleMcp()
+    assert.equal(h.state.mcpState.value.phase, 'running')
+    const start = h.mcpCalls.find(call => call[0] === 'start')
+    assert.equal(start[2].id, tab.key)
+    assert.equal(start[2].kind, kind)
+    assert.equal(start[2].title, tab.document.name)
+    assert.ok(start[3].length > 0, 'Every editor must provide usable tools')
+    assert.ok(start[3].some(tool => tool.annotations?.readOnlyHint === true))
+    await h.state.toggleMcp()
+    assert.equal(h.state.mcpState.value.phase, 'stopped')
+  } finally { h.unmount() }
+})
+
+test('MCP shell automatically stops when switching tabs or returning to the workbench', async () => {
+  const h = shell(), first = h.tab('mcp-first'), second = h.tab('mcp-second', { kind: 'sheet' })
+  try {
+    h.active(first); h.state.home.value = false
+    await h.state.toggleMcp()
+    await h.state.activate(second)
+    await settleShell()
+    assert.equal(h.state.mcpState.value.phase, 'stopped')
+    assert.equal(h.mcpCalls.filter(call => call[0] === 'start').length, 1)
+    h.state.readyFor(second.key)
+    await h.state.toggleMcp()
+    assert.equal(h.state.mcpState.value.documentId, second.key)
+    h.state.home.value = true
+    assert.equal(h.state.mcpState.value.phase, 'stopping', 'The synchronous watcher must revoke before the next UI tick')
+    await settleShell()
+    assert.equal(h.state.mcpState.value.phase, 'stopped')
+    h.state.home.value = false
+    await settleShell()
+    assert.equal(h.mcpCalls.filter(call => call[0] === 'start').length, 2, 'Reopening the editor never starts MCP automatically')
+  } finally { h.unmount() }
+})
+
+test('MCP shell switching during pending start cannot publish a stale Running state', async () => {
+  const h = shell(), first = h.tab('pending-start'), second = h.tab('next-document')
+  let finish, entered = false
+  h.mcpNative.mcpTransport.start = async () => {
+    entered = true
+    return new Promise(resolve => { finish = resolve })
+  }
+  try {
+    h.active(first); h.state.home.value = false
+    const startup = h.state.toggleMcp()
+    for (let turn = 0; turn < 30 && !entered; turn++) await Promise.resolve()
+    assert.equal(entered, true)
+    h.state.activeKey.value = second.key
+    finish({ running: true, sessionId: 'late-session', documentId: first.key, endpoint: 'http://127.0.0.1:38487/mcp', port: 38487 })
+    await startup; await settleShell()
+    assert.equal(h.state.mcpState.value.phase, 'stopped')
+    assert.ok(h.mcpCalls.some(call => call[0] === 'stop' && call[1] === 'late-session'))
+  } finally { h.unmount() }
+})
+
+test('MCP settings use the global modal barrier and stop the previous session before persisting', async () => {
+  const h = shell(), tab = h.tab('mcp-settings')
+  try {
+    h.active(tab); h.state.home.value = false
+    await h.state.toggleMcp()
+    h.state.openMcpSettings()
+    assert.equal(h.state.globalActionsBlocked.value, true)
+    assert.equal(h.state.editorInputBlocked.value, true)
+    const configuration = { ...h.state.mcpConfig.value, port: 38489, allowEdits: false }
+    await h.state.saveMcpSettings(configuration)
+    const stoppedIndex = h.mcpCalls.findIndex(call => call[0] === 'stop')
+    const savedIndex = h.mcpCalls.findIndex(call => call[0] === 'save-config')
+    assert.ok(stoppedIndex >= 0 && savedIndex > stoppedIndex, 'A running listener must not survive a configuration change')
+    assert.equal(h.state.mcpState.value.phase, 'stopped')
+    assert.equal(h.state.mcpSettingsOpen.value, false)
+    assert.equal(h.state.globalActionsBlocked.value, false)
+    assert.equal(h.state.mcpConfig.value.port, 38489)
+    await h.state.toggleMcp()
+    const restart = h.mcpCalls.filter(call => call[0] === 'start').at(-1)
+    assert.equal(restart[1].port, 38489)
+    assert.ok(restart[3].every(tool => tool.annotations?.readOnlyHint === true))
+  } finally { h.unmount() }
+})
+
+test('MCP configuration read and startup failures never expose Running', async () => {
+  for (const failingOperation of ['get-config', 'start']) {
+    const h = shell(), tab = h.tab('mcp-error')
+    try {
+      h.active(tab); h.state.home.value = false
+      if (failingOperation === 'get-config') h.mcpNative.getMcpConfig = async () => { throw Error('Unable to read settings') }
+      else h.mcpNative.mcpTransport.start = async () => { throw Error('Port unavailable') }
+      await h.state.toggleMcp()
+      assert.notEqual(h.state.mcpState.value.phase, 'running')
+      if (failingOperation === 'get-config') {
+        assert.equal(h.state.mcpSettingsOpen.value, true)
+        assert.match(h.state.mcpSettingsError.value, /Unable to read settings/)
+        assert.equal(h.mcpCalls.some(call => call[0] === 'start'), false)
+      } else {
+        assert.equal(h.state.mcpState.value.phase, 'error')
+        assert.match(h.state.error.value, /Port unavailable/)
+      }
+    } finally { h.unmount() }
+  }
+})
+
+test('MCP is unavailable in the browser preview and never claims a native running service', async () => {
+  const h = shell({ nativeEnabled: false }), tab = h.tab('browser-mcp')
+  try {
+    h.active(tab); h.state.home.value = false
+    await h.state.toggleMcp()
+    assert.equal(h.state.mcpSettingsOpen.value, true)
+    assert.equal(h.state.mcpState.value.phase, 'stopped')
+    assert.equal(h.mcpCalls.length, 0)
+  } finally { h.unmount() }
+})
+
+test('MCP requests cannot execute while the settings dialog or another file transaction owns the editor', async () => {
+  for (const blockedBy of ['settings', 'busy']) {
+    const h = shell(), tab = h.tab(`mcp-blocked-${blockedBy}`)
+    try {
+      h.active(tab); h.state.home.value = false
+      await h.state.toggleMcp()
+      if (blockedBy === 'settings') h.state.openMcpSettings()
+      else h.state.busy.value = 'Controlled file transaction'
+      const catalog = h.mcpCalls.find(call => call[0] === 'start')[3]
+      h.emitMcp({ toolName: catalog.find(tool => tool.annotations?.readOnlyHint === true).name })
+      await settleShell()
+      assert.equal(h.mcpResults.length, 1)
+      assert.equal(h.mcpResults[0].result.isError, true)
+      assert.match(h.mcpResults[0].result.content[0].text, /正在编辑或处理其他操作/)
+      assert.equal(h.state.mcpWorking.value, false)
+    } finally { h.state.busy.value = ''; h.unmount() }
+  }
+})
+
+test('MCP mutation ownership blocks local editing and postpones automatic saving', async () => {
+  const h = shell({ storedAutosave: 'true' }), tab = h.tab('mcp-autosave', { dirty: true })
+  try {
+    h.active(tab); h.state.home.value = false
+    await h.mount()
+    h.state.mcpWorking.value = true
+    h.state.mcpMutating.value = true
+    assert.equal(h.state.globalActionsBlocked.value, true)
+    assert.equal(h.state.editorInputBlocked.value, true)
+    await h.fireTimeout(10000)
+    assert.equal(h.calls.some(call => call[0] === 'save'), false, 'Autosave must not capture a half-applied remote change')
+    h.state.mcpWorking.value = false
+    h.state.mcpMutating.value = false
+    assert.equal(h.state.globalActionsBlocked.value, false)
+    await h.fireTimeout(10000)
+    assert.ok(h.calls.some(call => call[0] === 'save'))
+  } finally { h.unmount() }
+})
+
+for (const readOnly of [true, false]) test(`MCP actual dispatcher ${readOnly ? 'preserves read focus and input' : 'locks input during mutations'} while holding global file actions`, async () => {
+  const h = shell(), tab = h.tab('mcp-dispatch')
+  const toolName = readOnly ? 'document_inspect' : 'document_undo'
+  let release, entered = false, blurred = 0
+  const waiting = new Promise(resolve => { release = resolve })
+  const focused = new h.browser.HTMLElement()
+  focused.blur = () => { blurred++; h.browser.document.activeElement = null }
+  h.browser.document.activeElement = focused
+  h.rustWordHandle.mcpExecute = async (name, arguments_, assertCurrent) => {
+    assert.equal(name, toolName)
+    assert.equal(Object.keys(arguments_).length, 0)
+    entered = true
+    await waiting
+    assertCurrent()
+    return { documentId: 17, revision: 2, dirty: true }
+  }
+  try {
+    h.active(tab); h.state.home.value = false
+    await h.state.saveMcpSettings({ ...h.state.mcpConfig.value, allowEdits: true })
+    await h.state.toggleMcp()
+    h.emitMcp({ toolName })
+    await settleShell()
+    assert.equal(entered, true)
+    assert.equal(h.state.mcpWorking.value, true)
+    assert.equal(h.state.mcpMutating.value, !readOnly)
+    assert.equal(h.state.globalActionsBlocked.value, true)
+    assert.equal(h.state.editorInputBlocked.value, !readOnly)
+    assert.equal(blurred, readOnly ? 0 : 1)
+    if (readOnly) assert.equal(h.browser.document.activeElement, focused)
+    release(); await settleShell()
+    assert.equal(h.state.mcpWorking.value, false)
+    assert.equal(h.state.mcpMutating.value, false)
+    assert.equal(h.state.globalActionsBlocked.value, false)
+    assert.equal(h.mcpResults.length, 1)
+    assert.equal(h.mcpResults[0].result.isError, undefined)
+    assert.deepEqual(JSON.parse(h.mcpResults[0].result.content[0].text), { documentId: 17, revision: 2, dirty: true })
+  } finally { release(); h.unmount() }
+})
+
+for (const readOnly of [true, false]) test(`MCP ${readOnly ? 'read' : 'write'} refuses unsettled local input without blurring or acquiring the edit barrier`, async () => {
+  const h = shell(), tab = h.tab('mcp-unsettled')
+  let blurred = 0, probes = 0, executions = 0
+  const focused = new h.browser.HTMLElement(), transitions = []
+  focused.blur = () => { blurred++ }
+  h.browser.document.activeElement = focused
+  h.rustWordHandle.canBackgroundExport = async () => { probes++; return false }
+  h.rustWordHandle.mcpExecute = async () => { executions++; assert.fail('A pending gesture, paste or dialog must retain editor ownership') }
+  const unwatch = vue.watch(h.state.mcpMutating, value => transitions.push(value), { flush: 'sync' })
+  try {
+    h.active(tab); h.state.home.value = false
+    await h.state.saveMcpSettings({ ...h.state.mcpConfig.value, allowEdits: true })
+    await h.state.toggleMcp()
+    h.emitMcp({ toolName: readOnly ? 'document_inspect' : 'document_undo' })
+    await settleShell()
+    assert.equal(probes, 1)
+    assert.equal(executions, 0)
+    assert.equal(blurred, 0)
+    assert.equal(h.browser.document.activeElement, focused)
+    assert.deepEqual(transitions, [])
+    assert.equal(h.state.mcpWorking.value, false)
+    assert.equal(h.state.mcpMutating.value, false)
+    assert.equal(h.state.editorInputBlocked.value, false)
+    assert.equal(h.mcpResults.length, 1)
+    assert.equal(h.mcpResults[0].result.isError, true)
+    assert.match(h.mcpResults[0].result.content[0].text, /请先完成当前输入、拖动或弹窗操作/)
+  } finally { unwatch(); h.unmount() }
+})
+
+for (const interruption of ['file transaction', 'composition', 'document switch']) test(`MCP rechecks ${interruption} after asynchronous editor readiness checks`, async () => {
+  const h = shell(), tab = h.tab('mcp-readiness'), next = h.tab('mcp-next')
+  let release, probing = false, executions = 0, blurred = 0
+  const ready = new Promise(resolve => { release = resolve })
+  const focused = new h.browser.HTMLElement()
+  focused.blur = () => { blurred++ }
+  h.browser.document.activeElement = focused
+  h.rustWordHandle.canBackgroundExport = async () => { probing = true; return ready }
+  h.rustWordHandle.mcpExecute = async () => { executions++; assert.fail('Readiness must be rechecked after awaiting the editor') }
+  try {
+    h.active(tab); h.state.home.value = false
+    await h.state.saveMcpSettings({ ...h.state.mcpConfig.value, allowEdits: true })
+    await h.state.toggleMcp()
+    h.emitMcp({ toolName: 'document_undo' })
+    await settleShell()
+    assert.equal(probing, true)
+    assert.equal(h.state.mcpWorking.value, false)
+    assert.equal(h.state.editorInputBlocked.value, false)
+    if (interruption === 'file transaction') h.state.busy.value = 'Saving the current document'
+    else if (interruption === 'composition') h.state.composing.value = true
+    else h.state.activeKey.value = next.key
+    release(true); await settleShell()
+    assert.equal(executions, 0)
+    assert.equal(blurred, 0)
+    assert.equal(h.browser.document.activeElement, focused)
+    assert.equal(h.state.mcpWorking.value, false)
+    assert.equal(h.state.mcpMutating.value, false)
+    if (interruption === 'document switch') {
+      assert.equal(h.state.mcpState.value.phase, 'stopped')
+      assert.equal(h.mcpResults.length, 0, 'The stopped native session owns request cancellation')
+    } else {
+      assert.equal(h.mcpResults.length, 1)
+      assert.equal(h.mcpResults[0].result.isError, true)
+      assert.match(h.mcpResults[0].result.content[0].text, /正在处理其他操作/)
+    }
+  } finally { release(true); h.state.busy.value = ''; h.state.composing.value = false; h.unmount() }
+})
+
+test('MCP editor capability errors release the shell barrier without marking content as saved', async () => {
+  const h = shell(), tab = h.tab('mcp-dispatch-failure', { dirty: true })
+  h.rustWordHandle.mcpExecute = async () => { throw Error('Controlled editor failure') }
+  try {
+    h.active(tab); h.state.home.value = false
+    await h.state.toggleMcp()
+    h.emitMcp({ toolName: 'document_inspect' })
+    await settleShell()
+    assert.equal(h.state.mcpWorking.value, false)
+    assert.equal(h.state.editorInputBlocked.value, false)
+    assert.equal(h.mcpResults.length, 1)
+    assert.equal(h.mcpResults[0].result.isError, true)
+    assert.match(h.mcpResults[0].result.content[0].text, /Controlled editor failure/)
+    assert.equal(tab.dirty, true)
+    assert.equal(h.calls.some(call => call[0] === 'marked' || call[0] === 'save'), false)
+  } finally { h.unmount() }
+})
+
+test('MCP active document closure stops the service and does not transfer it to a remaining tab', async () => {
+  const h = shell(), first = h.tab('mcp-close'), second = h.tab('remaining')
+  try {
+    h.active(first); h.state.home.value = false
+    await h.state.toggleMcp()
+    await h.state.removeTab(first)
+    await settleShell()
+    assert.equal(h.state.activeKey.value, second.key)
+    assert.equal(h.state.mcpState.value.phase, 'stopped')
+    assert.equal(h.mcpCalls.filter(call => call[0] === 'start').length, 1)
+  } finally { h.unmount() }
+})
+
+test('MCP shell unmount removes its heartbeat timer and detaches the request bridge', async () => {
+  const h = shell(), tab = h.tab('mcp-unmount')
+  h.active(tab); h.state.home.value = false
+  await h.mount(); await h.state.toggleMcp()
+  assert.ok([...h.intervals.values()].some(timer => timer.milliseconds === 5000))
+  h.unmount(); await settleShell()
+  assert.equal(h.intervals.size, 0)
+  assert.equal(h.state.mcpState.value.phase, 'stopped')
+  assert.ok(h.mcpCalls.some(call => call[0] === 'unlisten'))
 })

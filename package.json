@@ -1,6 +1,6 @@
 {
   "name": "open-office",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -19,6 +19,7 @@
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build",
     "test:browser": "node tests/browser/office-pdf-native-helper.cjs",
+    "test:browser:mcp": "node tests/browser/mcp-editors.cjs",
     "test:compatibility": "node tests/browser/office-word-native-helper.cjs && node tests/browser/office-sheet-native-helper.cjs && node tests/browser/office-presentation-native-helper.cjs",
     "test:compatibility:onlyoffice": "node tests/compatibility/onlyoffice-desktop.mjs",
     "predev": "npm run word:build && npm run sheet:build && npm run deck:build && npm run pdf:build",

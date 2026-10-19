@@ -251,7 +251,37 @@ watch(() => props.document.id, async () => {
  } catch (cause) { report(cause) } finally { if (owner === token) loading.value = false }
 }, { immediate: true })
 onBeforeUnmount(() => { disposed = true; token++ })
-defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, inspect, syncRevision: inspect, canBackgroundExport, undo, redo, search, print, focus })
+async function mcpExecute(name: string, args: Record<string, unknown>, assertCurrent: () => void): Promise<unknown> {
+ const owner = token
+ const guard = () => { assertCurrent(); if (disposed || owner !== token || !props.active) throw Error('MCP 文档已切换，请重新开启服务。') }
+ guard()
+ if (!session || loading.value) throw Error('请等待笔记打开。')
+ if (name === 'document_inspect') return inspect()
+ if (name === 'note_read') return { ...session.model, currentSectionId: currentSection.value, currentPageId: currentPage.value }
+ await prepareDeactivate(); guard()
+ if (name === 'document_undo' || name === 'document_redo') {
+  if (name === 'document_undo') session.undo(); else session.redo()
+  accept(); refreshSelection(); await nextTick(); guard(); render()
+  return inspect()
+ }
+ if (name === 'note_add_page') {
+  const added = blankPage(noteTitle(String(args.title)))
+  if (args.text) added.regions[0]!.blocks[0] = { id: noteId(), type: 'paragraph', content: [{ text: String(args.text) }] }
+  change(copy => { const target = copy.sections.find(section => section.id === currentSection.value); if (!target) throw Error('当前分区不存在。'); target.pages.push(added) })
+  currentPage.value = added.id; navigation.value = false
+  await nextTick(); guard(); render()
+  return { ...await inspect(), pageId: added.id }
+ }
+ if (name === 'note_add_text') {
+  const region = blankRegion(Number(args.x ?? 24), Number(args.y ?? 24), Number(args.width ?? 480))
+  region.blocks = [{ id: noteId(), type: 'paragraph', content: [{ text: String(args.text) }] }]
+  change(copy => { const target = copy.sections.flatMap(section => section.pages).find(page => page.id === currentPage.value); if (!target) throw Error('当前页面不存在。'); target.regions.push(region) })
+  await nextTick(); guard(); render()
+  return { ...await inspect(), regionId: region.id }
+ }
+ throw Error('当前编辑器不支持此 MCP 工具。')
+}
+defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, inspect, syncRevision: inspect, canBackgroundExport, undo, redo, search, print, focus })
 </script>
 
 <template>

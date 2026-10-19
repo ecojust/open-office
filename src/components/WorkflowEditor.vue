@@ -7,7 +7,7 @@ import { WorkflowSession } from '../workflow/session'
 import { createDocument } from '../workflow/core/documents'
 import { documentScene, exportDocument, importText, type ExportFormat } from '../workflow/core/files'
 import { sceneToSvg } from '../workflow/core/svg'
-import { clone, type Scene, type WorkflowDocument } from '../workflow/core/types'
+import { clone, newId, DEFAULT_STYLE, type Scene, type WorkflowDocument, type ShapeElement } from '../workflow/core/types'
 import type { DiagramStyleId } from '../workflow/core/diagram-appearance'
 import type { NativeDocument } from '../types'
 import { base64ToBytes, bytesToBase64, type EditorExport, type Extension } from '../shared/document'
@@ -165,7 +165,27 @@ watch(() => props.document.id, async () => {
  } catch (cause) { report(cause) } finally { if (owner === token) loading.value = false }
 }, { immediate: true })
 onBeforeUnmount(() => { disposed = true; token++ })
-defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, inspect, inspectModel, syncRevision: inspect, canBackgroundExport, undo, redo, print, focus })
+async function mcpExecute(name: string, args: Record<string, unknown>, assertCurrent: () => void): Promise<unknown> {
+ const owner = token
+ const guard = () => { assertCurrent(); if (disposed || owner !== token || !props.active) throw Error('MCP 文档已切换，请重新开启服务。') }
+ guard()
+ const current = requireLoaded()
+ if (name === 'document_inspect') return inspect()
+ if (name === 'canvas_read' && !diagram.value) return current.model.scene
+ if (name === 'diagram_read_source' && diagram.value) return { source: current.model.source }
+ await flush(); guard()
+ if (name === 'document_undo' || name === 'document_redo') {
+  if (name === 'document_undo') current.undo(); else current.redo()
+ } else if (name === 'canvas_add_shape' && !diagram.value) {
+  const shape: ShapeElement = { id: newId('shape'), type: 'shape', shape: (args.shape ?? 'rectangle') as ShapeElement['shape'], text: String(args.text ?? ''), x: Number(args.x ?? 40), y: Number(args.y ?? 40), width: Number(args.width ?? 200), height: Number(args.height ?? 100), cornerRadius: 0, style: { ...DEFAULT_STYLE }, locked: false }
+  current.change(copy => copy.scene.elements.push(shape))
+ } else if (name === 'diagram_set_source' && diagram.value) {
+  current.change(copy => { copy.source = String(args.source) })
+ } else throw Error('当前编辑器不支持此 MCP 工具。')
+ accept(); await nextTick(); guard()
+ return inspect()
+}
+defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, inspect, inspectModel, syncRevision: inspect, canBackgroundExport, undo, redo, print, focus })
 </script>
 
 <template>

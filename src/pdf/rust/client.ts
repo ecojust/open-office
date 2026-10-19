@@ -225,12 +225,15 @@ export class RustPdfSession {
       return this.backgroundExportReady(await getHost())
     })
   }
-  command(commandId: string, params: Record<string, unknown> = {}): Promise<OfficePdfSnapshot> {
+  command(commandId: string, params: Record<string, unknown> = {}, assertCurrent?: () => void): Promise<OfficePdfSnapshot> {
     return serialize(async () => {
+      assertCurrent?.()
       this.assertOpen()
       const api = await getHost()
+      assertCurrent?.()
       // Only explicit pending-input decisions may bypass the save barrier.
       if (!isPdfPendingDecisionCommand(commandId)) await this.flushInput(api)
+      assertCurrent?.()
       const result = JSON.parse(api.command(this.id, commandId, JSON.stringify(params))) as { ok: boolean; snapshot?: OfficePdfSnapshot; error?: string }
       this.accept(snapshotOf(result.snapshot ? JSON.stringify(result.snapshot) : api.inspect(this.id), this.id))
       if (!result.ok) throw Error(result.error || 'PDF 文档操作失败。')

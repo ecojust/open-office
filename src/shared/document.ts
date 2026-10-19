@@ -30,6 +30,8 @@ export function saveFileName(stem: string, extension: SaveExtension): string {
 }
 export type EditorExport = {base64:string; extension:Extension; name?:string; saveAs?:boolean; dirty?:boolean; revision?:string}
 export type EditorHandle = {
+ /** Bounded tools for the active document; guard must run immediately before every mutation. */
+ mcpExecute?(name:string,args:Record<string,unknown>,assertCurrent:()=>void):Promise<unknown>;
  /** Commit queued input while retaining the live model and undo history; never export or acknowledge a save. */
  prepareDeactivate():Promise<{documentId:number;revision:number;dirty:boolean}>;
  exportFile(options?:{format?:Extension;background?:boolean}):Promise<EditorExport>;

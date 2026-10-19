@@ -4,6 +4,9 @@ mod files;
 mod macos_diagnostics;
 #[cfg(target_os = "macos")]
 mod macos_webview;
+mod mcp;
+mod mcp_commands;
+mod mcp_probe;
 mod print;
 mod server;
 mod smoke;
@@ -169,6 +172,15 @@ pub fn run() {
         .manage(Closing::default())
         .invoke_handler(tauri::generate_handler![
             bootstrap,
+            mcp_commands::mcp_get_config,
+            mcp_commands::mcp_save_config,
+            mcp_commands::mcp_start,
+            mcp_commands::mcp_stop,
+            mcp_commands::mcp_status,
+            mcp_commands::mcp_heartbeat,
+            mcp_commands::mcp_claim,
+            mcp_commands::mcp_complete,
+            mcp_commands::mcp_smoke_probe,
             confirm_close,
             smoke_report,
             files::open_document,
@@ -221,6 +233,7 @@ pub fn run() {
                 appdata
             };
             let asset_root = frontend_root(app.handle())?;
+            app.manage(mcp::McpService::new(appdata.join("mcp.json"))?);
             app.manage(files::DocumentStore::new(appdata)?);
             let server = server::AssetServer::start_with_smoke(&asset_root, diagnostic.clone())?;
             let navigation = server.info.clone();
@@ -234,6 +247,14 @@ pub fn run() {
                 .remote(server.ipc_origin_pattern())
                 .permission("core:default")
                 .permission("allow-bootstrap")
+                .permission("allow-mcp-get-config")
+                .permission("allow-mcp-save-config")
+                .permission("allow-mcp-start")
+                .permission("allow-mcp-stop")
+                .permission("allow-mcp-status")
+                .permission("allow-mcp-heartbeat")
+                .permission("allow-mcp-claim")
+                .permission("allow-mcp-complete")
                 .permission("allow-confirm-close")
                 .permission("allow-smoke-report")
                 .permission("allow-open-document")
@@ -246,6 +267,7 @@ pub fn run() {
                 .permission("allow-print-html");
             let capability = if diagnostic.is_some() {
                 capability
+                    .permission("allow-mcp-smoke-probe")
                     .permission("allow-smoke-prepare-document")
                     .permission("allow-smoke-cleanup-autosave")
             } else {
@@ -274,13 +296,20 @@ pub fn run() {
             if let Some(configuration) = macos_webview::configuration(diagnostic.as_ref())? {
                 builder = builder.with_webview_configuration(configuration);
             }
-            if let Some(smoke) = &diagnostic {
-                let progress = smoke.clone();
-                builder = builder
-                    .initialization_script(smoke::initialization_script(&url))
-                    .on_page_load(move |_, payload| {
-                        progress.note("webview-page", &format!("{:?}", payload.event()))
-                    });
+            let page_lifecycle = app.handle().clone();
+            let page_diagnostic = diagnostic.clone();
+            builder = builder.on_page_load(move |_, payload| {
+                if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                    if let Some(service) = page_lifecycle.try_state::<mcp::McpService>() {
+                        let _ = service.stop(None);
+                    }
+                }
+                if let Some(progress) = &page_diagnostic {
+                    progress.note("webview-page", &format!("{:?}", payload.event()));
+                }
+            });
+            if diagnostic.is_some() {
+                builder = builder.initialization_script(smoke::initialization_script(&url));
             }
             let window = builder.build()?;
             if let Some(smoke) = &diagnostic {
@@ -308,6 +337,9 @@ pub fn run() {
             }
             if window.label() == "main" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    if let Some(service) = window.try_state::<mcp::McpService>() {
+                        let _ = service.stop(None);
+                    }
                     if !window.state::<Closing>().0.load(Ordering::Acquire) {
                         api.prevent_close();
                         let _ = window.emit("app-close-requested", ());
@@ -320,6 +352,9 @@ pub fn run() {
 
     application.run(|app, event| match event {
         tauri::RunEvent::ExitRequested { api, .. } => {
+            if let Some(service) = app.try_state::<mcp::McpService>() {
+                let _ = service.stop(None);
+            }
             if !app.state::<Closing>().0.load(Ordering::Acquire) {
                 api.prevent_exit();
                 let _ = app.emit("app-close-requested", ());

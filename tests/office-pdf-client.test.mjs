@@ -25,7 +25,7 @@ function harness(kind = 'pdf') {
   const sheet = kind === 'sheet', format = sheet ? 'xlsx' : 'pdf'
   const state = new Map(), calls = [], document = { baseURI: 'http://localhost/', activeElement: null }
   const authorStore = new Map(), author = { normalizePdfAuthor, pdfAuthorPreference: createPdfAuthorPreference(() => ({ getItem: key => authorStore.get(key) ?? null, setItem: (key, value) => authorStore.set(key, value) })) }
-  let receive, documentId = 0, pendingText, startGate, drainGate, flushError, authorError, discardPending = false, activeHostId
+  let receive, flushGate, documentId = 0, pendingText, startGate, drainGate, flushError, authorError, discardPending = false, activeHostId
   class Element {
     children = []; parentElement; style = {}; dataset = {}; isConnected = true; listeners = new Map()
     append(child) { child.remove(); this.children.push(child); child.parentElement = this }
@@ -53,7 +53,7 @@ function harness(kind = 'pdf') {
     async start(canvas) { calls.push(['start']); canvas.parentElement.append(new Input()); if (startGate) await startGate },
     activate(id) { calls.push(['activate', id]); activeHostId = id; return snapshot(id) },
     inspect: snapshot,
-    async flush(id) { calls.push(['flush', id]); if (flushError) throw flushError; if (pendingText?.id === id) { edit(id, pendingText.text); pendingText = undefined } },
+    async flush(id) { calls.push(['flush', id]); if (flushGate) await flushGate(); if (flushError) throw flushError; if (pendingText?.id === id) { edit(id, pendingText.text); pendingText = undefined } },
     command(id, commandId, params) {
       calls.push(['command', id, commandId]); const value = JSON.parse(params), doc = state.get(id)
       if (commandId === 'text.set') edit(id, value.text)
@@ -98,7 +98,7 @@ function harness(kind = 'pdf') {
     }, { ...globals, defineProps: () => props, withDefaults: value => value, defineEmits: () => (...event) => events.push(event), defineExpose(value) { exposed = value } }))
     return { props, events, editor: exposed, dispose() { unmount.forEach(callback => callback()); scope.stop() } }
   }
-  return { client, open, source, state, calls, document, Element, component, authorStore, author: author.pdfAuthorPreference, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value }, setDrainGate(value) { drainGate = value }, setFlushError(value) { flushError = value }, setAuthorError(value) { authorError = value } }
+  return { client, open, source, state, calls, document, Element, component, setFlushGate(value) { flushGate = value }, authorStore, author: author.pdfAuthorPreference, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value }, setDrainGate(value) { drainGate = value }, setFlushError(value) { flushError = value }, setAuthorError(value) { authorError = value } }
 }
 
 test('PDF identity applies before editing and follows open tabs without changing document receipts or drafts', async () => {
@@ -492,4 +492,32 @@ for (const kind of ['pdf', 'sheet']) {
       assert.equal(h.state.get(original.sessionId).text, 'queued live content')
     } finally { mounted.dispose() }
   })
+}
+
+for (const kind of ['sheet', 'pdf']) {
+ test(`${kind} MCP guard cancels commands revoked while queued or while flushing, before any engine mutation`, async () => {
+  const h = harness(kind), current = await h.open()
+  let revoked = true
+  const guard = () => { if (revoked) throw Error('MCP session stopped') }
+  const command = () => kind === 'pdf' ? current.command('text.set', { text: 'remote text' }, guard) : current.command('text.set', { text: 'remote text' }, undefined, guard)
+  const initial = h.calls.length
+  await assert.rejects(command(), /MCP session stopped/)
+  assert.equal(h.calls.length, initial)
+  revoked = false
+  let release, entered
+  const waiting = new Promise(resolve => { entered = resolve })
+  const blocked = new Promise(resolve => { release = resolve })
+  h.setFlushGate(async () => { entered(); await blocked })
+  const pending = command()
+  await waiting
+  revoked = true; release()
+  await assert.rejects(pending, /MCP session stopped/)
+  assert.equal(h.state.get(current.id).text, '')
+  assert.equal(h.calls.filter(call => call[0] === 'command' && call[2] === 'text.set').length, 0)
+  h.setFlushGate(undefined); revoked = false
+  await command()
+  assert.equal(h.state.get(current.id).text, 'remote text')
+  assert.equal(h.state.get(current.id).dirty, true)
+  await current.close(true)
+ })
 }

@@ -11,13 +11,14 @@ import { presentationReport } from './helpers/office-presentation-smoke-report.m
 import { workspaceReport } from './helpers/workspace-smoke-report.mjs';
 import { notebookReport } from './helpers/notebook-smoke-report.mjs';
 import { workflowReport } from './helpers/workflow-smoke-report.mjs';
+import { mcpReport } from './helpers/mcp-smoke-report.mjs';
 
 function completeReport() {
   return {
     ok: true, crossOriginIsolated: true, sharedArrayBuffer: true,
     userAgent: 'Native WebView contract test',
     word: wordReport(), sheet: sheetReport(), presentation: presentationReport(),
-    pdf: pdfReport(), workspace: workspaceReport(), notebook: notebookReport(), workflow: workflowReport(),
+    pdf: pdfReport(), workspace: workspaceReport(), notebook: notebookReport(), workflow: workflowReport(), mcp: mcpReport(),
   };
 }
 
@@ -70,6 +71,7 @@ test('release evidence requires four Rust canvases, PDF text replacement, and na
     'notebookDomInput', 'notebookSavedFileReadback', 'notebookSessionCleanup',
     'canvasDomInput', 'canvasSavedFileReadback', 'canvasSessionCleanup',
     'diagramDomInput', 'diagramSavedFileReadback', 'diagramSessionCleanup',
+    'mcpNativeHttp', 'mcpNativeDocumentTools', 'mcpNativeDocxExport', 'mcpNativeSwitchStop', 'mcpNativeSessionCleanup',
   ]) assert.equal(checks[required], true);
   assert.equal(Object.hasOwn(checks, 'sharedArrayBuffer'), false);
 });
@@ -89,6 +91,13 @@ test('other editors cannot substitute for native canvas and code diagram accepta
   for (const index of [0, 1]) {
     const report = completeReport(); report.workflow.documents.splice(index, 1);
     assert.throws(() => validateFrontendReport(report), /Native workflow/);
+  }
+});
+
+test('publication rejects absent MCP acceptance, browser substitutes and isolated native transport probes', () => {
+  for (const mcp of [undefined, null, {}, { ok: true, transport: 'browser' }, { ok: true, transport: 'native-http', handshake: true }]) {
+    const report = completeReport(); report.mcp = mcp;
+    assert.throws(() => validateFrontendReport(report), /Native MCP/);
   }
 });
 

@@ -195,7 +195,19 @@ onBeforeUnmount(() => {
   session?.deactivate()
   void session?.close(true).catch(cause => console.error('Presentation session cleanup failed', cause))
 })
-defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, present, stopPresentation, inspect, syncRevision, canBackgroundExport, command, query, applyTemplate })
+async function mcpExecute(name: string, args: Record<string, unknown>, assertCurrent: () => void): Promise<unknown> {
+  const owner = generation
+  const guard = () => { assertCurrent(); if (disposed || owner !== generation || !props.active) throw Error('MCP 文档已切换，请重新开启服务。') }
+  guard(); await opening; guard()
+  const current = session
+  if (!current || loading.value) throw Error('请等待文档打开。')
+  if (name === 'document_inspect') { const result = await current.inspect(); guard(); return result }
+  if (name === 'document_undo' || name === 'document_redo') return current.command(name === 'document_undo' ? 'edit.undo' : 'edit.redo', {}, undefined, guard)
+  if (name === 'presentation_read_slide') { const result = await current.query('slide.inspect', args); guard(); return result }
+  if (name === 'presentation_add_slide') return current.command('slide.new', { layout: 'titleAndContent', title: args.title, body: args.body ?? '' }, undefined, guard)
+  throw Error('当前编辑器不支持此 MCP 工具。')
+}
+defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, present, stopPresentation, inspect, syncRevision, canBackgroundExport, command, query, applyTemplate })
 </script>
 
 <template>

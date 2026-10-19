@@ -27,7 +27,7 @@ function harness(kind = 'presentation') {
   const font = { loadFailures: 0, registrationFailures: 0, alreadyAdded: false, chinese: true, htmlResponse: false, data: undefined }
   const fontHeader = new Uint8Array(28)
   fontHeader[1] = 1; fontHeader[5] = 1
-  let receive, documentId = 0, pendingText, startGate
+  let receive, flushGate, documentId = 0, pendingText, startGate
   class Element {
     children = []; parentElement; style = {}; dataset = {}; isConnected = true; listeners = new Map()
     append(child) { child.remove(); this.children.push(child); child.parentElement = this }
@@ -55,7 +55,7 @@ function harness(kind = 'presentation') {
     async start(canvas) { calls.push(['start']); canvas.parentElement.append(new Input()); if (startGate) await startGate },
     activate(id) { calls.push(['activate', id]); state.get(id).ui = { dialog: null, showing: null, home: false }; return snapshot(id) },
     inspect: snapshot,
-    async flush(id) { calls.push(['flush', id]); if (pendingText?.id === id) { edit(id, pendingText.text); pendingText = undefined } },
+    async flush(id) { calls.push(['flush', id]); if (flushGate) await flushGate(); if (pendingText?.id === id) { edit(id, pendingText.text); pendingText = undefined } },
     command(id, commandId, params) {
       calls.push(['command', id, commandId]); const value = JSON.parse(params), doc = state.get(id)
       if (commandId === 'font.add') {
@@ -107,7 +107,7 @@ function harness(kind = 'presentation') {
     }, { ...globals, defineProps: () => props, withDefaults: value => value, defineEmits: () => (...event) => events.push(event), defineExpose(value) { exposed = value } }))
     return { props, events, editor: exposed, dispose() { unmount.forEach(callback => callback()); scope.stop() } }
   }
-  return { client, open, source, state, calls, document, Element, component, font, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value } }
+  return { client, open, source, state, calls, document, Element, component, setFlushGate(value) { flushGate = value }, font, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value } }
 }
 
 test('Deck registers the bundled document font once for concurrent sessions without edits or save acknowledgements', async () => {
@@ -487,4 +487,32 @@ for (const kind of ['word', 'presentation']) {
       await assert.rejects(editor.discardChanges(), /未保存/)
     } finally { mounted.dispose() }
   })
+}
+
+for (const kind of ['word', 'presentation']) {
+ test(`${kind} MCP guard cancels commands revoked while queued or while flushing, before any engine mutation`, async () => {
+  const h = harness(kind), current = await h.open()
+  let revoked = true
+  const guard = () => { if (revoked) throw Error('MCP session stopped') }
+  const command = () => kind === 'pdf' ? current.command('text.set', { text: 'remote text' }, guard) : current.command('text.set', { text: 'remote text' }, undefined, guard)
+  const initial = h.calls.length
+  await assert.rejects(command(), /MCP session stopped/)
+  assert.equal(h.calls.length, initial)
+  revoked = false
+  let release, entered
+  const waiting = new Promise(resolve => { entered = resolve })
+  const blocked = new Promise(resolve => { release = resolve })
+  h.setFlushGate(async () => { entered(); await blocked })
+  const pending = command()
+  await waiting
+  revoked = true; release()
+  await assert.rejects(pending, /MCP session stopped/)
+  assert.equal(h.state.get(current.id).text, '')
+  assert.equal(h.calls.filter(call => call[0] === 'command' && call[2] === 'text.set').length, 0)
+  h.setFlushGate(undefined); revoked = false
+  await command()
+  assert.equal(h.state.get(current.id).text, 'remote text')
+  assert.equal(h.state.get(current.id).dirty, true)
+  await current.close(true)
+ })
 }

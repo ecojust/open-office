@@ -185,7 +185,26 @@ onBeforeUnmount(() => {
   session?.deactivate()
   void session?.close(true).catch(cause => console.error('PDF session cleanup failed', cause))
 })
-defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, syncRevision, canBackgroundExport, command, query })
+async function mcpExecute(name: string, args: Record<string, unknown>, assertCurrent: () => void): Promise<unknown> {
+  const owner = generation
+  const guard = () => { assertCurrent(); if (disposed || owner !== generation || !props.active) throw Error('MCP 文档已切换，请重新开启服务。') }
+  guard(); await opening; guard()
+  const current = session
+  if (!current || loading.value) throw Error('请等待文档打开。')
+  if (name === 'document_inspect') { const result = await current.inspect(); guard(); return result }
+  if (authorDialog.value) throw Error('请先关闭 PDF 署名设置。')
+  if (name === 'document_undo' || name === 'document_redo') return current.command(name === 'document_undo' ? 'edit.undo' : 'edit.redo', {}, guard)
+  if (name === 'pdf_read') { const result = await current.query('document.inspect'); guard(); return result }
+  if (name === 'pdf_add_text') {
+    const state = await current.inspect(); guard()
+    const page = Number(args.page ?? state.activePage ?? 0), bounds = state.pages[page]
+    const x = Number(args.x ?? 36), y = Number(args.y ?? 36), width = Number(args.width ?? 300), height = Number(args.height ?? 60)
+    if (!bounds || typeof bounds.width !== 'number' || typeof bounds.height !== 'number' || x + width > bounds.width || y + height > bounds.height) throw Error('文字框超出 PDF 页面范围。')
+    return current.command('pdf.addText', { text: args.text, page, rect: [x, y, x + width, y + height], size: args.size ?? 18 }, guard)
+  }
+  throw Error('当前编辑器不支持此 MCP 工具。')
+}
+defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, syncRevision, canBackgroundExport, command, query })
 </script>
 
 <template>
