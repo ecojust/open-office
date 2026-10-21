@@ -1,75 +1,160 @@
-name: Read existing native verification diagnostics
+name: Recheck exact retained native App with read-only process observation
 
 on:
   workflow_dispatch:
     inputs:
-      run_id:
-        description: Existing desktop build run ID (diagnostics only, no rebuild or release)
-        type: string
+      source_run_id:
+        description: Diagnostic run containing the retained App from commit 5d9e3f7
         required: true
-      job_id:
-        description: Optional failed job ID; expose only repository-known test names, compiler codes, and fixed failure categories
-        type: string
+        default: '39571063145'
+      source_artifact_id:
+        description: Exact App artifact ID from that diagnostic run
+        required: true
+      evidence_artifact_id:
+        description: Optional prior crash evidence artifact ID for complete memory summaries
         required: false
-        default: ''
+      summary_only:
+        description: Read existing evidence only without launching the App
+        type: boolean
+        default: false
 
 permissions:
-  actions: read
   contents: read
+  actions: read
 
 jobs:
-  diagnostics:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  diagnostic:
+    name: Reuse exact macOS ARM App once (no build or release)
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      OPEN_OFFICE_PLATFORM_ID: macos-arm64
+      OPEN_OFFICE_TARGET: aarch64-apple-darwin
+      OPEN_OFFICE_DIAGNOSTIC_BINARY_COMMIT: 5d9e3f7b884e83022e948b991179c847ac0411e5
+      OPEN_OFFICE_DIAGNOSTIC_SOURCE_ROOT: ${{ github.workspace }}/binary-source
+      OPEN_OFFICE_SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+      OPEN_OFFICE_RECHECK_DOWNLOAD: ${{ github.workspace }}/retained-native-app
+    defaults:
+      run:
+        shell: bash
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 5d9e3f7b884e83022e948b991179c847ac0411e5
+          path: binary-source
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Validate build identifier
-        env:
-          SOURCE_RUN_ID: ${{ inputs.run_id }}
-        run: node -e 'if(!/^[0-9]+$/.test(process.env.SOURCE_RUN_ID))throw Error("Invalid run ID")'
-      - uses: actions/checkout@v4
-      - name: Summarize only allowlisted failure identifiers without exposing logs
-        if: inputs.job_id != ''
-        env:
-          SOURCE_RUN_ID: ${{ inputs.run_id }}
-          SOURCE_JOB_ID: ${{ inputs.job_id }}
-          SOURCE_REPOSITORY: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/read-failed-job-log.mjs
-      - uses: actions/download-artifact@v4
-        if: inputs.job_id == ''
+          architecture: arm64
+      - uses: actions/setup-python@v5
         with:
+          python-version: '3.12'
+          architecture: arm64
+          cache: pip
+          cache-dependency-path: tests/requirements-pdf-inspection.txt
+      - name: Validate exact source run and artifact IDs before downloading
+        uses: actions/github-script@v7
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          SOURCE_ARTIFACT_ID: ${{ inputs.source_artifact_id }}
+          EVIDENCE_ARTIFACT_ID: ${{ inputs.evidence_artifact_id }}
+          SUMMARY_ONLY: ${{ inputs.summary_only }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const source = '5d9e3f7b884e83022e948b991179c847ac0411e5';
+            for (const key of ['SOURCE_RUN_ID', 'SOURCE_ARTIFACT_ID']) {
+              if (!/^[1-9][0-9]{0,19}$/.test(process.env[key] || '')) throw Error('Invalid diagnostic ID');
+            }
+            if (process.env.SUMMARY_ONLY === 'true' && !process.env.EVIDENCE_ARTIFACT_ID) throw Error('Summary-only requires source evidence');
+            const runId = Number(process.env.SOURCE_RUN_ID);
+            const run = (await github.rest.actions.getWorkflowRun({ owner, repo, run_id: runId })).data;
+            if (run.head_sha !== source || run.status !== 'completed') throw Error('Unexpected source App run');
+            for (const [key, expected] of [['SOURCE_ARTIFACT_ID', 'open-office-native-full-crash-app-macos-arm64'],
+              ['EVIDENCE_ARTIFACT_ID', 'open-office-native-full-crash-evidence']]) {
+              if (!process.env[key]) continue;
+              if (!/^[1-9][0-9]{0,19}$/.test(process.env[key])) throw Error('Invalid diagnostic artifact ID');
+              const artifact = (await github.rest.actions.getArtifact({ owner, repo, artifact_id: Number(process.env[key]) })).data;
+              if (artifact.name !== expected || artifact.expired || artifact.workflow_run?.id !== runId || artifact.workflow_run?.head_sha !== source) {
+                throw Error('Unexpected diagnostic artifact identity');
+              }
+            }
+      - uses: actions/download-artifact@v4
+        if: ${{ !inputs.summary_only }}
+        with:
+          artifact-ids: ${{ inputs.source_artifact_id }}
+          run-id: ${{ inputs.source_run_id }}
           github-token: ${{ github.token }}
-          run-id: ${{ inputs.run_id }}
-          pattern: open-office-native-*
-          path: diagnostics
+          path: ${{ env.OPEN_OFFICE_RECHECK_DOWNLOAD }}
           merge-multiple: true
-      - name: Expose existing bounded reports through readable check annotations
-        if: inputs.job_id == ''
+      - uses: actions/download-artifact@v4
+        if: inputs.evidence_artifact_id != ''
+        with:
+          artifact-ids: ${{ inputs.evidence_artifact_id }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+          path: prior-evidence
+          merge-multiple: true
+      - name: Summarize prior run memory without rerunning its App
+        if: inputs.evidence_artifact_id != ''
+        run: python3 scripts/inspect-native-full-memory.py prior-evidence/native-full-crash
+      - name: Verify retained archive and executable before native launch
+        if: ${{ !inputs.summary_only }}
+        run: python3 scripts/prepare-native-app-recheck.py
+      - name: Install independent PDF inspector and record Python
+        if: ${{ !inputs.summary_only }}
+        run: |
+          python -m pip install -r tests/requirements-pdf-inspection.txt
+          python - <<'PY'
+          import os, platform, sys
+          assert sys.platform == 'darwin' and platform.machine() == 'arm64'
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              output.write(f'OPEN_OFFICE_PYTHON={sys.executable}\n')
+          PY
+      - name: Compile read-only process exit observer
+        if: ${{ !inputs.summary_only }}
+        run: |
+          swiftc scripts/macos-process-exit.swift -o "$RUNNER_TEMP/open-office-process-exit"
+          echo "OPEN_OFFICE_EXIT_OBSERVER_HELPER=$RUNNER_TEMP/open-office-process-exit" >> "$GITHUB_ENV"
+      - name: Run exact retained App once with read-only OS observation
+        if: ${{ !inputs.summary_only }}
+        timeout-minutes: 8
+        run: node scripts/native-full-crash-diagnostics.mjs --app "$OPEN_OFFICE_RECHECK_APP"
+      - name: Summarize exact binary native stages
+        if: ${{ always() && !inputs.summary_only }}
         run: |
           node --input-type=module <<'NODE'
-          import { appendFileSync, readFileSync, readdirSync, statSync } from 'node:fs';
-          import assert from 'node:assert/strict';
+          import { existsSync, readFileSync } from 'node:fs';
           import { nativeReportSummary } from './scripts/native-report-summary.mjs';
-          const files = readdirSync('diagnostics').filter(name => /^[a-z0-9-]+-native-smoke\.json$/.test(name));
-          assert.ok(files.length > 0, 'No existing native verification reports were found');
-          const escape = value => String(value).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
-          for (const file of files) {
-            assert.ok(statSync(`diagnostics/${file}`).size <= 12 * 1024 * 1024, 'Diagnostic report exceeds 12 MiB');
-            const report = JSON.parse(readFileSync(`diagnostics/${file}`, 'utf8'));
-            // GitHub truncates each annotation message at 4096 bytes. Preserve
-            // valid JSON through numbered ASCII chunks instead of cutting JSON
-            // in the middle of an error or losing the final resource events.
-            const excerpt = nativeReportSummary(report);
-            const details = JSON.stringify(excerpt, null, 2);
-            const encoded = Buffer.from(JSON.stringify(excerpt), 'utf8').toString('base64');
-            const count = Math.ceil(encoded.length / 3000);
-            for (let index = 0; index < count; index++) {
-              const title = `${file}.base64-part-${String(index + 1).padStart(3, '0')}-of-${String(count).padStart(3, '0')}`;
-              console.log(`::notice title=${escape(title)}::${encoded.slice(index * 3000, (index + 1) * 3000)}`);
-            }
-            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### ${file}\n\n<pre>${details.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</pre>\n`);
+          const path = 'artifacts/macos-arm64-native-smoke.json';
+          if (existsSync(path)) {
+            const report = JSON.parse(readFileSync(path, 'utf8'));
+            if (report.commit !== process.env.OPEN_OFFICE_DIAGNOSTIC_BINARY_COMMIT) throw Error('Binary source identity mismatch');
+            const encoded = Buffer.from(JSON.stringify(nativeReportSummary(report))).toString('base64');
+            const count = Math.ceil(encoded.length / 3800);
+            if (count > 10) throw Error('Bounded native summary exceeds annotation capacity');
+            for (let index=0; index<count; index++) console.log(`::notice title=full-native-summary-${index+1}-of-${count}::${encoded.slice(index*3800,(index+1)*3800)}`);
           }
           NODE
+      - name: Summarize bounded logs and process memory
+        if: ${{ always() && !inputs.summary_only }}
+        run: python3 scripts/inspect-macos-diagnostic.py --directory artifacts/native-full-crash
+      - name: Summarize bounded crash exception and stack
+        if: ${{ always() && !inputs.summary_only }}
+        run: python3 scripts/inspect-native-full-crash.py artifacts/native-full-crash
+      - name: Summarize memory peaks and verified process exits
+        if: ${{ always() && !inputs.summary_only }}
+        run: python3 scripts/inspect-native-full-memory.py artifacts/native-full-crash
+      - name: Retain recheck evidence without republishing the App
+        if: ${{ always() && !inputs.summary_only }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-office-native-prebuilt-recheck-evidence
+          path: |
+            artifacts/native-full-crash/
+            artifacts/macos-arm64-native-smoke.json
+            artifacts/macos-arm64-native-diagnostics.json
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7

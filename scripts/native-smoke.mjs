@@ -305,7 +305,7 @@ function killTree(child, env, force = false) {
   }
 }
 
-async function runGui(executable, output, workingDirectory, env, diagnostic, executionMode = 'native') {
+async function runGui(executable, output, workingDirectory, env, diagnostic, executionMode = 'native', observation = {}) {
   return new Promise((resolvePromise, reject) => {
     const launch = guiLaunchCommand(executable, executionMode);
     const child = spawn(launch.command, launch.args, {
@@ -316,6 +316,11 @@ async function runGui(executable, output, workingDirectory, env, diagnostic, exe
     diagnostic.launchExecutable = launch.command;
     diagnostic.launchArguments = launch.args;
     diagnostic.pid = child.pid ?? null;
+    // Diagnostic branch only: read-only OS observers receive the exact spawned app PID.
+    if (Number.isSafeInteger(child.pid)) {
+      try { observation.onSpawn?.(child.pid); }
+      catch { diagnostic.observerHookFailed = true; }
+    }
     const hashes = { stdout: createHash('sha256'), stderr: createHash('sha256') };
     const tails = { stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) };
     diagnostic.stdoutBytes = 0; diagnostic.stderrBytes = 0;
@@ -418,7 +423,7 @@ export function preserveNativeDiagnostics(temporaryDirectory, root, platformId, 
   }
 }
 
-export async function runNativeSmoke(args = process.argv.slice(2), env = process.env, root = PROJECT_ROOT) {
+export async function runNativeSmoke(args = process.argv.slice(2), env = process.env, root = PROJECT_ROOT, observation = {}) {
   const started = Date.now();
   const platformId = Object.hasOwn(PLATFORMS, env.OPEN_OFFICE_PLATFORM_ID || '') ? env.OPEN_OFFICE_PLATFORM_ID : 'unknown-platform';
   const reportPath = join(root, 'artifacts', `${platformId}-native-smoke.json`);
@@ -461,7 +466,7 @@ export async function runNativeSmoke(args = process.argv.slice(2), env = process
     rawReport = join(temporaryDirectory, 'frontend-report.json');
     // This path is unique, was not created beforehand, and is not reused on reruns.
     requireCheck(!existsSync(rawReport), 'The native GUI report destination is not fresh');
-    await runGui(location.executable, rawReport, temporaryDirectory, env, report.process, execution.executionMode);
+    await runGui(location.executable, rawReport, temporaryDirectory, env, report.process, execution.executionMode, observation);
     report.frontend = readFrontendReport(rawReport);
     report.checks = validateFrontendReport(report.frontend);
     Object.assign(report.checks, validateNativeOfficeWordEvidence(report, { root }));

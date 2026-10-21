@@ -2,10 +2,11 @@
 // keeping bounded OS evidence around it. This never publishes or accepts a release.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { isAbsolute, join, resolve } from 'node:path';
 import { runNativeSmoke } from './native-smoke.mjs';
 import { captureStream, collectCrashReports } from './macos-editing-diagnostic.mjs';
+import { observeOwnedWebContent } from './macos-owned-webcontent.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const directory = join(root, 'artifacts', 'native-full-crash');
@@ -25,7 +26,7 @@ const safeCommand = (program, args) => {
   const result = spawnSync(program, args, { shell: false, encoding: 'utf8', timeout: 1500, maxBuffer: 256 * 1024 });
   return result.status === 0 && !result.signal && !result.error ? result.stdout : null;
 };
-let log, finishLog, timer, smoke, lastMemory = 0;
+let log, finishLog, timer, smoke, ownedObserver, lastMemory = 0;
 const sample = () => {
   const now = Date.now();
   const processes = safeCommand('/bin/ps', ['-axo', 'pid,ppid,rss,pcpu,comm']);
@@ -58,13 +59,32 @@ try {
   assert.equal(process.arch, 'arm64');
   assert.match(report.commit || '', /^[a-f0-9]{40}$/);
   assert.match(report.runId || '', /^\d{1,20}$/);
+  const sourceRoot = process.env.OPEN_OFFICE_DIAGNOSTIC_SOURCE_ROOT || root;
+  const binaryCommit = process.env.OPEN_OFFICE_DIAGNOSTIC_BINARY_COMMIT || report.commit;
+  assert(isAbsolute(sourceRoot)); assert.match(binaryCommit, /^[a-f0-9]{40}$/);
+  report.harnessCommit = report.commit; report.binaryCommit = binaryCommit;
+  const helper = process.env.OPEN_OFFICE_EXIT_OBSERVER_HELPER;
+  if (helper) assert(isAbsolute(helper));
   report.system = { swVers: safeCommand('/usr/bin/sw_vers', [])?.trim(), machine: 'arm64', node: process.version,
-    memoryBytes: Number(safeCommand('/usr/sbin/sysctl', ['-n', 'hw.memsize'])?.trim()) || null };
+    memoryBytes: Number(safeCommand('/usr/sbin/sysctl', ['-n', 'hw.memsize'])?.trim()) || null,
+    webKitVersion: safeCommand('/usr/libexec/PlistBuddy', ['-c', 'Print:CFBundleShortVersionString', '/System/Library/Frameworks/WebKit.framework/Resources/Info.plist'])?.trim(),
+    webKitBuild: safeCommand('/usr/libexec/PlistBuddy', ['-c', 'Print:CFBundleVersion', '/System/Library/Frameworks/WebKit.framework/Resources/Info.plist'])?.trim() };
   const predicate = 'process == "open-office" OR process CONTAINS "WebContent" OR process CONTAINS "WebKit" OR process == "ReportCrash" OR subsystem BEGINSWITH "com.apple.WebKit" OR (process == "kernel" AND eventMessage CONTAINS[c] "memorystatus") OR (process == "runningboardd" AND eventMessage CONTAINS[c] "WebContent")';
   log = spawn('/usr/bin/log', ['stream', '--style', 'ndjson', '--level', 'debug', '--predicate', predicate], { shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
   finishLog = captureStream(log, join(directory, 'system-webkit.ndjson'), 8 * 1024 * 1024);
   sample(); timer = setInterval(sample, 500);
-  smoke = await runNativeSmoke(process.argv.slice(2), { ...process.env, OPEN_OFFICE_SMOKE_SCOPE: 'full' }, root);
+  smoke = await runNativeSmoke(process.argv.slice(2), { ...process.env,
+    GITHUB_SHA: binaryCommit, OPEN_OFFICE_SMOKE_SCOPE: 'full' }, sourceRoot, {
+    onSpawn: appPid => {
+      if (helper) ownedObserver = observeOwnedWebContent({ appPid, helper, directory: join(directory, 'exit-observers') });
+    },
+  });
+  if (sourceRoot !== root) {
+    for (const name of ['macos-arm64-native-smoke.json', 'macos-arm64-native-diagnostics.json']) {
+      const source = join(sourceRoot, 'artifacts', name);
+      if (existsSync(source)) copyFileSync(source, join(root, 'artifacts', name));
+    }
+  }
   report.nativeDiagnostics = smoke.nativeDiagnostics;
   report.process = smoke.process;
   report.frontend = { ok: smoke.frontend?.ok === true, error: smoke.frontend?.error || null };
@@ -78,6 +98,7 @@ try {
   report.error = 'Diagnostic orchestration could not finish; retained evidence may be incomplete.';
 } finally {
   clearInterval(timer);
+  if (ownedObserver) report.ownedWebContent = await ownedObserver.stop();
   sample();
   const terminated = report.nativeDiagnostics?.terminations > 0;
   if (terminated && finishLog) report.systemLog = finishLog(undefined, { reset: true });
