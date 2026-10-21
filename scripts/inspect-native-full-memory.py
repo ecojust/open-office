@@ -19,6 +19,41 @@ if not path.is_file() or path.is_symlink() or path.stat().st_size > 12 * 1024 * 
     emit("full-native-memory", {"available": False})
     sys.exit(0)
 report = json.loads(path.read_text())
+policies = []
+def policy_record(value, origin):
+    if not isinstance(value, str) or len(value) > 512:
+        return
+    try:
+        value = json.loads(value)
+    except (ValueError, TypeError):
+        return
+    if not isinstance(value, dict) or value.get("source") != "WKWebpagePreferences.securityRestrictionMode":
+        return
+    if value.get("stage") not in {"before-create", "before-set", "after-set", "created"}:
+        return
+    action = value.get("action")
+    if action not in {"keep-platform-default", "set-maximize-compatibility", "already-compatible", "preserve-lockdown",
+                      "preserve-unknown-mode", "not-main-thread", "readback", "platform-handle-unavailable"}:
+        action = "unknown-action"
+    result = {"stage": value["stage"], "supported": value.get("supported") if isinstance(value.get("supported"), bool) else None,
+              "requested": value.get("requested") if type(value.get("requested")) is int and value["requested"] in [0, 1, 2] else None,
+              "actual": value.get("actual") if type(value.get("actual")) is int and value["actual"] in [0, 1, 2] else None,
+              "action": action, "origin": origin}
+    if not any({key: item[key] for key in item if key != "origin"} == {key: result[key] for key in result if key != "origin"} for item in policies):
+        if len(policies) < 8:
+            policies.append(result)
+for event in (report.get("nativeDiagnostics") or {}).get("events", [])[-256:]:
+    if event.get("phase") == "editing-webkit-policy":
+        policy_record(event.get("detail"), "native-events")
+stderr = (report.get("process") or {}).get("stderrTail")
+if isinstance(stderr, str):
+    for line in stderr[-32768:].splitlines():
+        prefix = "OPEN_OFFICE_SMOKE editing-webkit-policy: "
+        if line.startswith(prefix):
+            policy_record(line[len(prefix):], "bounded-native-stderr")
+emit("full-native-webkit-policy", {"retained": bool(policies), "policies": policies,
+     "createdReadbackCompatible": any(item["stage"] == "created" and item["supported"] is True and item["actual"] == 1 for item in policies),
+     "missingEvidenceDoesNotImplyJitEnabled": True})
 termination = next((event.get("unixMs") for event in (report.get("nativeDiagnostics") or {}).get("events", [])
                     if event.get("phase") == "web-content-terminated" and number(event.get("unixMs")) is not None), None)
 rows = []

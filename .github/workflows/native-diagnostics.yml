@@ -99,6 +99,9 @@ jobs:
       - name: Summarize prior run memory without rerunning its App
         if: inputs.evidence_artifact_id != ''
         run: python3 scripts/inspect-native-full-memory.py prior-evidence/native-full-crash
+      - name: Read prior crash stack and version without rerunning its App
+        if: inputs.evidence_artifact_id != ''
+        run: python3 scripts/inspect-native-full-crash.py prior-evidence/native-full-crash
       - name: Verify retained archive and executable before native launch
         if: ${{ !inputs.summary_only }}
         run: python3 scripts/prepare-native-app-recheck.py

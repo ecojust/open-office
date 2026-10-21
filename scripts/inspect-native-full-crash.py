@@ -25,6 +25,9 @@ def symbol(value):
         return None
     return inspector.scrub(value, 240)
 
+def version(value):
+    return value if isinstance(value, str) and re.fullmatch(r"[0-9.]{1,64}", value) else None
+
 def crash_summary(path, index):
     metadata = path.lstat()
     if path.is_symlink() or not stat.S_ISREG(metadata.st_mode) or not 0 < metadata.st_size <= 8 * 1024 * 1024:
@@ -54,11 +57,17 @@ def crash_summary(path, index):
         frames.append({"image": name, "symbol": symbol(frame.get("symbol")), "imageOffset": integer(frame.get("imageOffset")), "symbolOffset": integer(frame.get("symbolLocation"))})
         if len(frames) >= 12:
             break
+    image_versions = [{"image": image.get("name"), "version": version(image.get("CFBundleShortVersionString")),
+                       "build": version(image.get("CFBundleVersion"))} for image in images[:4096]
+                      if isinstance(image, dict) and image.get("name") in {"WebKit", "WebCore", "JavaScriptCore"}][:3]
+    bundle = body.get("bundleInfo") if isinstance(body.get("bundleInfo"), dict) else {}
     return {"index": index, "status": "parsed", "pid": integer(body.get("pid"), 2147483647),
             "exceptionType": exception.get("type") if exception.get("type") in EXCEPTIONS else "unknown",
             "signal": exception.get("signal") if exception.get("signal") in SIGNALS else None,
             "terminationNamespace": termination.get("namespace") if termination.get("namespace") in NAMESPACES else "unknown",
             "terminationCode": integer(termination.get("code")), "faultingThread": fault, "frames": frames,
+            "systemImageVersions": image_versions, "processBundleVersion": version(bundle.get("CFBundleShortVersionString")),
+            "processBundleBuild": version(bundle.get("CFBundleVersion")),
             "rawFieldsOmitted": True}
 
 root = Path(sys.argv[1])
