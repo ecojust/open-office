@@ -118,7 +118,12 @@ jobs:
           NODE
       - name: Summarize bounded WebKit logs and process memory
         if: always()
-        run: python3 scripts/inspect-macos-diagnostic.py --directory artifacts/native-full-crash
+        run: |
+          if [ -d artifacts/native-full-crash ]; then
+            python3 scripts/inspect-macos-diagnostic.py --directory artifacts/native-full-crash
+          else
+            echo 'Native crash collection was not reached; no native execution result is available.'
+          fi
       - name: Summarize bounded IPS exception and WebKit stack evidence
         if: always()
         run: python3 scripts/inspect-native-full-crash.py artifacts/native-full-crash

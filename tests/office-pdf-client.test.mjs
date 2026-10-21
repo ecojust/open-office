@@ -75,6 +75,7 @@ function harness(kind = 'pdf') {
   }
   const globals = { document, window: { dispatchEvent() {} }, HTMLElement: Element, HTMLInputElement: Input, Event: class { constructor(type) { this.type = type } }, FocusEvent: class { constructor(type) { this.type = type } }, InputEvent: class { constructor(type, options) { this.type = type; Object.assign(this, options) } } }
   const client = evaluate(sheet ? sheetClientSource : clientSource, name => {
+    if (name === '../../smoke') return { smokeStage() {} }
     if (name === '../../shared/document') return { base64ToBytes }
     if (name === '../../shared/id') return { createId }
     if (name === '../author') return author
