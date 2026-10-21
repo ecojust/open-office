@@ -62,6 +62,9 @@ def crash_summary(path, index):
                       if isinstance(image, dict) and image.get("name") in {"WebKit", "WebCore", "JavaScriptCore"}][:3]
     bundle = body.get("bundleInfo") if isinstance(body.get("bundleInfo"), dict) else {}
     return {"index": index, "status": "parsed", "pid": integer(body.get("pid"), 2147483647),
+            "responsiblePid": integer(body.get("responsiblePid"), 2147483647),
+            "responsibleProcess": body.get("responsibleProc") if body.get("responsibleProc") in {"open-office", "Open Office"} else None,
+            "parentPid": integer(body.get("parentPid"), 2147483647),
             "exceptionType": exception.get("type") if exception.get("type") in EXCEPTIONS else "unknown",
             "signal": exception.get("signal") if exception.get("signal") in SIGNALS else None,
             "terminationNamespace": termination.get("namespace") if termination.get("namespace") in NAMESPACES else "unknown",
