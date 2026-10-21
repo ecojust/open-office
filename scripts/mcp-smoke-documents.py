@@ -281,8 +281,8 @@ def presentation(path):
 
 
 def pdf(path):
-    import fitz
-    with fitz.open(path) as document:
+    import pymupdf as pdf_reader
+    with pdf_reader.open(path) as document:
         require(document.is_pdf and not document.needs_pass and 0 < len(document) <= 128, 'invalid/encrypted PDF specimen')
         texts = []
         for page in document:

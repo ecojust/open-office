@@ -219,6 +219,15 @@
   "dependencyIdentities": [
     {
       "paths": [
+        "scripts/mcp-smoke-documents.py"
+      ],
+      "patterns": [
+        "\\bimport\\s+pymupdf\\s+as\\s+pdf_reader\\b"
+      ],
+      "reason": "The independent native MCP export oracle imports its test-only PDF inspection dependency by its canonical package name."
+    },
+    {
+      "paths": [
         "tests/compatibility/inspect-output.py",
         "tests/browser/pdf-verify.py",
         "tests/browser/pdf-fixtures.py",
