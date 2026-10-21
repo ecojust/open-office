@@ -186,6 +186,8 @@ a { color: var(--ui-accent); }
 .document-mcp-kind { display: flex; align-items: center; gap: 6px; margin-right: auto; white-space: nowrap; }
 .document-mcp-kind small { margin-left: 4px; color: var(--ui-muted); font-size: inherit; opacity: .75; }
 .document-mcp-detail { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.document-mcp-permission { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 4px 6px; border-radius: var(--ui-radius); color: var(--ui-muted); font-size: var(--ui-font-small); }
+.document-mcp-permission:hover:not(:disabled) { color: var(--ui-accent); background: var(--ui-accent-soft); }
 .document-mcp-toggle { display: inline-flex; flex: none; align-items: center; gap: 6px; padding: 4px 9px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius); background: var(--ui-surface-muted); color: var(--ui-text); font-size: var(--ui-font-small); }
 .document-mcp-toggle:hover:not(:disabled) { border-color: var(--ui-accent); color: var(--ui-accent); }
 .document-mcp-toggle.running { color: var(--ui-accent); border-color: var(--ui-accent); background: var(--ui-accent-soft); }

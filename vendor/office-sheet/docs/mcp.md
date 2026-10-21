@@ -1,5 +1,23 @@
 # OfficeSheet MCP server
 
+## Open Office embedded document service
+
+The Open Office host exposes the active workbook through its shared authenticated HTTP
+MCP service. `sheet_list_commands` provides the registered document command catalog,
+parameter documentation, enabled state, search and pagination. `sheet_execute_command`
+executes these commands on the same session that paints the workbook; the host publishes
+the resulting revision/dirty receipt and requests a repaint. `sheet_write_range` is a
+bounded two-dimensional entry helper, and `sheet_query` reads cell styles, formulas,
+objects, workbook structure and history without editing.
+
+The embedded service excludes file/window lifecycle, external filesystem paths and script
+execution. Image insertion accepts inline base64 and CSV import accepts inline text.
+Commands that require parameters return a readable error instead of opening a dialog.
+Document formatting, row/column/sheet structure, tables, charts, drawings, images,
+validation, filters, sorting, PivotTables, comments and print layout use their existing
+engine commands and undo history. The shell keeps ownership of save/export and transport
+permissions. These integration changes were last checked on 2026-10-21.
+
 `office-sheet-cli mcp` exposes OfficeSheet to AI agents over the [Model Context Protocol](https://modelcontextprotocol.io):
 newline-delimited JSON-RPC 2.0 on stdin/stdout (protocol `2025-06-18`; `2025-03-26` and `2024-11-05` clients are
 answered in their own version). Logs go to stderr.

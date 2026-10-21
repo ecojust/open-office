@@ -1,6 +1,8 @@
+use std::collections::HashMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 
+use base64::Engine;
 use office_pdf_engine::{AddedContent, AddedText, DocId, Edit, Session};
 use office_pdf_ui_egui::OfficePdfApp;
 use serde_json::{Value, json};
@@ -171,6 +173,52 @@ impl Entry {
     }
 
     fn run_command(&mut self, command: &str, params: &Value) -> Result<Value, String> {
+        if command == "mcp.commands" {
+            let filter = params.get("filter").and_then(Value::as_str).unwrap_or("").to_lowercase();
+            let exact = params.get("command").and_then(Value::as_str);
+            let tools = office_pdf_automation::embedded_tools().into_iter().filter(|tool| {
+                exact.is_none_or(|name| tool.name == name) && (filter.is_empty() || format!("{} {} {}", tool.name, tool.title, tool.description).to_lowercase().contains(&filter))
+            }).map(|tool| json!({"command":tool.name,"title":tool.title,"description":tool.description,"inputSchema":tool.input_schema,"readOnly":tool.read_only,"destructive":tool.destructive})).collect::<Vec<_>>();
+            return Ok(
+                json!({"commands":tools,"pageNumbering":"1-based","coordinates":"PDF points, top-left origin, y down","assets":"File arguments refer only to filenames supplied in assets (base64). No external filesystem access."}),
+            );
+        }
+        if matches!(command, "mcp.execute" | "mcp.query") {
+            let name = params.get("command").and_then(Value::as_str).ok_or("缺少 PDF 命令。")?;
+            let arguments = params.get("params").cloned().unwrap_or_else(|| json!({}));
+            let mut assets = HashMap::new();
+            if let Some(value) = params.get("assets") {
+                let entries = value.as_object().filter(|entries| entries.len() <= 16).ok_or("PDF 素材必须为最多 16 个文件的对象。")?;
+                let mut total = 0usize;
+                for (name, value) in entries {
+                    if !office_pdf_automation::valid_asset_name(name) {
+                        return Err("素材只能使用文件名，不能使用系统路径。".into());
+                    }
+                    let encoded = value.as_str().filter(|value| value.len() <= 6 * 1024 * 1024).ok_or("素材必须为不超过 6 MiB 的 base64 字符串。")?;
+                    let bytes = base64::engine::general_purpose::STANDARD.decode(encoded).map_err(|_| "素材 base64 格式无效。")?;
+                    total = total.checked_add(bytes.len()).ok_or("素材总大小超限。")?;
+                    if total > 4 * 1024 * 1024 {
+                        return Err("每次操作的素材总大小不能超过 4 MiB。".into());
+                    }
+                    assets.insert(name.clone(), bytes);
+                }
+            }
+            let read_only = command == "mcp.query";
+            if !read_only {
+                self.commit_pending()?;
+            }
+            let id = self.id()?;
+            let before = self.app.session.get(id).ok_or("PDF 文档已关闭。")?.edit_generation();
+            let result = office_pdf_automation::Automation::call_in_session(&mut self.app.session, id, name, &arguments, assets, read_only)
+                .map_err(|error| error.to_string());
+            // A tool can report an error after an engine edit. Always reconcile the real
+            // model, clear stale rasters and notify the shell, including that case.
+            if self.app.session.get(id).is_some_and(|doc| doc.edit_generation() != before) {
+                self.refresh_view()?;
+            }
+            self.sync()?;
+            return result;
+        }
         if matches!(command, "document.inspect" | "ui.state" | "ui.inspect") {
             return if command == "document.inspect" { self.inspect_document() } else { Ok(self.app.embedding_state()) };
         }
@@ -353,6 +401,66 @@ mod tests {
     use super::*;
     fn blank() -> Entry {
         Entry::new("Test.pdf", &[], 1).unwrap()
+    }
+    #[test]
+    fn mcp_edits_live_objects_annotations_and_pages_with_undo_and_export() {
+        let mut entry = blank();
+        let identity = entry.document_id;
+        let run =
+            |entry: &mut Entry, command: &str, params: Value| entry.command("mcp.execute", &json!({"command":command,"params":params})).unwrap();
+        run(&mut entry, "page_add_text", json!({"page":1,"text":"Editable text","at":[40,80],"size":18}));
+        run(&mut entry, "content_update", json!({"page":1,"index":1,"text":"Updated text","bold":true,"color":"#ff0000"}));
+        let content = entry.command("mcp.query", &json!({"command":"content_list"})).unwrap();
+        assert!(content.to_string().contains("Updated text"));
+        run(&mut entry, "comment_add", json!({"page":1,"type":"stamp","at":[180,220],"stamp":"approved","dynamic":true,"author":"Open Office"}));
+        run(&mut entry, "fill_sign_add", json!({"page":1,"type":"signature","at":[80,300],"text":"Open Office","author":"Open Office"}));
+        let comments = entry.command("mcp.query", &json!({"command":"comment_list"})).unwrap();
+        assert!(comments.to_string().contains("Open Office"));
+        run(&mut entry, "page_insert_blank", json!({"at":2}));
+        assert_eq!(entry.snapshot("mcp").unwrap()["pageCount"], 2);
+        run(&mut entry, "page_delete", json!({"pages":[2]}));
+        assert_eq!(entry.snapshot("mcp").unwrap()["pageCount"], 1);
+        run(&mut entry, "edit_undo", json!({}));
+        assert_eq!(entry.snapshot("mcp").unwrap()["pageCount"], 2);
+        assert_eq!(entry.document_id, identity);
+        assert!(entry.dirty());
+        let saved = entry.export("pdf").unwrap();
+        let reopened = Entry::new("Saved.pdf", &saved, 2).unwrap();
+        assert_eq!(reopened.app.session.get(reopened.id().unwrap()).unwrap().info.pages.len(), 2);
+        assert!(!reopened.app.session.get(reopened.id().unwrap()).unwrap().info.annotations.is_empty());
+    }
+
+    #[test]
+    fn mcp_is_document_bound_readonly_enforced_and_asset_only() {
+        let mut entry = blank();
+        let revision = entry.revision;
+        for payload in
+            [json!({"command":"page_add_text","params":{"page":1,"text":"Blocked"}}), json!({"command":"page_delete","params":{"pages":[1]}})]
+        {
+            assert!(entry.command("mcp.query", &payload).is_err());
+        }
+        for payload in [
+            json!({"command":"doc_open","params":{"path":"/tmp/example.pdf"}}),
+            json!({"command":"js_run","params":{"script":"1+1"}}),
+            json!({"command":"doc_save","params":{}}),
+            json!({"command":"page_add_image","params":{"page":1,"path":"/tmp/example.png"}}),
+            json!({"command":"doc_info","params":{"doc":999}}),
+        ] {
+            assert!(entry.command("mcp.execute", &payload).is_err());
+        }
+        assert_eq!(entry.revision, revision);
+        assert!(!entry.dirty());
+        let source = blank().export("pdf").unwrap();
+        let encoded = base64::engine::general_purpose::STANDARD.encode(source.as_ref());
+        entry
+            .command("mcp.execute", &json!({"command":"page_insert_file","params":{"at":2,"path":"page.pdf"},"assets":{"page.pdf":encoded}}))
+            .unwrap();
+        assert_eq!(entry.snapshot("mcp").unwrap()["pageCount"], 2);
+        let catalog = entry.command("mcp.commands", &json!({})).unwrap();
+        assert!(catalog["commands"].as_array().unwrap().len() > 90);
+        assert!(
+            !catalog["commands"].as_array().unwrap().iter().any(|tool| matches!(tool["command"].as_str(), Some("doc_save" | "doc_open" | "js_run")))
+        );
     }
     #[test]
     fn explicit_author_is_unicode_bounded_and_does_not_edit_the_document() {

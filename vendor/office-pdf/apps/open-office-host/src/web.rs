@@ -10,7 +10,7 @@ use crate::document::{Entry, MAX_INPUT_BYTES, guarded};
 use crate::input_barrier::InputDiscardBarrier;
 
 const MAX_SESSIONS: usize = 8;
-const MAX_PARAMS_BYTES: usize = 2 * 1024 * 1024;
+const MAX_PARAMS_BYTES: usize = 8 * 1024 * 1024;
 const DISCARD_INPUT_EVENT: &str = "open-office-pdf-discard-input";
 
 struct FlushWaiter {

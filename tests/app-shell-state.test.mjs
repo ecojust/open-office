@@ -19,7 +19,7 @@ const utilities = await readFile(new URL('../src/shared/document.ts', import.met
 const dialogFocus = await readFile(new URL('../src/shared/dialog-focus.ts', import.meta.url), 'utf8')
 const appearanceSource = await readFile(new URL('../src/shared/appearance.ts', import.meta.url), 'utf8')
 const autosaveSource = await readFile(new URL('../src/shared/autosave.ts', import.meta.url), 'utf8')
-const mcpSources = Object.fromEntries(await Promise.all(['config', 'service', 'document-tools'].map(async name =>
+const mcpSources = Object.fromEntries(await Promise.all(['config', 'service', 'document-tools', 'tool-schema', 'word-tools', 'sheet-tools', 'presentation-tools', 'pdf-tools', 'notes-workflow-tools'].map(async name =>
   [`./mcp/${name}`, await readFile(new URL(`../src/mcp/${name}.ts`, import.meta.url), 'utf8')]
 )))
 const names = 'tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,rustPdfEntries,rustPdfHandles,setRustPdfHandle,rustWordEntries,rustWordHandles,setRustWordHandle,rustSheetEntries,rustSheetHandles,setRustSheetHandle,rustPresentationEntries,rustPresentationHandles,setRustPresentationHandle,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,browserFile,saveActive,closeTab,closeAllTabs,closeWindow,resolveClose,removeTab,removeTabs,task,editorTransaction,nativeTransactionalEditor,appearance,currentDocument,globalActionsBlocked,documentActionsDisabled,globalFileAction,globalNewDocument,keydown,rustEditorFileAction,previewSlides'
@@ -149,6 +149,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     },
   }
   function mcpModule(name) {
+    name = name.replace(/\.ts$/, '')
     if (modules.has(name)) return modules.get(name)
     const source = mcpSources[name]
     if (!source) throw Error(`Unexpected MCP module import ${name}`)
@@ -173,10 +174,10 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     if (name === './mcp/native') return mcpNative
     if (name === './mcp/native-smoke') return { async runMcpNativeSmoke(adapter) {
       calls.push(['mcp-native-smoke'])
-      for (const method of ['openWord', 'start', 'state', 'stop', 'close']) assert.equal(typeof adapter[method], 'function')
+      for (const method of ['open', 'start', 'documentState', 'state', 'stop', 'close']) assert.equal(typeof adapter[method], 'function')
       if (mcpSmokeError) throw Error(mcpSmokeError)
       if (mcpSmokeRun) return mcpSmokeRun(adapter)
-      return mcpSmokeReport ?? { schemaVersion: 1, kind: 'mcp-native', ok: true }
+      return mcpSmokeReport ?? { schemaVersion: 2, kind: 'mcp-native', ok: true }
     } }
     if (name.startsWith('./mcp/')) return mcpModule(name)
     if (name === './smoke') return {smokeRequested:()=>smoke,smokeStage(){},smokeFeatures:()=>({}),smokeFailure:async(error,phase)=>{calls.push(['smoke-failure',phase,String(error)])},smokeAwait:async(_phase,action)=>action()}

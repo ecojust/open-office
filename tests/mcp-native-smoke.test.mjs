@@ -12,6 +12,7 @@ test('native MCP acceptance requires HTTP, real document changes, independent DO
   assert.deepEqual(validateNativeMcpReport(mcpReport()), {
     mcpNativeHttp: true, mcpNativeDocumentTools: true, mcpNativeDocxExport: true,
     mcpNativeSwitchStop: true, mcpNativeSessionCleanup: true,
+    mcpNativeSevenEditorEditing: true, mcpNativeWordFormatHistory: true, mcpNativeSevenEditorExports: true,
   });
 });
 
@@ -94,6 +95,54 @@ test('MCP publication requires a visible Running state and closes the actual old
   ]) {
     const report = mcpReport(); mutate(report);
     assert.throws(() => validateNativeMcpReport(report), /Native MCP/);
+  }
+});
+
+test('MCP publication requires all seven new editing interfaces and matching actual editor revisions', () => {
+  for (const mutate of [
+    r => { r.schemaVersion = 1; }, r => { delete r.editors; }, r => { r.editors.pop(); },
+    r => { r.editors.reverse(); }, r => { r.editors[6] = r.editors[5]; },
+    r => { r.editors[1].key = r.editors[0].key; },
+    r => { r.editors[1].service.sessionId = r.editors[0].service.sessionId; },
+  ]) {
+    const report = mcpReport(); mutate(report);
+    assert.throws(() => validateNativeMcpReport(report), /Native MCP/);
+  }
+  for (let index = 0; index < 7; index++) for (const mutate of [
+    e => { e.edit.tool = 'document_inspect'; }, e => { e.query.tool = 'document_inspect'; },
+    e => { e.edit.probe.sessionId = 'stale'; }, e => { e.query.probe.port++; },
+    e => { e.edit.probe.response.result.isError = true; }, e => { e.query.probe.catalog.result.tools = []; },
+    e => { e.after.revision = e.before.revision; }, e => { e.after.documentId++; },
+    e => { e.after.dirty = false; }, e => { e.shellDirty = false; },
+    e => { e.actual = { text: 'stale document' }; }, e => { e.exported.sha256 = '0'.repeat(64); },
+  ]) {
+    const report = mcpReport(); mutate(report.editors[index]);
+    assert.throws(() => validateNativeMcpReport(report), /Native MCP/);
+  }
+  for (const index of [4, 5, 6]) {
+    const report = mcpReport(); report.editors[index].visibleText = '';
+    assert.throws(() => validateNativeMcpReport(report), /UI did not redraw/);
+  }
+});
+
+test('MCP publication verifies actual Word formatting and undo/redo query history', () => {
+  for (const mutate of [
+    e => { e.actual.format.bold = false; }, e => { e.actual.format.size = 11; },
+    e => { delete e.history; }, e => { e.history.undo.response.result.isError = true; },
+    e => { e.history.undone = e.history.redone; }, e => { e.history.redone = e.history.before; },
+    e => { e.history.redo.response.result.content[0].text = JSON.stringify({ ...e.after, revision: 2 }); },
+  ]) {
+    const report = mcpReport(); mutate(report.editors[0]);
+    assert.throws(() => validateNativeMcpReport(report), /Native MCP/);
+  }
+});
+
+test('MCP publication independently inspects every exported format, even when hashes match', () => {
+  for (let index = 0; index < 7; index++) {
+    const report = mcpReport(), receipt = report.editors[index].exported;
+    const bytes = Buffer.from('not an edited document '.repeat(10));
+    Object.assign(receipt, { base64: bytes.toString('base64'), sizeBytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') });
+    assert.throws(() => validateNativeMcpReport(report), /independent seven-editor/);
   }
 });
 

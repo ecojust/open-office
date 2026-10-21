@@ -138,6 +138,7 @@ jobs:
         run: |
           regression_status=0
           cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p open-office-word-host --lib document_state:: -- --test-threads=1 || regression_status=1
+          cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p open-office-word-host --lib mcp::tests:: -- --test-threads=1 || regression_status=1
           cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p office-word-engine --lib delete_surrounding_ -- --test-threads=1 || regression_status=1
           cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p office-word-ui-egui --lib browser_clipboard_ -- --test-threads=1 || regression_status=1
           cargo test --locked --manifest-path vendor/office-word/Cargo.toml -p office-word-ui-egui --lib input_method_ -- --test-threads=1 || regression_status=1

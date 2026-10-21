@@ -3,6 +3,9 @@
 
 #[cfg(any(target_arch = "wasm32", test))]
 #[cfg_attr(test, allow(dead_code))]
+mod automation;
+#[cfg(any(target_arch = "wasm32", test))]
+#[cfg_attr(test, allow(dead_code))]
 mod document;
 #[cfg(target_arch = "wasm32")]
 mod web;

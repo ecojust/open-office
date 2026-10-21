@@ -266,6 +266,29 @@ export class RustPresentationSession {
       return result.result
     })
   }
+  /** Execute only the host's document-scoped catalog and publish its returned revision. */
+  mcp(action: 'list' | 'describe' | 'query' | 'execute', args: Record<string, unknown>, assertCurrent: () => void): Promise<unknown> {
+    return serialize(async () => {
+      assertCurrent(); this.assertOpen()
+      const api = await getHost()
+      assertCurrent()
+      if (action === 'execute') await this.flushInput(api)
+      assertCurrent()
+      const response = JSON.parse(api.command(this.id, `mcp.${action}`, JSON.stringify(args))) as { ok: boolean; result?: unknown; snapshot?: OfficePresentationSnapshot; error?: string }
+      this.accept(snapshotOf(response.snapshot ? JSON.stringify(response.snapshot) : api.inspect(this.id), this.id))
+      if (!response.ok) throw Error(response.error || '演示文稿 MCP 操作失败。')
+      if (action === 'execute') {
+        // The host's flush receipt is resolved after a real rendered frame, including
+        // slide thumbnails. Input stays blocked by the shell throughout the operation.
+        await api.flush(this.id)
+        assertCurrent(); this.assertOpen()
+        this.accept(snapshotOf(api.inspect(this.id), this.id))
+        return { result: response.result, snapshot: this.snapshot }
+      }
+      assertCurrent()
+      return response.result
+    })
+  }
   export(format: 'pptx' | 'pdf' = 'pptx', options: { background?: boolean } = {}): Promise<{ bytes: Uint8Array; snapshot: OfficePresentationSnapshot }> {
     return serialize(async () => {
       this.assertOpen()

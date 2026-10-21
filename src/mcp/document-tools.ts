@@ -1,21 +1,20 @@
 import type { EditorHandle, Kind } from '../shared/document'
 
-/** Only these bounded operations can cross the MCP bridge. Engine command IDs are never accepted. */
-type Field = { type: 'string' | 'number' | 'integer'; description?: string; maxLength?: number; minLength?: number; minimum?: number; maximum?: number; enum?: string[]; pattern?: string }
-export type McpToolDefinition = {
- name: string; description: string;
- inputSchema: { type: 'object'; properties: Record<string, Field>; required: string[]; additionalProperties: false };
- annotations: { readOnlyHint: boolean; destructiveHint: false; idempotentHint: boolean; openWorldHint: false };
-}
-const text: Field = { type: 'string', maxLength: 20000, minLength: 1 }
-const optionalText: Field = { type: 'string', maxLength: 20000 }
-const index: Field = { type: 'integer', minimum: 0, maximum: 100000 }
-const coordinate: Field = { type: 'number', minimum: 0, maximum: 19000 }
-const size: Field = { type: 'number', minimum: 80, maximum: 1000 }
-const cell: Field = { type: 'string', maxLength: 10, pattern: '^[A-Z]{1,3}[1-9][0-9]{0,6}$' }
-function tool(name: string, description: string, readOnlyHint: boolean, properties: Record<string, Field> = {}, required: string[] = []): McpToolDefinition {
- return { name, description, inputSchema: { type: 'object', properties, required, additionalProperties: false }, annotations: { readOnlyHint, destructiveHint: false, idempotentHint: readOnlyHint, openWorldHint: false } }
-}
+import { tool, validateToolArguments, type McpSchema } from './tool-schema.ts'
+export type { McpToolDefinition } from './tool-schema.ts'
+import type { McpToolDefinition } from './tool-schema.ts'
+import { wordEditingTools } from './word-tools.ts'
+import { sheetEditingTools } from './sheet-tools.ts'
+import { presentationEditingTools } from './presentation-tools.ts'
+import { pdfEditingTools } from './pdf-tools.ts'
+import { noteEditingTools, canvasEditingTools, diagramEditingTools } from './notes-workflow-tools.ts'
+
+const text: McpSchema = { type: 'string', maxLength: 20000, minLength: 1 }
+const optionalText: McpSchema = { type: 'string', maxLength: 20000 }
+const index: McpSchema = { type: 'integer', minimum: 0, maximum: 100000 }
+const coordinate: McpSchema = { type: 'number', minimum: 0, maximum: 19000 }
+const size: McpSchema = { type: 'number', minimum: 80, maximum: 1000 }
+const cell: McpSchema = { type: 'string', maxLength: 10, pattern: '^[A-Z]{1,3}[1-9][0-9]{0,6}$' }
 const common = [
  tool('document_inspect', '读取当前文档状态、修订号以及撤销和重做状态。', true),
  tool('document_undo', '撤销当前文档最后一次编辑；不会删除文件或关闭文档。', false),
@@ -33,6 +32,11 @@ const catalogs: Record<Kind, McpToolDefinition[]> = {
  canvas: [tool('canvas_read', '读取当前画布的元素、坐标和样式，图片不返回二进制数据。', true), tool('canvas_add_shape', '向画布添加一个图形或纯文本对象，可撤销。', false, { shape: { type: 'string', enum: ['rectangle', 'ellipse', 'diamond', 'text'] }, text: optionalText, x: coordinate, y: coordinate, width: size, height: { type: 'number', minimum: 20, maximum: 1000 } })],
  diagram: [tool('diagram_read_source', '读取代码图表源码。', true), tool('diagram_set_source', '更新当前代码图表源码，立即更新预览，可撤销；不能访问文件或网络。', false, { source: { ...text, maxLength: 50000 } }, ['source'])],
 }
+const editingTools: Record<Kind, McpToolDefinition[]> = {
+ word: wordEditingTools, sheet: sheetEditingTools, presentation: presentationEditingTools,
+ pdf: pdfEditingTools, note: noteEditingTools, canvas: canvasEditingTools, diagram: diagramEditingTools,
+}
+for (const kind of Object.keys(catalogs) as Kind[]) catalogs[kind].push(...editingTools[kind])
 export function catalogForKind(kind: Kind): McpToolDefinition[] {
  return structuredClone([...common, ...catalogs[kind]])
 }
@@ -45,17 +49,7 @@ function cellPosition(address: string): [number, number] {
  return [column, line]
 }
 function validate(definition: McpToolDefinition, raw: unknown): Record<string, unknown> {
- const value = raw ?? {}
- if (typeof value !== 'object' || Array.isArray(value)) throw Error('MCP 参数必须为 JSON 对象。')
- const args = value as Record<string, unknown>, schema = definition.inputSchema
- for (const name of schema.required) if (!Object.hasOwn(args, name)) throw Error(`缺少 MCP 参数：${name}。`)
- for (const [name, value] of Object.entries(args)) {
-  if (!Object.hasOwn(schema.properties, name)) throw Error(`不支持的 MCP 参数：${name}。`)
-  const field = schema.properties[name]!
-  if (field.type === 'string') {
-   if (typeof value !== 'string' || (field.maxLength !== undefined && value.length > field.maxLength) || (field.minLength !== undefined && value.length < field.minLength) || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value) || (field.enum && !field.enum.includes(value)) || (field.pattern && !new RegExp(field.pattern).test(value))) throw Error(`MCP 参数 ${name} 的文字格式或长度无效。`)
-  } else if (typeof value !== 'number' || !Number.isFinite(value) || (field.type === 'integer' && !Number.isInteger(value)) || (field.minimum !== undefined && value < field.minimum) || (field.maximum !== undefined && value > field.maximum)) throw Error(`MCP 参数 ${name} 的数值无效。`)
- }
+ const args = validateToolArguments(definition.inputSchema, raw)
  if (definition.name === 'sheet_read_range') {
   const range = String(args.range).split(':'), [x1, y1] = cellPosition(range[0]!), [x2, y2] = cellPosition(range[1] ?? range[0]!)
   if (x2 < x1 || y2 < y1 || (x2 - x1 + 1) * (y2 - y1 + 1) > 1000) throw Error('每次读取最多 1000 个单元格，请缩小范围。')
@@ -63,15 +57,17 @@ function validate(definition: McpToolDefinition, raw: unknown): Record<string, u
  if (definition.name === 'sheet_set_cell') cellPosition(String(args.cell))
  return { ...args }
 }
-/** Avoid binary image payloads and unbounded text/arrays in engine inspection output. */
+/** Remove binary/local-file payloads without silently corrupting editable structures or schemas.
+ * Individual readers expose pagination; oversized results fail rather than look complete. */
 export function summarizeMcpValue(value: unknown, depth = 0): unknown {
- if (depth > 12) return '[嵌套内容已省略]'
- if (typeof value === 'string') return value.length > 100000 ? value.slice(0, 100000) + '\n[后续文字已省略]' : value
- if (Array.isArray(value)) return value.slice(0, 1000).map(item => summarizeMcpValue(item, depth + 1))
+ if (depth > 32) throw Error('文档结构过深，请读取较小范围。')
+ if (Array.isArray(value)) return value.map(item => summarizeMcpValue(item, depth + 1))
  if (value && typeof value === 'object') {
   const result: Record<string, unknown> = {}
   for (const [key, item] of Object.entries(value)) {
-   if (['dataUrl', 'imageData', 'base64', 'data', 'path', 'importSource', 'ui'].includes(key)) continue
+   if (['dataUrl', 'imageData', 'base64', 'importSource', 'ui'].includes(key)) continue
+   if (key === 'path' && typeof item === 'string' && /^(?:\/|[A-Za-z]:[\\/]|file:)/.test(item)) continue
+   if (key === 'data' && typeof item === 'string' && (/^data:/.test(item) || item.length > 100000)) continue
    result[key] = summarizeMcpValue(item, depth + 1)
   }
   return result
@@ -87,6 +83,6 @@ export async function executeDocumentTool(kind: Kind, handle: EditorHandle, name
  const result = await handle.mcpExecute(name, validated, assertCurrent)
  assertCurrent()
  const summary = summarizeMcpValue(result ?? null)
- if (JSON.stringify(summary).length > 1024 * 1024) throw Error('文档内容过多，请读取较小范围。')
+ if (new TextEncoder().encode(JSON.stringify(summary)).length > 7 * 1024 * 1024) throw Error('文档内容过多，请读取较小范围。')
  return summary
 }

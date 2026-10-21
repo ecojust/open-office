@@ -196,19 +196,41 @@ export class RustWordSession {
     })
   }
   command(commandId: string, params: Record<string, unknown> = {}, expected?: Pick<OfficeWordSnapshot, 'documentId' | 'revision' | 'selection'>, assertCurrent?: () => void): Promise<OfficeWordSnapshot> {
+    return this.execute(commandId, params, expected, assertCurrent).then(value => value.snapshot)
+  }
+  private execute(commandId: string, params: Record<string, unknown>, expected?: Pick<OfficeWordSnapshot, 'documentId' | 'revision' | 'selection'>, assertCurrent?: () => void, readOnly = false): Promise<{ result: unknown; snapshot: OfficeWordSnapshot }> {
     return serialize(async () => {
       assertCurrent?.()
       this.assertOpen()
       const api = await getHost()
       assertCurrent?.()
-      await this.flushInput(api)
+      if (!readOnly) await this.flushInput(api)
       if (expected && (expected.documentId !== this.snapshot.documentId || expected.revision !== this.snapshot.revision || JSON.stringify(expected.selection) !== JSON.stringify(this.snapshot.selection))) throw Error('选择文件期间文稿或选区已有变化，请重新选择插入位置。')
       assertCurrent?.()
-      const result = JSON.parse(api.command(this.id, commandId, JSON.stringify(params))) as { ok: boolean; snapshot?: OfficeWordSnapshot; error?: string }
-      if (!result.ok) throw Error(result.error || '文稿操作失败。')
+      const result = JSON.parse(api.command(this.id, commandId, JSON.stringify(params))) as { ok: boolean; result?: unknown; snapshot?: OfficeWordSnapshot; error?: string }
+      // Even a rejected engine command can supply a fresh selection/state receipt.
       this.accept(snapshotOf(result.snapshot ? JSON.stringify(result.snapshot) : api.inspect(this.id), this.id))
-      return this.snapshot
+      if (!result.ok) throw Error(result.error || '文稿操作失败。')
+      if (commandId === 'host.mcp.execute') {
+        // The host requests a repaint even while MCP temporarily blocks keyboard/pointer
+        // input. Wait for that frame so callers see new content, layout and ribbon state.
+        await api.flush(this.id)
+        assertCurrent?.()
+        this.assertOpen()
+        this.accept(snapshotOf(api.inspect(this.id), this.id))
+      }
+      assertCurrent?.()
+      return { result: result.result, snapshot: this.snapshot }
     })
+  }
+  async mcpCommands(params: Record<string, unknown>, assertCurrent: () => void): Promise<unknown> {
+    return (await this.execute('host.mcp.commands', params, undefined, assertCurrent, true)).result
+  }
+  async mcpQuery(command: string, params: Record<string, unknown>, assertCurrent: () => void): Promise<unknown> {
+    return (await this.execute('host.mcp.query', { command, params }, undefined, assertCurrent, true)).result
+  }
+  mcpCommand(command: string, params: Record<string, unknown>, assertCurrent: () => void): Promise<{ result: unknown; snapshot: OfficeWordSnapshot }> {
+    return this.execute('host.mcp.execute', { command, params }, undefined, assertCurrent)
   }
   export(format: 'docx' | 'pdf' = 'docx', options: { background?: boolean } = {}): Promise<{ bytes: Uint8Array; snapshot: OfficeWordSnapshot }> {
     return serialize(async () => {

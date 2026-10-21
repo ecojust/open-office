@@ -19,8 +19,8 @@ test('each editor advertises only bounded local tools, with read-only discovery 
   for (const tool of catalog) {
    assert.equal(tool.inputSchema.additionalProperties,false)
    assert.equal(tool.annotations.openWorldHint,false)
-   assert.equal(tool.annotations.destructiveHint,false)
-   assert.doesNotMatch(tool.name,/delete|file|execute|command|script|url/)
+   assert.equal(typeof tool.annotations.destructiveHint,'boolean')
+   assert.doesNotMatch(tool.name,/file_open|file_save|shell|eval|javascript|fetch_url/)
   }
   catalog[0].name = 'tampered'
   assert.equal(catalogForKind(kind)[0].name,'document_inspect')
@@ -46,6 +46,22 @@ test('sheet rectangle reads and cell writes stay within supported spreadsheet di
  await assert.rejects(executeDocumentTool('sheet',h.handle,'sheet_set_cell',{cell:'ZZZ1',input:'x'},h.guard))
  assert.equal(h.calls.length,2)
 })
+test('complete editing entrypoints are discoverable and nested invalid edits never reach the engine', async () => {
+ const h = harness()
+ for (const kind of ['word', 'sheet', 'presentation', 'pdf']) {
+  assert.ok(catalogForKind(kind).some(tool => tool.name === `${kind}_list_commands` && tool.annotations.readOnlyHint))
+  assert.ok(catalogForKind(kind).some(tool => tool.name === `${kind}_execute_command` && !tool.annotations.readOnlyHint))
+  await assert.rejects(executeDocumentTool(kind, h.handle, `${kind}_execute_command`, { command:'format.bold', params:JSON.parse('{"deep":{"__proto__":{"polluted":true}}}') },h.guard))
+ }
+ for (const [kind,name,args] of [
+  ['note','note_edit',{operations:[{op:'page.delete',pageId:'p',unexpected:true}]}],
+  ['canvas','canvas_edit',{operations:[{op:'update',id:'shape',patch:{style:{opacity:2}}}]}],
+  ['diagram','diagram_update',{style:'not-a-style'}],
+ ]) await assert.rejects(executeDocumentTool(kind,h.handle,name,args,h.guard))
+ assert.equal(h.calls.length,0)
+ await executeDocumentTool('word', h.handle, 'word_execute_command', {command:'format.set',params:{props:{bold:true,size:18}}},h.guard)
+ assert.deepEqual(h.calls[0].args,{command:'format.set',params:{props:{bold:true,size:18}}})
+})
 test('scope is checked before dispatch and after async work, and missing handles never pretend success', async () => {
  const h=harness();h.stop()
  await assert.rejects(executeDocumentTool('word',h.handle,'document_inspect',{},h.guard),/stopped/)
@@ -55,13 +71,14 @@ test('scope is checked before dispatch and after async work, and missing handles
  active.handle.mcpExecute=async()=>{active.stop();return {text:'must not leak after scope change'}}
  await assert.rejects(executeDocumentTool('word',active.handle,'word_read',{},active.guard),/stopped/)
 })
-test('inspection removes binary images and local paths, bounds output and preserves literal plain text', async () => {
+test('inspection removes binary images and local paths, rejects oversized output and preserves editable structures', async () => {
  const value=summarizeMcpValue({path:'/private/file',base64:'AAAA',ui:{dialog:'secret'},regions:[{text:'<img onerror=alert(1)>',dataUrl:'data:image/png;base64,AAA',imageData:'BBB',content:'a'.repeat(100001)}]})
  assert.deepEqual(Object.keys(value),['regions'])
  assert.equal(value.regions[0].text,'<img onerror=alert(1)>')
  assert.equal('dataUrl' in value.regions[0],false)
- assert.ok(value.regions[0].content.length<100100)
- assert.equal(summarizeMcpValue(Array.from({length:2000},(_,index)=>index)).length,1000)
- const h=harness();h.handle.mcpExecute=async()=>({texts:Array(20).fill('x'.repeat(100000))})
+ assert.equal(value.regions[0].content.length,100001)
+ assert.equal(summarizeMcpValue(Array.from({length:2000},(_,index)=>index)).length,2000)
+ assert.deepEqual(summarizeMcpValue({ data: [[1, 2]], path: 'M 0 0 L 10 20', properties: { data: { type: 'string' }, path: { type: 'string' } } }), { data: [[1, 2]], path: 'M 0 0 L 10 20', properties: { data: { type: 'string' }, path: { type: 'string' } } })
+ const h=harness();h.handle.mcpExecute=async()=>({texts:Array(80).fill('x'.repeat(100000))})
  await assert.rejects(executeDocumentTool('pdf',h.handle,'pdf_read',{},h.guard),/内容过多/)
 })

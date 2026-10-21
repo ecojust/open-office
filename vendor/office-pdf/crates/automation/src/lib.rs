@@ -19,6 +19,7 @@ mod batch;
 mod comments;
 mod content;
 mod conventions;
+mod embedded;
 pub mod file_access;
 mod forms;
 mod links;
@@ -41,6 +42,7 @@ use office_pdf_platform::staging::{StagingName, staging_suffixes};
 use office_pdf_render::{PageRenderer, PageText, RenderConfig, RenderRequest, RequestKind};
 use serde_json::{Value, json};
 
+pub use embedded::{embedded_tools, valid_asset_name};
 pub use office_pdf_render::Pixels;
 pub use tools::{ToolDef, tools};
 
@@ -118,6 +120,8 @@ pub struct Automation {
     renderers: HashMap<DocId, (Arc<Vec<u8>>, PageRenderer)>,
     /// Extracted page text, under one memory budget across all open documents.
     texts: TextCache,
+    /// Embedded document tools only read explicitly supplied in-memory attachments.
+    embedded_assets: Option<HashMap<String, Vec<u8>>>,
 }
 
 impl Default for Automation {
@@ -128,7 +132,7 @@ impl Default for Automation {
 
 impl Automation {
     pub fn new() -> Self {
-        Self { session: Session::new(), root: None, roots: None, renderers: HashMap::new(), texts: TextCache::default() }
+        Self { session: Session::new(), root: None, roots: None, renderers: HashMap::new(), texts: TextCache::default(), embedded_assets: None }
     }
 
     /// Confine every path the tools read or write to `root` (relative paths resolve inside it).
@@ -362,8 +366,8 @@ impl Automation {
             "doc_protect" => self.doc_protect(&a)?,
             "page_replace" => {
                 let pages = self.pages(&a, "pages")?;
-                let path = self.resolve(a.str("path")?, false)?;
-                let bytes = Arc::new(std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?);
+                let (path, bytes) = self.input_bytes(a.str("path")?)?;
+                let bytes = Arc::new(bytes);
                 let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
                 let src_pages = match a.opt_ints("from_pages")? {
                     Some(p) => one_based(&p)?,
@@ -505,8 +509,7 @@ impl Automation {
                         "flip_vertical" => ImageEdit::Flip { horizontal: false },
                         "delete" => ImageEdit::Delete,
                         "replace" => {
-                            let path = self.resolve(a.str("path")?, false)?;
-                            let bytes = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+                            let (path, bytes) = self.input_bytes(a.str("path")?)?;
                             ImageEdit::Replace {
                                 name: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
                                 bytes: Arc::new(bytes),
@@ -712,8 +715,7 @@ impl Automation {
             "form_fields" => self.form_fields(&a)?,
             "form_fill" => self.form_fill(&a)?,
             "form_set_image" => {
-                let path = self.resolve(a.str("path")?, false)?;
-                let bytes = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+                let (_, bytes) = self.input_bytes(a.str("path")?)?;
                 self.apply(&a, Edit::SetFieldImage { name: a.str("field")?.to_owned(), image: Arc::new(bytes) })?
             }
             "form_reset" => self.form_reset(&a)?,
@@ -1150,8 +1152,7 @@ impl Automation {
     /// A watermark or background picture: `file` (an image or a PDF) and `file_page` (1-based).
     fn mark_file(&self, a: &Args) -> Result<Option<office_pdf_engine::MarkFile>> {
         let Some(p) = a.opt_str("file")? else { return Ok(None) };
-        let path = self.resolve(p, false)?;
-        let bytes = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+        let (path, bytes) = self.input_bytes(p)?;
         let page = a.opt_int("file_page")?.unwrap_or(1).max(1) as usize - 1;
         Ok(Some(office_pdf_engine::MarkFile {
             name: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
@@ -1505,8 +1506,7 @@ impl Automation {
 
     fn insert_file(&mut self, a: &Args) -> Result<Value> {
         let at = self.position(a, "at")?;
-        let path = self.resolve(a.str("path")?, false)?;
-        let bytes = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+        let (path, bytes) = self.input_bytes(a.str("path")?)?;
         let pages = a.opt_ints("pages")?.map(|p| one_based(&p)).transpose()?;
         let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         self.apply(a, Edit::InsertPagesFrom { name, bytes: Arc::new(bytes), pages, at, field_conflicts: office_pdf_organize::FieldConflicts::Rename })
@@ -2068,6 +2068,9 @@ impl Automation {
     /// is only read may still be missing (a path checked up front, whose absence is reported per
     /// file later). The automation roots, if any, get the last word.
     fn resolve_for(&self, path: &str, access: file_access::Access, may_be_missing: bool) -> Result<PathBuf> {
+        if self.embedded_assets.is_some() {
+            return Err(failed("The document editor cannot read or write external paths; supply an inline asset."));
+        }
         let target = self.resolve_in_root(path, may_be_missing)?;
         self.check_roots(path, &target, access)?;
         Ok(target)

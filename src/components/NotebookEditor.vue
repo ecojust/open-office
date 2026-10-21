@@ -9,6 +9,7 @@ import { base64ToBytes, bytesToBase64, type EditorExport, type Extension } from 
 import { printHtml, type PrintOutcome } from '../shared/printing'
 import { blankPage, blankRegion, descendantPageIds, noteId, noteTitle, pageHierarchy, pageText, NOTE_MAX_PAGE_DEPTH, type Notebook, type NoteRegion } from '../notes/model'
 import { NotebookSession } from '../notes/session'
+import { editNotebook, findNotePage, type NoteEditOperation } from '../notes/mcp'
 import { renderBlocks } from '../notes/dom'
 import { noteSearchMatches, searchSegments } from '../notes/search'
 
@@ -258,7 +259,33 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
  if (!session || loading.value) throw Error('请等待笔记打开。')
  if (name === 'document_inspect') return inspect()
  if (name === 'note_read') return { ...session.model, currentSectionId: currentSection.value, currentPageId: currentPage.value }
+ if (name === 'note_read_page') {
+  const target = findNotePage(session.model, String(args.pageId ?? currentPage.value)), offset = Number(args.offset ?? 0), limit = Number(args.limit ?? 50)
+  return { sectionId: target.section.id, pageId: target.page.id, title: target.page.title, parentId: target.page.parentId, totalRegions: target.page.regions.length, offset, regions: target.page.regions.slice(offset, offset + limit) }
+ }
  await prepareDeactivate(); guard()
+ if (name === 'note_select_page') {
+  const target = findNotePage(session.model, String(args.pageId))
+  currentSection.value = target.section.id; currentPage.value = target.page.id; navigation.value = false
+  closePageMenu(); await nextTick(); guard(); render()
+  return { ...await inspect(), currentSectionId: currentSection.value, currentPageId: currentPage.value }
+ }
+ if (name === 'note_edit') {
+  let result: ReturnType<typeof editNotebook> | undefined
+  // Validate the requested visible page inside the same transaction so a bad
+  // selection cannot report failure after committing otherwise valid changes.
+  change(copy => {
+   result = editNotebook(copy, args.operations as NoteEditOperation[])
+   if (args.selectPageId !== undefined) findNotePage(copy, String(args.selectPageId))
+  })
+  const selectedId = (args.selectPageId as string | undefined) ?? result?.pageId
+  if (selectedId && session.model.sections.some(section => section.pages.some(page => page.id === selectedId))) {
+   const target = findNotePage(session.model, selectedId); currentSection.value = target.section.id; currentPage.value = target.page.id
+  }
+  refreshSelection(); titleDraft.value = undefined; navigation.value = false; closePageMenu()
+  await nextTick(); guard(); render(); await nextTick(); guard()
+  return { ...await inspect(), created: result?.created, currentSectionId: currentSection.value, currentPageId: currentPage.value }
+ }
  if (name === 'document_undo' || name === 'document_redo') {
   if (name === 'document_undo') session.undo(); else session.redo()
   accept(); refreshSelection(); await nextTick(); guard(); render()

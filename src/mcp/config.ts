@@ -14,7 +14,7 @@ export function createMcpToken(): string {
 }
 
 export function createDefaultMcpConfig(): McpConfig {
-  return { port: MCP_DEFAULT_PORT, token: createMcpToken(), allowEdits: false }
+  return { port: MCP_DEFAULT_PORT, token: createMcpToken(), allowEdits: true }
 }
 
 /** Reject malformed persisted values instead of silently opening a different port. */

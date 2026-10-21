@@ -249,8 +249,15 @@ const mcpService = createMcpService({
       if (mutating && document.activeElement instanceof HTMLElement) document.activeElement.blur()
       await nextTick()
       assertCurrent()
-      return await executeDocumentTool(tab.document.kind, handle, request.toolName, request.arguments, assertCurrent)
-    } finally { mcpWorking.value = false; mcpMutating.value = false }
+      const result = await executeDocumentTool(tab.document.kind, handle, request.toolName, request.arguments, assertCurrent)
+      assertCurrent()
+      if (mutating) status.value = 'MCP 操作已应用到当前文档'
+      return result
+    } finally {
+      mcpWorking.value = false; mcpMutating.value = false
+      // Resume editor input and flush the dirty/status UI before replying to the client.
+      await nextTick()
+    }
   },
 })
 let mcpSettingsLoading:Promise<void>|undefined
@@ -1203,30 +1210,41 @@ onMounted(async()=>{
           const {runMcpNativeSmoke}=await import('./mcp/native-smoke')
           const savedMcpConfig=mcpConfig.value
           const mcp=await runMcpNativeSmoke({
-            openWord:async source=>{
+            open:async source=>{
               const tab=await editorTransaction('正在验证本机 MCP',()=>addDocument(source))
               if(!tab)throw Error('Native MCP smoke tab missing')
               await nextTick();await awaitReady(tab)
-              const editor=rustWordHandles.get(tab.key) as OfficeWordSmokeEditor|undefined
-              if(!editor?.inspect||!editor.command)throw Error('Native MCP Word editor unavailable')
-              return {key:tab.key,editor}
+              const handle=handleFor(tab) as (EditorHandle & {inspect():Promise<{documentId:number;revision:number;dirty:boolean;[key:string]:unknown}>;query?(id:string,params?:Record<string,unknown>):Promise<unknown>;inspectModel?():Promise<unknown>})|undefined
+              if(!handle?.inspect||!handle.exportFile)throw Error('Native MCP editor unavailable')
+              return {key:tab.key,editor:handle,read:async()=>{
+                if(source.kind==='sheet')return handle.query!('cell.get',{cell:'A1'})
+                if(source.kind==='presentation')return handle.query!('slide.inspect',{index:0})
+                if(source.kind==='pdf')return handle.query!('document.inspect')
+                if(source.kind==='canvas'||source.kind==='diagram')return handle.inspectModel!()
+                if(source.kind==='note')return {visibleText:[...document.querySelectorAll('[data-testid="notebook-content"]')].map(element=>element.textContent||'').join('\n')}
+                return handle.inspect()
+              }}
             },
             start:async key=>{
               const tab=currentDocument.value
-              if(!tab||tab.key!==key||tab.document.kind!=='word')throw Error('Native MCP target is not active')
+              if(!tab||tab.key!==key)throw Error('Native MCP target is not active')
               // Ephemeral smoke permissions never overwrite the user's saved settings.
               mcpConfig.value={...createDefaultMcpConfig(),allowEdits:true}
               await mcpService.start(mcpConfig.value,{id:tab.key,kind:tab.document.kind,title:tab.document.name},catalogForKind(tab.document.kind))
               await nextTick()
             },
+            documentState:key=>({active:activeKey.value===key&&!home.value,dirty:tabs.value.find(tab=>tab.key===key)?.dirty===true}),
             state:()=>mcpService.inspect(),
             stop:async()=>{try{await mcpService.stop()}finally{mcpConfig.value=savedMcpConfig;await nextTick()}},
             close:async key=>{
               const tab=tabs.value.find(item=>item.key===key)
               if(!tab)throw Error('Native MCP cleanup tab missing')
-              const sessionId=(await (rustWordHandles.get(key) as OfficeWordSmokeEditor|undefined)?.inspect())?.sessionId
+              const handle=handleFor(tab)
+              const sessionId=(await handle?.inspect?.() as {sessionId?:string}|undefined)?.sessionId
               await removeTab(tab,true);await nextTick()
-              if(sessionId){let closed=false;try{await inspectOfficeWordSession(sessionId)}catch{closed=true};if(!closed)throw Error('Native MCP Word session survived cleanup')}
+              if(handleFor(tab)||tabs.value.some(item=>item.key===key))throw Error('Native MCP editor survived cleanup')
+              const inspector=tab.document.kind==='word'?inspectOfficeWordSession:tab.document.kind==='sheet'?inspectOfficeSheetSession:tab.document.kind==='presentation'?inspectOfficePresentationSession:tab.document.kind==='pdf'?inspectOfficePdfSession:undefined
+              if(sessionId&&inspector){let closed=false;try{await inspector(sessionId)}catch{closed=true};if(!closed)throw Error('Native MCP Rust session survived cleanup')}
             },
           })
           report.mcp=mcp
@@ -1360,7 +1378,8 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       </div>
       <div v-if="currentDocument" class="document-mcp-bar" role="toolbar" :aria-label="kindNames[currentDocument.document.kind]+' MCP 服务'">
         <span class="document-mcp-kind"><Icon :name="icons[currentDocument.document.kind]" :size="14"/>{{kindNames[currentDocument.document.kind]}}<small>当前文档</small></span>
-        <span v-if="mcpState.phase==='running'" class="document-mcp-detail">{{mcpConfig.allowEdits?'可读取和编辑':'只读'}} · 切换文档后关闭</span>
+        <span v-if="mcpState.phase==='running'" class="document-mcp-detail" role="status">{{mcpWorking?'正在处理…':'修改实时显示 · 切换文档后关闭'}}</span>
+        <button v-if="mcpConfigReady" class="document-mcp-permission" data-testid="document-mcp-permission" :disabled="globalActionsBlocked" aria-label="MCP 读写权限设置" :title="mcpConfig.allowEdits?'已开放当前文档编辑，点击调整权限':'当前仅提供读取工具；点击设置中开启编辑权限'" @click="openMcpSettings">{{mcpConfig.allowEdits?'允许编辑':'只读'}}<Icon name="chevron-down" :size="12"/></button>
         <button data-testid="document-mcp-toggle" class="document-mcp-toggle" :class="{running:mcpState.phase==='running'}" :aria-pressed="mcpState.phase==='running'" :aria-label="mcpState.phase==='running'?'停止当前文档 MCP 服务':'开启当前文档 MCP 服务'" :disabled="mcpState.phase==='stopping'||documentActionsDisabled" :title="!native.isTauri()?'请在桌面版开启本机 MCP 服务':mcpState.error||mcpState.endpoint||'根据全局设置开启当前文档的 MCP 服务；切换文档后自动关闭'" @click="toggleMcp">
           <i v-if="mcpState.phase==='running'" class="mcp-running-dot"/><Icon v-else name="link" :size="15"/>
           <span>MCP</span><strong v-if="mcpState.phase==='running'">Running</strong><span v-else-if="mcpState.phase==='starting'">启动中…</span><span v-else-if="mcpState.phase==='stopping'">停止中…</span><span v-else-if="mcpState.phase==='error'">重试</span>

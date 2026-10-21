@@ -240,6 +240,26 @@ export class RustPdfSession {
       return this.snapshot
     })
   }
+  executeMcp(commandId: string, params: Record<string, unknown>, assertCurrent: () => void): Promise<unknown> {
+    return serialize(async () => {
+      assertCurrent(); this.assertOpen()
+      const api = await getHost()
+      assertCurrent()
+      if (commandId === 'mcp.execute') await this.flushInput(api)
+      assertCurrent()
+      const response = JSON.parse(api.command(this.id, commandId, JSON.stringify(params))) as { ok: boolean; result?: unknown; snapshot?: OfficePdfSnapshot; error?: string }
+      this.accept(snapshotOf(response.snapshot ? JSON.stringify(response.snapshot) : api.inspect(this.id), this.id))
+      if (!response.ok) throw Error(response.error || 'PDF 文档操作失败。')
+      // The Rust host invalidates changed rasters and requests repaint; Vue must also
+      // receive its revision before the MCP caller can issue the next operation.
+      await new Promise<void>(resolve => {
+        const timer = setTimeout(resolve, 100)
+        requestAnimationFrame(() => { clearTimeout(timer); resolve() })
+      })
+      assertCurrent()
+      return { result: response.result, snapshot: this.snapshot }
+    })
+  }
   setAuthor(value: string): Promise<boolean> {
     const author = normalizePdfAuthor(value)
     return serialize(async () => {
@@ -253,7 +273,7 @@ export class RustPdfSession {
     })
   }
   query(commandId: string, params: Record<string, unknown> = {}): Promise<unknown> {
-    if (!['document.inspect', 'ui.state', 'ui.inspect', 'ui.commands'].includes(commandId)) return Promise.reject(Error('此查询不在只读检查范围内。'))
+    if (!['document.inspect', 'ui.state', 'ui.inspect', 'ui.commands', 'mcp.commands'].includes(commandId)) return Promise.reject(Error('此查询不在只读检查范围内。'))
     return serialize(async () => {
       this.assertOpen()
       const api = await getHost()

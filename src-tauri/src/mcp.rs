@@ -18,8 +18,10 @@ use std::{
 };
 
 const MAX_HEADER: usize = 16 * 1024;
-const MAX_BODY: usize = 1024 * 1024;
-const MAX_RESULT: usize = 8 * 1024 * 1024;
+// Embedded image assets and structured range/shape edits share this bounded body.
+const MAX_BODY: usize = 8 * 1024 * 1024;
+// A 7 MiB structured result is JSON-encoded again in MCP content[].text.
+const MAX_RESULT: usize = 16 * 1024 * 1024;
 const MAX_CONNECTIONS: usize = 16;
 const MAX_PENDING: usize = 8;
 const MAX_CLIENTS: usize = 64;
@@ -162,7 +164,7 @@ impl McpService {
                 let config = McpConfig {
                     port: 19780,
                     token: random_id()?,
-                    allow_edits: false,
+                    allow_edits: true,
                 };
                 persist_config(&config_path, &config)?;
                 Ok(config)
@@ -1009,7 +1011,7 @@ mod tests {
         let (directory, service) = service();
         let initial = service.get_config().unwrap();
         assert_eq!(initial.token.len(), 64);
-        assert!(!initial.allow_edits);
+        assert!(initial.allow_edits);
         let custom = config();
         service.save_config(custom.clone()).unwrap();
         let restored = McpService::new(directory.path().join("mcp.json"))
@@ -1018,6 +1020,7 @@ mod tests {
             .unwrap();
         assert_eq!(restored.token, custom.token);
         assert_eq!(restored.port, custom.port);
+        assert!(!restored.allow_edits, "an explicitly saved read-only preference is retained");
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -1203,6 +1206,34 @@ mod tests {
         assert!(service
             .complete(&session, &event.request_id, result)
             .is_err());
+    }
+
+    #[test]
+    fn inline_edit_assets_cross_http_and_oversized_bodies_are_rejected() {
+        let (_, service) = service();
+        let mut config = config();
+        config.allow_edits = true;
+        let (sender, events) = mpsc::channel();
+        let catalog = vec![json!({"name":"document_edit", "inputSchema":{"type":"object"}, "annotations":{"readOnlyHint":false}})];
+        let status = service.start(config.clone(), document("a"), catalog,
+            Arc::new(move |event| sender.send(event).map_err(|_| "closed".into()))).unwrap();
+        let client_config = config.clone();
+        let client = thread::spawn(move || rpc(&client_config,
+            json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"document_edit","arguments":{"assets":{"picture.png":"A".repeat(2 * 1024 * 1024)}}}})));
+        let event = events.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert_eq!(event.arguments["assets"]["picture.png"].as_str().unwrap().len(), 2 * 1024 * 1024);
+        let session = status.session_id.unwrap();
+        assert!(service.claim(&session, &event.request_id).unwrap());
+        service.complete(&session, &event.request_id, json!({"content":[{"type":"text","text":"updated"}]})).unwrap();
+        assert_eq!(client.join().unwrap()["result"]["content"][0]["text"], "updated");
+
+        let mut stream = TcpStream::connect(("127.0.0.1", config.port)).unwrap();
+        stream.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+        write!(stream, "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nAuthorization: Bearer {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n", config.port, config.token, MAX_BODY + 1).unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 413 "), "{response}");
+        assert!(events.try_recv().is_err());
     }
 
     #[test]

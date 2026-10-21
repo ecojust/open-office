@@ -303,6 +303,9 @@ impl OfficeSheetHost {
             let entry = state.entry_mut(id)?;
             entry.sync().map_err(js_error)?;
             let result = match command_id {
+                "host.mcpCommands" => crate::automation::list(&entry.app.session, &params),
+                "host.mcpExecute" => crate::automation::execute(entry, &params, false),
+                "host.mcpQuery" => crate::automation::execute(entry, &params, true),
                 "host.cancelPicture" => {
                     if let Some(picture) = picture {
                         picture.try_borrow_mut().map_err(js_error)?.take();

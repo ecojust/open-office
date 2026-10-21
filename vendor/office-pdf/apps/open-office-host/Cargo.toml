@@ -14,6 +14,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 office-pdf-engine = { workspace = true }
+office-pdf-automation = { workspace = true }
+base64 = "0.22"
 office-pdf-ui-egui = { workspace = true }
 office-pdf-render = { workspace = true }
 egui = { workspace = true }

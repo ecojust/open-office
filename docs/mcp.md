@@ -5,7 +5,7 @@ Open Office 桌面版可作为本机 MCP 服务，供支持 Streamable HTTP 的 
 ## 连接
 
 1. 点击左下角的 **MCP 设置**。默认地址为 `http://127.0.0.1:19780/mcp`，可以修改端口。
-2. 默认仅允许读取。如需 AI 修改文档，勾选 **允许编辑当前文档**，保存设置。
+2. 新配置默认允许编辑。升级后保留原有权限；工作区的 **只读 / 允许编辑** 可直接打开权限设置。需要 AI 修改文档时，勾选 **允许编辑当前文档** 并保存。
 3. 复制设置中的客户端 JSON，添加到支持 HTTP MCP 的客户端。配置包含访问密钥，不要公开分享。
 4. 打开任意文档，点击工作区中的 **MCP**。出现 **Running** 后即可连接。
 
@@ -21,19 +21,39 @@ Open Office 桌面版可作为本机 MCP 服务，供支持 Streamable HTTP 的 
 
 所有子软件均支持 `document_inspect`；开启编辑权限后还提供 `document_undo` 和 `document_redo`。
 
-| 子软件 | 读取 | 编辑（可撤销） |
+| 子软件 | 命令发现 / 读取 | 编辑能力 |
 | --- | --- | --- |
-| 文字文档 | `word_read`：正文纯文本 | `word_insert_text`：在当前光标或选区插入文字 |
-| 电子表格 | `sheet_read_range`：指定区域，最多 1000 个单元格 | `sheet_set_cell`：写入文字、数值或公式 |
-| 演示文稿 | `presentation_read_slide`：幻灯片文字、形状和备注 | `presentation_add_slide`：新增带标题和正文的内容页 |
-| PDF | `pdf_read`：可提取文字和批注 | `pdf_add_text`：添加文字框 |
-| 笔记本 | `note_read`：分区、页面和区域文字 | `note_add_page`、`note_add_text`：新增页面或文字区域 |
-| 画布 | `canvas_read`：图形、位置和样式 | `canvas_add_shape`：添加图形或文字 |
-| 代码图表 | `diagram_read_source`：图表源码 | `diagram_set_source`：更新源码和预览 |
+| 文字文档 | `word_list_commands`、`word_inspect_document`、`word_query`、`word_read` | `word_execute_command`：内容替换删除、字符/段落格式、样式列表、表格、图片图形、页面布局、页眉页脚、批注修订等；`word_select_text` / `word_select_range` 设置编辑位置 |
+| 电子表格 | `sheet_list_commands`、`sheet_query`、`sheet_read_range` | `sheet_execute_command`：公式、单元格格式、行列/工作表、排序筛选、图表图片、数据透视表、批注和打印布局；`sheet_write_range` 批量写入二维数据 |
+| 演示文稿 | `presentation_list_commands`、`presentation_describe_command`、`presentation_query`、`presentation_list_templates` | `presentation_execute_command`：页面增删复制、文字/形状/图片/表格/图表、主题母版、过渡动画、备注批注；`presentation_apply_template` 应用模板 |
+| PDF | `pdf_list_commands`、`pdf_query`、`pdf_read` | `pdf_execute_command`：文字图像、批注高亮、签名图章、表单、书签链接、页面管理、水印页眉等 |
+| 笔记本 | `note_read`、`note_read_page` | `note_edit`：分区/页面/子页增删改和移动，区域位置尺寸、富文本、待办及图片；`note_select_page` 显示指定页面 |
+| 画布 | `canvas_read`、`canvas_read_elements`、`canvas_list_templates` | `canvas_edit`：全部图形、连线、笔迹和图片的内容样式、位置尺寸、锁定、组合、层级、对齐布局及模板；`canvas_select_elements` 选择或定位元素 |
+| 代码图表 | `diagram_read`、`diagram_read_source`、`diagram_list_templates` | `diagram_update`：源码、标题、风格及模板；保留 `diagram_set_source` |
 
-参数说明通过 `tools/list` 提供。工作表、幻灯片及 PDF 页面的索引从 0 开始。图片二进制内容不返回，较大的文本和集合有读取上限。
+原有新增文字、单元格、幻灯片、PDF 文字框、笔记页面和画布图形的快捷工具继续可用。
 
-编辑会更新实际文档和撤销历史，并显示为未保存。保存和自动保存继续由 Open Office 的原有文件操作处理；新建文档仍需先选定保存位置。本服务不提供任意脚本执行、系统命令或访问其他文件的工具。
+### 调用方式
+
+先从 `tools/list` 获取工具定义。文字、表格、演示和 PDF 的 `*_list_commands` 返回当前文档引擎支持的命令、参数说明和可用状态，再把命令名称与参数交给 `*_execute_command`。命令存在但当前不可用时，先根据提示选中对应文字、对象、工作表或页面。不会以打开手动编辑弹窗代替完成操作。
+
+例如，文字文档先用 `word_select_text` 选择一段文字，再调用：
+
+```json
+{"name":"word_execute_command","arguments":{"command":"format.set","params":{"props":{"bold":true,"size":18}}}}
+```
+
+笔记和画布的 `*_edit` 接收结构化 `operations` 数组；同一批次整体校验、整体提交，出错不保留前半批修改。工具定义包含全部操作和字段。画布锁定对象需先显式解锁。
+
+文字定位的 `off` 使用 UTF-8 字节偏移；按文字定位时优先用 `word_select_text`。工作表、幻灯片索引从 0 开始。PDF 新命令的页码和对象序号从 **1** 开始，旧 `pdf_add_text` 的 `page` 仍从 **0** 开始，具体以命令说明为准。
+
+图片等素材以内嵌数据传入，不能引用本机路径。PDF `assets` 是素材名到 base64 的映射，命令文件字段仅引用该映射；不会读取其他文件。HTTP 请求体最多 8 MiB，工具参数最多 7 MiB，各软件可设置更小的单素材上限。读取时省略图片二进制，大文本和集合按工具说明限制或分页。
+
+### 页面与保存
+
+MCP 使用当前界面的同一个文档、选区和历史。编辑完成后同步重绘正文/工作表/幻灯片与缩略图/PDF，笔记与画布更新页面和属性面板，代码图表更新源码与预览；未保存标记及撤销重做状态同时更新。操作仍可用顶部撤销、重做，或 `document_undo` / `document_redo`。
+
+保存和自动保存继续使用原有文件操作；新建文档仍需先选定保存位置。正在输入、拖动或打开手动编辑弹窗时，请先结束该操作再调用 MCP。服务不提供任意脚本执行、系统命令或访问其他文件的工具。
 
 ## 协议
 

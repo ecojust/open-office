@@ -374,8 +374,7 @@ impl Automation {
                 }
                 "attachment" => {
                     let [x, y] = a.need::<2>("at", "an attachment (its icon's top-left)")?;
-                    let path = self.resolve(a.str("path")?, false)?;
-                    let data = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+                    let (path, data) = self.input_bytes(a.str("path")?)?;
                     let file = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
                     let icon = match a.opt_str("icon")? {
                         Some(n) => office_pdf_engine::AttachIcon::from_name(n)
@@ -489,8 +488,7 @@ impl Automation {
             if !matches!(kind, "signature" | "initials") || a.opt_str("text")?.is_some() {
                 return Err(ToolError::InvalidArgs("path is only for an image signature or initials; pass either path or text".into()));
             }
-            let path = self.resolve(path, false)?;
-            let file = std::fs::File::open(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+            let file = self.input_reader(path)?;
             let image = if scan {
                 let sensitivity = match sensitivity {
                     None => office_pdf_engine::signature_scan::DEFAULT_SENSITIVITY,
@@ -651,8 +649,7 @@ impl Automation {
     pub(crate) fn stamp_custom(&mut self, a: &Args) -> Result<Value> {
         let page = self.page(a)?;
         let info = self.doc(a)?.info.pages[page].clone();
-        let path = self.resolve(a.str("path")?, false)?;
-        let bytes = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+        let (path, bytes) = self.input_bytes(a.str("path")?)?;
         let file = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         let name = a.opt_str("name")?.map(str::to_owned).unwrap_or_else(|| file.rsplit_once('.').map_or(file.clone(), |(s, _)| s.to_owned()));
         let [x, y] = a.need::<2>("at", "a stamp (its centre)")?;

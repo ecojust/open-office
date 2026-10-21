@@ -250,6 +250,24 @@ export class RustSheetSession {
       return result.result
     })
   }
+  /** MCP changes use the same live Rust session and repaint path as local edits. */
+  automation(operation: 'commands' | 'execute' | 'query', params: Record<string, unknown>, assertCurrent: () => void): Promise<unknown> {
+    return serialize(async () => {
+      assertCurrent(); this.assertOpen()
+      const api = await getHost()
+      assertCurrent()
+      if (operation === 'execute') await this.flushInput(api)
+      assertCurrent()
+      const commandId = operation === 'commands' ? 'host.mcpCommands' : operation === 'query' ? 'host.mcpQuery' : 'host.mcpExecute'
+      const response = JSON.parse(api.command(this.id, commandId, JSON.stringify(params))) as { ok: boolean; result?: unknown; snapshot?: OfficeSheetSnapshot; error?: string }
+      // Publish the authoritative receipt even on an engine error; failed compound
+      // operations must never leave the shell showing an outdated revision.
+      this.accept(snapshotOf(response.snapshot ? JSON.stringify(response.snapshot) : api.inspect(this.id), this.id))
+      if (!response.ok) throw Error(response.error || '工作簿 MCP 操作失败。')
+      assertCurrent()
+      return operation === 'execute' ? { result: response.result, snapshot: this.snapshot } : response.result
+    })
+  }
   export(format: 'xlsx' | 'csv' | 'tsv' | 'pdf' = 'xlsx', options: { background?: boolean } = {}): Promise<{ bytes: Uint8Array; snapshot: OfficeSheetSnapshot }> {
     return serialize(async () => {
       this.assertOpen()

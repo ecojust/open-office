@@ -8,6 +8,7 @@ import * as vue from 'vue'
 import { base64ToBytes, bytesToBase64 } from '../src/shared/document.ts'
 import { createId } from '../src/shared/id.ts'
 import * as mediaValidation from '../src/presentation/rust/media.ts'
+import * as wordTools from '../src/mcp/word-tools.ts'
 
 const clientSource = await readFile(new URL('../src/presentation/rust/client.ts', import.meta.url), 'utf8')
 const editorSource = (await readFile(new URL('../src/components/RustPresentationEditor.vue', import.meta.url), 'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
@@ -65,6 +66,7 @@ function harness(kind = 'presentation') {
         return JSON.stringify({ ok: true, result: { faces: 1 }, snapshot: JSON.parse(snapshot(id)) })
       }
       if (commandId === 'text.set') edit(id, value.text)
+      else if (commandId === 'mcp.execute' && value.command === 'text.set') edit(id, value.params.text)
       else if (commandId === 'host.setTemplatePanelOpen') doc.ui = { ...doc.ui, templatePanelOpen: value.open }
       else if (commandId === 'edit.undo' && doc.undo.length) { doc.redo.push(doc.text); doc.text = doc.undo.pop(); doc.revision++; doc.dirty = true; doc.canRedo = true }
       else if (commandId === 'edit.redo' && doc.redo.length) { doc.undo.push(doc.text); doc.text = doc.redo.pop(); doc.revision++; doc.dirty = true }
@@ -103,12 +105,52 @@ function harness(kind = 'presentation') {
       if (name === '../shared/printing') return { printPdf: () => assert.fail('Unexpected printing in a non-printing presentation component test') }
       if (name === `../${kind}/rust/client`) return client
       if (name === '../presentation/rust/media') return mediaValidation
+      if (name === '../mcp/word-tools') return wordTools
       throw Error(`Unexpected component import ${name}`)
     }, { ...globals, defineProps: () => props, withDefaults: value => value, defineEmits: () => (...event) => events.push(event), defineExpose(value) { exposed = value } }))
     return { props, events, editor: exposed, dispose() { unmount.forEach(callback => callback()); scope.stop() } }
   }
   return { client, open, source, state, calls, document, Element, component, setFlushGate(value) { flushGate = value }, font, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value } }
 }
+
+test('presentation MCP publishes the actual edit and waits for its render receipt without saving', async () => {
+  const h = harness(), current = await h.open()
+  let calls = 0, release, reached
+  const waiting = new Promise(resolve => { reached = resolve })
+  const rendered = new Promise(resolve => { release = resolve })
+  h.setFlushGate(async () => { if (++calls === 2) { reached(); await rendered } })
+  let completed = false
+  const pending = current.mcp('execute', { command: 'text.set', params: { text: 'Visible MCP update' } }, () => {}).then(result => { completed = true; return result })
+  await waiting
+  assert.equal(current.snapshot.dirty, true, 'Mutation is published to Vue subscribers immediately')
+  assert.equal(completed, false, 'The MCP response waits for the engine render receipt')
+  release()
+  const result = await pending
+  assert.equal(result.result.text, 'Visible MCP update')
+  assert.equal(result.snapshot.revision, current.snapshot.revision)
+  assert.equal(h.calls.filter(call => call[0] === 'export' || call[0] === 'saved').length, 0)
+  h.setFlushGate(undefined)
+  const before = h.calls.filter(call => call[0] === 'flush').length
+  await current.mcp('query', { command: 'text.get' }, () => {})
+  assert.equal(h.calls.filter(call => call[0] === 'flush').length, before, 'Read-only tools never commit pending input')
+  await current.close(true)
+})
+
+test('presentation full MCP command rechecks a revoked document after input flush', async () => {
+  const h = harness(), current = await h.open()
+  let revoked = false, release, reached
+  const waiting = new Promise(resolve => { reached = resolve })
+  const blocked = new Promise(resolve => { release = resolve })
+  h.setFlushGate(async () => { reached(); await blocked })
+  const pending = current.mcp('execute', { command: 'text.set', params: { text: 'must not run' } }, () => { if (revoked) throw Error('MCP session stopped') })
+  await waiting
+  revoked = true; release()
+  await assert.rejects(pending, /MCP session stopped/)
+  assert.equal(h.calls.filter(call => call[0] === 'command' && call[2] === 'mcp.execute').length, 0)
+  assert.equal(h.state.get(current.id).text, '')
+  h.setFlushGate(undefined)
+  await current.close(true)
+})
 
 test('Deck registers the bundled document font once for concurrent sessions without edits or save acknowledgements', async () => {
   const h = harness(), sessions = await Promise.all([h.open(), h.open()])

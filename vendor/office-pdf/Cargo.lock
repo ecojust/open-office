@@ -3814,6 +3814,8 @@ checksum = "cfe21416a02c693fb9f980befcb230ecc70b0b3d1cc4abf88b9675c4c1457f0c"
 name = "open-office-pdf-host"
 version = "0.8.0"
 dependencies = [
+ "base64 0.22.1",
+ "office-pdf-automation",
  "eframe",
  "egui",
  "js-sys",

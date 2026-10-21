@@ -18,11 +18,38 @@ fn write_json(output: &Arc<Mutex<io::Stdout>>, value: Value) -> Result<(), Strin
 
 fn run() -> Result<(), String> {
     let directory = tempfile::tempdir().map_err(|error| error.to_string())?;
-    let service = mcp::McpService::new(directory.path().join("mcp.json"))?;
+    let service = Arc::new(mcp::McpService::new(directory.path().join("mcp.json"))?);
     let output = Arc::new(Mutex::new(io::stdout()));
     for line in io::stdin().lock().lines() {
         let request: Value = serde_json::from_str(&line.map_err(|error| error.to_string())?)
             .map_err(|error| error.to_string())?;
+        // Rehearse the installed smoke with the same Rust HTTP probe. Keep the
+        // main stdio reader free to claim/complete requests from the WebView.
+        if request["op"] == "probe" {
+            let service = service.clone();
+            let output = output.clone();
+            std::thread::spawn(move || {
+                let result = (|| -> Result<Value, String> {
+                    let probe: mcp_probe::ProbeRequest = serde_json::from_value(request["request"].clone()).map_err(|error| error.to_string())?;
+                    match probe {
+                        mcp_probe::ProbeRequest::Tool { session_id, tool_name, arguments } => {
+                            let (port, token) = service.probe_connection(&session_id)?;
+                            let mut value = mcp_probe::probe_tool(port, &token, &tool_name, arguments)?;
+                            service.probe_connection(&session_id)?;
+                            value["sessionId"] = Value::String(session_id);
+                            Ok(value)
+                        }
+                        mcp_probe::ProbeRequest::Stopped { port } => mcp_probe::probe_stopped(port),
+                    }
+                })();
+                let response = match result {
+                    Ok(result) => json!({"id":request["id"],"ok":true,"result":result}),
+                    Err(error) => json!({"id":request["id"],"ok":false,"error":error}),
+                };
+                let _ = write_json(&output, response);
+            });
+            continue;
+        }
         let result: Result<Value, String> = (|| {
             let required = |key: &str| request[key].as_str().ok_or_else(|| format!("Missing {key}"));
             match required("op")? {

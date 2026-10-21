@@ -201,6 +201,22 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
   guard(); await opening; guard()
   const current = session
   if (!current || loading.value) throw Error('请等待文档打开。')
+  if (name === 'presentation_list_commands') return current.mcp('list', args, guard)
+  if (name === 'presentation_describe_command') return current.mcp('describe', args, guard)
+  if (name === 'presentation_query') return current.mcp('query', args, guard)
+  if (name === 'presentation_execute_command') return current.mcp('execute', args, guard)
+  if (name === 'presentation_list_templates' || name === 'presentation_apply_template') {
+    const { listPresentationTemplates, loadPresentationTemplate } = await import('../presentation/templates'); guard()
+    const templates = await listPresentationTemplates(); guard()
+    if (name === 'presentation_list_templates') {
+      const search = String(args.search ?? '').trim().toLowerCase()
+      return { templates: templates.filter(template => !search || `${template.name} ${template.description}`.toLowerCase().includes(search)).map(({ preview: _preview, ...template }) => template) }
+    }
+    const template = templates.find(template => template.id === args.id)
+    if (!template) throw Error('找不到该模板，请重新查询模板列表。')
+    const { base64 } = await loadPresentationTemplate(template); guard()
+    return current.mcp('execute', { command: 'template.applyBytes', params: { data: base64 } }, guard)
+  }
   if (name === 'document_inspect') { const result = await current.inspect(); guard(); return result }
   if (name === 'document_undo' || name === 'document_redo') return current.command(name === 'document_undo' ? 'edit.undo' : 'edit.redo', {}, undefined, guard)
   if (name === 'presentation_read_slide') { const result = await current.query('slide.inspect', args); guard(); return result }

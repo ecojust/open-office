@@ -26,7 +26,7 @@ pub(crate) fn dialog_visible(name: &str) -> bool {
 /// Presentation policy, separate from the host's file-ownership/security policy. File shortcuts
 /// reach `host_command` before this check; they never open a second file interface here.
 pub(crate) fn command_visible(id: &str) -> bool {
-    (!id.starts_with("file.") || matches!(id, "file.properties" | "file.accessibility" | "file.printMarkup" | "file.setAuthor"))
+    (!id.starts_with("file.") || matches!(id, "file.properties" | "file.accessibility" | "file.printMarkup" | "file.setAuthor" | "file.privacy" | "file.privacyOptions"))
         && !id.starts_with("help.")
         && !id.starts_with("ui.zotero.")
         && !matches!(

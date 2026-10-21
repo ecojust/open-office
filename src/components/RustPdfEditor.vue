@@ -192,7 +192,14 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
   const current = session
   if (!current || loading.value) throw Error('请等待文档打开。')
   if (name === 'document_inspect') { const result = await current.inspect(); guard(); return result }
+  if (name === 'pdf_list_commands') { const result = await current.query('mcp.commands', args); guard(); return result }
   if (authorDialog.value) throw Error('请先关闭 PDF 署名设置。')
+  if (name === 'pdf_query') return current.executeMcp('mcp.query', args, guard)
+  if (name === 'pdf_execute_command') {
+    const params = { ...((args.params as Record<string, unknown> | undefined) ?? {}) }
+    if (['comment_add', 'comment_reply', 'comment_set_status', 'comment_mark', 'stamp_custom', 'fill_sign_add'].includes(String(args.command)) && params.author === undefined) params.author = author.value
+    return current.executeMcp('mcp.execute', { ...args, params }, guard)
+  }
   if (name === 'document_undo' || name === 'document_redo') return current.command(name === 'document_undo' ? 'edit.undo' : 'edit.redo', {}, guard)
   if (name === 'pdf_read') { const result = await current.query('document.inspect'); guard(); return result }
   if (name === 'pdf_add_text') {

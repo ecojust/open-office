@@ -237,7 +237,12 @@ function hasPendingEdits() {
   const element = primary.value, input = propertyTextInput.value
   return Boolean(input && element && ((element.type === 'shape' && input.value !== element.text) || (element.type === 'edge' && input.value !== element.label)))
 }
-defineExpose({ flush, fitCanvas, hasPendingEdits })
+function selectElements(ids: string[], fit = false) {
+ selected.value = ids.filter(id => draft.value.elements.some(element => element.id === id))
+ tool.value = 'select'; toolLocked.value = false; editingId.value = undefined
+ if (fit) fitCanvas()
+}
+defineExpose({ flush, fitCanvas, hasPendingEdits, selectElements })
 function pointerDown(event: PointerEvent, element?: SceneElement, resize = false) {
   if (!interactive.value) return
   if (event.button !== 0 && event.button !== 1) return

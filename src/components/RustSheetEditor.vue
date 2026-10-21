@@ -163,6 +163,10 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
   if (name === 'document_undo' || name === 'document_redo') return current.command(name === 'document_undo' ? 'edit.undo' : 'edit.redo', {}, undefined, guard)
   if (name === 'sheet_read_range') { const result = await current.query('sheet.read', args); guard(); return result }
   if (name === 'sheet_set_cell') return current.command('cell.set', args, undefined, guard)
+  if (name === 'sheet_list_commands') return current.automation('commands', args, guard)
+  if (name === 'sheet_execute_command') return current.automation('execute', args, guard)
+  if (name === 'sheet_query') return current.automation('query', args, guard)
+  if (name === 'sheet_write_range') return current.automation('execute', { command: 'range.setValues', params: args }, guard)
   throw Error('当前编辑器不支持此 MCP 工具。')
 }
 defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, syncRevision, canBackgroundExport, command, query })

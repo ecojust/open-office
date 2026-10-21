@@ -12,6 +12,8 @@ export const MCP_NATIVE_CHECKS = Object.freeze([
   'native-mcp-event-edits-and-reads-current-document',
   'native-mcp-docx-export',
   'native-mcp-document-switch-closes-listener',
+  'native-mcp-seven-editor-edit-query-export',
+  'native-mcp-word-format-undo-redo',
   'native-mcp-session-cleanup',
 ]);
 export const MCP_NATIVE_LIMITATIONS = Object.freeze([
@@ -68,10 +70,91 @@ function verifyDocx(document) {
   check(evidence.text === MCP_NATIVE_TEXT, 'independent DOCX text differs from the actual MCP edit');
 }
 
+export const MCP_NATIVE_EDITORS = Object.freeze(['word', 'sheet', 'presentation', 'pdf', 'note', 'canvas', 'diagram']);
+const editorTools = {
+  word: ['word_execute_command', 'format.set', 'word_query', 'document.inspect', 'docx', MCP_NATIVE_TEXT],
+  sheet: ['sheet_execute_command', 'range.setValues', 'sheet_query', 'cell.get', 'xlsx', 'NATIVE_MCP_SHEET'],
+  presentation: ['presentation_execute_command', 'shape.insert', 'presentation_query', 'slide.inspect', 'pptx', 'NATIVE_MCP_PRESENTATION'],
+  pdf: ['pdf_execute_command', 'page_add_text', 'pdf_query', 'content_list', 'pdf', 'NATIVE_MCP_PDF'],
+  note: ['note_edit', undefined, 'note_read', undefined, 'oonote', 'NATIVE_MCP_NOTE'],
+  canvas: ['canvas_edit', undefined, 'canvas_read', undefined, 'owflow', 'NATIVE_MCP_CANVAS'],
+  diagram: ['diagram_update', undefined, 'diagram_read', undefined, 'owflow', 'NATIVE_MCP_DIAGRAM'],
+};
+function snapshot(value, label) {
+  object(value, label); integer(value.documentId, `${label} document id`, 1); integer(value.revision, `${label} revision`);
+  check(typeof value.dirty === 'boolean', `${label} dirty flag is absent`);
+}
+function wordBlocks(probe, service) { return toolValue(probe, 'word_query', service).blocks; }
+function verifyEditorExports(editors) {
+  const directory = mkdtempSync(join(tmpdir(), 'open-office-mcp-editors-'));
+  let result;
+  try {
+    for (const entry of editors) {
+      const output = entry.exported;
+      object(output, `${entry.kind} exported document`);
+      check(output.extension === editorTools[entry.kind][4], `${entry.kind} exported another format`);
+      integer(output.sizeBytes, `${entry.kind} exported size`, 101);
+      check(output.sizeBytes <= 8 * 1024 * 1024 && typeof output.base64 === 'string' && output.base64.length <= 11_184_812, `${entry.kind} export exceeds the bound`);
+      check(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(output.base64), `${entry.kind} export base64 is invalid`);
+      const bytes = Buffer.from(output.base64, 'base64');
+      check(bytes.toString('base64') === output.base64 && bytes.length === output.sizeBytes && createHash('sha256').update(bytes).digest('hex') === output.sha256, `${entry.kind} export bytes differ from their receipt`);
+      writeFileSync(join(directory, `${entry.kind}.${output.extension}`), bytes, { flag: 'wx' });
+    }
+    const python = process.env.OPEN_OFFICE_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+    result = spawnSync(python, [join(dirname(fileURLToPath(import.meta.url)), 'mcp-smoke-documents.py'), directory], {
+      stdio: ['ignore', 'pipe', 'pipe'], shell: false, encoding: 'utf8', timeout: 20_000, maxBuffer: 64 * 1024, windowsHide: true,
+    });
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+  check(!result.error && result.status === 0 && !result.signal, `independent seven-editor export verification failed: ${result.stderr || result.error?.message || ''}`);
+  let evidence;
+  try { evidence = JSON.parse(result.stdout); } catch { throw Error('Native MCP: independent export evidence is invalid JSON'); }
+  assert.deepEqual(evidence, Object.fromEntries(MCP_NATIVE_EDITORS.map(kind => [kind, true])), 'Native MCP: incomplete independent exported document evidence');
+}
+function verifyEditors(report) {
+  check(Array.isArray(report.editors), 'seven-editor native evidence is absent');
+  assert.deepEqual(report.editors.map(entry => entry?.kind), [...MCP_NATIVE_EDITORS], 'Native MCP: missing or duplicate editor coverage');
+  check(new Set(report.editors.map(entry => entry.key)).size === 7, 'editor evidence reuses a document key');
+  check(new Set(report.editors.map(entry => entry.service?.sessionId)).size === 7, 'editor evidence reuses another running service');
+  for (const entry of report.editors) {
+    const [editTool, command, queryTool, queryCommand, , marker] = editorTools[entry.kind];
+    id(entry.key, `${entry.kind} key`); object(entry.service, `${entry.kind} service`);
+    id(entry.service.sessionId, `${entry.kind} session`); integer(entry.service.port, `${entry.kind} port`, 1024);
+    check(entry.service.port <= 65535, `${entry.kind} invalid port`);
+    snapshot(entry.before, `${entry.kind} before`); snapshot(entry.after, `${entry.kind} after`);
+    check(entry.before.documentId === entry.after.documentId && entry.after.revision > entry.before.revision && entry.after.dirty === true && entry.shellDirty === true, `${entry.kind} actual document/shell did not change`);
+    object(entry.edit, `${entry.kind} edit`); object(entry.query, `${entry.kind} query`);
+    check(entry.edit.tool === editTool && entry.query.tool === queryTool, `${entry.kind} did not use the new editor tools`);
+    object(entry.edit.arguments, `${entry.kind} edit arguments`); object(entry.query.arguments, `${entry.kind} query arguments`);
+    check(entry.edit.arguments.command === command && entry.query.arguments.command === queryCommand, `${entry.kind} ran another editor command`);
+    const edited = toolValue(entry.edit.probe, editTool, entry.service), queried = toolValue(entry.query.probe, queryTool, entry.service);
+    const updated = edited.snapshot || edited;
+    snapshot(updated, `${entry.kind} HTTP edit snapshot`);
+    check(updated.documentId === entry.after.documentId && updated.revision > entry.before.revision && updated.revision <= entry.after.revision && updated.dirty === true, `${entry.kind} HTTP edit differs from actual editor state`);
+    check(JSON.stringify(queried).includes(marker) && entry.actual !== undefined && JSON.stringify(entry.actual).includes(marker), `${entry.kind} HTTP query and actual document disagree`);
+    if (['note', 'canvas', 'diagram'].includes(entry.kind)) check(typeof entry.visibleText === 'string' && entry.visibleText.includes(marker), `${entry.kind} UI did not redraw the edit`);
+    if (['sheet', 'presentation'].includes(entry.kind)) assert.deepEqual(entry.actual, queried, `Native MCP: ${entry.kind} queried another actual document`);
+    if (entry.kind === 'word') {
+      check(entry.key === report.document.key && entry.service.sessionId === report.service.sessionId && entry.service.port === report.service.port, 'Word enhanced edit targets a different legacy specimen');
+      check(entry.actual.documentId === entry.after.documentId && entry.actual.revision === entry.after.revision, 'Word actual snapshot is stale');
+      check(entry.actual.format?.bold === true && entry.actual.format?.size === 22 && entry.actual.format?.color === 'D52B3F', 'Word actual format did not update');
+      const runs = queried.blocks?.flatMap(block => block.runs || []) || [];
+      check(runs.some(run => run.props?.bold === true && run.props?.size === 22 && JSON.stringify(run.props?.color) === '{"Rgb":[213,43,63]}'), 'Word formatting query lacks the edited runs');
+      object(entry.history, 'Word HTTP undo/redo history');
+      toolValue(entry.history.select, 'word_select_text', entry.service);
+      const before = wordBlocks(entry.history.before, entry.service), undone = wordBlocks(entry.history.undone, entry.service), redone = wordBlocks(entry.history.redone, entry.service);
+      check(Array.isArray(before) && Array.isArray(undone) && Array.isArray(redone) && JSON.stringify(before) !== JSON.stringify(queried.blocks), 'Word format history did not change');
+      assert.deepEqual(undone, before, 'Native MCP: Word undo failed'); assert.deepEqual(redone, queried.blocks, 'Native MCP: Word redo failed');
+      const undo = toolValue(entry.history.undo, 'document_undo', entry.service), redo = toolValue(entry.history.redo, 'document_redo', entry.service);
+      check(undo.documentId === entry.after.documentId && redo.documentId === entry.after.documentId && undo.revision > updated.revision && redo.revision > undo.revision && redo.revision === entry.after.revision, 'Word history responses target another revision');
+    }
+  }
+  verifyEditorExports(report.editors);
+}
+
 /** Publication requires installed-app IPC, real HTTP responses and independent exported bytes. */
 export function validateNativeMcpReport(report) {
   object(report, 'installed native MCP report');
-  check(report.schemaVersion === 1 && report.kind === 'mcp-native' && report.ok === true, 'installed MCP acceptance did not pass');
+  check(report.schemaVersion === 2 && report.kind === 'mcp-native' && report.ok === true, 'installed MCP acceptance did not pass');
   check(report.transport === 'native-webview-ipc-http', 'requires genuine native IPC and HTTP transport');
   object(report.native, 'native WebView identity');
   check(report.native.tauri === true, 'native IPC was unavailable');
@@ -98,6 +181,8 @@ export function validateNativeMcpReport(report) {
   check(written.documentId === document.afterDocumentId && written.revision === document.afterRevision && written.dirty === true && written.text === MCP_NATIVE_TEXT, 'HTTP write result differs from the actual Rust document');
   check(read.text === MCP_NATIVE_TEXT && read.totalCharacters === MCP_NATIVE_TEXT.length && read.truncated === false, 'HTTP read did not return the actual MCP edit');
   verifyDocx(document);
-  check(report.cleanup?.closedDocuments === 2 && report.cleanup?.serviceStopped === true, 'native service or document cleanup is incomplete');
-  return { mcpNativeHttp: true, mcpNativeDocumentTools: true, mcpNativeDocxExport: true, mcpNativeSwitchStop: true, mcpNativeSessionCleanup: true };
+  verifyEditors(report);
+  check(report.cleanup?.closedDocuments === 8 && report.cleanup?.serviceStopped === true, 'native service or document cleanup is incomplete');
+  return { mcpNativeHttp: true, mcpNativeDocumentTools: true, mcpNativeDocxExport: true, mcpNativeSwitchStop: true, mcpNativeSessionCleanup: true,
+    mcpNativeSevenEditorEditing: true, mcpNativeWordFormatHistory: true, mcpNativeSevenEditorExports: true };
 }

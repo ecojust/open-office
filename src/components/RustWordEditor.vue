@@ -6,6 +6,7 @@ import { bytesToBase64, type EditorExport, type Extension } from '../shared/docu
 import { printPdf, type PrintOutcome } from '../shared/printing'
 import { prepareRustWordDocument, setRustWordTheme, type PreparedRustWordDocument, type RustWordSession } from '../word/rust/client'
 import type { OfficeWordEvent, OfficeWordFileAction, OfficeWordSnapshot } from '../word/rust/office-word-types'
+import { describeWordCommands } from '../mcp/word-tools'
 
 const props = withDefaults(defineProps<{ document: NativeDocument; prepared?: PreparedRustWordDocument; active?: boolean; disabled?: boolean; theme?: Appearance }>(), { active: true, disabled: false, theme: 'system' })
 const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: OfficeWordFileAction] }>()
@@ -160,9 +161,15 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
   const current = session
   if (!current || loading.value) throw Error('请等待文档打开。')
   if (name === 'document_inspect') { const result = await current.inspect(); guard(); return result }
-  if (name === 'document_undo' || name === 'document_redo') return current.command(name === 'document_undo' ? 'edit.undo' : 'edit.redo', {}, undefined, guard)
+  if (name === 'document_undo' || name === 'document_redo') return (await current.mcpCommand(name === 'document_undo' ? 'edit.undo' : 'edit.redo', {}, guard)).snapshot
   if (name === 'word_read') { const value = await current.inspect(); guard(); return { text: (value.text ?? '').slice(0, 100000), totalCharacters: (value.text ?? '').length, truncated: (value.text ?? '').length > 100000 } }
-  if (name === 'word_insert_text') return current.command('text.insert', { text: args.text, raw: true }, undefined, guard)
+  if (name === 'word_insert_text') return (await current.mcpCommand('text.insert', { text: args.text, raw: true }, guard)).snapshot
+  if (name === 'word_list_commands') return describeWordCommands(await current.mcpCommands(args, guard))
+  if (name === 'word_inspect_document') return current.mcpQuery('document.inspect', args, guard)
+  if (name === 'word_query') return current.mcpQuery(String(args.command), (args.params ?? {}) as Record<string, unknown>, guard)
+  if (name === 'word_execute_command') return current.mcpCommand(String(args.command), (args.params ?? {}) as Record<string, unknown>, guard)
+  if (name === 'word_select_text') return current.mcpCommand('select.text', { ...args, occurrence: Number(args.occurrence ?? 0) + 1 }, guard)
+  if (name === 'word_select_range') return current.mcpCommand('select.range', args, guard)
   throw Error('当前编辑器不支持此 MCP 工具。')
 }
 defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, undo, redo, search, print, focus, inspect, syncRevision, canBackgroundExport, command })

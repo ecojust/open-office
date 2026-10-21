@@ -4,6 +4,11 @@ import Icon from './Icon.vue'
 import SceneEditor from '../workflow/components/SceneEditor.vue'
 import CodeDiagramEditor from '../workflow/components/CodeDiagramEditor.vue'
 import { WorkflowSession } from '../workflow/session'
+import { editCanvas, updateDiagram, type CanvasEditOperation, type DiagramUpdate } from '../workflow/mcp'
+import { BOARD_TEMPLATES } from '../workflow/core/board-templates'
+import { DIAGRAM_TEMPLATES } from '../workflow/core/diagrams/catalog'
+import { DIAGRAM_STYLES } from '../workflow/core/diagram-appearance'
+import { compileCodeDiagram } from '../workflow/core/code-diagram'
 import { createDocument } from '../workflow/core/documents'
 import { documentScene, exportDocument, importText, type ExportFormat } from '../workflow/core/files'
 import { sceneToSvg } from '../workflow/core/svg'
@@ -173,8 +178,35 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
  if (name === 'document_inspect') return inspect()
  if (name === 'canvas_read' && !diagram.value) return current.model.scene
  if (name === 'diagram_read_source' && diagram.value) return { source: current.model.source }
+ if (name === 'canvas_read_elements' && !diagram.value) {
+  const ids = args.ids as string[] | undefined, elements = ids ? current.model.scene.elements.filter(element => ids.includes(element.id)) : current.model.scene.elements
+  if (ids?.some(id => !elements.some(element => element.id === id))) throw Error('部分画布元素不存在。')
+  const offset = Number(args.offset ?? 0), limit = Number(args.limit ?? 50)
+  return { title: current.model.title, background: current.model.scene.background, grid: current.model.scene.grid, defaultStyle: current.model.scene.defaultStyle, total: elements.length, offset, elements: elements.slice(offset,offset + limit) }
+ }
+ if (name === 'canvas_list_templates' && !diagram.value) return BOARD_TEMPLATES
+ if (name === 'diagram_list_templates' && diagram.value) {
+  const query = String(args.query ?? '').toLocaleLowerCase()
+  return { templates: DIAGRAM_TEMPLATES.filter(template => `${template.id} ${template.title} ${template.kind}`.toLocaleLowerCase().includes(query)).map(({ id,title,kind }) => ({ id,title,kind })), styles: DIAGRAM_STYLES.map(({id,label,description}) => ({id,label,description})) }
+ }
+ if (name === 'diagram_read' && diagram.value) {
+  let parseError: string | undefined
+  try { compileCodeDiagram(current.model.source) } catch (cause) { parseError = cause instanceof Error ? cause.message : String(cause) }
+  return { title: current.model.title, source: current.model.source, style: current.model.diagramStyle ?? 'classic', valid: !parseError, parseError }
+ }
  await flush(); guard()
- if (name === 'document_undo' || name === 'document_redo') {
+ if (name === 'canvas_select_elements' && !diagram.value) {
+  const ids = args.ids as string[]
+  if (ids.some(id => !current.model.scene.elements.some(element => element.id === id))) throw Error('画布元素不存在。')
+  sceneEditor.value?.selectElements(ids, args.fit === true); await nextTick(); guard()
+  return { ...await inspect(), selectedIds: ids }
+ }
+ let editResult: ReturnType<typeof editCanvas> | undefined
+ if (name === 'canvas_edit' && !diagram.value) {
+  current.change(copy => { editResult = editCanvas(copy,args.operations as CanvasEditOperation[]) })
+ } else if (name === 'diagram_update' && diagram.value) {
+  current.change(copy => updateDiagram(copy,args as DiagramUpdate))
+ } else if (name === 'document_undo' || name === 'document_redo') {
   if (name === 'document_undo') current.undo(); else current.redo()
  } else if (name === 'canvas_add_shape' && !diagram.value) {
   const shape: ShapeElement = { id: newId('shape'), type: 'shape', shape: (args.shape ?? 'rectangle') as ShapeElement['shape'], text: String(args.text ?? ''), x: Number(args.x ?? 40), y: Number(args.y ?? 40), width: Number(args.width ?? 200), height: Number(args.height ?? 100), cornerRadius: 0, style: { ...DEFAULT_STYLE }, locked: false }
@@ -183,7 +215,12 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
   current.change(copy => { copy.source = String(args.source) })
  } else throw Error('当前编辑器不支持此 MCP 工具。')
  accept(); await nextTick(); guard()
- return inspect()
+ if (name === 'canvas_edit' && !diagram.value) {
+  if (editResult?.created.length) sceneEditor.value?.selectElements(editResult.created,args.fit === true)
+  else if (args.fit === true) sceneEditor.value?.fitCanvas()
+ }
+ await nextTick(); guard()
+ return { ...await inspect(), ...(editResult ? { created: editResult.created } : {}) }
 }
 defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, inspect, inspectModel, syncRevision: inspect, canBackgroundExport, undo, redo, print, focus })
 </script>

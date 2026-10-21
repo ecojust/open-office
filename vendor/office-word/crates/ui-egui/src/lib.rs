@@ -827,6 +827,20 @@ impl WordApp {
     /// Run a command for a script or an agent (control channel, MCP bridge): never asks first.
     /// UI-level commands (`ui.*`) are handled here, the rest by the engine.
     pub fn execute(&mut self, id: &str, params: Value) -> Result<Value, String> {
+        self.execute_with_interaction(id, params, true)
+    }
+
+    /// Execute an engine operation without opening a dialog or picker. Automation callers
+    /// still restrict the available command families; this additionally catches a command's
+    /// interactive fallback before the UI can consume it, including future engine commands.
+    pub fn execute_noninteractive(&mut self, id: &str, params: Value) -> Result<Value, String> {
+        if id.starts_with("ui.") || self.session.registry.get(id).is_none() {
+            return Err("Only registered document commands can run without interaction.".into());
+        }
+        self.execute_with_interaction(id, params, false)
+    }
+
+    fn execute_with_interaction(&mut self, id: &str, params: Value, interactive: bool) -> Result<Value, String> {
         if let Some(result) = self.services.host_command.as_ref().and_then(|hook| hook(id, &params)) {
             return result;
         }
@@ -915,7 +929,19 @@ impl WordApp {
         }
         let document = self.session.document_id();
         let old_path = self.session.path.clone();
-        let r = self.session.run(id, &params).map_err(|e| e.to_string());
+        let before = (!interactive).then(|| self.session.edit_snapshot());
+        let mut r = self.session.run(id, &params).map_err(|e| e.to_string());
+        if !interactive && self.session.ui_requests.iter().any(|request| {
+            request.get("open").is_some() || request.get("close").is_some() || request.get("focus").is_some()
+        }) {
+            // A dialog-only branch can still checkpoint a nominally mutating command. Restore
+            // its document, selection and undo/redo before reporting the missing parameters.
+            if let Some(before) = before {
+                self.session.restore(before);
+            }
+            self.session.ui_requests.clear();
+            r = Err("This operation requires explicit parameters; interactive dialogs are unavailable.".into());
+        }
         // Copy and Cut put what they took on the system clipboard, whichever control ran them
         // (the ribbon, a context menu, the native menu, or the Cmd+C/X event). Only the key event
         // used to write it, so a Cut button deleted the words without copying them.

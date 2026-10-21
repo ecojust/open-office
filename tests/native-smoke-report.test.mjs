@@ -71,7 +71,7 @@ test('release evidence requires four Rust canvases, PDF text replacement, and na
     'notebookDomInput', 'notebookSavedFileReadback', 'notebookSessionCleanup',
     'canvasDomInput', 'canvasSavedFileReadback', 'canvasSessionCleanup',
     'diagramDomInput', 'diagramSavedFileReadback', 'diagramSessionCleanup',
-    'mcpNativeHttp', 'mcpNativeDocumentTools', 'mcpNativeDocxExport', 'mcpNativeSwitchStop', 'mcpNativeSessionCleanup',
+    'mcpNativeHttp', 'mcpNativeDocumentTools', 'mcpNativeDocxExport', 'mcpNativeSwitchStop', 'mcpNativeSessionCleanup', 'mcpNativeSevenEditorEditing', 'mcpNativeWordFormatHistory', 'mcpNativeSevenEditorExports',
   ]) assert.equal(checks[required], true);
   assert.equal(Object.hasOwn(checks, 'sharedArrayBuffer'), false);
 });

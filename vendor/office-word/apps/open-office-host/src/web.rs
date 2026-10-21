@@ -410,7 +410,13 @@ impl OfficeWordHost {
             let mut state = self.state.try_borrow_mut().map_err(js_error)?;
             let entry = state.entry_mut(id)?;
             entry.sync().map_err(js_error)?;
-            let result = if command_id == "host.cancelPicture" {
+            let result = if command_id == "host.mcp.commands" {
+                Ok(crate::mcp::commands(&entry.app.session, &params))
+            } else if matches!(command_id, "host.mcp.execute" | "host.mcp.query") {
+                let target = params.get("command").and_then(Value::as_str).unwrap_or("");
+                let payload = params.get("params").cloned().unwrap_or_else(|| json!({}));
+                crate::mcp::execute(&mut entry.app, target, payload, command_id == "host.mcp.query")
+            } else if command_id == "host.cancelPicture" {
                 entry.app.change_picture_target = None;
                 Ok(json!({"cancelled":true}))
             } else if command_id == "host.deliverPicture" {

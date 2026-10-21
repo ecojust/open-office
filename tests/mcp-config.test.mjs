@@ -21,10 +21,10 @@ function withStorage(store, callback) {
   }
 }
 
-test('MCP defaults are local, read-only and use independently generated 256-bit keys', () => {
+test('MCP defaults are local, editable and use independently generated 256-bit keys', () => {
   const config = createDefaultMcpConfig()
   assert.equal(config.port, 19780)
-  assert.equal(config.allowEdits, false)
+  assert.equal(config.allowEdits, true)
   assert.match(config.token, /^[a-f0-9]{64}$/)
   assert.notEqual(config.token, createMcpToken())
   assert.equal(validateMcpConfig(config), null)
@@ -49,9 +49,11 @@ test('MCP config normalization retains only supported fields and does not mutate
 })
 
 test('loading valid MCP browser settings never writes or generates a replacement token', () => {
-  const store = storage(JSON.stringify({ ...valid(), allowEdits: true }))
-  withStorage(store, () => assert.deepEqual(loadMcpConfig(), { ...valid(), allowEdits: true }))
-  assert.equal(store.writes, 0)
+  for (const allowEdits of [false, true]) {
+    const store = storage(JSON.stringify({ ...valid(), allowEdits }))
+    withStorage(store, () => assert.deepEqual(loadMcpConfig(), { ...valid(), allowEdits }))
+    assert.equal(store.writes, 0)
+  }
 })
 
 test('missing, damaged or unreadable MCP browser settings recover without persisting', () => {
@@ -59,7 +61,7 @@ test('missing, damaged or unreadable MCP browser settings recover without persis
     const store = storage(value)
     withStorage(store, () => {
       const config = loadMcpConfig()
-      assert.equal(config.allowEdits, false)
+      assert.equal(config.allowEdits, true)
       assert.equal(validateMcpConfig(config), null)
     })
     assert.equal(store.writes, 0)
