@@ -14,6 +14,7 @@ const FAILURES = new Map([
   ['已有页眉页脚需要使用有版本保护的编辑操作。', 'immediate-command-existing-header-footer'],
 ]);
 const finite = value => Number.isSafeInteger(value) && value >= 0 && value <= 86400000 ? value : null;
+const lifecycleCounts = value => ({ generation: finite(value?.generation), terminations: finite(value?.terminations) });
 
 // Only fixed identifiers, booleans and bounded numbers leave this function.
 // Raw logs, free-form details, errors, paths and document text never do.
@@ -34,6 +35,10 @@ export function nativeReportSummary(report) {
     commit: typeof report.commit === 'string' && /^[a-f0-9]{40}$/.test(report.commit) ? report.commit : null,
     runId: typeof report.runId === 'string' && /^\d{1,20}$/.test(report.runId) ? report.runId : null,
     ok: report.ok === true, durationMs: finite(report.durationMs),
+    // Preserve the host-written verdict and diagnostic counters independently.
+    // Missing evidence must not become an inferred successful lifecycle.
+    nativeLifecycle: lifecycleCounts(frontend.nativeLifecycle),
+    diagnosticLifecycle: lifecycleCounts(report.nativeDiagnostics),
     process: { exitCode: Number.isInteger(report.process?.exitCode) && Math.abs(report.process.exitCode) <= 255 ? report.process.exitCode : null, timedOut: report.process?.timedOut === true },
     failure: FAILURES.get(frontend.error) || (frontend.error ? 'other' : null),
     groups, events: events.slice(-80), rawDetailsOmitted: true };

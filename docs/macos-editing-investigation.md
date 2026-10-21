@@ -93,3 +93,13 @@ GITHUB_SHA="$(git rev-parse HEAD)" node scripts/macos-editing-diagnostic.mjs \
 先创建两个完全空白的表格，再通过系统 CGEvent 单击输入、双击输入、功能区加粗和全局撤销，最后创建 Word 作输入对照。采集器同时校验 Rust 模型内容、原始会话身份、标签可见性以及原生启动代次。CGEvent 经过系统输入路径，但不代表物理键盘或中文输入法组合输入已经验证。
 
 输出位于 `artifacts/macos-editing/`：`report.json` 是结果，`actions.json` 保存系统输入回执，`frontend-report.json` 保存可信事件与模型观测，`native-diagnostics.json` 保存启动及终止记录；另外保留系统 WebKit 日志和本次运行产生的相关崩溃报告（若系统提供）。工作流上传同名诊断 artifact。权限预检通过只表示可以开始，不能解释为编辑测试通过；本地 Chromium 通过也不能代替这项原生验证。
+
+## 0.19.0 发布前的完整 MCP 验证
+
+提交 `353ff2a63dbea38fe244aedf56534800c9142a9c` 的[发布运行 39556806561](https://github.com/ecojust/open-office/actions/runs/39556806561)新增七应用 MCP 编辑、查询、导出及切换文档后的权限撤销检查。Windows 安装包通过当时的完整门禁；ARM macOS 的第二次尝试发生网页进程终止，该次运行未达到发布要求。首次尝试的资源读取错误与第二次退出是否同因仍未确定。
+
+[只读归档摘要 39568807752](https://github.com/ecojust/open-office/actions/runs/39568807752)确认第二次尝试的原生计数为 `generation=2`、`terminations=1`。第一次页面中的普通 Word、表格、演示、PDF、笔记和画布/代码图表检查均已完成；MCP 检查于 19,749 ms 开始，表格于 25,550 ms 报告就绪，WebContent 于 25,572 ms 终止，页面于 25,869 ms 重新启动。表格就绪早于首帧完成，因此这些时序尚不能确定退出发生在 MCP 写入内部。
+
+重启后的烟测再次运行，在创建已存在的笔记夹具时报告 `File exists (os error 17)`。这是重启后的次生错误，不能通过覆盖夹具或改用随机文件名消除。原生完整烟测现与系统输入诊断采用相同规则：宿主必须只观察到一次页面启动、零次 WebContent 终止；即使重启后的前端报告成功也会拒绝验收。
+
+此前表格的导出重开检查同时保留原标签，两个文档共用宿主和渲染器；MCP 流程进一步覆盖了关闭全部表格后重新建立宿主的路径。该差异只用于缩小调查范围，不代表已经确认渲染器生命周期是根因。临时逐步跟踪仅保留在诊断分支，避免挤出正式验收所需的初始生命周期事件。

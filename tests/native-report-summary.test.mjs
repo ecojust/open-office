@@ -4,9 +4,11 @@ import { nativeReportSummary } from '../scripts/native-report-summary.mjs';
 
 test('native report summary exposes current editor groups and bounded lifecycle metadata', () => {
   const report = nativeReportSummary({ platformId: 'macos-arm64', commit: 'a'.repeat(40), runId: '123', durationMs: 40000,
-    process: { exitCode: 1, timedOut: false }, frontend: { word: { ok: true }, sheet: { ok: true }, presentation: { ok: false }, pdf: { ok: true } },
-    nativeDiagnostics: { events: [{ phase: 'office-presentation-roundtrip', detail: 'initializing', elapsedMs: 30000 },
+    process: { exitCode: 1, timedOut: false }, frontend: { nativeLifecycle: { generation: 1, terminations: 0 }, word: { ok: true }, sheet: { ok: true }, presentation: { ok: false }, pdf: { ok: true } },
+    nativeDiagnostics: { generation: 1, terminations: 0, events: [{ phase: 'office-presentation-roundtrip', detail: 'initializing', elapsedMs: 30000 },
       { phase: 'pdf-roundtrip', detail: 'complete', elapsedMs: 35000 }] } });
+  assert.deepEqual(report.nativeLifecycle, { generation: 1, terminations: 0 });
+  assert.deepEqual(report.diagnosticLifecycle, { generation: 1, terminations: 0 });
   assert.deepEqual(report.groups, { word: { present: true, ok: true }, sheet: { present: true, ok: true }, presentation: { present: true, ok: false }, pdf: { present: true, ok: true } });
   assert.deepEqual(report.events, [{ phase: 'office-presentation-roundtrip', elapsedMs: 30000, complete: false }, { phase: 'pdf-roundtrip', elapsedMs: 35000, complete: true }]);
 });
@@ -15,13 +17,40 @@ test('native report summaries cannot expose logs document data unknown phases or
   const secret = 'PRIVATE_TOKEN_DO_NOT_PUBLISH';
   const report = nativeReportSummary({ platformId: secret, commit: secret, runId: secret, durationMs: Infinity,
     process: { stdoutTail: secret, stderrTail: secret, exitCode: secret, signal: secret }, errors: [secret],
-    frontend: { error: secret, stack: secret, presentation: { ok: true, text: secret } },
-    nativeDiagnostics: { events: [{ phase: secret, detail: secret }, { phase: 'presentation', detail: secret, elapsedMs: secret },
+    frontend: { error: secret, stack: secret, presentation: { ok: true, text: secret }, nativeLifecycle: { generation: secret, terminations: secret, detail: secret } },
+    nativeDiagnostics: { generation: secret, terminations: secret, events: [{ phase: secret, detail: secret }, { phase: 'presentation', detail: secret, elapsedMs: secret },
       { phase: 'office-host:reply', detail: JSON.stringify({ action: 'export', error: secret }) }] } });
   const text = JSON.stringify(report);
   assert.ok(!text.includes(secret)); assert.ok(!text.includes(Buffer.from(secret).toString('base64')));
   assert.equal(report.failure, 'other'); assert.equal(report.events.length, 1);
   assert.equal(report.durationMs, null); assert.equal(report.process.exitCode, null);
+  assert.deepEqual(report.nativeLifecycle, { generation: null, terminations: null });
+  assert.deepEqual(report.diagnosticLifecycle, { generation: null, terminations: null });
+});
+
+test('lifecycle summaries retain restart counts and disagreeing evidence without inferring success', () => {
+  const report = nativeReportSummary({ ok: true,
+    nativeLifecycle: { generation: 99, terminations: 99 },
+    frontend: { nativeLifecycle: { generation: 1, terminations: 0 } },
+    nativeDiagnostics: { generation: 2, terminations: 1,
+      events: [{ phase: 'document-start', generation: 1 }] } });
+  assert.deepEqual(report.nativeLifecycle, { generation: 1, terminations: 0 });
+  assert.deepEqual(report.diagnosticLifecycle, { generation: 2, terminations: 1 });
+  const missing = nativeReportSummary({ nativeDiagnostics: { generation: 1, terminations: 0 } });
+  assert.deepEqual(missing.nativeLifecycle, { generation: null, terminations: null });
+  assert.deepEqual(missing.diagnosticLifecycle, { generation: 1, terminations: 0 });
+  assert.deepEqual(nativeReportSummary({}).diagnosticLifecycle, { generation: null, terminations: null });
+});
+
+test('lifecycle summaries reject unbounded, fractional, negative and coerced counters', () => {
+  for (const value of [undefined, null, '1', true, -1, 1.5, NaN, Infinity, 86400001, Number.MAX_SAFE_INTEGER]) {
+    const report = nativeReportSummary({ frontend: { nativeLifecycle: { generation: value, terminations: value } },
+      nativeDiagnostics: { generation: value, terminations: value } });
+    assert.deepEqual(report.nativeLifecycle, { generation: null, terminations: null });
+    assert.deepEqual(report.diagnosticLifecycle, { generation: null, terminations: null });
+  }
+  const report = nativeReportSummary({ frontend: { nativeLifecycle: { generation: 0, terminations: 86400000 } } });
+  assert.deepEqual(report.nativeLifecycle, { generation: 0, terminations: 86400000 });
 });
 
 test('known state failures retain fixed categories while exception suffixes remain private', () => {
