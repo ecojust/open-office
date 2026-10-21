@@ -122,7 +122,7 @@ impl Smoke {
             .and_then(Value::as_bool)
             .ok_or("Smoke report requires an explicit ok boolean.")?;
         let mut report = report.clone();
-        if self.scope == "macos-editing" {
+        {
             let state = self.lifecycle.lock().unwrap_or_else(|e| e.into_inner());
             report["nativeLifecycle"] =
                 json!({"generation":state.generation,"terminations":state.terminations});
@@ -131,9 +131,11 @@ impl Smoke {
             if state.generation != 1 || state.terminations != 0 {
                 passed = false;
                 report["ok"] = json!(false);
-                report["error"] = json!(
+                report["error"] = json!(if self.scope == "macos-editing" {
                     "Native editing diagnostic observed a page restart or WebContent termination."
-                );
+                } else {
+                    "Native full diagnostic observed a page restart or WebContent termination."
+                });
             }
         }
         let bytes = serde_json::to_vec_pretty(&report).map_err(|_| "Invalid smoke report.")?;
@@ -243,6 +245,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let output = directory.path().join("report.json");
         let smoke = Smoke::new(output.clone(), || {});
+        smoke.note("document-start", "first");
         let valid = json!({"ok": true, "pdfBase64": "A".repeat(1024 * 1024 + 1)});
         assert!(smoke.report(&valid).unwrap());
         let saved = std::fs::read(&output).unwrap();
@@ -250,6 +253,69 @@ mod tests {
         let oversized = json!({"ok": true, "pdfBase64": "A".repeat(REPORT_LIMIT)});
         assert!(smoke.report(&oversized).is_err());
         assert_eq!(std::fs::read(output).unwrap(), saved);
+    }
+
+    #[test]
+    fn full_diagnostic_requires_one_host_observed_document_and_preserves_failures() {
+        let directory = tempfile::tempdir().unwrap();
+        let output = directory.path().join("report.json");
+        let smoke = Smoke::new(output.clone(), || {});
+        assert!(!smoke
+            .report(&json!({"ok":true,"nativeLifecycle":{"generation":1,"terminations":0}}))
+            .unwrap());
+        let report: Value = serde_json::from_slice(&std::fs::read(&output).unwrap()).unwrap();
+        assert_eq!(
+            report["nativeLifecycle"],
+            json!({"generation":0,"terminations":0})
+        );
+        assert_eq!(report["ok"], false);
+
+        smoke.note("document-start", "first");
+        assert!(smoke.report(&json!({"ok":true})).unwrap());
+        let report: Value = serde_json::from_slice(&std::fs::read(&output).unwrap()).unwrap();
+        assert_eq!(
+            report["nativeLifecycle"],
+            json!({"generation":1,"terminations":0})
+        );
+        assert_eq!(report["ok"], true);
+
+        assert!(!smoke
+            .report(&json!({"ok":false,"error":"actual editor failure"}))
+            .unwrap());
+        let report: Value = serde_json::from_slice(&std::fs::read(output).unwrap()).unwrap();
+        assert_eq!(report["error"], "actual editor failure");
+        assert_eq!(report["ok"], false);
+    }
+
+    #[test]
+    fn full_diagnostic_cannot_pass_after_navigation_or_renderer_termination() {
+        for (terminated, reloaded) in [(false, true), (true, false), (true, true)] {
+            let directory = tempfile::tempdir().unwrap();
+            let output = directory.path().join("report.json");
+            let smoke = Smoke::new(output.clone(), || {});
+            smoke.note("document-start", "first");
+            assert!(smoke.report(&json!({"ok":true})).unwrap());
+            if terminated {
+                smoke.note("web-content-terminated", "main");
+            }
+            if reloaded {
+                smoke.note("document-start", "reloaded");
+            }
+            // A restarted frontend cannot reset counters held by the native host.
+            assert!(!smoke
+                .report(&json!({"ok":true,"nativeLifecycle":{"generation":1,"terminations":0}}))
+                .unwrap());
+            let report: Value = serde_json::from_slice(&std::fs::read(output).unwrap()).unwrap();
+            assert_eq!(report["ok"], false);
+            assert_eq!(
+                report["nativeLifecycle"],
+                json!({"generation":if reloaded {2} else {1},"terminations":if terminated {1} else {0}})
+            );
+            assert_eq!(
+                report["error"],
+                "Native full diagnostic observed a page restart or WebContent termination."
+            );
+        }
     }
 
     #[test]
