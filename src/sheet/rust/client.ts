@@ -2,6 +2,7 @@ import type { NativeDocument } from '../../types'
 import type { Appearance } from '../../shared/appearance'
 import { base64ToBytes } from '../../shared/document'
 import { createId } from '../../shared/id'
+import { smokeStage } from '../../smoke'
 import type { OfficeSheetEvent, OfficeSheetFileAction, OfficeSheetSnapshot } from './office-sheet-types'
 
 interface OfficeSheetHost {
@@ -156,8 +157,10 @@ export class RustSheetSession {
       canvas ??= newCanvas()
       container.append(canvas)
       if (textAgent) container.append(textAgent)
+      smokeStage('sheet-attach-runner-start', started ? 'reuse' : 'new')
       started ??= api.start(canvas).catch(cause => { started = undefined; throw cause })
       await started
+      smokeStage('sheet-attach-runner-ready')
       if (!textAgent && canvas.nextElementSibling instanceof HTMLInputElement) {
         textAgent = canvas.nextElementSibling
         textAgent.dataset.testid = 'office-sheet-input'
@@ -174,9 +177,11 @@ export class RustSheetSession {
       // Starting the WASM renderer is asynchronous. The shell may finish its
       // open/save task while it starts, so apply the latest input state here.
       interactive = this.desiredInteractive
+      smokeStage('sheet-attach-activate-begin')
       this.accept(snapshotOf(api.activate(this.id), this.id))
       api.setActive(interactive)
       window.dispatchEvent(new Event('resize'))
+      smokeStage('sheet-attach-activate-end')
     })
   }
   setInteractive(enabled: boolean) {
@@ -196,6 +201,7 @@ export class RustSheetSession {
   }
   focus() { if (activeId === this.id && interactive) canvas?.focus({ preventScroll: true }) }
   private async flushInput(api: OfficeSheetHost) {
+    smokeStage('sheet-flush-input-begin')
     if (compositionId === this.id) {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
       await new Promise<void>(resolve => setTimeout(resolve, 0))
@@ -204,6 +210,7 @@ export class RustSheetSession {
     await api.flush(this.id)
     this.assertOpen()
     this.accept(snapshotOf(api.inspect(this.id), this.id))
+    smokeStage('sheet-flush-input-end')
   }
   settled(): Promise<void> {
     return serialize(async () => { this.assertOpen(); const api = await getHost(); await this.flushInput(api) })
@@ -253,18 +260,22 @@ export class RustSheetSession {
   /** MCP changes use the same live Rust session and repaint path as local edits. */
   automation(operation: 'commands' | 'execute' | 'query', params: Record<string, unknown>, assertCurrent: () => void): Promise<unknown> {
     return serialize(async () => {
+      smokeStage('sheet-mcp-operation-begin', operation)
       assertCurrent(); this.assertOpen()
       const api = await getHost()
       assertCurrent()
       if (operation === 'execute') await this.flushInput(api)
       assertCurrent()
       const commandId = operation === 'commands' ? 'host.mcpCommands' : operation === 'query' ? 'host.mcpQuery' : 'host.mcpExecute'
+      smokeStage('sheet-mcp-command-begin', commandId)
       const response = JSON.parse(api.command(this.id, commandId, JSON.stringify(params))) as { ok: boolean; result?: unknown; snapshot?: OfficeSheetSnapshot; error?: string }
+      smokeStage('sheet-mcp-command-end', commandId)
       // Publish the authoritative receipt even on an engine error; failed compound
       // operations must never leave the shell showing an outdated revision.
       this.accept(snapshotOf(response.snapshot ? JSON.stringify(response.snapshot) : api.inspect(this.id), this.id))
       if (!response.ok) throw Error(response.error || '工作簿 MCP 操作失败。')
       assertCurrent()
+      smokeStage('sheet-mcp-operation-end', operation)
       return operation === 'execute' ? { result: response.result, snapshot: this.snapshot } : response.result
     })
   }

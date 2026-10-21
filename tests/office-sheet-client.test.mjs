@@ -59,6 +59,7 @@ function harness() {
     require(name) {
       if (name === '../../shared/document') return { base64ToBytes: () => new Uint8Array() }
       if (name === '../../shared/id') return { createId: () => String(++nextId) }
+      if (name === '../../smoke') return { smokeStage() {} }
       if (name === 'http://localhost/office-sheet/office-sheet.js') return { default: async () => {}, createHost: () => host }
       throw Error(`Unexpected import ${name}`)
     },

@@ -1,4 +1,4 @@
-name: Diagnose macOS editing with real OS input
+name: Diagnose full native macOS smoke and preserve crash evidence
 
 on:
   workflow_dispatch:
@@ -7,14 +7,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: open-office-macos-editing-${{ github.run_id }}
+  group: open-office-native-full-crash-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
-  editing:
-    name: macOS 26 Apple Silicon editing diagnostic
-    runs-on: macos-26
-    timeout-minutes: 75
+  diagnostic:
+    name: macOS 15 ARM full smoke crash diagnostic (no release)
+    runs-on: macos-15
+    timeout-minutes: 90
     env:
       OPEN_OFFICE_PLATFORM_ID: macos-arm64
       OPEN_OFFICE_TARGET: aarch64-apple-darwin
@@ -29,49 +29,6 @@ jobs:
           node-version: '24'
           architecture: arm64
           cache: npm
-      - name: Record and require the actual macOS 26 ARM host
-        run: |
-          mkdir -p artifacts/macos-editing
-          node --input-type=module <<'NODE'
-          import assert from 'node:assert/strict';
-          import { spawnSync } from 'node:child_process';
-          import { writeFileSync } from 'node:fs';
-          const command = (program, args) => {
-            const result = spawnSync(program, args, { encoding: 'utf8', timeout: 15000 });
-            return { status: result.status, stdout: result.stdout?.trim(), stderr: result.stderr?.trim(), error: result.error?.message };
-          };
-          const host = {
-            recordedAt: new Date().toISOString(), commit: process.env.GITHUB_SHA,
-            runId: process.env.GITHUB_RUN_ID, platform: process.platform, nodeArch: process.arch,
-            macOS: command('/usr/bin/sw_vers', ['-productVersion']),
-            macOSBuild: command('/usr/bin/sw_vers', ['-buildVersion']),
-            hardwareArch: command('/usr/bin/uname', ['-m']),
-            appleSilicon: command('/usr/sbin/sysctl', ['-n', 'hw.optional.arm64']),
-            swift: command('/usr/bin/xcrun', ['swiftc', '--version']),
-            limitation: 'The hosted macOS 26 image is recorded exactly; it may differ from the reported macOS 26.5 machine. This run cannot establish a fix.',
-          };
-          writeFileSync('artifacts/macos-editing/host.json', `${JSON.stringify(host, null, 2)}\n`);
-          assert.equal(host.platform, 'darwin');
-          assert.equal(host.nodeArch, 'arm64', 'Diagnostic orchestration must use native ARM Node');
-          assert.equal(host.hardwareArch.status, 0);
-          assert.equal(host.hardwareArch.stdout, 'arm64');
-          assert.equal(host.appleSilicon.status, 0);
-          assert.equal(host.appleSilicon.stdout, '1');
-          assert.equal(host.macOS.status, 0);
-          assert.match(host.macOS.stdout, /^26(?:\.|$)/, 'This diagnostic requires macOS 26');
-          assert.equal(host.swift.status, 0, 'The native Swift compiler is unavailable');
-          console.log(JSON.stringify(host, null, 2));
-          NODE
-      - name: Compile the real keyboard and mouse input helper before building the app
-        timeout-minutes: 3
-        run: |
-          xcrun swiftc scripts/macos-os-input.swift -o "$RUNNER_TEMP/open-office-os-input" 2>&1 | tee artifacts/macos-editing/swift-build.log
-      - name: Require OS event permissions and a supported keyboard input source
-        id: preflight
-        timeout-minutes: 2
-        run: node scripts/macos-editing-diagnostic.mjs --helper "$RUNNER_TEMP/open-office-os-input" --preflight
-      # A blocked preflight exits nonzero. Do not build or label a skipped input
-      # test successful, and do not grant TCC permissions automatically.
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -91,77 +48,98 @@ jobs:
             vendor/office-pdf -> target
           key: aarch64-apple-darwin
           cache-on-failure: true
-      - name: Require native build interpreters
+          cache-workspace-crates: true
+      - name: Require native ARM interpreters and record Python
         run: |
           test "$(rustc -vV | sed -n 's/^host: //p')" = "$OPEN_OFFICE_TARGET"
+          node -e 'if(process.platform!=="darwin"||process.arch!=="arm64")throw Error("Native Apple Silicon is required")'
           python - <<'PY'
           import os, platform, sys
-          assert sys.platform == 'darwin'
-          assert platform.machine() == 'arm64'
+          assert sys.platform == 'darwin' and platform.machine() == 'arm64'
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
               output.write(f'OPEN_OFFICE_PYTHON={sys.executable}\n')
-          print(sys.version, platform.platform())
           PY
       - name: Install frontend dependencies
         run: npm ci
-      - name: Install the pinned editor WASM bridge
+      - name: Validate native dependency lockfile
+        run: cargo metadata --locked --format-version 1 --filter-platform aarch64-apple-darwin --manifest-path src-tauri/Cargo.toml > "$RUNNER_TEMP/open-office-native-metadata.json"
+      - name: Install pinned editor WASM bridge
         run: cargo install --locked wasm-bindgen-cli --version 0.2.129
       - name: Install independent test-only PDF inspector
         run: python -m pip install -r tests/requirements-pdf-inspection.txt
-      - name: Check frontend types, diagnostic contracts and PDF round trips
-        run: npm test 2>&1 | tee artifacts/macos-editing/tests.log
-      - name: Build all four Rust editors and complete frontend resources
-        run: npm run build 2>&1 | tee artifacts/macos-editing/frontend-build.log
-      - name: Verify the generated editor resources against their source
+      - name: Check frontend types and real editing round trips
+        run: npm test
+      - name: Build all editor resources
+        run: npm run build
+      - name: Verify all editor resources match source
         run: |
           npm run word:check
           npm run sheet:check
           npm run deck:check
           npm run pdf:check
           npm run engine:check:dist
-      - name: Compile and test the native lifecycle and file bridge
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml -- --include-ignored 2>&1 | tee artifacts/macos-editing/native-tests.log
-      - name: Build the native diagnostic application without a release installer
-        run: npm run desktop:build -- --bundles app 2>&1 | tee artifacts/macos-editing/app-build.log
-      - name: Exercise editing through native macOS keyboard and mouse events
-        id: diagnostic
-        timeout-minutes: 8
+      # Native engine regression suites remain required by desktop-release.yml.
+      # This diagnostic skips those suites and cannot publish a release.
+      - name: Build native diagnostic app
+        id: package
+        run: npm run desktop:build -- --bundles app
+      - name: Retain exact App archive for subsequent diagnostics
         run: |
-          node scripts/macos-editing-diagnostic.mjs --helper "$RUNNER_TEMP/open-office-os-input" --app "$GITHUB_WORKSPACE/src-tauri/target/release/bundle/macos/Open Office.app"
-      - name: Explain the diagnostic result and its limits
+          mkdir -p artifacts/native-full-app
+          tar -czf artifacts/native-full-app/Open-Office-diagnostic-macos-arm64.app.tar.gz -C src-tauri/target/release/bundle/macos 'Open Office.app'
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const hash = path => createHash('sha256').update(readFileSync(path)).digest('hex');
+          const report = { schemaVersion: 1, diagnosticOnly: true, releaseAcceptance: false,
+            commit: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID,
+            executableSha256: hash('src-tauri/target/release/bundle/macos/Open Office.app/Contents/MacOS/open-office'),
+            archiveSha256: hash('artifacts/native-full-app/Open-Office-diagnostic-macos-arm64.app.tar.gz') };
+          writeFileSync('artifacts/native-full-app/identity.json', JSON.stringify(report, null, 2) + '\n');
+          NODE
+      - name: Run one full native smoke with bounded OS crash capture
+        timeout-minutes: 8
+        run: node scripts/native-full-crash-diagnostics.mjs --app "$GITHUB_WORKSPACE/src-tauri/target/release/bundle/macos/Open Office.app"
+      - name: Summarize native stages using the strict fixed allowlist
         if: always()
-        env:
-          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
-          DIAGNOSTIC_OUTCOME: ${{ steps.diagnostic.outcome }}
         run: |
           node --input-type=module <<'NODE'
-          import { appendFileSync, existsSync, readFileSync } from 'node:fs';
-          const path = 'artifacts/macos-editing/report.json';
-          let status = 'No structured diagnostic report was produced.';
+          import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+          import { nativeReportSummary } from './scripts/native-report-summary.mjs';
+          const path = 'artifacts/macos-arm64-native-smoke.json';
           if (existsSync(path)) {
-            try { status = `Recorded report status: ${String(JSON.parse(readFileSync(path, 'utf8')).status ?? 'unknown')}`; }
-            catch { status = 'The diagnostic report could not be parsed; inspect the retained logs.'; }
+            const summary = nativeReportSummary(JSON.parse(readFileSync(path, 'utf8')));
+            writeFileSync('artifacts/native-full-crash/native-summary.json', JSON.stringify(summary, null, 2) + '\n');
+            const encoded = Buffer.from(JSON.stringify(summary)).toString('base64');
+            const count = Math.ceil(encoded.length / 3800);
+            if (count > 10) throw Error('Native summary exceeds the annotation count bound');
+            for (let index = 0; index < count; index++) console.log(`::notice title=full-native-summary-${index+1}-of-${count}::${encoded.slice(index*3800,(index+1)*3800)}`);
           }
-          const text = [
-            '## macOS editing diagnostic', '',
-            `OS input preflight: ${process.env.PREFLIGHT_OUTCOME || 'not reached'}.`,
-            `Application input test: ${process.env.DIAGNOSTIC_OUTCOME || 'not reached'}.`,
-            status, '',
-            'A blocked or skipped input test provides no editing result. A completed run without reproduction does not establish a fix for macOS 26.5. The exact host version, permissions, native lifecycle and input evidence are retained in the diagnostic artifact.',
-            'This workflow does not publish an application or release.', '',
-          ].join('\n');
-          console.log(text);
-          appendFileSync(process.env.GITHUB_STEP_SUMMARY, text);
           NODE
-      - name: Expose a bounded evidence summary through check annotations
+      - name: Summarize bounded WebKit logs and process memory
         if: always()
-        run: python3 scripts/inspect-macos-diagnostic.py --directory artifacts/macos-editing
-      - name: Always retain diagnostic evidence and build errors
+        run: python3 scripts/inspect-macos-diagnostic.py --directory artifacts/native-full-crash
+      - name: Summarize bounded IPS exception and WebKit stack evidence
+        if: always()
+        run: python3 scripts/inspect-native-full-crash.py artifacts/native-full-crash
+      - name: Retain bounded native crash evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: macos-editing-diagnostics
-          path: artifacts/macos-editing/
+          name: open-office-native-full-crash-evidence
+          path: |
+            artifacts/native-full-crash/
+            artifacts/macos-arm64-native-smoke.json
+            artifacts/macos-arm64-native-diagnostics.json
           if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
+      - name: Retain built App even when native smoke fails
+        if: always() && steps.package.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-office-native-full-crash-app-macos-arm64
+          path: artifacts/native-full-app/
+          if-no-files-found: error
           retention-days: 7
           compression-level: 0

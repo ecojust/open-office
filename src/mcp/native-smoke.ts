@@ -1,5 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { base64ToBytes } from '../native'
+import { smokeStage } from '../smoke'
 import type { DocumentKind, NativeDocument } from '../types'
 import type { McpServiceState, McpStatus } from './service'
 
@@ -81,8 +82,16 @@ function assert(value: unknown, message: string): asserts value {
 }
 async function bounded<T>(work: Promise<T>, label: string, milliseconds = 40000): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
+  // Fixed diagnostic labels only; never record document contents or credentials.
+  // Host-owned progress survives a native WebView process restart.
+  smokeStage('mcp-step-start', label)
   try {
-    return await Promise.race([work, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(Error(`Native MCP: ${label} timed out`)), milliseconds) })])
+    const result = await Promise.race([work, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(Error(`Native MCP: ${label} timed out`)), milliseconds) })])
+    smokeStage('mcp-step-complete', label)
+    return result
+  } catch (cause) {
+    smokeStage('mcp-step-failed', label)
+    throw cause
   } finally { if (timer !== undefined) clearTimeout(timer) }
 }
 function toolValue(probe: ToolProbe, tool: string, sessionId: string, port: number) {
@@ -146,7 +155,7 @@ async function editingEvidence(adapter: McpNativeSmokeAdapter, opened: Awaited<R
     editTool = 'diagram_update'; editArgs = { source: `sequenceDiagram\n  Alice->>Bob: ${markers.diagram}`, style: 'blueprint' }
     queryTool = 'diagram_read'; queryArgs = {}
   }
-  const before = await opened.editor.inspect()
+  const before = await bounded(opened.editor.inspect(), `${kind} inspect before edit`)
   const edit = await probe(editTool, editArgs), edited = toolValue(edit, editTool, sessionId, port)
   const query = await probe(queryTool, queryArgs), queried = toolValue(query, queryTool, sessionId, port)
   assert(json(queried).includes(markers[kind]), `${kind} native query did not observe the edited content`)

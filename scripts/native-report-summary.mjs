@@ -11,7 +11,22 @@ const PHASES = new Set([
   'word', 'sheet', 'presentation', 'office-word-roundtrip', 'office-sheet-roundtrip',
   'office-presentation-roundtrip', 'pdf-roundtrip', 'ipc-smoke-report', 'report-written',
   'editor-ready', 'editor-error', 'web-content-terminated', 'web-content-reload-requested',
+  'mcp-step-start', 'mcp-step-complete', 'mcp-step-failed',
+  'sheet-attach-runner-start', 'sheet-attach-runner-ready', 'sheet-attach-activate-begin', 'sheet-attach-activate-end',
+  'sheet-flush-input-begin', 'sheet-flush-input-end', 'sheet-mcp-operation-begin', 'sheet-mcp-operation-end',
+  'sheet-mcp-command-begin', 'sheet-mcp-command-end',
 ]);
+const MCP_LABELS = new Set([
+  'new document', 'normal MCP start', 'native service status', 'word_insert_text', 'word_read',
+  'MCP edited DOCX export', 'edited document export', 'switch current document', 'stopped native service status',
+  'closed MCP TCP listener', 'close Word specimen', 'final MCP stop', 'close MCP smoke document', 'cleanup native status',
+  ...EDITORS.flatMap(kind => ['inspect before edit', 'native document', 'native MCP start', 'native status', 'stop', 'close'].map(action => `${kind} ${action}`)),
+  'word word_select_text', 'word word_query', 'word word_execute_command', 'word document_undo', 'word document_redo',
+  'sheet sheet_execute_command', 'sheet sheet_query', 'presentation presentation_execute_command', 'presentation presentation_query',
+  'pdf pdf_execute_command', 'pdf pdf_query', 'note note_edit', 'note note_read',
+  'canvas canvas_edit', 'canvas canvas_read', 'diagram diagram_update', 'diagram diagram_read',
+]);
+const SHEET_LABELS = new Set(['new', 'reuse', 'commands', 'execute', 'query', 'host.mcpCommands', 'host.mcpExecute', 'host.mcpQuery']);
 const IO_KINDS = new Set([
   'NotFound', 'PermissionDenied', 'ConnectionRefused', 'ConnectionReset', 'HostUnreachable',
   'NetworkUnreachable', 'ConnectionAborted', 'NotConnected', 'AddrInUse', 'AddrNotAvailable',
@@ -41,6 +56,8 @@ const MCP_CHECKS = [
   'native-mcp-session-cleanup',
 ];
 const FAILURES = new Map([
+  ['Native full diagnostic observed a page restart or WebContent termination.', 'native-lifecycle-restarted'],
+  ['Native editing diagnostic observed a page restart or WebContent termination.', 'native-lifecycle-restarted'],
   ['Unable to create isolated native smoke document: File exists (os error 17)', 'isolated-fixture-already-exists'],
   ['Load failed', 'resource-load-failed'],
   ['Failed to fetch', 'resource-fetch-failed'],
@@ -103,6 +120,8 @@ export function nativeReportSummary(input) {
       if (event.phase === 'editor-error') item.failure = failure(event.detail);
       if (event.phase === 'report-written') item.passed = event.detail === 'passed';
       if (event.phase === 'web-content-reload-requested') item.reloadSucceeded = event.detail === 'ok';
+      if (event.phase.startsWith('mcp-step-')) item.step = MCP_LABELS.has(event.detail) ? event.detail : 'unknown-step';
+      if (event.phase.startsWith('sheet-') && event.detail) item.step = SHEET_LABELS.has(event.detail) ? event.detail : 'unknown-step';
       events.push(item);
     } else if (['http-asset', 'http-asset-complete', 'http-io-error', 'http-socket-error', 'http-404'].includes(event.phase)) {
       resources.push(resourceEvent(event));
@@ -110,6 +129,11 @@ export function nativeReportSummary(input) {
   }
   const sheet = record(frontend.sheet), canvas = record(sheet.canvas), sheetResources = record(sheet.resources), cleanup = record(sheet.cleanup);
   const mcp = record(frontend.mcp), mcpEditors = Array.isArray(mcp.editors) ? mcp.editors.slice(0, 7) : [];
+  const terminationIndex = events.findIndex(event => event.phase === 'web-content-terminated');
+  // Preserve the first observed termination and its preceding operations even
+  // when an automatic reload generates a second, unrelated smoke sequence.
+  const selected = terminationIndex < 0 ? events.slice(-64) : events.filter((event, index) =>
+    (index >= Math.max(0, terminationIndex - 40) && index <= terminationIndex + 11) || index >= events.length - 10);
   return {
     schemaVersion: 2,
     platformId: PLATFORM.has(report.platformId) ? report.platformId : 'unknown',
@@ -118,7 +142,8 @@ export function nativeReportSummary(input) {
     ok: report.ok === true, durationMs: integer(report.durationMs),
     process: { exitCode: Number.isInteger(report.process?.exitCode) && Math.abs(report.process.exitCode) <= 255 ? report.process.exitCode : null, timedOut: report.process?.timedOut === true },
     failure: failure(frontend.error), groups,
-    lifecycle: { generation: integer(diagnostics.generation, 1000), terminations: integer(diagnostics.terminations, 1000) },
+    lifecycle: { generation: integer(diagnostics.generation, 1000), terminations: integer(diagnostics.terminations, 1000),
+      documentStartRetained: events.some(event => event.phase === 'document-start'), retainedEventCount: integer(diagnostics.events?.length, 256) },
     sheetProgress: {
       canvasPresent: hasObject(sheet.canvas), canvasWidth: integer(canvas.width, 32768), canvasHeight: integer(canvas.height, 32768), paintCalls: integer(canvas.paintCalls, 10000000),
       resourcesVerified: sheetResources.wasmLoaded === true && sheetResources.sameOrigin === true,
@@ -136,7 +161,7 @@ export function nativeReportSummary(input) {
       }),
       closedDocuments: integer(mcp.cleanup?.closedDocuments, 1000), serviceStopped: mcp.cleanup?.serviceStopped === true,
     },
-    events: events.slice(-64), resourceEvents: resources.slice(-128),
+    events: selected, resourceEvents: resources.slice(-64),
     rawDetailsOmitted: true,
     resourceEventsAreCorrelatedByTimeOnly: true,
   };
