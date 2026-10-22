@@ -5,6 +5,9 @@ on:
       source_run_id:
         type: string
         required: true
+      inspect_only:
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -63,10 +66,14 @@ jobs:
           printf '801b237643cc0f4ab27ebd1745e7863e23bf194a038bc6ca8ce5618212e43669  /tmp/wasm-tools.tar.gz\n' | shasum -a 256 -c
           mkdir /tmp/wasm-tools
           tar -xzf /tmp/wasm-tools.tar.gz -C /tmp/wasm-tools
-          while IFS= read -r wasm_file; do
-            python scripts/diagnose-wasm-switches.py "$wasm_file"
-          done < <(rg --files --hidden --no-ignore "$OPEN_OFFICE_VERIFIED_APP/Contents/Resources" -g '*.wasm')
+          python - <<'PYTHON'
+          import os,pathlib,subprocess
+          files=list(pathlib.Path(os.environ['OPEN_OFFICE_VERIFIED_APP'],'Contents/Resources').rglob('*.wasm'))
+          assert len(files)>=4, 'Packaged editor WASM files are missing'
+          subprocess.run(['python','scripts/diagnose-wasm-switches.py',*[str(p) for p in files]],check=True)
+          PYTHON
       - name: Reproduce and retain bounded crash frames
+        if: inputs.inspect_only != true
         run: |
           node --input-type=module <<'JS'
           import {spawn} from 'node:child_process';
