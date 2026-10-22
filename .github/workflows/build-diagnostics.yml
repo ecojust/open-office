@@ -1,72 +1,38 @@
-name: Read failed build diagnostics
-
+name: Read bounded failed packaging diagnostics
 on:
-  push:
-    branches: ['work/release-*']
-    paths: ['.github/workflows/build-diagnostics.yml']
   workflow_dispatch:
     inputs:
       source_run_id:
-        description: Build run whose completed failed jobs should be inspected
         required: true
         type: string
-
 permissions:
-  actions: read
   contents: read
-
+  actions: read
 jobs:
   diagnostics:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Extract failed test and compiler messages
+      - name: Read only the failed native package command tail
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
         run: |
           python3 - <<'PY'
-          import json, os, re, subprocess
-
-          repo = os.environ['GITHUB_REPOSITORY']
-          run_id = os.environ['SOURCE_RUN_ID']
-          if not run_id:
-              # Bootstrap on a release branch before this workflow is available
-              # in the default branch's manual-dispatch menu.
-              runs = json.loads(subprocess.check_output([
-                  'gh', 'api', '--method', 'GET',
-                  f'repos/{repo}/actions/workflows/desktop-release.yml/runs',
-                  '-f', f"branch={os.environ['GITHUB_REF_NAME']}", '-f', 'per_page=1',
-              ]))['workflow_runs']
-              assert runs, 'No desktop build found on this release branch'
-              run_id = str(runs[0]['id'])
-          assert re.fullmatch(r'[0-9]+', run_id), 'Run ID must contain digits only'
-          pages = json.loads(subprocess.check_output([
-              'gh', 'api', '--paginate', '--slurp',
-              f'repos/{repo}/actions/runs/{run_id}/jobs?per_page=100',
-          ]))
-          jobs = [job for page in pages for job in page['jobs']
-                  if job['status'] == 'completed' and job['conclusion'] == 'failure']
-          assert jobs, 'No completed failed jobs to inspect'
-
-          def escape(value):
-              return value.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-
+          import json,os,re,subprocess
+          run=os.environ['SOURCE_RUN_ID'];repo=os.environ['GITHUB_REPOSITORY']
+          assert re.fullmatch(r'[0-9]+',run)
+          jobs=json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/actions/runs/{run}/jobs?per_page=100']))['jobs']
+          escape=lambda s:s.replace('%','%25').replace('\r','%0D').replace('\n','%0A')
           for job in jobs:
-              log = subprocess.check_output([
-                  'gh', 'api', '--allow-escape-sequences',
-                  f"repos/{repo}/actions/jobs/{job['id']}/logs",
-              ], text=True)
-              lines = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', log).splitlines()
-              matches = set()
-              for index, line in enumerate(lines):
-                  if re.search(r'error\[|error:|panicked at|FAILED|^.*failures:|assertion .*failed', line):
-                      matches.update(range(max(0, index - 2), min(len(lines), index + 12)))
-              excerpt = '\n'.join(lines[i] for i in sorted(matches)) or '\n'.join(lines[-100:])
-              # An annotation is also readable through the API when the runner's
-              # separate log-download host cannot be reached by a developer.
-              message = f"{job['name']} (job {job['id']})\n{excerpt}"
-              print(f'::notice title=Build failure details::{escape(message[:60000])}')
-              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
-                  summary.write(f"## {job['name']}\n\n```text\n{excerpt}\n```\n")
+              if job['status']!='completed' or job['conclusion']!='failure':continue
+              raw=subprocess.check_output(['gh','api',f"repos/{repo}/actions/jobs/{job['id']}/logs"],text=True)
+              lines=re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]','',raw).splitlines()
+              starts=[i for i,l in enumerate(lines) if '##[group]Run npm run desktop:build' in l]
+              assert starts,'Package command not found'
+              start=starts[-1];ends=[i for i in range(start,len(lines)) if '##[error]' in lines[i]]
+              end=ends[0]+1 if ends else len(lines)
+              excerpt='\n'.join(l[:800] for l in lines[max(start,end-45):end])
+              for i in range(0,len(excerpt),2800):
+                  print(f"::notice title=Package command tail {i//2800:03d}::{escape(excerpt[i:i+2800])}")
           PY
