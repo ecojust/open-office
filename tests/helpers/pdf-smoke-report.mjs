@@ -1,3 +1,4 @@
+import { WASM_COMPAT_SOURCES } from '../../scripts/wasm-webkit-compat.mjs';
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -6,7 +7,7 @@ import { inspectInstalledPdf, pdfSourceHash, PDF_SMOKE_LIMITATIONS, REQUIRED_OFF
 const digest = value => createHash('sha256').update(value).digest('hex');
 const write = (path, bytes) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, bytes); };
 export function installPdfFixture(root, resourceRoot) {
-  for (const path of ['scripts/build-office-pdf.mjs', 'scripts/build-office-icons.mjs', 'vendor/office-pdf/src/lib.rs',
+  for (const path of [...WASM_COMPAT_SOURCES, 'scripts/build-office-pdf.mjs', 'scripts/build-office-icons.mjs', 'vendor/office-pdf/src/lib.rs',
     'assets/fonts/open-office/license.txt', 'assets/fonts/deck/license.txt', 'assets/fonts/ui/license.txt',
     'src/shared/office-ui-fonts.rs', 'src/icons/test.svg']) {
     // Shared fixture files may already be used by the other editor manifests.

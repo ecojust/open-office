@@ -23,3 +23,4 @@ public/office-presentation/
 vendor/office-presentation/target/
 public/office-pdf/
 vendor/office-pdf/target/
+scripts/wasm-webkit-compat/target/
