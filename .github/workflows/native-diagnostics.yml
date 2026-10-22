@@ -5,6 +5,9 @@ on:
       source_run_id:
         type: string
         required: true
+      rewrite_i64:
+        type: boolean
+        default: false
       inspect_only:
         type: boolean
         default: false
@@ -60,6 +63,21 @@ jobs:
           path: artifacts
       - name: Verify and copy original package without modifying its resources
         run: GITHUB_SHA="$DIAGNOSTIC_SOURCE_SHA" GITHUB_RUN_ID="$SOURCE_RUN_ID" node scripts/macos-intel-transfer.mjs verify-and-copy
+      - name: Apply explicitly diagnostic-only WASM overlay and re-sign the modified copy
+        if: inputs.rewrite_i64 == true
+        run: |
+          cargo build --locked --release --manifest-path scripts/wasm-webkit-compat/Cargo.toml
+          python - <<'PYTHON'
+          import os,pathlib,subprocess,json,hashlib
+          app=pathlib.Path(os.environ['OPEN_OFFICE_VERIFIED_APP'])
+          files=list((app/'Contents/Resources').rglob('*.wasm'))
+          assert len(files)>=4
+          for p in files:
+              subprocess.run(['scripts/wasm-webkit-compat/target/release/open-office-wasm-webkit-compat',str(p)],check=True)
+              m=p.parent/'manifest.json';r=json.loads(m.read_text());r['files'][p.name]=hashlib.sha256(p.read_bytes()).hexdigest();r['sizeBytes']=p.stat().st_size;m.write_text(json.dumps(r,indent=2)+'\n')
+          print('::notice title=Diagnostic overlay::Modified WASM and ad-hoc signature; not an unchanged installer or publication proof.')
+          PYTHON
+          codesign --force --deep --sign - "$OPEN_OFFICE_VERIFIED_APP"
       - name: Inspect actual packaged WASM constants without executing them
         run: |
           curl -fsSL https://github.com/bytecodealliance/wasm-tools/releases/download/v1.262.0/wasm-tools-1.262.0-aarch64-macos.tar.gz -o /tmp/wasm-tools.tar.gz
