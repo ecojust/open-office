@@ -62,6 +62,10 @@ for filename in sys.argv[1:]:
   if known or (len(constants)>=7 and max(constants)-min(constants)>=2**63):
    candidates.append({'index':i+imports,'bytes':len(body),'name':names.get(i+imports,''),'knownMatches':len(known),'comparedI64Constants':len(constants),'values':sorted(constants)})
  import base64
+ import re
+ for c in candidates:
+  c['range']=[min(c['values']),max(c['values'])] if c['values'] else []
+  del c['values'];c['name']=re.sub(r'\[[0-9a-f]{16}\]','',c['name'])[:180]
  report={'file':Path(filename).name,'candidates':candidates}
  Path('/tmp/'+Path(filename).name+'-switches.json').write_text(json.dumps(report,indent=2))
  encoded=base64.b64encode(json.dumps(report).encode()).decode()
