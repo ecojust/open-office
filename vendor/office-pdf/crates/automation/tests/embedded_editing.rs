@@ -51,3 +51,20 @@ fn document_fonts_are_loaded_only_from_inline_assets_and_can_be_undone() {
     assert!(Automation::call_in_session(&mut session, id, "text_font_import", &args, HashMap::new(), false).is_err());
     assert!(Automation::call_in_session(&mut session, id, "text_font_import", &args, assets, true).is_err());
 }
+
+#[test]
+fn catalog_callers_cannot_change_shared_definitions_or_restore_document_arguments() {
+    let mut first = office_pdf_automation::embedded_tools();
+    let name = first[0].name;
+    let schema = first[0].input_schema.clone();
+    first[0].name = "tampered";
+    first[0].input_schema["properties"]["doc"] = json!({"type":"integer"});
+    first.clear();
+    let second = office_pdf_automation::embedded_tools();
+    assert_eq!(second[0].name, name);
+    assert_eq!(second[0].input_schema, schema);
+    assert!(second.iter().all(|tool| tool.input_schema["properties"].get("doc").is_none()));
+    let source = office_pdf_automation::tools();
+    let raw = source.iter().find(|tool| tool.name == "doc_info").unwrap();
+    assert!(raw.input_schema["properties"].get("doc").is_some());
+}
