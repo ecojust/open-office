@@ -23,10 +23,10 @@ Open Office 桌面版可作为本机 MCP 服务，供支持 Streamable HTTP 的 
 
 | 子软件 | 命令发现 / 读取 | 编辑能力 |
 | --- | --- | --- |
-| 文字文档 | `word_list_commands`、`word_inspect_document`、`word_query`、`word_read` | `word_execute_command`：内容替换删除、字符/段落格式、样式列表、表格、图片图形、页面布局、页眉页脚、批注修订等；`word_select_text` / `word_select_range` 设置编辑位置 |
+| 文字文档 | `word_list_commands`、`word_inspect_document`、`word_query`、`word_read` | `word_execute_command`：内容替换删除、字符/段落格式、样式列表、表格、图片图形、页面布局、页眉页脚、批注修订、文档内剪贴板、表格绘制/擦除、内嵌文档导入和模板样式更新等；`word_select_text` / `word_select_range` 设置编辑位置 |
 | 电子表格 | `sheet_list_commands`、`sheet_query`、`sheet_read_range` | `sheet_execute_command`：公式、单元格格式、行列/工作表、排序筛选、图表图片、数据透视表、批注和打印布局；`sheet_write_range` 批量写入二维数据 |
 | 演示文稿 | `presentation_list_commands`、`presentation_describe_command`、`presentation_query`、`presentation_list_templates` | `presentation_execute_command`：页面增删复制、文字/形状/图片/表格/图表、主题母版、过渡动画、备注批注；`presentation_apply_template` 应用模板 |
-| PDF | `pdf_list_commands`、`pdf_query`、`pdf_read` | `pdf_execute_command`：文字图像、批注高亮、签名图章、表单、书签链接、页面管理、水印页眉等 |
+| PDF | `pdf_list_commands`、`pdf_query`、`pdf_read` | `pdf_execute_command`：文字图像、批注高亮、签名图章、表单及其动作/脚本内容、文档脚本内容、内嵌字体、书签链接、页面管理、水印页眉等 |
 | 笔记本 | `note_read`、`note_read_page` | `note_edit`：分区/页面/子页增删改和移动，区域位置尺寸、富文本、待办及图片；`note_select_page` 显示指定页面 |
 | 画布 | `canvas_read`、`canvas_read_elements`、`canvas_list_templates` | `canvas_edit`：全部图形、连线、笔迹和图片的内容样式、位置尺寸、锁定、组合、层级、对齐布局及模板；`canvas_select_elements` 选择或定位元素 |
 | 代码图表 | `diagram_read`、`diagram_read_source`、`diagram_list_templates` | `diagram_update`：源码、标题、风格及模板；保留 `diagram_set_source` |
@@ -44,6 +44,12 @@ Open Office 桌面版可作为本机 MCP 服务，供支持 Streamable HTTP 的 
 ```
 
 笔记和画布的 `*_edit` 接收结构化 `operations` 数组；同一批次整体校验、整体提交，出错不保留前半批修改。工具定义包含全部操作和字段。画布锁定对象需先显式解锁。
+
+文字文档的 `edit.copy` / `edit.cut`、无参数 `edit.paste` / `edit.pasteMerge` / `edit.pasteText` 使用当前文档的内部剪贴板，不访问系统剪贴板。`edit.clipboardItems` 可读取历史，`edit.pasteClipboardItem` / `edit.pasteAllClipboard` 可粘贴历史内容；`edit.repeat` 会重新检查被重复命令的文档权限与参数。`table.draw` 必须提供 page、x0、y0、x1、y1，`table.eraser` 必须提供 page、x、y，不能只打开画笔模式。
+
+`insert.textFromFile` / `insert.object`、`styles.copyFrom`、`tools.attachTemplate` / `tools.updateStyles` 接收 `name`（仅文件名与扩展名）和 `data`（文档字节的 base64）；样式复制还需提供 `styles`。它们不会读取该名称对应的本机文件，也不替换当前文档身份。`styles.organizer` 无参数时列出当前文档样式，提供 name/data 时可检查素材文档样式。导入内容和更新样式支持正常撤销。
+
+PDF 的 `text_font_import` 使用 `params.path` 引用 `assets` 中的字体文件名，字体须通过现有字体嵌入校验。`form_actions` / `form_set_actions` 读取或替换字段动作；`form_set_script` 编辑字段的验证、格式或计算脚本；`js_document_scripts` / `js_set_document_script` 读取、增删或修改文档内保存的脚本内容。脚本运行沿用 PDF 引擎的既有规则；MCP 不开放 `js_run` 控制台或系统命令。
 
 文字定位的 `off` 使用 UTF-8 字节偏移；按文字定位时优先用 `word_select_text`。工作表、幻灯片索引从 0 开始。PDF 新命令的页码和对象序号从 **1** 开始，旧 `pdf_add_text` 的 `page` 仍从 **0** 开始，具体以命令说明为准。
 

@@ -570,11 +570,12 @@ impl Automation {
             }
             "text_font_import" => {
                 let page = self.page(&a)?;
-                let path = self.resolve(a.str("path")?, false)?;
-                let file = std::fs::File::open(&path).map_err(failed)?;
+                // The embedded editor supplies named inline assets; the standalone CLI
+                // continues to resolve files under its configured filesystem roots.
+                let reader = self.input_reader(a.str("path")?)?;
                 use std::io::Read;
                 let mut bytes = Vec::new();
-                file.take((16 << 20) + 1).read_to_end(&mut bytes).map_err(failed)?;
+                reader.take((16 << 20) + 1).read_to_end(&mut bytes).map_err(failed)?;
                 if bytes.len() > 16 << 20 {
                     return Err(ToolError::InvalidArgs("font input exceeds 16 MiB".into()));
                 }

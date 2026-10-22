@@ -505,10 +505,9 @@ pub fn specs() -> Vec<CommandSpec> {
         })
         .params(r#"{"signer"?: string, "title"?: string}"#),
         CommandSpec::new("insert.object", "Object", "Insert › Text", |s, v| {
-            let path = p::req_str(v, "path")?;
-            s.run("insert.textFromFile", &json!({"path": path}))
+            s.run("insert.textFromFile", v)
         })
-        .params(r#"{"path": string}"#),
+        .params(r#"{"path"?: string, "name"?: string, "data"?: base64 (inline document bytes; requires name)}"#),
         CommandSpec::new("insert.spreadsheet", "Spreadsheet Table", "Insert › Tables", |s, v| {
             let csv = p::str(v, "csv").unwrap_or("A,B,C\n1,2,3\n4,5,6");
             let rows = super::mailings::parse_csv(csv);

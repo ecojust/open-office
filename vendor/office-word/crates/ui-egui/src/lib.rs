@@ -945,7 +945,7 @@ impl WordApp {
         // Copy and Cut put what they took on the system clipboard, whichever control ran them
         // (the ribbon, a context menu, the native menu, or the Cmd+C/X event). Only the key event
         // used to write it, so a Cut button deleted the words without copying them.
-        if matches!(id, "edit.copy" | "edit.cut")
+        if interactive && matches!(id, "edit.copy" | "edit.cut")
             && let Ok(v) = &r
             && let Some(ctx) = &ctx
         {
@@ -3943,6 +3943,34 @@ mod tests {
         a.run("edit.copy", json!({})).unwrap();
         assert_eq!(body_text(&a), text, "copy kept the text");
         assert!(copied(&ctx).contains(&text), "copy put {text:?} on the clipboard: {:?}", copied(&ctx));
+    }
+
+    #[test]
+    fn noninteractive_copy_and_cut_only_use_the_document_clipboard() {
+        let ctx = egui::Context::default();
+        let writes = std::rc::Rc::new(std::cell::Cell::new(0));
+        let observed = writes.clone();
+        let mut app = typed();
+        app.ctx = Some(ctx.clone());
+        app.services.set_clipboard_html = Some(Box::new(move |_, _| {
+            observed.set(observed.get() + 1);
+            true
+        }));
+        app.execute_noninteractive("select.all", json!({})).unwrap();
+        let original = body_text(&app);
+        app.execute_noninteractive("edit.copy", json!({})).unwrap();
+        assert_eq!(app.session.clipboard_text, original);
+        assert_eq!(writes.get(), 0);
+        assert!(ctx.output(|output| output.commands.is_empty()));
+        app.execute_noninteractive("edit.cut", json!({})).unwrap();
+        assert!(body_text(&app).is_empty());
+        assert_eq!(app.session.clipboard_text, original);
+        assert_eq!(writes.get(), 0);
+        assert!(ctx.output(|output| output.commands.is_empty()));
+        app.execute_noninteractive("edit.paste", json!({})).unwrap();
+        assert_eq!(body_text(&app), original);
+        app.execute_noninteractive("edit.undo", json!({})).unwrap();
+        assert!(body_text(&app).is_empty());
     }
 
     /// #1265: every user entry point publishes Cut to the one clipboard sink — the ribbon's button

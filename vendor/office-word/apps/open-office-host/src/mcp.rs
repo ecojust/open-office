@@ -42,28 +42,29 @@ pub fn allowed(id: &str) -> bool {
             | "mailings"
     ) || matches!(
         id,
-        "font.list" | "file.properties" | "file.privacy" | "file.privacyOptions"
+        "font.list"
+            | "file.properties"
+            | "file.privacy"
+            | "file.privacyOptions"
+            | "file.setAuthor"
+            | "file.printMarkup"
+            | "file.accessibility"
+            | "file.compatibility"
+            | "file.inspect"
+            | "tools.templates"
+            | "tools.attachTemplate"
+            | "tools.detachTemplate"
+            | "tools.linkStyles"
+            | "tools.updateStyles"
     );
     document_command
         && !matches!(
             id,
-            "edit.repeat"
-                | "edit.copy"
-                | "edit.cut"
-                | "edit.clipboardPane"
-                | "edit.clipboardItems"
-                | "edit.pasteClipboardItem"
-                | "edit.pasteAllClipboard"
-                | "edit.deleteClipboardItem"
-                | "edit.clearClipboard"
+            "edit.clipboardPane"
                 | "edit.findReplace"
                 | "format.fontDialog"
                 | "para.dialog"
                 | "styles.manage"
-                | "styles.organizer"
-                | "styles.copyFrom"
-                | "insert.object"
-                | "insert.textFromFile"
                 | "mailings.labels"
                 | "mailings.finish"
                 | "review.readAloud"
@@ -71,9 +72,6 @@ pub fn allowed(id: &str) -> bool {
                 | "review.proofing"
                 | "design.setDefault"
                 | "references.researcher"
-                | "table.draw"
-                | "table.eraser"
-                | "table.borderPainter"
         )
 }
 
@@ -91,6 +89,11 @@ pub fn query_allowed(id: &str) -> bool {
             | "edit.undoHistory"
             | "link.targets"
             | "file.privacy"
+            | "file.accessibility"
+            | "file.compatibility"
+            | "edit.clipboardItems"
+            | "tools.templates"
+            | "styles.organizer"
     )
 }
 
@@ -109,6 +112,13 @@ fn has_file_path(value: &Value) -> bool {
     }
 }
 
+fn inline_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 255
+        && !name.contains(['/', '\\', ':'])
+        && !matches!(name, "." | "..")
+}
+
 pub fn validate(id: &str, params: &Value) -> Result<(), String> {
     if !allowed(id) {
         return Err("This command is not available for document automation.".into());
@@ -125,6 +135,31 @@ pub fn validate(id: &str, params: &Value) -> Result<(), String> {
     let string = |key: &str| params.get(key).and_then(Value::as_str).is_some();
     let ready = match id {
         "insert.picture" | "picture.change" => string("data"),
+        "insert.object"
+        | "insert.textFromFile"
+        | "styles.copyFrom"
+        | "tools.attachTemplate"
+        | "tools.updateStyles" => {
+            string("data")
+                && params
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .is_some_and(inline_name)
+        }
+        "styles.organizer" => {
+            !has("name")
+                || (string("data")
+                    && params
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .is_some_and(inline_name))
+        }
+        "table.draw" => ["page", "x0", "y0", "x1", "y1"]
+            .iter()
+            .all(|key| params.get(*key).and_then(Value::as_f64).is_some()),
+        "table.eraser" => ["page", "x", "y"]
+            .iter()
+            .all(|key| params.get(*key).and_then(Value::as_f64).is_some()),
         "insert.icon" => string("id"),
         "insert.chart" => string("type") || has("data"),
         "format.phonetic" => has("ruby"),
@@ -142,14 +177,7 @@ pub fn validate(id: &str, params: &Value) -> Result<(), String> {
                 || string("bookmark")
                 || params.get("paragraph").and_then(Value::as_u64).is_some()
         }
-        "edit.paste" | "edit.pasteMerge" => ["text", "html", "rtf"].iter().any(|key| string(key)),
-        "edit.pasteText" => string("text"),
-        "edit.pasteSpecial" => {
-            string("as")
-                && ["text", "html", "rtf", "picture"]
-                    .iter()
-                    .any(|key| string(key))
-        }
+        "edit.pasteSpecial" => string("as"),
         "mailings.envelopes" => params.get("add") == Some(&Value::Bool(true)),
         "review.compare" | "review.combine" => {
             string("text") && params.get("showIn").and_then(Value::as_str) == Some("original")
@@ -167,6 +195,19 @@ pub fn execute(app: &mut WordApp, id: &str, params: Value, query: bool) -> Resul
         return Err("This command is not a read-only document query.".into());
     }
     validate(id, &params)?;
+    // Resolve Repeat through the same policy as an explicit call. The last UI command
+    // might own a file or need a dialog; never let it bypass document-scoped validation.
+    if id == "edit.repeat" {
+        let (last, args) = app
+            .session
+            .last_command
+            .clone()
+            .ok_or("Nothing to repeat.")?;
+        if last == "edit.repeat" {
+            return Err("Cannot repeat a repeat command.".into());
+        }
+        return execute(app, &last, args, false);
+    }
     if app.session.registry.get(id).is_none() {
         return Err("Unknown document command.".into());
     }
@@ -214,7 +255,7 @@ pub fn commands(session: &Session, params: &Value) -> Value {
         let disabled = (command.enabled)(session);
         json!({"id":command.id, "label":command.label, "category":command.location,
             "parameters":command.params, "enabled":disabled.is_none(), "disabledReason":disabled,
-            "changesDocument":command.mutates || matches!(command.id, "edit.undo" | "edit.undoTo" | "edit.redo"),
+            "changesDocument":command.mutates || matches!(command.id, "edit.undo" | "edit.undoTo" | "edit.redo" | "edit.repeat"),
             "query":query_allowed(command.id)})
     }).collect();
     json!({"commands":entries,"total":total,"offset":offset,"nextOffset":(offset.saturating_add(limit)<total).then_some(offset.saturating_add(limit)),
@@ -251,10 +292,8 @@ mod tests {
             "file.open",
             "file.save",
             "tools.macros",
-            "edit.repeat",
             "format.fontDialog",
             "font.add",
-            "insert.textFromFile",
         ] {
             assert!(!allowed(id), "{id}");
         }
@@ -273,8 +312,15 @@ mod tests {
                 "review.combine",
                 json!({"text":"Revised", "showIn":"original", "original":"/tmp/private"}),
             ),
-            ("edit.paste", json!({})),
             ("edit.pasteSpecial", json!({"text":"hello"})),
+            ("table.draw", json!({})),
+            ("table.eraser", json!({"x":20,"y":20})),
+            (
+                "styles.copyFrom",
+                json!({"name":"/tmp/private.docx","data":"abc","styles":["Normal"]}),
+            ),
+            ("tools.updateStyles", json!({})),
+            ("insert.textFromFile", json!({"name":"private.docx"})),
             (
                 "insert.picture",
                 json!({"data":"abc", "nested":{"path":"/tmp/private"}}),
@@ -345,6 +391,229 @@ mod tests {
         );
         execute(&mut app, "edit.undo", json!({}), false).unwrap();
         assert_eq!(app.session.doc, before);
+    }
+
+    #[test]
+    fn clipboard_edits_preserve_formatting_and_undo() {
+        let mut app = WordApp::new(
+            Session::new(office_word_doc::Document::from_text("Hello world")),
+            office_word_ui_egui::Services {
+                embedded_editor: true,
+                ..Default::default()
+            },
+        );
+        execute(&mut app, "select.text", json!({"text":"Hello"}), false).unwrap();
+        execute(
+            &mut app,
+            "format.set",
+            json!({"props":{"bold":true}}),
+            false,
+        )
+        .unwrap();
+        let original = app.session.doc.clone();
+        let copied = execute(&mut app, "edit.copy", json!({}), false).unwrap();
+        assert_eq!(copied["text"], "Hello");
+        let clips = execute(&mut app, "edit.clipboardItems", json!({}), true).unwrap();
+        assert!(!clips.is_null());
+        execute(&mut app, "caret.docEnd", json!({}), false).unwrap();
+        execute(&mut app, "edit.paste", json!({}), false).unwrap();
+        assert_eq!(
+            app.session.doc.plain_text(office_word_doc::StoryRef::Body),
+            "Hello worldHello"
+        );
+        let info = execute(&mut app, "document.inspect", json!({}), true).unwrap();
+        assert!(
+            info["blocks"][0]["runs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|run| run["props"]["bold"] == true)
+        );
+        execute(&mut app, "edit.undo", json!({}), false).unwrap();
+        assert_eq!(app.session.doc, original);
+        execute(&mut app, "select.text", json!({"text":"Hello"}), false).unwrap();
+        execute(&mut app, "edit.cut", json!({}), false).unwrap();
+        assert_eq!(
+            app.session.doc.plain_text(office_word_doc::StoryRef::Body),
+            " world"
+        );
+        execute(&mut app, "edit.undo", json!({}), false).unwrap();
+        assert_eq!(app.session.doc, original);
+        execute(&mut app, "edit.clearClipboard", json!({}), false).unwrap();
+        assert_eq!(
+            execute(&mut app, "edit.clipboardItems", json!({}), true).unwrap(),
+            json!([])
+        );
+        assert!(execute(&mut app, "edit.paste", json!({}), false).is_ok());
+    }
+
+    #[test]
+    fn inline_document_import_and_repeat_stay_in_the_current_document_and_are_undoable() {
+        for command in ["insert.textFromFile", "insert.object"] {
+            let mut app = WordApp::new(
+                Session::new(office_word_doc::Document::from_text("Original ")),
+                office_word_ui_egui::Services {
+                    embedded_editor: true,
+                    ..Default::default()
+                },
+            );
+            let identity = app.session.document_id();
+            let original = app.session.doc.clone();
+            execute(&mut app, "caret.docEnd", json!({}), false).unwrap();
+            execute(
+                &mut app,
+                command,
+                json!({"name":"source.txt","data":"SW1wb3J0ZWQ="}),
+                false,
+            )
+            .unwrap();
+            assert!(
+                app.session
+                    .doc
+                    .plain_text(office_word_doc::StoryRef::Body)
+                    .contains("Imported")
+            );
+            assert_eq!(app.session.document_id(), identity);
+            execute(&mut app, "edit.undo", json!({}), false).unwrap();
+            assert_eq!(app.session.doc, original);
+        }
+        let mut app = WordApp::new(
+            Session::new(office_word_doc::Document::from_text("")),
+            Default::default(),
+        );
+        execute(
+            &mut app,
+            "text.insert",
+            json!({"text":"Again", "raw":true}),
+            false,
+        )
+        .unwrap();
+        execute(&mut app, "edit.repeat", json!({}), false).unwrap();
+        assert_eq!(
+            app.session.doc.plain_text(office_word_doc::StoryRef::Body),
+            "AgainAgain"
+        );
+        let original = app.session.doc.clone();
+        for (id, args) in [
+            ("file.open", json!({"path":"/tmp/private"})),
+            ("table.draw", json!({})),
+            ("edit.repeat", json!({})),
+        ] {
+            app.session.last_command = Some((id.into(), args));
+            assert!(execute(&mut app, "edit.repeat", json!({}), false).is_err());
+            assert_eq!(app.session.doc, original);
+        }
+    }
+
+    #[test]
+    fn inline_style_copy_and_template_update_are_live_undoable_edits() {
+        let mut source = Session::new(office_word_doc::Document::from_text("Template"));
+        source
+            .run("styles.create", &json!({"name":"MCP Custom Style"}))
+            .unwrap();
+        let bytes = office_word_engine::io::save_bytes("styles.docx", &source.doc).unwrap();
+        let data = office_word_engine::cmd::insert::base64_encode(&bytes);
+        for command in [
+            "styles.copyFrom",
+            "tools.attachTemplate",
+            "tools.updateStyles",
+        ] {
+            let mut app = WordApp::new(
+                Session::new(office_word_doc::Document::from_text("Keep this document")),
+                office_word_ui_egui::Services {
+                    embedded_editor: true,
+                    ..Default::default()
+                },
+            );
+            let original = app.session.doc.clone();
+            let identity = app.session.document_id();
+            let params = json!({"name":"styles.docx","data":data,"styles":["MCP Custom Style"],"update":true});
+            execute(&mut app, command, params.clone(), false).unwrap();
+            assert!(
+                app.session.doc.styles.find("MCP Custom Style").is_some(),
+                "{command}"
+            );
+            assert_eq!(app.session.document_id(), identity);
+            assert_eq!(
+                app.session.doc.plain_text(office_word_doc::StoryRef::Body),
+                "Keep this document"
+            );
+            assert!(app.dialog.is_none());
+            execute(&mut app, "edit.undo", json!({}), false).unwrap();
+            assert_eq!(app.session.doc, original, "{command}");
+            let styles = execute(&mut app, "styles.organizer", params, true).unwrap();
+            assert!(
+                styles["file"]["styles"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|style| style["name"] == "MCP Custom Style")
+            );
+        }
+    }
+
+    #[test]
+    fn newly_exposed_commands_are_discoverable_and_paths_cannot_substitute_for_inline_content() {
+        let session = Session::new(office_word_doc::Document::from_text("Hello"));
+        for id in [
+            "edit.copy",
+            "edit.cut",
+            "edit.repeat",
+            "edit.clipboardItems",
+            "edit.pasteClipboardItem",
+            "edit.pasteAllClipboard",
+            "edit.deleteClipboardItem",
+            "edit.clearClipboard",
+            "insert.textFromFile",
+            "insert.object",
+            "styles.copyFrom",
+            "styles.organizer",
+            "table.draw",
+            "table.eraser",
+            "table.borderPainter",
+            "tools.templates",
+            "tools.attachTemplate",
+            "tools.detachTemplate",
+            "tools.linkStyles",
+            "tools.updateStyles",
+            "file.inspect",
+            "file.accessibility",
+            "file.compatibility",
+            "file.setAuthor",
+        ] {
+            let catalog = commands(&session, &json!({"search":id,"limit":100}));
+            assert!(
+                catalog["commands"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|command| command["id"] == id),
+                "{id}"
+            );
+        }
+        for id in [
+            "insert.textFromFile",
+            "insert.object",
+            "styles.copyFrom",
+            "tools.attachTemplate",
+            "tools.updateStyles",
+        ] {
+            for params in [
+                json!({}),
+                json!({"name":"source.docx"}),
+                json!({"name":"../source.docx","data":"AAAA"}),
+                json!({"name":"source.docx","data":"AAAA","nested":{"path":"/tmp/private"}}),
+            ] {
+                assert!(validate(id, &params).is_err(), "{id}: {params}");
+            }
+            assert!(
+                validate(id, &json!({"name":"source.docx","data":"AAAA"})).is_ok(),
+                "{id}"
+            );
+        }
+        assert!(query_allowed("edit.clipboardItems"));
+        assert!(!query_allowed("edit.copy"));
+        assert!(!query_allowed("edit.repeat"));
     }
 
     #[test]

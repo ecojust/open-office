@@ -161,6 +161,8 @@ fn shell_policy(id: &str, params: &Value) -> Option<Result<Value, String>> {
                 | "file.setAuthor"
                 | "file.privacy"
                 | "file.privacyOptions"
+                | "file.inspect"
+                | "file.compatibility"
         )
     {
         return Some(Err("This file operation is managed by Open Office.".into()));
