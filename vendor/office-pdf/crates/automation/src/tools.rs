@@ -114,9 +114,37 @@ impl T {
 }
 
 /// Every tool, in a stable order.
+// Keep schema construction units small: a single heavily inlined table puts
+// excessive pressure on WebKit's optimizing WASM compiler. Never inline groups.
 pub fn tools() -> Vec<ToolDef> {
-    let save_out = json!({ "type": "string", "description": "File to write. Omit to open the result as a new unsaved document instead." });
-    let open = json!({ "type": "boolean", "description": "Also open the result as a new document (default: only when out is omitted)." });
+    let mut result = Vec::with_capacity(170);
+    result.extend(tools_00());
+    result.extend(tools_01());
+    result.extend(tools_02());
+    result.extend(tools_03());
+    result.extend(tools_04());
+    result.extend(tools_05());
+    result.extend(tools_06());
+    result.extend(tools_07());
+    result.extend(tools_08());
+    result.extend(tools_09());
+    result.extend(tools_10());
+    result.extend(tools_11());
+    result.extend(tools_12());
+    result.extend(tools_13());
+    result.extend(tools_14());
+    result.extend(tools_15());
+    result.extend(tools_16());
+    result.extend(tools_17());
+    result.extend(tools_18());
+    result.extend(tools_19());
+    result.extend(tools_20());
+    result.extend(tools_21());
+    result
+}
+
+#[inline(never)]
+fn tools_00() -> Vec<ToolDef> {
     vec![
         t("doc_batch", "Process files and folders", "Run convert, ocr and/or optimize over files and folders, one file at a time. recursive defaults to false. Preserve paths relative to each selected folder inside out_dir; duplicate inputs run once. Skip unsupported files, links and the output subtree. Existing outputs receive numbered names and are never replaced. Continue after per-file errors unless stop_on_error is true. Return completed/failed/skipped counts and per-file results. Discovery is bounded to 10000 entries and 64 folder levels. Convert must be first; each step can appear once. OCR uses installed models. Optimize uses Reduce File Size settings, optionally overriding target ppi (threshold 1.5 times ppi) and JPEG quality; a larger candidate keeps the original bytes. Sources and open documents are unchanged.")
             .with(schema(json!({
@@ -164,6 +192,12 @@ pub fn tools() -> Vec<ToolDef> {
                 "hide_text_block": { "type": "integer", "minimum": 1, "description": "Render an inline editor background without this paragraph (index from text_paragraphs). Does not modify the document." },
                 "hide_added_text": { "type": "integer", "minimum": 1, "description": "Render a retyping background without this added text item (added index from object_list). Mutually exclusive with hide_text_block. Does not modify the document." }
             }), &["doc", "page"])),
+    ]
+}
+
+#[inline(never)]
+fn tools_01() -> Vec<ToolDef> {
+    vec![
         t("object_list", "List editable objects", "List existing paragraphs, Image/Form artwork and added content once, with source kind/index references, displayed rectangles and document generation. Indexes change when content changes; use generation in object_move to reject stale references.")
             .ro().with(schema(json!({"doc":doc(),"page":{"type":"integer","minimum":1}}), &["doc","page"])),
         t("object_move", "Move objects together", "Atomically translate 1–1000 mixed references from object_list by [dx, dy] in displayed points (right/down). Preserves glyph codes, fonts, image data and relative spacing; success is one undo step. Clipping and vertical text are refused. A bad/stale reference refuses the entire move.")
@@ -220,6 +254,14 @@ pub fn tools() -> Vec<ToolDef> {
             .destructive()
             .cmd("page.delete")
             .with(schema(json!({ "doc": doc(), "pages": pages("to delete") }), &["doc", "pages"])),
+    ]
+}
+
+#[inline(never)]
+fn tools_02() -> Vec<ToolDef> {
+    let save_out = json!({ "type": "string", "description": "File to write. Omit to open the result as a new unsaved document instead." });
+    let open = json!({ "type": "boolean", "description": "Also open the result as a new document (default: only when out is omitted)." });
+    vec![
         t("page_move", "Move pages", "Move pages so the first of them lands at position `to` (1-based, counted before the move). Undoable.").with(schema(
             json!({ "doc": doc(), "pages": pages("to move"), "to": { "type": "integer", "minimum": 1 } }),
             &["doc", "pages", "to"],
@@ -286,6 +328,12 @@ pub fn tools() -> Vec<ToolDef> {
             }),
             &["doc"],
         )),
+    ]
+}
+
+#[inline(never)]
+fn tools_03() -> Vec<ToolDef> {
+    vec![
         t("bookmark_add", "Add a bookmark", "Add a bookmark that goes to a page, under a parent bookmark (or at the top level), at a position. Undoable.").with(schema(
             json!({ "doc": doc(), "title": { "type": "string", "minLength": 1 }, "page": { "type": "integer", "minimum": 1 }, "parent": path("Parent bookmark (omit for the top level)"), "position": { "type": "integer", "minimum": 1, "description": "1-based position among the parent's children (default: last)." } }),
             &["doc", "title", "page"],
@@ -321,6 +369,12 @@ pub fn tools() -> Vec<ToolDef> {
         t("form_fields", "List form fields", "Every interactive form field: name, type (text, checkbox, radio, combo, list, button, signature), value, options, page, rect (top-left-origin points) and rotation (0, 90, 180 or 270 degrees counterclockwise), read-only and required flags.")
             .ro()
             .with(schema(json!({ "doc": doc() }), &["doc"])),
+    ]
+}
+
+#[inline(never)]
+fn tools_04() -> Vec<ToolDef> {
+    vec![
         t(
             "form_fill",
             "Fill in form fields",
@@ -408,6 +462,12 @@ pub fn tools() -> Vec<ToolDef> {
         t("doc_export_data", "Export comments or form data", "Write comments and/or form data to path; the extension picks the format: .xfdf or .fdf (comments and/or fields), .xml, .csv or .txt (form data). For an XFA form, .xml is its data alone (rooted at the form's root data node, as Acrobat exports it) and .xdp an XML Data Package holding the whole datasets. what: all (default), comments, fields.")
             .destructive()
             .with(schema(json!({ "doc": doc(), "path": { "type": "string" }, "what": { "type": "string", "enum": ["all", "comments", "fields"] } }), &["doc", "path"])),
+    ]
+}
+
+#[inline(never)]
+fn tools_05() -> Vec<ToolDef> {
+    vec![
         t("doc_import_data", "Import comments or form data", "Import comments and/or field values from an XFDF, FDF, XML, CSV or tab-delimited text file (detected from its content). Comments with the same name are replaced; values go through the form's formats and validation. For an XFA form, an XDP, datasets or data XML file replaces the form's data: a laid-out form is laid out again from it (rows included) and its calculations run. Undoable.")
             .with(schema(json!({ "doc": doc(), "path": { "type": "string" } }), &["doc", "path"])),
         t("form_delete_field", "Delete a field", "Delete a form field and all its widgets. Undoable.")
@@ -475,6 +535,12 @@ pub fn tools() -> Vec<ToolDef> {
         )
         .ro()
         .with(schema(json!({ "doc": doc() }), &["doc"])),
+    ]
+}
+
+#[inline(never)]
+fn tools_06() -> Vec<ToolDef> {
+    vec![
         t("printers", "List printers", "The printers the system's print spooler knows (CUPS on macOS and Linux), with the default marked.").ro().with(schema(json!({}), &[])),
         t("printer_options", "List printer options", "A printer driver's own job options (CUPS: from its PPD), such as the paper tray, paper type or finishing: key, label, group, default and choices. Pass chosen values to doc_print as options. Empty on Windows, where the driver's preferences window holds them.")
             .ro()
@@ -563,6 +629,12 @@ pub fn tools() -> Vec<ToolDef> {
         t("content_delete", "Delete added content", "Delete an added item (page, index from content_list). Undoable.")
             .destructive()
             .with(schema(json!({ "doc": doc(), "page": { "type": "integer", "minimum": 1 }, "index": { "type": "integer", "minimum": 1 } }), &["doc", "page", "index"])),
+    ]
+}
+
+#[inline(never)]
+fn tools_07() -> Vec<ToolDef> {
+    vec![
         t("link_list", "List links", "Every link: page, 1-based index (for link_edit/link_delete), rect (points from the top-left of the page), and where it goes (url or to_page).")
             .ro()
             .with(schema(json!({ "doc": doc() }), &["doc"])),
@@ -603,6 +675,12 @@ pub fn tools() -> Vec<ToolDef> {
             .with(schema(json!({ "doc": doc(), "pages": pages("whose links to remove (default: all)") }), &["doc"])),
         t("measure_distance", "Measure distance", "Add an undoable two-point distance annotation using the scale of the first point's viewport.")
             .cmd("measure.distance").with(measure_schema()),
+    ]
+}
+
+#[inline(never)]
+fn tools_08() -> Vec<ToolDef> {
+    vec![
         t("measure_perimeter", "Measure perimeter", "Add an undoable connected-line length annotation. To include a closing edge, repeat the first point at the end.")
             .cmd("measure.perimeter").with(measure_schema()),
         t("measure_area", "Measure area", "Add an undoable area annotation from a simple polygon. The last edge closes automatically.")
@@ -620,6 +698,12 @@ pub fn tools() -> Vec<ToolDef> {
         t("comment_list", "List comments", "Every comment (annotation other than links, form widgets and pop-ups) with its page, index, id, type, author, text, date, rectangle, colour, review status and replies.")
             .ro()
             .with(schema(json!({ "doc": doc(), "page": { "type": "integer", "minimum": 1, "description": "Only this page." } }), &["doc"])),
+    ]
+}
+
+#[inline(never)]
+fn tools_09() -> Vec<ToolDef> {
+    vec![
         t(
             "comment_add",
             "Add a comment",
@@ -745,6 +829,14 @@ pub fn tools() -> Vec<ToolDef> {
                 }),
                 &["doc", "id", "out"],
             )),
+    ]
+}
+
+#[inline(never)]
+fn tools_10() -> Vec<ToolDef> {
+    let save_out = json!({ "type": "string", "description": "File to write. Omit to open the result as a new unsaved document instead." });
+    let open = json!({ "type": "boolean", "description": "Also open the result as a new document (default: only when out is omitted)." });
+    vec![
         t("sign_trust", "Trust certificates", "Add certificates (.cer/.crt/.pem/.der, or the certificates in a .p12 with `password`) to the trusted certificates used to validate signatures, or clear the list (clear: true). Every open document is revalidated. Returns the trusted list.").with(schema(
             json!({ "paths": { "type": "array", "items": { "type": "string" } }, "password": { "type": "string" }, "clear": { "type": "boolean" } }),
             &[],
@@ -794,6 +886,12 @@ pub fn tools() -> Vec<ToolDef> {
         )),
         t("comment_image_preview", "Preview image signature layers", "Return a PNG of the page without the selected image signature/initials (layer=background, default), or its embedded image with alpha (layer=image). Includes the displayed rectangle, document rotation, image_rotation (how far clockwise the image is shown turned) and annotation opacity. Cache these layers for live placement/resizing; commit once with comment_edit. Does not change the document or undo history.")
             .ro().with(schema(comment_ref(json!({ "layer": { "type": "string", "enum": ["background", "image"], "default": "background" }, "dpi": { "type": "number", "minimum": 1, "maximum": 600, "default": 96 } })), &["doc"])),
+    ]
+}
+
+#[inline(never)]
+fn tools_11() -> Vec<ToolDef> {
+    vec![
         t("comment_delete", "Delete a comment", "Delete a comment with its pop-up and replies. Undoable.").destructive().with(schema(comment_ref(json!({})), &["doc"])),
         t(
             "doc_protect",
@@ -881,6 +979,12 @@ pub fn tools() -> Vec<ToolDef> {
             }),
             &["doc"],
         )),
+    ]
+}
+
+#[inline(never)]
+fn tools_12() -> Vec<ToolDef> {
+    vec![
         t("doc_watermark", "Add watermark", "Add a watermark to pages: text, or a picture from `file` (an image, or page `file_page` of a PDF) at `scale` of the page (default 0.5); rotated (degrees counter-clockwise, default 45), semi-transparent (opacity 0–1, default 0.5), text fitted to the page unless font_size is given, on top unless behind: true; moved from the page centre by `offset_x` (right) and `offset_y` (up) points (default 0). replace: true swaps out existing ones. Undoable.")
             .cmd("edit.watermark")
             .with(schema(
@@ -945,6 +1049,12 @@ pub fn tools() -> Vec<ToolDef> {
                 }),
                 &["doc"],
             )),
+    ]
+}
+
+#[inline(never)]
+fn tools_13() -> Vec<ToolDef> {
+    vec![
         t("accessibility_find_untagged", "Find untagged content", "Find untagged painted page content, annotations, and form widgets. This focused check does not modify the PDF or claim that its other accessibility rules pass.")
             .ro()
             .cmd("a11y.find_untagged")
@@ -997,6 +1107,12 @@ pub fn tools() -> Vec<ToolDef> {
             .ro()
             .cmd("a11y.alt_text")
             .with(schema(json!({ "doc": doc() }), &["doc"])),
+    ]
+}
+
+#[inline(never)]
+fn tools_14() -> Vec<ToolDef> {
+    vec![
         t("accessibility_set_alt", "Set alternate text", "Set a figure's alternate text (alt; empty or omitted clears it), or mark it decorative (decorative: true: its content becomes an artifact and the figure leaves the tags). figure is a number from accessibility_figures. Returns the figures. Undoable.")
             .cmd("a11y.alt_text")
             .with(schema(json!({ "doc": doc(), "figure": { "type": "integer", "minimum": 1 }, "alt": { "type": "string" }, "decorative": { "type": "boolean" } }), &["doc", "figure"])),
@@ -1047,6 +1163,12 @@ pub fn tools() -> Vec<ToolDef> {
                 json!({ "doc": doc(), "script": { "type": "string" }, "field": { "type": "string", "description": "Run as this button's Mouse Up event." } }),
                 &["doc", "script"],
             )),
+    ]
+}
+
+#[inline(never)]
+fn tools_15() -> Vec<ToolDef> {
+    vec![
         t("js_document_scripts", "Document JavaScripts", "List the document-level JavaScripts (name and source), which define functions field scripts use.")
             .ro()
             .cmd("tools.document_js")
@@ -1077,6 +1199,12 @@ pub fn tools() -> Vec<ToolDef> {
             .ro()
             .cmd("actions.wizard")
             .with(schema(json!({}), &[])),
+    ]
+}
+
+#[inline(never)]
+fn tools_16() -> Vec<ToolDef> {
+    vec![
         t("action_run", "Run an action", "Action Wizard: run a built-in action (action: its name) or a list of steps ([{step, arg}], ids from action_list) on each PDF in paths, writing the results into folder under the same names. Returns each file's step log or error.")
             .cmd("actions.wizard")
             .with(schema(
@@ -1117,6 +1245,12 @@ pub fn tools() -> Vec<ToolDef> {
             )),
         t("js_enabled", "JavaScript on or off", "Preferences ▸ JavaScript ▸ Enable Acrobat JavaScript: set it with `enabled`, or read it. With JavaScript off, field scripts other than Acrobat's AF calls don't run.")
             .with(schema(json!({ "enabled": { "type": "boolean" } }), &[])),
+    ]
+}
+
+#[inline(never)]
+fn tools_17() -> Vec<ToolDef> {
+    vec![
         t("ocr_recognize", "Recognize text (OCR)", "Scan & OCR ▸ Recognize text: render pages, read the words in them and add them as invisible text over the page image, so scanned pages become searchable and selectable (a searchable image; the image is not changed). Pages that already have text are skipped unless skip_text_pages is false; then pictures on those pages are read too, and recognised words that the page's own text already has (an earlier OCR layer included) are left out and counted as already_on_page. Returns each page's recognised text, word count or why it was skipped. Needs the OCR models (ocr_status). Undoable as one step.")
             .cmd("ocr.recognize")
             .with(schema(
@@ -1203,6 +1337,12 @@ pub fn tools() -> Vec<ToolDef> {
             }),
             &["from"],
         )),
+    ]
+}
+
+#[inline(never)]
+fn tools_18() -> Vec<ToolDef> {
+    vec![
         t("doc_reduce", "Reduce file size", "Write a smaller copy of the document to `path` with Acrobat's Reduce File Size choices: images above 225 ppi downsampled to 150 ppi and JPEG-compressed (medium quality), thumbnails dropped, identical fonts and images merged, unused objects dropped, compressed object streams. If the copy wouldn't be smaller, nothing is written and `written` is false. The open document is unchanged.")
             .cmd("optimize.reduce")
             .with(schema(json!({ "doc": doc(), "path": { "type": "string" } }), &["doc", "path"])),
@@ -1259,6 +1399,12 @@ pub fn tools() -> Vec<ToolDef> {
             .destructive()
             .cmd("edit.edit_text")
             .with(schema(json!({ "doc": doc(), "page": { "type": "integer", "minimum": 1 }, "image": { "type": "integer", "minimum": 1 }, "path": { "type": "string" } }), &["doc", "page", "image", "path"])),
+    ]
+}
+
+#[inline(never)]
+fn tools_19() -> Vec<ToolDef> {
+    vec![
         t("text_font_files", "List installed document fonts", "Discover openly licensed, embeddable TrueType/OpenType files on request. Optional directories (at most 16) restrict the scan; with --root, only that root is scanned by default and supplied folders must stay inside it. The scan skips symlinks, collections and invalid/licence-restricted fonts, with depth, entry and byte budgets. Select a returned path with text_font_import.")
             .ro().cmd("edit.edit_text")
             .with(schema(json!({"directories":{"type":"array","items":{"type":"string"},"maxItems":16}}), &[])),
@@ -1303,6 +1449,12 @@ pub fn tools() -> Vec<ToolDef> {
             .with(schema(json!({ "doc": doc() }), &["doc"])),
         t("doc_open_revision", "Open a revision", "Open saved revision `revision` (1 = the oldest) of a document as a new, unsaved document, to see the file as it was then.")
             .with(schema(json!({ "doc": doc(), "revision": { "type": "integer", "minimum": 1 } }), &["doc", "revision"])),
+    ]
+}
+
+#[inline(never)]
+fn tools_20() -> Vec<ToolDef> {
+    vec![
         t("doc_optimize", "Optimize PDF", "Write an optimized copy to `path` (Acrobat's PDF Optimizer). preset: standard (default; Reduce File Size's choices) or mobile (images to 96 ppi above 144, JPEG high quality); the options below change it. merge_fragments (default true) first puts a page picture drawn as many stacked image strips (as some PDF printers write it) back together into one image, so it can be resampled (merged_images, fragments_merged). color / gray: { downsample, ppi, above_ppi, compression: jpeg|zip|retain, quality 1–100 } (defaults: downsample to 150 ppi above 225, JPEG 60). Images are measured where pages draw them and replaced only when smaller. discard_*: thumbnails (default true), alternate_images (true), tags, print_settings; flate_unencoded (true); remove_invalid_links and remove_unreferenced_dests (true); images and forms the pages list but never draw are always dropped (unused_xobjects). discard: Remove Hidden Information categories (metadata, attachments, comments, form-fields, hidden-text, hidden-layers, bookmarks, links-actions-scripts, private-data). Signed documents are refused. The open document is unchanged.")
             .cmd("optimize.advanced")
             .with(schema(
@@ -1343,6 +1495,12 @@ pub fn tools() -> Vec<ToolDef> {
             .destructive().with(schema(json!({"id":{"type":"string"},"params":{"type":"object"}}), &["id"])),
         t("command_batch", "Run several commands", "Run steps in order (at most 1000). Returns completed/failed counts and per-step ok/result/error; stop_on_error defaults to true.")
             .destructive().with(schema(json!({"steps":{"type":"array","items":schema(json!({"id":{"type":"string"},"params":{"type":"object"}}), &["id"])},"stop_on_error":{"type":"boolean"}}), &["steps"])),
+    ]
+}
+
+#[inline(never)]
+fn tools_21() -> Vec<ToolDef> {
+    vec![
         t("doc_inspect", "Inspect open documents", "With doc, return doc_info; otherwise return information for every open document (empty documents array when none are open).")
             .ro().with(schema(json!({"doc":doc()}), &[])),
         t("render_preview", "Render a preview", "Render a PNG bounded by max_side (default 1024), without changing or saving the document. Page defaults to 1; doc may be omitted when exactly one document is open.")
@@ -1351,6 +1509,12 @@ pub fn tools() -> Vec<ToolDef> {
 }
 
 static TOOLS: std::sync::LazyLock<Vec<ToolDef>> = std::sync::LazyLock::new(tools);
+
+/// Share immutable definitions with embedded discovery rather than reconstructing
+/// the schema table for every request. Callers clone before adapting schemas.
+pub(crate) fn all() -> &'static [ToolDef] {
+    TOOLS.as_slice()
+}
 
 pub(crate) fn find(name: &str) -> Option<&'static ToolDef> {
     TOOLS.iter().find(|t| t.name == name)

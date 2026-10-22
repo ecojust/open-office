@@ -17,14 +17,14 @@ const position: McpSchema = {
 export const wordQueryCommands = [
   'document.inspect', 'document.text', 'document.paragraph', 'document.selection',
   'document.layout', 'format.state', 'styles.inspect', 'font.list', 'edit.undoHistory',
-  'link.targets', 'file.privacy',
+  'link.targets', 'file.privacy', 'file.accessibility', 'file.compatibility', 'edit.clipboardItems', 'tools.templates', 'styles.organizer',
 ] as const
 
 export const wordEditingTools: McpToolDefinition[] = [
   tool('word_list_commands', '发现文字文稿的全部可用编辑命令及参数、分类和当前可用状态，支持关键词过滤和分页。编辑命令实际使用当前 Rust 文档、画面和撤销历史；文件与应用操作不在此目录内。', true, {
     search: { type: 'string', maxLength: 200 }, offset: index, limit: { type: 'integer', minimum: 1, maximum: 100 },
   }),
-  tool('word_execute_command', '执行 word_list_commands 列出的文档命令：文字替换/删除、选区、字符和段落格式、样式/列表、表格、图片/形状/图表、页面/分节/页眉页脚、批注/修订、公式/引用/内容控件等。params 按目录说明填写；图片传 base64 data；拒绝文件路径、宏、系统剪贴板和弹窗。完成后画面与未保存状态立即更新，可撤销。', false, {
+  tool('word_execute_command', '执行 word_list_commands 列出的文档命令：文字替换/删除、选区、字符和段落格式、样式/列表、表格、图片/形状/图表、页面/分节/页眉页脚、批注/修订、公式/引用/内容控件等。params 按目录说明填写；图片传 base64 data；支持文档内复制剪切、粘贴与剪贴板历史；导入文档或样式使用name和base64 data。拒绝文件路径、宏、系统剪贴板和弹窗。完成后画面与未保存状态立即更新，可撤销。', false, {
     command: { type: 'string', minLength: 1, maxLength: 100, pattern: '^[A-Za-z]+\\.[A-Za-z][A-Za-z0-9]*$' },
     params: { ...object, description: '对应命令的参数，先用 word_list_commands 查询；省略表示空对象。' },
   }, ['command']),
@@ -42,7 +42,24 @@ export const wordEditingTools: McpToolDefinition[] = [
 
 const schema = (properties: Record<string, McpSchema>, required: string[] = []): McpSchema => ({ type: 'object', properties, required, additionalProperties: true })
 const choice = (values: string[]): McpSchema => ({ type: 'string', enum: values })
+const inlineDocument = { name: { type: 'string', minLength: 1, maxLength: 255, pattern: '^[^/\\\\:]+$', description: '仅文件名及扩展名，如 source.docx 或 styles.dotx；不接受路径。' } as McpSchema, data: { type: 'string', minLength: 1, maxLength: 6 * 1024 * 1024, description: '文档原始字节的 base64。' } as McpSchema }
 const commonSchemas: Record<string, McpSchema> = {
+  'insert.textFromFile': schema(inlineDocument, ['name', 'data']),
+  'insert.object': schema(inlineDocument, ['name', 'data']),
+  'styles.copyFrom': schema({ ...inlineDocument, styles: { anyOf: [text, { type: 'array', items: text, minItems: 1, maxItems: 10000 }] } }, ['name', 'data', 'styles']),
+  'styles.organizer': schema(inlineDocument),
+  'tools.attachTemplate': schema({ ...inlineDocument, linkStyles: { type: 'boolean' }, update: { type: 'boolean' } }, ['name', 'data']),
+  'tools.updateStyles': schema(inlineDocument, ['name', 'data']),
+  'table.draw': schema({ page: index, x0: number, y0: number, x1: number, y1: number }, ['page', 'x0', 'y0', 'x1', 'y1']),
+  'table.eraser': schema({ page: index, x: number, y: number }, ['page', 'x', 'y']),
+  'table.borderPainter': schema({ kind: text, width: number, color: text }),
+  'edit.pasteClipboardItem': schema({ index }, ['index']),
+  'edit.deleteClipboardItem': schema({ index }, ['index']),
+  'edit.paste': schema({ text, html: text, rtf: text }),
+  'edit.pasteMerge': schema({ text, html: text, rtf: text }),
+  'edit.pasteText': schema({ text }),
+  'edit.pasteSpecial': schema({ as: text, text, html: text, rtf: text, picture: text }, ['as']),
+
   'text.insert': schema({ text, raw: { type: 'boolean' } }, ['text']),
   'document.setText': schema({ text }, ['text']),
   'document.inspect': schema({ text: { type: 'boolean' } }),
@@ -90,7 +107,9 @@ export function describeWordCommands(value: unknown): unknown {
     if (!inputSchema && (String(command.parameters).includes('"value"?: bool') || ['format.subscript', 'format.superscript', 'format.allCaps', 'format.smallCaps', 'format.hidden'].includes(id))) inputSchema = schema({ value: { type: 'boolean' } })
     const parameters = ['review.compare', 'review.combine'].includes(id)
       ? `${String(command.parameters)} MCP: provide revised text and showIn:"original" to edit the current document; original/path and new/revised workspaces are unavailable.`
-      : command.parameters
+      : ['insert.object', 'insert.textFromFile', 'styles.copyFrom', 'styles.organizer', 'tools.attachTemplate', 'tools.updateStyles'].includes(id)
+        ? 'MCP: inline document bytes in base64 data, with name giving only the filename and extension. No filesystem paths. styles.copyFrom also requires styles; tools.attachTemplate accepts linkStyles and update. styles.organizer without arguments reads current document styles.'
+        : command.parameters
     return { ...command, parameters, inputSchema: { ...(inputSchema ?? object), description: parameters } }
   }) }
 }

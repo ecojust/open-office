@@ -32,7 +32,7 @@ pub fn specs() -> Vec<CommandSpec> {
             .params(r#"{} → {"template": path|null, "linkStyles": bool} (from the ribbon, the app shows the dialog)"#)
         .pure(),
         CommandSpec::new("tools.attachTemplate", "Attach Template", LOC, attach)
-            .params(r#"{"path": string, "linkStyles"?: bool, "update"?: bool (update the styles from it now), "data"?: base64 (the template's bytes, for "update")}"#),
+            .params(r#"{"path"?: string, "name"?: string (inline filename, alternative to path), "linkStyles"?: bool, "update"?: bool (update the styles from it now), "data"?: base64 (the template's bytes, for "update")}"#),
         CommandSpec::new("tools.detachTemplate", "Detach Template", LOC, |s, _| {
             s.doc.settings.attached_template = None;
             s.doc.settings.link_styles = false;
@@ -44,12 +44,12 @@ pub fn specs() -> Vec<CommandSpec> {
         })
         .params(r#"{"value"?: bool (default: toggle)}"#),
         CommandSpec::new("tools.updateStyles", "Update Styles from Template", LOC, update_styles)
-            .params(r#"{"path"?: string (default: the attached template), "data"?: base64 (the file's bytes; `path` then only names it)} → {"added", "replaced"}"#),
+            .params(r#"{"path"?: string (default: the attached template), "name"?: string (inline filename, alternative to path), "data"?: base64 (the file's bytes; `path` then only names it)} → {"added", "replaced"}"#),
         CommandSpec::new("styles.organizer", "Organizer", "View › Templates › Organizer", organizer)
-            .params(r#"{"path"?: string, "data"?: base64} → {"document": [style], "file"?: {"path", "styles": [style]}}"#)
+            .params(r#"{"path"?: string, "name"?: string (inline filename, alternative to path), "data"?: base64} → {"document": [style], "file"?: {"path", "styles": [style]}}"#)
             .pure(),
         CommandSpec::new("styles.copyFrom", "Copy Styles", "View › Templates › Organizer", copy_from)
-            .params(r#"{"path": string, "data"?: base64, "styles": [name or id]} → {"added", "replaced", "skipped"}"#),
+            .params(r#"{"path"?: string, "name"?: string (inline filename, alternative to path), "data"?: base64, "styles": [name or id]} → {"added", "replaced", "skipped"}"#),
         CommandSpec::new("styles.rename", "Rename Style", "View › Templates › Organizer", rename)
             .params(r#"{"style": string (name or id; custom styles only), "name": string}"#),
     ]
@@ -60,7 +60,7 @@ fn state(s: &Session) -> Value {
 }
 
 fn attach(s: &mut Session, v: &Value) -> CmdResult {
-    let path = p::req_str(v, "path")?.trim();
+    let path = p::str(v, "name").or_else(|| p::str(v, "path")).ok_or_else(|| CmdError::Params("`name` or `path` is required".into()))?.trim();
     if path.is_empty() {
         return Err(CmdError::Params("`path` is empty".into()));
     }
@@ -74,7 +74,7 @@ fn attach(s: &mut Session, v: &Value) -> CmdResult {
     }
     let mut out = state(s);
     if p::bool(v, "update").unwrap_or(false) {
-        let mut params = json!({"path": path});
+        let mut params = if p::str(v, "name").is_some() { json!({"name": path}) } else { json!({"path": path}) };
         if let (Some(d), Some(o)) = (p::str(v, "data"), params.as_object_mut()) {
             o.insert("data".into(), json!(d));
         }
@@ -90,7 +90,7 @@ fn attach(s: &mut Session, v: &Value) -> CmdResult {
 /// styles of the same name.
 fn update_styles(s: &mut Session, v: &Value) -> CmdResult {
     let attached = s.doc.settings.attached_template.clone();
-    let path = p::str(v, "path").map(str::to_string).or(attached).ok_or_else(|| CmdError::Params("no template is attached; give `path`".into()))?;
+    let path = p::str(v, "name").or_else(|| p::str(v, "path")).map(str::to_string).or(attached).ok_or_else(|| CmdError::Params("no template is attached; give `path`".into()))?;
     let base = s.path.clone();
     let src = load_other(&path, p::str(v, "data"), base.as_deref())?;
     let report = apply_template_styles(&mut s.doc, &src);
@@ -108,7 +108,7 @@ pub fn apply_template_styles(doc: &mut Document, src: &Document) -> Value {
 
 fn organizer(s: &mut Session, v: &Value) -> CmdResult {
     let mut out = json!({"document": style_list(&s.doc)});
-    if let Some(path) = p::str(v, "path") {
+    if let Some(path) = p::str(v, "name").or_else(|| p::str(v, "path")) {
         let base = s.path.clone();
         let other = load_other(path, p::str(v, "data"), base.as_deref())?;
         if let Some(o) = out.as_object_mut() {
@@ -138,7 +138,7 @@ pub fn style_list(doc: &Document) -> Value {
 }
 
 fn copy_from(s: &mut Session, v: &Value) -> CmdResult {
-    let path = p::req_str(v, "path")?;
+    let path = p::str(v, "name").or_else(|| p::str(v, "path")).ok_or_else(|| CmdError::Params("`name` or `path` is required".into()))?;
     let names: Vec<&str> = match v.get("styles") {
         Some(Value::Array(a)) => a.iter().filter_map(Value::as_str).take(MAX_COPY).collect(),
         Some(Value::String(one)) => vec![one.as_str()],

@@ -1,0 +1,10 @@
+[package]
+name = "open-office-wasm-webkit-compat"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+wasmparser = "=0.252.0"

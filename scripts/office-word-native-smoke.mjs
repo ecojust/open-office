@@ -1,3 +1,4 @@
+import { WASM_COMPAT_SOURCES } from './wasm-webkit-compat.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -35,7 +36,7 @@ function positive(value, label, maximum = Number.MAX_SAFE_INTEGER) {
 
 /** Match the build script's path+NUL+bytes+NUL fingerprint without executing a build. */
 export function wordSourceHash(root = ROOT) {
-  const files = ['scripts/build-office-word.mjs', 'scripts/build-office-icons.mjs', 'src/shared/office-ui-fonts.rs'];
+  const files = ['scripts/build-office-word.mjs', 'scripts/build-office-icons.mjs', 'src/shared/office-ui-fonts.rs', ...WASM_COMPAT_SOURCES];
   function collect(directory) {
     for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
       if (['target', '.git'].includes(entry.name)) continue;

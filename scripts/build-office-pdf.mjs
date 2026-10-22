@@ -4,13 +4,14 @@ import { spawnSync } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildOfficeIcons } from './build-office-icons.mjs'
+import { patchWasmForWebKit, WASM_COMPAT_SOURCES } from './wasm-webkit-compat.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const source = join(root, 'vendor/office-pdf')
 const output = join(root, 'public/office-pdf')
 const digest = value => createHash('sha256').update(value).digest('hex')
 await buildOfficeIcons({ root, families: ['pdf'], check: process.argv.includes('--check') })
-const sources = ['scripts/build-office-pdf.mjs', 'scripts/build-office-icons.mjs', 'src/shared/office-ui-fonts.rs']
+const sources = ['scripts/build-office-pdf.mjs', 'scripts/build-office-icons.mjs', 'src/shared/office-ui-fonts.rs', ...WASM_COMPAT_SOURCES]
 async function collect(relative) {
   for (const entry of (await readdir(join(root, relative), { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
     if (['target', '.git'].includes(entry.name)) continue
@@ -46,7 +47,9 @@ if (version.status !== 0 || version.stdout.trim() !== 'wasm-bindgen 0.2.129') {
   throw Error('Install the pinned WASM bridge: cargo install --locked wasm-bindgen-cli --version 0.2.129 (or set WASM_BINDGEN to that executable).')
 }
 const targetDir = process.env.OFFICE_PDF_TARGET_DIR || join(source, 'target')
-const built = spawnSync(process.env.CARGO || 'cargo', ['build', '--locked', '--release', '--target', 'wasm32-unknown-unknown', '--manifest-path', join(source, 'Cargo.toml'), '-p', 'open-office-pdf-host', '--target-dir', targetDir], { cwd: root, stdio: 'inherit', env: { ...process.env, CARGO_PROFILE_RELEASE_LTO: 'false', OPEN_OFFICE_FONTS_DIR: join(root, 'assets/fonts/open-office'), OPEN_OFFICE_DECK_FONTS_DIR: join(root, 'assets/fonts/deck') } })
+// Size optimization limits LLVM inlining in this large editor module. WebKit's
+// optimizing WASM compiler can otherwise exhaust memory while compiling its hot paths.
+const built = spawnSync(process.env.CARGO || 'cargo', ['build', '--locked', '--release', '--target', 'wasm32-unknown-unknown', '--manifest-path', join(source, 'Cargo.toml'), '-p', 'open-office-pdf-host', '--target-dir', targetDir], { cwd: root, stdio: 'inherit', env: { ...process.env, CARGO_PROFILE_RELEASE_LTO: 'false', CARGO_PROFILE_RELEASE_OPT_LEVEL: 's', OPEN_OFFICE_FONTS_DIR: join(root, 'assets/fonts/open-office'), OPEN_OFFICE_DECK_FONTS_DIR: join(root, 'assets/fonts/deck') } })
 if (built.error) throw built.error
 if (built.status !== 0) process.exit(built.status || 1)
 await rm(output, { recursive: true, force: true })
@@ -54,6 +57,7 @@ await mkdir(output, { recursive: true })
 const generated = spawnSync(bindgen, [join(targetDir, 'wasm32-unknown-unknown/release/open_office_pdf_host.wasm'), '--target', 'web', '--out-dir', output, '--out-name', 'office_pdf'], { stdio: 'inherit' })
 if (generated.error) throw generated.error
 if (generated.status !== 0) process.exit(generated.status || 1)
+patchWasmForWebKit(join(output, 'office_pdf_bg.wasm'))
 const files = {}
 async function hashOutput(prefix = '') {
   for (const entry of await readdir(join(output, prefix), { withFileTypes: true })) {

@@ -4,13 +4,14 @@ import { spawnSync } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildOfficeIcons } from './build-office-icons.mjs'
+import { patchWasmForWebKit, WASM_COMPAT_SOURCES } from './wasm-webkit-compat.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const source = join(root, 'vendor/office-sheet')
 const output = join(root, 'public/office-sheet')
 const digest = value => createHash('sha256').update(value).digest('hex')
 await buildOfficeIcons({ root, families: ['sheet'], check: process.argv.includes('--check') })
-const sources = ['scripts/build-office-sheet.mjs', 'scripts/build-office-icons.mjs', 'src/shared/office-ui-fonts.rs']
+const sources = ['scripts/build-office-sheet.mjs', 'scripts/build-office-icons.mjs', 'src/shared/office-ui-fonts.rs', ...WASM_COMPAT_SOURCES]
 async function collect(relative) {
   for (const entry of (await readdir(join(root, relative), { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
     if (['target', '.git'].includes(entry.name)) continue
@@ -50,6 +51,7 @@ await mkdir(output, { recursive: true })
 const generated = spawnSync(bindgen, [join(targetDir, 'wasm32-unknown-unknown/release/open_office_sheet_host.wasm'), '--target', 'web', '--out-dir', output, '--out-name', 'office-sheet'], { stdio: 'inherit' })
 if (generated.error) throw generated.error
 if (generated.status !== 0) process.exit(generated.status || 1)
+patchWasmForWebKit(join(output, 'office-sheet_bg.wasm'))
 const files = {}
 async function hashOutput(prefix = '') {
   for (const entry of await readdir(join(output, prefix), { withFileTypes: true })) {

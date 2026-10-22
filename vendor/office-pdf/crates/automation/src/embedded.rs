@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use office_pdf_engine::{DocId, Session};
 use serde_json::{Value, json};
 
-use crate::{Automation, Content, Result, ToolDef, ToolError, failed, tools};
+use crate::{Automation, Content, Result, ToolDef, ToolError, failed};
 
 /// An explicit set: adding a future CLI/system tool cannot expand editor access.
 fn allowed(name: &str) -> bool {
@@ -21,6 +21,7 @@ fn allowed(name: &str) -> bool {
             | "text_find"
             | "text_lines"
             | "text_fonts"
+            | "text_font_import"
             | "text_paragraphs"
             | "text_edit_layout"
             | "text_edit"
@@ -54,6 +55,11 @@ fn allowed(name: &str) -> bool {
             | "form_tab_order"
             | "form_delete_field"
             | "form_detect_fields"
+            | "form_actions"
+            | "form_set_actions"
+            | "form_set_script"
+            | "js_document_scripts"
+            | "js_set_document_script"
             | "doc_import_data"
             | "redact_mark"
             | "redact_apply"
@@ -123,9 +129,10 @@ fn allowed(name: &str) -> bool {
 }
 
 pub fn embedded_tools() -> Vec<ToolDef> {
-    tools()
-        .into_iter()
+    crate::tools::all()
+        .iter()
         .filter(|tool| allowed(tool.name))
+        .cloned()
         .map(|mut tool| {
             // The shell binds the document, never the agent. Paths name inline assets only.
             if let Some(props) = tool.input_schema.get_mut("properties").and_then(Value::as_object_mut) {

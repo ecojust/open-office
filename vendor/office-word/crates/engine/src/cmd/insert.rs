@@ -117,8 +117,17 @@ pub fn specs() -> Vec<CommandSpec> {
             })
         }),
         CommandSpec::new("insert.textFromFile", "Text from File", "Insert › Text › Object", |s, v| {
-            let path = p::req_str(v, "path")?;
-            let doc = crate::io::open_path(std::path::Path::new(path)).map_err(CmdError::Failed)?;
+            let doc = if let Some(data) = p::str(v, "data") {
+                if data.len() > 6 * 1024 * 1024 {
+                    return Err(CmdError::Params("inline document exceeds 6 MiB".into()));
+                }
+                let name = p::req_str(v, "name")?;
+                let bytes = base64_decode(data).ok_or_else(|| CmdError::Params("bad base64".into()))?;
+                crate::io::open_bytes(name, &bytes).map_err(CmdError::Failed)?
+            } else {
+                let path = p::req_str(v, "path")?;
+                crate::io::open_path(std::path::Path::new(path)).map_err(CmdError::Failed)?
+            };
             let mut frag = doc.body_fragment();
             super::paste::unlink_sections(&mut frag.blocks);
             let at = delete_selection(s)?;
@@ -126,7 +135,7 @@ pub fn specs() -> Vec<CommandSpec> {
             s.sel = Selection::caret(end);
             sel_result(s)
         })
-        .params(r#"{"path": string}"#),
+        .params(r#"{"path"?: string, "name"?: string (filename identifying the inline format), "data"?: base64 (inline document bytes; requires name, replaces path)}"#),
     ]
 }
 

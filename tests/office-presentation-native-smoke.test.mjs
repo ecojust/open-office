@@ -1,3 +1,4 @@
+import { installWasmCompatSources } from './helpers/wasm-compat-fixture.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -25,6 +26,7 @@ function installation() {
   writeFileSync(join(root, 'assets/fonts/ui/license.txt'), 'interface font fixture');
   writeFileSync(join(root, 'src/shared/office-ui-fonts.rs'), '// shared interface typography');
   writeFileSync(join(root, 'assets/fonts/deck/license.txt'), 'deck font fixture');
+  installWasmCompatSources(root);
   const assets = join(resourceRoot, 'frontend/office-presentation'); mkdirSync(assets, { recursive: true });
   const bytes = { 'office-presentation.js': Buffer.from('export const engine = "Open Office";'), 'office-presentation.d.ts': Buffer.from('export const engine: string;'),
     'office-presentation_bg.wasm': Buffer.from('0061736d01000000', 'hex'), 'office-presentation_bg.wasm.d.ts': Buffer.from('export const memory: WebAssembly.Memory;') };

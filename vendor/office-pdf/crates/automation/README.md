@@ -209,3 +209,9 @@ behavior. Back/Forward
 returns to page tops, does not restore zoom, does not switch documents, and is not saved across
 restarts. Standalone engine/MCP sessions have no viewport, so they do not have a separate
 navigation-history tool; use the opt-in UI control channel to navigate the displayed document.
+
+## Open Office current-document integration
+
+The embedded command catalog includes inline font import, form actions, field script content and document script content. Font inputs go through `input_reader`, so the embedded caller supplies bytes by asset name and the standalone CLI retains root-confined file access. The console (`js_run`), filesystem operations and document lifecycle remain outside this catalog. `tests/embedded_editing.rs` verifies actual live-session edits, undo, save/reopen and asset-only font loading; both tests fail against the previous embedded catalog.
+
+The complete catalog is constructed in small non-inlined groups and shared through the existing immutable table. Embedded discovery clones only allowed definitions before removing the document argument. The refactor preserves the complete serialized catalog byte for byte and avoids repeatedly executing the large constructor on WebKit. A regression verifies that one catalog caller cannot mutate later callers or the standalone schema.
