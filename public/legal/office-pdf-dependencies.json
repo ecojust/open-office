@@ -4,7 +4,7 @@
   "rootPackage": "open-office-pdf-host",
   "scope": "Normal and build dependency closure from cargo tree --locked --target wasm32-unknown-unknown --edges normal,build. packages records external resolved sources; vendoredPackages separately records all patched third-party source directories and whether each appears in that closure; workspacePackages records local editor code under the retained upstream license and integration notice. Dependency presence does not prove every crate contributes code to the optimized binary. Original asset attribution is retained separately.",
   "lockfile": "vendor/office-pdf/Cargo.lock",
-  "lockfileSha256": "f03957b94b1bdfe2705d81d07d48ed4bc047b117ea3f4b70b4a81ec2d854e654",
+  "lockfileSha256": "0b09b35aeec686b760f3fc26865790bd831ca7f18bc0f95151fa56a4605166e2",
   "packages": [
     {
       "name": "accesskit",
@@ -4444,6 +4444,18 @@
       "sourceCode": "https://crates.io/api/v1/crates/vello_cpu/0.0.8/download"
     },
     {
+      "name": "vello_cpu",
+      "version": "0.1.0",
+      "license": "Apache-2.0 OR MIT",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "ac7349e1f55f6b801c7c277958df4ea53e7f20f21e8014910ad888b2ecda93ea",
+      "licenseFiles": [
+        "rust/vello_cpu@0.1.0/LICENSE-APACHE",
+        "rust/vello_cpu@0.1.0/LICENSE-MIT"
+      ],
+      "sourceCode": "https://crates.io/api/v1/crates/vello_cpu/0.1.0/download"
+    },
+    {
       "name": "version_check",
       "version": "0.9.5",
       "license": "MIT/Apache-2.0",
@@ -5039,28 +5051,6 @@
         "version": "0.0.8",
         "commit": null,
         "commitEvidence": "No upstream commit is retained in this vendored directory; the exact imported patched source is identified by vendoredSource and office-pdf/source-manifest.json, rather than an inferred upstream commit."
-      }
-    },
-    {
-      "name": "vello_cpu",
-      "version": "0.1.0",
-      "license": "Apache-2.0 OR MIT",
-      "source": null,
-      "licenseFiles": [
-        "rust/vello_cpu@0.1.0/LICENSE-APACHE",
-        "rust/vello_cpu@0.1.0/LICENSE-MIT"
-      ],
-      "sourceLocation": "vendor/office-pdf/vendor/vello_cpu",
-      "patchLocation": "vendor/office-pdf/vendor/vello_cpu",
-      "patchDescription": "vendor/office-pdf/vendor/README.md",
-      "upstreamRepository": "https://github.com/linebender/vello",
-      "upstreamReleaseSource": "https://crates.io/api/v1/crates/vello_cpu/0.1.0/download",
-      "inWasmDependencyClosure": true,
-      "upstreamSourceEvidence": {
-        "repository": "https://github.com/linebender/vello",
-        "commit": "1b63b04c03873d81109b25316a7a523bec17b5e6",
-        "crateVcsPath": "sparse_strips/vello_cpu",
-        "commitEvidence": ".cargo_vcs_info.json retained in vendored package"
       }
     },
     {

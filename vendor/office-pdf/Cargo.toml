@@ -115,4 +115,3 @@ lopdf = { path = "vendor/lopdf" }
 winit = { path = "vendor/winit" }
 egui-wgpu = { path = "vendor/egui-wgpu" }
 vello_common = { path = "vendor/vello_common" }
-vello_cpu = { path = "vendor/vello_cpu" }

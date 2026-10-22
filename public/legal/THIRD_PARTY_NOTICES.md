@@ -32,5 +32,3 @@ Vue 和 Tauri 的原始许可保留在 `public/legal/npm`、`public/legal/rust`�
 发行页应提供精确提交的应用源码（包含四套编辑器本地修改）、锁文件、构建与安装脚本、来源清单及适用许可要求的依赖源码。固定来源与下载校验记录在 [`corresponding-sources-manifest.json`](public/legal/corresponding-sources-manifest.json)，各组件的逐项源码链接见其依赖索引。`node scripts/fetch-corresponding-sources.mjs` 获取清单中的归档，`--verify` 或 `--offline` 核验已有内容。
 
 只提供上游主页不等于已交付完整对应源码；具体组装说明见 [`CORRESPONDING-SOURCE.md`](public/legal/CORRESPONDING-SOURCE.md)。第三方许可原文优先于此概述，软件按适用许可原样提供，不作保证。
-
-PDF 的 `vello_cpu` 0.1.0 使用保留原始 Apache-2.0 / MIT 许可的本地补丁，仅限制 WASM 合成运算的内联。源码与补丁说明随发行源码归档提供，见 `vendor/office-pdf/vendor/vello_cpu` 和该目录上级的 `README.md`。
