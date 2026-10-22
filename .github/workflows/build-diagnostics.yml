@@ -26,11 +26,11 @@ jobs:
           escape=lambda s:s.replace('%','%25').replace('\r','%0D').replace('\n','%0A')
           for job in jobs:
               if job['status']!='completed' or job['conclusion']!='failure':continue
-              raw=subprocess.check_output(['gh','api',f"repos/{repo}/actions/jobs/{job['id']}/logs"],text=True)
+              raw=subprocess.check_output(['gh','api','--allow-escape-sequences',f"repos/{repo}/actions/jobs/{job['id']}/logs"]).decode('utf8',errors='replace')
               lines=re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]','',raw).splitlines()
               starts=[i for i,l in enumerate(lines) if '##[group]Run npm run desktop:build' in l]
-              assert starts,'Package command not found'
-              start=starts[-1];ends=[i for i in range(start,len(lines)) if '##[error]' in lines[i]]
+              start=starts[-1] if starts else 0
+              ends=[i for i in range(start,len(lines)) if 'Process completed with exit code' in lines[i]]
               end=ends[0]+1 if ends else len(lines)
               excerpt='\n'.join(l[:800] for l in lines[max(start,end-45):end])
               for i in range(0,len(excerpt),2800):
