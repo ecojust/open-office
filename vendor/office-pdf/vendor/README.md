@@ -52,3 +52,13 @@ black-point normalization is unchanged. `lab_bradford_tests` checks independent
 D50/equal-energy neutral and chromatic oracles, D65 identity, and direct/Indexed
 consistency (including an asymmetric chromatic Range), and zero/overflowing
 cone-response fallback.
+
+### Open Office: bounded WASM compositing functions
+
+`vello_cpu` 0.1.0 is vendored from the crates.io release (Apache-2.0 OR MIT;
+licences retained). Its low-precision and high-precision Porter-Duff macro
+implementations use `inline(never)` on wasm32 only. This keeps the scalar
+operators in separate compiler functions rather than inlining every operator
+into one very large WebKit optimization graph. Equations, dispatch, masks and
+native SIMD inlining are unchanged. The native installation smoke still rejects
+any WebContent termination; this patch does not change that gate.
