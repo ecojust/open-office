@@ -57,6 +57,15 @@ jobs:
           path: artifacts
       - name: Verify and copy original package without modifying its resources
         run: GITHUB_SHA="$DIAGNOSTIC_SOURCE_SHA" GITHUB_RUN_ID="$SOURCE_RUN_ID" node scripts/macos-intel-transfer.mjs verify-and-copy
+      - name: Inspect actual packaged WASM constants without executing them
+        run: |
+          curl -fsSL https://github.com/bytecodealliance/wasm-tools/releases/download/v1.262.0/wasm-tools-1.262.0-aarch64-macos.tar.gz -o /tmp/wasm-tools.tar.gz
+          printf '801b237643cc0f4ab27ebd1745e7863e23bf194a038bc6ca8ce5618212e43669  /tmp/wasm-tools.tar.gz\n' | shasum -a 256 -c
+          mkdir /tmp/wasm-tools
+          tar -xzf /tmp/wasm-tools.tar.gz -C /tmp/wasm-tools
+          while IFS= read -r wasm_file; do
+            python scripts/diagnose-wasm-switches.py "$wasm_file"
+          done < <(rg --files --hidden --no-ignore "$OPEN_OFFICE_VERIFIED_APP/Contents/Resources" -g '*.wasm')
       - name: Reproduce and retain bounded crash frames
         run: |
           node --input-type=module <<'JS'
