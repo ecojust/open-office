@@ -5,11 +5,16 @@ on:
       source_run_id:
         required: true
         type: string
+      mode:
+        type: choice
+        default: logs
+        options: [logs, repack]
 permissions:
   contents: read
   actions: read
 jobs:
   diagnostics:
+    if: inputs.mode != 'repack'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -36,3 +41,49 @@ jobs:
               for i in range(0,len(excerpt),2800):
                   print(f"::notice title=Package command tail {i//2800:03d}::{escape(excerpt[i:i+2800])}")
           PY
+
+  repack:
+    if: inputs.mode == 'repack'
+    name: Diagnostic only / package existing Intel app on macOS 15
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      OPEN_OFFICE_PLATFORM_ID: macos-x64
+      OPEN_OFFICE_TARGET: x86_64-apple-darwin
+      OPEN_OFFICE_ALLOW_ROSETTA: '1'
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 42c67b742adcddb65c40561901ea705cb1c4fc4f
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          architecture: arm64
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run_id }}
+          name: open-office-build-macos-x64
+          path: artifacts
+      - name: Read and verify the original source package
+        run: GITHUB_SHA=42c67b742adcddb65c40561901ea705cb1c4fc4f GITHUB_RUN_ID="$SOURCE_RUN_ID" node scripts/macos-intel-transfer.mjs verify-and-copy
+      - name: Verbose packaging diagnostic, never publication evidence
+        run: |
+          python - <<'PYTHON'
+          import os,pathlib,shutil,subprocess
+          app=pathlib.Path(os.environ['OPEN_OFFICE_VERIFIED_APP'])
+          shutil.copytree(app/'Contents/Resources/frontend','dist',dirs_exist_ok=True)
+          target=pathlib.Path('src-tauri/target/x86_64-apple-darwin/release');target.mkdir(parents=True,exist_ok=True)
+          shutil.copy2(app/'Contents/MacOS/open-office',target/'open-office')
+          print(subprocess.check_output(['df','-h','.'],text=True))
+          r=subprocess.run(['npm','exec','--','tauri','bundle','--target','x86_64-apple-darwin','--bundles','dmg','--verbose'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+          tail=r.stdout[-22000:]
+          escape=lambda s:s.replace('%','%25').replace('\r','%0D').replace('\n','%0A')
+          for i in range(0,len(tail),2800):print(f'::notice title=DMG diagnostic {i//2800:03d}::{escape(tail[i:i+2800])}')
+          print(f'::notice title=DMG diagnostic result::Diagnostic only: exit={r.returncode}; not publication acceptance.')
+          raise SystemExit(r.returncode)
+          PYTHON
