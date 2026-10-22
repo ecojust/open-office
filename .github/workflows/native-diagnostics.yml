@@ -1,75 +1,88 @@
-name: Read existing native verification diagnostics
-
+name: Diagnose packaged MCP WebKit crash
 on:
   workflow_dispatch:
     inputs:
-      run_id:
-        description: Existing desktop build run ID (diagnostics only, no rebuild or release)
+      source_run_id:
         type: string
         required: true
-      job_id:
-        description: Optional failed job ID; expose only repository-known test names, compiler codes, and fixed failure categories
-        type: string
-        required: false
-        default: ''
-
 permissions:
-  actions: read
   contents: read
-
+  actions: read
 jobs:
-  diagnostics:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  diagnose:
+    name: Diagnostic only / original Intel package / macOS 15
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      OPEN_OFFICE_PLATFORM_ID: macos-x64
+      OPEN_OFFICE_TARGET: x86_64-apple-darwin
+      OPEN_OFFICE_ALLOW_ROSETTA: '1'
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Validate build identifier
+          architecture: arm64
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: arm64
+      - run: npm ci --ignore-scripts
+      - run: python -m pip install -r tests/requirements-pdf-inspection.txt
+      - name: Bind diagnostic to the existing source run
         env:
-          SOURCE_RUN_ID: ${{ inputs.run_id }}
-        run: node -e 'if(!/^[0-9]+$/.test(process.env.SOURCE_RUN_ID))throw Error("Invalid run ID")'
-      - uses: actions/checkout@v4
-      - name: Summarize only allowlisted failure identifiers without exposing logs
-        if: inputs.job_id != ''
-        env:
-          SOURCE_RUN_ID: ${{ inputs.run_id }}
-          SOURCE_JOB_ID: ${{ inputs.job_id }}
-          SOURCE_REPOSITORY: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/read-failed-job-log.mjs
+        run: |
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]]
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}" > /tmp/source-run.json
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync,appendFileSync} from 'node:fs';
+          const run=JSON.parse(readFileSync('/tmp/source-run.json'));
+          assert.equal(run.head_sha,'2b26fab491a0c34bd2d4db61c66e07d0d9bbd907');
+          assert.equal(run.path,'.github/workflows/desktop-release.yml');
+          appendFileSync(process.env.GITHUB_ENV,`DIAGNOSTIC_SOURCE_SHA=${run.head_sha}\n`);
+          JS
+      - name: Require available Rosetta translation
+        run: |
+          if ! /usr/bin/arch -x86_64 /usr/sbin/sysctl -in sysctl.proc_translated; then
+            /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+          fi
       - uses: actions/download-artifact@v4
-        if: inputs.job_id == ''
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ inputs.run_id }}
-          pattern: open-office-native-*
-          path: diagnostics
-          merge-multiple: true
-      - name: Expose existing bounded reports through readable check annotations
-        if: inputs.job_id == ''
+          run-id: ${{ inputs.source_run_id }}
+          name: open-office-build-macos-x64
+          path: artifacts
+      - name: Verify and copy original package without modifying its resources
+        run: GITHUB_SHA="$DIAGNOSTIC_SOURCE_SHA" GITHUB_RUN_ID="$SOURCE_RUN_ID" node scripts/macos-intel-transfer.mjs verify-and-copy
+      - name: Reproduce and retain bounded crash frames
         run: |
-          node --input-type=module <<'NODE'
-          import { appendFileSync, readFileSync, readdirSync, statSync } from 'node:fs';
-          import assert from 'node:assert/strict';
-          import { nativeReportSummary } from './scripts/native-report-summary.mjs';
-          const files = readdirSync('diagnostics').filter(name => /^[a-z0-9-]+-native-smoke\.json$/.test(name));
-          assert.ok(files.length > 0, 'No existing native verification reports were found');
-          const escape = value => String(value).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
-          for (const file of files) {
-            assert.ok(statSync(`diagnostics/${file}`).size <= 12 * 1024 * 1024, 'Diagnostic report exceeds 12 MiB');
-            const report = JSON.parse(readFileSync(`diagnostics/${file}`, 'utf8'));
-            // GitHub truncates each annotation message at 4096 bytes. Preserve
-            // valid JSON through numbered ASCII chunks instead of cutting JSON
-            // in the middle of an error or losing the final resource events.
-            const excerpt = nativeReportSummary(report);
-            const details = JSON.stringify(excerpt, null, 2);
-            const encoded = Buffer.from(JSON.stringify(excerpt), 'utf8').toString('base64');
-            const count = Math.ceil(encoded.length / 3000);
-            for (let index = 0; index < count; index++) {
-              const title = `${file}.base64-part-${String(index + 1).padStart(3, '0')}-of-${String(count).padStart(3, '0')}`;
-              console.log(`::notice title=${escape(title)}::${encoded.slice(index * 3000, (index + 1) * 3000)}`);
-            }
-            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### ${file}\n\n<pre>${details.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</pre>\n`);
+          node --input-type=module <<'JS'
+          import {spawn} from 'node:child_process';
+          import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
+          import {collectCrashReports} from './scripts/macos-editing-diagnostic.mjs';
+          const started=Date.now(),directory='artifacts/crash-diagnostic';mkdirSync(directory,{recursive:true});
+          const child=spawn(process.execPath,['scripts/native-smoke.mjs','--app',process.env.OPEN_OFFICE_VERIFIED_APP],{stdio:'inherit',env:{...process.env,GITHUB_SHA:process.env.DIAGNOSTIC_SOURCE_SHA,GITHUB_RUN_ID:process.env.SOURCE_RUN_ID}});
+          const exitCode=await new Promise(resolve=>child.on('close',resolve));
+          const crashes=await collectCrashReports(started,directory,{terminated:true});
+          writeFileSync(`${directory}/collection.json`,JSON.stringify(crashes,null,2));
+          console.log(`::notice title=Diagnostic reproduction::${JSON.stringify({diagnosticOnly:true,exitCode,crashes})}`);
+          const escape=s=>s.replaceAll('%','%25').replaceAll('\r','%0D').replaceAll('\n','%0A');
+          for(const file of crashes.files){
+            const name=typeof file==='string'?file:file.file||file.path||file.destination||file.name;
+            if(!name)continue;
+            let text=readFileSync(`${directory}/${name}`,'utf8'),r;
+            try{r=JSON.parse(text);}catch{r=JSON.parse(text.slice(text.indexOf('\n')+1));}
+            const threads=r.threads||[],thread=threads[r.faultingThread]||threads.find(t=>t.triggered)||{};
+            const frames=(thread.frames||[]).slice(0,64).map(f=>({symbol:String(f.symbol||'').slice(0,250),imageIndex:f.imageIndex}));
+            for(let i=0;i<frames.length;i+=8)console.log(`::notice title=Crash stack ${i/8}::${escape(JSON.stringify({exception:r.exception,termination:r.termination,frames:frames.slice(i,i+8)}))}`);
           }
-          NODE
+          if(exitCode)process.exitCode=1;
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mcp-webkit-crash-diagnostic
+          path: artifacts/crash-diagnostic
