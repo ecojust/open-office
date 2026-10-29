@@ -188,6 +188,19 @@ impl DocExt {
         }
         Ok(())
     }
+
+    /// JSON stays import-only except for a bounded schedule data copy. Keep the
+    /// exception content-aware so other supported JSON imports cannot acquire
+    /// a general JSON save capability.
+    fn ensure_exportable_content(self, bytes: &[u8]) -> Result<(), String> {
+        if self == Self::Json
+            && bytes.len() <= SCHEDULE_LIMIT
+            && workflow_json(bytes).is_some_and(|value| valid_schedule_header(&value))
+        {
+            return Ok(());
+        }
+        self.ensure_exportable()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -573,12 +586,13 @@ impl DocumentStore {
         extension: DocExt,
         bytes: Vec<u8>,
     ) -> Result<SaveResult, String> {
-        extension.ensure_exportable()?;
+        extension.ensure_exportable_content(&bytes)?;
         let hash = hash_bytes(&bytes);
         let kind = document_kind(&bytes, extension);
-        // Images are export copies, not editable document capabilities. Keep them
-        // out of recents and never replace an active document's registered identity.
-        if matches!(extension, DocExt::Svg | DocExt::Png) {
+        // Images and schedule JSON are export copies, not editable document
+        // capabilities. Keep them out of recents and never replace an active
+        // document's registered identity. JSON content was checked above.
+        if matches!(extension, DocExt::Svg | DocExt::Png | DocExt::Json) {
             let name = file_name(&snapshot.path)?;
             let staged = stage_bytes(&snapshot.path, &bytes, snapshot.permissions.clone())?;
             let id = new_id()?;
@@ -1014,7 +1028,12 @@ fn valid_schedule_header(value: &serde_json::Value) -> bool {
                             && event
                                 .get("height")
                                 .and_then(|v| v.as_f64())
-                                .is_some_and(|height| height == 0.5 || height == 1.0)
+                                .is_some_and(|height| {
+                                    (height == 0.5 || height == 1.0)
+                                        && event.get("slot").and_then(|v| v.as_f64()).is_some_and(
+                                            |slot| slot == 0.0 || (height == 0.5 && slot == 1.0),
+                                        )
+                                })
                     })
             })
 }
@@ -1488,8 +1507,8 @@ pub async fn save_document(
         let _operation = store.begin_operation()?;
         validate_file_name(&request.name, request.extension)?;
         validate_protected_document_ids(&request.protected_document_ids)?;
-        request.extension.ensure_exportable()?;
         let bytes = decode_document(&request.base64)?;
+        request.extension.ensure_exportable_content(&bytes)?;
         validate_document_signature(&bytes, request.extension)?;
         let existing = request
             .document_id
@@ -1640,6 +1659,7 @@ mod tests {
         schedule["events"][0]["startDate"] = "2026-10-09".into();
         schedule["events"][0]["endDate"] = "2026-10-13".into();
         schedule["events"][0]["roleId"] = serde_json::Value::Null;
+        schedule["events"][0]["slot"] = 1.into();
         let edited = serde_json::to_vec(&schedule).unwrap();
         validate_document_signature(&edited, DocExt::Ooschedule).unwrap();
         let saved = store
@@ -1677,7 +1697,10 @@ mod tests {
         let opened = store.register_open(source.clone()).unwrap();
         assert_eq!(opened.kind, DocumentKind::Schedule);
         assert_eq!(opened.extension, DocExt::Json);
+        // JSON has no general save capability; only validated schedule copies
+        // can be exported, and an imported JSON source still cannot be updated.
         assert!(DocExt::Json.ensure_exportable().is_err());
+        DocExt::Json.ensure_exportable_content(&original).unwrap();
         for extension in [DocExt::Json, DocExt::Ooschedule] {
             assert!(store
                 .save_existing(
@@ -1709,6 +1732,151 @@ mod tests {
             restored.record(&opened.id).unwrap().kind,
             Some(DocumentKind::Schedule)
         );
+    }
+
+    #[test]
+    fn schedule_json_export_round_trips_without_rebinding_source_or_recents() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let store = DocumentStore::new(data.clone()).unwrap();
+        let source = directory.path().join("项目排期.ooschedule");
+        let original = serde_json::to_vec(&schedule_fixture()).unwrap();
+        fs::write(&source, &original).unwrap();
+        let opened = store.register_open(source.clone()).unwrap();
+        let history = fs::read(data.join("recent-files.json")).unwrap();
+        let mut changed = schedule_fixture();
+        changed["title"] = "调整后的项目".into();
+        changed["events"][0]["slot"] = 1.into();
+        changed["layout"] = serde_json::json!({"trackHeights": {"overall": 140}});
+        let exported = serde_json::to_vec(&changed).unwrap();
+        validate_document_signature(&exported, DocExt::Json).unwrap();
+        let copy = directory.path().join("完整排期数据.json");
+        let saved = store
+            .save_to_target(
+                TargetSnapshot::capture(copy.clone()).unwrap(),
+                DocExt::Json,
+                exported.clone(),
+            )
+            .unwrap();
+        let SaveResult::Saved { document } = saved else {
+            panic!("expected schedule JSON export")
+        };
+        assert_eq!(document.kind, DocumentKind::Schedule);
+        assert_eq!(document.extension, DocExt::Json);
+        assert_ne!(document.id, opened.id);
+        assert_eq!(document.sha256, hash_bytes(&exported));
+        assert_eq!(document.size_bytes, exported.len() as u64);
+        assert!(store.record(&document.id).is_err());
+        assert_eq!(store.record(&opened.id).unwrap().path, source);
+        assert_eq!(store.record(&opened.id).unwrap().sha256, opened.sha256);
+        assert_eq!(fs::read(&source).unwrap(), original);
+        assert_eq!(fs::read(&copy).unwrap(), exported);
+        assert_eq!(fs::read(data.join("recent-files.json")).unwrap(), history);
+        assert_eq!(store.records().unwrap().len(), 1);
+
+        let imported = store.register_open(copy.clone()).unwrap();
+        assert_eq!(imported.kind, DocumentKind::Schedule);
+        assert_eq!(imported.extension, DocExt::Json);
+        assert_eq!(STANDARD.decode(&imported.base64).unwrap(), exported);
+        let snapshot = TargetSnapshot::capture(copy.clone()).unwrap();
+        assert!(store
+            .ensure_target_not_open(&snapshot, &[opened.id.clone(), imported.id.clone()])
+            .is_err());
+        assert!(store
+            .save_existing(
+                &store.record(&imported.id).unwrap(),
+                DocExt::Json,
+                Some(&imported.sha256),
+                original.clone(),
+            )
+            .is_err());
+        assert_eq!(fs::read(copy).unwrap(), exported);
+        assert_eq!(fs::read(source).unwrap(), original);
+    }
+
+    #[test]
+    fn schedule_json_export_exception_rejects_other_json_and_invalid_envelopes() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let mut malformed = schedule_fixture();
+        malformed["calendar"]["hideWeekends"] = "true".into();
+        let mut future = schedule_fixture();
+        future["version"] = 2.into();
+        let mut oversized = serde_json::to_vec(&schedule_fixture()).unwrap();
+        oversized.resize(SCHEDULE_LIMIT + 1, b' ');
+        for bytes in [
+            workflow_fixture("mermaid"),
+            br#"{"type":"excalidraw","elements":[]}"#.to_vec(),
+            br#"{"format":"open-office-schedule"}"#.to_vec(),
+            b"{}".to_vec(),
+            b"[1,2,3]".to_vec(),
+            serde_json::to_vec(&malformed).unwrap(),
+            serde_json::to_vec(&future).unwrap(),
+            oversized,
+        ] {
+            assert!(DocExt::Json.ensure_exportable_content(&bytes).is_err());
+            let target = directory.path().join("不能导出.json");
+            assert!(store
+                .save_to_target(
+                    TargetSnapshot::capture(target.clone()).unwrap(),
+                    DocExt::Json,
+                    bytes
+                )
+                .is_err());
+            assert!(!target.exists());
+            assert!(store.records().unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn schedule_half_day_slots_have_matching_import_and_export_contracts() {
+        let fixture = schedule_fixture();
+        for (height, slot) in [(1.0, 0.0), (0.5, 0.0), (0.5, 1.0)] {
+            let mut valid = fixture.clone();
+            valid["events"][0]["height"] = serde_json::json!(height);
+            valid["events"][0]["slot"] = serde_json::json!(slot);
+            let bytes = serde_json::to_vec(&valid).unwrap();
+            for extension in [DocExt::Ooschedule, DocExt::Json] {
+                validate_document_signature(&bytes, extension).unwrap();
+                extension.ensure_exportable_content(&bytes).unwrap();
+                assert_eq!(document_kind(&bytes, extension), DocumentKind::Schedule);
+            }
+        }
+        for height in [1.0, 0.5] {
+            for slot in [
+                serde_json::json!(-1),
+                serde_json::json!(2),
+                serde_json::json!(0.5),
+                serde_json::json!("0"),
+                serde_json::json!("1"),
+                serde_json::json!(true),
+                serde_json::Value::Null,
+            ] {
+                let mut invalid = fixture.clone();
+                invalid["events"][0]["height"] = serde_json::json!(height);
+                invalid["events"][0]["slot"] = slot;
+                let bytes = serde_json::to_vec(&invalid).unwrap();
+                for extension in [DocExt::Ooschedule, DocExt::Json] {
+                    assert!(validate_document_signature(&bytes, extension).is_err());
+                }
+                assert!(DocExt::Json.ensure_exportable_content(&bytes).is_err());
+            }
+        }
+        let mut full_afternoon = fixture.clone();
+        full_afternoon["events"][0]["height"] = 1.into();
+        full_afternoon["events"][0]["slot"] = 1.into();
+        let mut missing_slot = fixture;
+        missing_slot["events"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("slot");
+        for invalid in [full_afternoon, missing_slot] {
+            let bytes = serde_json::to_vec(&invalid).unwrap();
+            for extension in [DocExt::Ooschedule, DocExt::Json] {
+                assert!(validate_document_signature(&bytes, extension).is_err());
+            }
+            assert!(DocExt::Json.ensure_exportable_content(&bytes).is_err());
+        }
     }
 
     #[test]

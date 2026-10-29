@@ -1,4 +1,4 @@
-import { createSchedule, decodeSchedule, encodeSchedule, validateSchedule, type ScheduleProject } from './model.ts'
+import { createSchedule, decodeSchedule, encodeSchedule, scheduleId, validateSchedule, type ScheduleEvent, type ScheduleProject } from './model.ts'
 
 let nextDocument = 0
 export type ScheduleSnapshot = { documentId: number; revision: number; dirty: boolean; canUndo: boolean; canRedo: boolean }
@@ -30,6 +30,18 @@ export class ScheduleSession {
   while (this.history.length > 1 && (this.history.length > 100 || size > 16 * 1024 * 1024)) size -= this.history.shift()!.length * 2
   this.cursor = this.history.length - 1
   return true
+ }
+ /** Copy a live source into a new placement in one validated, undoable edit. */
+ copyEvent(placement: ScheduleEvent): ScheduleEvent {
+  const source = this.value.events.find(event => event.id === placement.id)
+  if (!source) throw Error('原事件已被删除，无法复制。')
+  const duplicate: ScheduleEvent = { ...source, id: scheduleId(), roleId: placement.roleId, startDate: placement.startDate, endDate: placement.endDate, slot: source.height === 1 ? 0 : placement.slot }
+  this.change(copy => {
+   copy.events.push(duplicate)
+   const height = copy.layout?.trackHeights[`event-${source.id}`]
+   if (height !== undefined) copy.layout!.trackHeights[`event-${duplicate.id}`] = height
+  })
+  return this.value.events.find(event => event.id === duplicate.id)!
  }
  undo(): boolean { if (!this.cursor) return false; this.value = JSON.parse(this.history[--this.cursor]); this.revision++; return true }
  redo(): boolean { if (this.cursor >= this.history.length - 1) return false; this.value = JSON.parse(this.history[++this.cursor]); this.revision++; return true }

@@ -227,6 +227,7 @@ const helpDialog = ref<HTMLElement>(), closeDialog = ref<HTMLElement>()
 useDialogFocus(helpDialog)
 useDialogFocus(closeDialog)
 const fileInput = ref<HTMLInputElement>()
+const scheduleImportInput = ref<HTMLInputElement>()
 let unlisten: (() => void) | undefined
 let pendingWindowClose = false
 const editor = () => activeRustWord.value ? rustWordHandles.get(activeKey.value) : activeRustSheet.value ? rustSheetHandles.get(activeKey.value) : activeRustPresentation.value ? rustPresentationHandles.get(activeKey.value) : activeRustPdf.value ? rustPdfHandles.get(activeKey.value) : activeSchedule.value ? scheduleHandles.get(activeKey.value) : activeWorkflow.value ? workflowHandles.get(activeKey.value) : noteHandles.get(activeKey.value)
@@ -519,6 +520,45 @@ function exportWorkflowCopy(id:string,output:EditorExport) {
     const result=await native.saveDocument({name,extension:output.extension,base64:output.base64,saveAs:true,protectedDocumentIds:tabs.value.flatMap(tab=>tab.fileId?[tab.fileId]:[])})
     if(result.status==='conflict')throw Error(result.message)
     if(result.status==='saved')status.value='图片副本已保存'
+  })
+}
+function exportScheduleCopy(id:string,format:'json'|'png') {
+  if(globalActionsBlocked.value||home.value||id!==activeKey.value)return
+  void task(format==='png'?'正在导出完整排期图片':'正在导出排期数据',async()=>{
+    const tab=active.value;if(!tab||tab.key!==id||tab.document.kind!=='schedule')return
+    const output=await requireEditor(tab).exportFile({format})
+    if(output.extension!==format)throw Error('排期导出格式与请求不符。')
+    const bytes=base64ToBytes(output.base64)
+    validateDocumentSignature(bytes,format)
+    if(format==='json')decodeSchedule(bytes)
+    const name=withExtension(tab.document.name,format), label=format==='png'?'整张排期表 PNG':'排期 JSON 数据'
+    if(!native.isTauri()){download(output.base64,name);status.value=`${label}已生成下载文件`;return}
+    const result=await native.saveDocument({name,extension:format,base64:output.base64,saveAs:true,protectedDocumentIds:tabs.value.flatMap(tab=>tab.fileId?[tab.fileId]:[])})
+    if(result.status==='conflict')throw Error(result.message)
+    if(result.status==='saved')status.value=`${label}副本已保存`
+  })
+}
+function importSchedule(id:string) {
+  if(globalActionsBlocked.value||home.value||id!==activeKey.value)return
+  if(!native.isTauri()){scheduleImportInput.value?.click();return}
+  void task('正在导入排期',async()=>{
+    const doc=await native.openDocument()
+    if(!doc)return
+    if(!['ooschedule','json'].includes(doc.extension)||doc.kind!=='schedule')throw Error('请选择 .ooschedule 或导出的排期 JSON 文件。')
+    await openImportedDocument(doc,doc.id)
+    await refreshRecents()
+  })
+}
+async function browserScheduleFile(event:Event) {
+  const input=event.target as HTMLInputElement, file=input.files?.[0];input.value=''
+  if(!file)return
+  await task('正在导入排期',async()=>{
+    const extension=extensionOf(file.name)
+    if(!['ooschedule','json'].includes(extension))throw Error('请选择 .ooschedule 或导出的排期 JSON 文件。')
+    if(file.size>4*1024*1024)throw Error('排期文件不能超过 4 MiB。')
+    const bytes=new Uint8Array(await file.arrayBuffer())
+    decodeSchedule(bytes)
+    await openImportedDocument({id:'',name:file.name,extension,kind:'schedule',base64:bytesToBase64(bytes),sha256:'',sizeBytes:file.size})
   })
 }
 function openFile() {
@@ -1324,6 +1364,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 <template>
   <div class="app-shell" :class="{'editing':!home}">
     <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.xlsx,.csv,.tsv,.pptx,.potx,.ppsx,.pdf,.oonote,.ooschedule,.owflow,.mmd,.mermaid,.drawio,.xml,.excalidraw,.json" @change="browserFile" />
+    <input ref="scheduleImportInput" data-testid="schedule-import-input" class="visually-hidden" type="file" accept=".ooschedule,.json" @change="browserScheduleFile" />
     <aside class="sidebar" aria-label="全局导航" :inert="globalActionsBlocked">
       <button class="primary open-sidebar" @click="openFile" aria-label="打开文件" title="打开文件 · Ctrl / ⌘ O"><Icon name="folder"/><span>打开文件</span><kbd>⌘ / Ctrl O</kbd></button>
       <nav aria-label="工作区"><button :class="{selected:home}" :aria-current="home ? 'page' : undefined" aria-label="工作台" title="工作台" @click="home=true"><Icon name="home"/><span>工作台</span></button></nav>
@@ -1414,7 +1455,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <RustPresentationEditor :theme="appearance" v-for="entry in rustPresentationEntries" :key="entry.document.id" v-show="activeRustPresentation&&activeKey===entry.document.id" :ref="handle=>setRustPresentationHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPresentation&&activeKey===entry.document.id" :disabled="editorInputBlocked" :templates-open="templatePanelOpen" @toggle-templates="activeKey===entry.document.id&&togglePresentationTemplates()" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <RustPdfEditor :theme="appearance" v-for="entry in rustPdfEntries" :key="entry.document.id" v-show="activeRustPdf&&activeKey===entry.document.id" :ref="handle=>setRustPdfHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPdf&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <NotebookEditor :theme="appearance" v-for="entry in noteEntries" :key="entry.document.id" v-show="activeNote&&activeKey===entry.document.id" :ref="handle=>setNoteHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeNote&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
-        <ScheduleEditor :theme="effectiveAppearance" v-for="entry in scheduleEntries" :key="entry.document.id" v-show="activeSchedule&&activeKey===entry.document.id" :ref="handle=>setScheduleHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeSchedule&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
+        <ScheduleEditor :theme="effectiveAppearance" v-for="entry in scheduleEntries" :key="entry.document.id" v-show="activeSchedule&&activeKey===entry.document.id" :ref="handle=>setScheduleHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeSchedule&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)" @import="importSchedule(entry.document.id)" @export="exportScheduleCopy(entry.document.id,$event)"/>
         <WorkflowEditor :theme="effectiveAppearance" v-for="entry in workflowEntries" :key="entry.document.id" v-show="activeWorkflow&&activeKey===entry.document.id" :ref="handle=>setWorkflowHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeWorkflow&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)" @create-canvas="activeKey===entry.document.id&&createCanvasCopy($event)" @export="exportWorkflowCopy(entry.document.id,$event)"/>
       </div>
       <PresentationTemplates v-if="!home&&activeRustPresentation&&templatePanelOpen" class="template-panel" :templates="presentationTemplates" :loading="templateListLoading" :error="templateListError" :disabled="documentActionsDisabled" @select="openPresentationTemplateDialog('apply',$event)" @save="openPresentationTemplateDialog('save')" @delete="openPresentationTemplateDialog('delete',$event)" @retry="refreshPresentationTemplates" @close="templatePanelOpen=false"/>
@@ -1478,14 +1519,6 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
             <span class="help-tool-icon"><Icon :name="icons[tool.kind]" :size="21"/></span>
             <div><h3>{{tool.name}}</h3><p>{{tool.description}}</p></div>
           </article>
-        </div>
-        <div class="help-community" aria-labelledby="help-community-heading">
-          <img src="/software-community-qr.svg" width="180" height="180" alt="软件及交流群二维码，扫码访问软件下载与交流群页面"/>
-          <div>
-            <h3 id="help-community-heading">软件及交流群</h3>
-            <p>扫码获取软件与交流群</p>
-            <span class="help-extraction-code">提取码 <b>rhb3</b></span>
-          </div>
         </div>
         <footer class="help-footer"><small>版本 {{appVersion}} · 构建 {{buildVersion}}</small><button class="primary" @click="help=false">开始工作</button></footer>
       </section>
