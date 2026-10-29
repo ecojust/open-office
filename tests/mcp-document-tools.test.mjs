@@ -82,3 +82,11 @@ test('inspection removes binary images and local paths, rejects oversized output
  const h=harness();h.handle.mcpExecute=async()=>({texts:Array(80).fill('x'.repeat(100000))})
  await assert.rejects(executeDocumentTool('pdf',h.handle,'pdf_read',{},h.guard),/内容过多/)
 })
+
+
+test('schedule does not advertise or dispatch unimplemented MCP tools',async()=>{
+ const h=harness()
+ assert.deepEqual(catalogForKind('schedule'),[])
+ await assert.rejects(executeDocumentTool('schedule',h.handle,'document_inspect',{},h.guard),/暂不支持/)
+ assert.equal(h.calls.length,0)
+})

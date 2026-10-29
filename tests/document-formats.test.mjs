@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { extensionOf, kindOf, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFileName, saveFormats } from '../src/shared/document.ts'
+import { extensionOf, kindOf, documentKindOf, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFileName, saveFormats } from '../src/shared/document.ts'
 
 function ole(major=3) {
   const bytes=new Uint8Array(512),view=new DataView(bytes.buffer)
@@ -75,4 +75,22 @@ test('PDF may have a short header prefix; empty or far-off fake headers are refu
   assert.doesNotThrow(()=>validateDocumentSignature(encode('\n%PDF-1.7\n'),'pdf'))
   assert.throws(()=>validateDocumentSignature(encode(' '.repeat(1024)+'%PDF-1.7'),'pdf'))
   for(const extension of ['docx','xlsx','csv','tsv','pptx','potx','ppsx','pdf'])assert.throws(()=>validateDocumentSignature(new Uint8Array(),extension),/文档为空/)
+})
+
+
+test('schedule files and JSON envelopes route to their own native save format',()=>{
+  const header={format:'open-office-schedule',version:1,id:'plan',title:'Launch',startDate:'2026-10-01',endDate:'2026-10-31',calendar:{},roles:[],events:[]}
+  assert.equal(extensionOf('Launch.OOSCHEDULE'),'ooschedule')
+  assert.equal(kindOf('ooschedule'),'schedule')
+  assert.equal(defaultSaveExtension('ooschedule'),'ooschedule')
+  assert.equal(defaultSaveExtension('json','schedule'),'ooschedule')
+  assert.equal(defaultSaveExtension('json','canvas'),'owflow')
+  assert.equal(isImportOnly('ooschedule'),false);assert.equal(isImportOnly('json'),true)
+  assert.deepEqual(saveFormats('schedule').map(format=>format.extension),['ooschedule'])
+  assert.equal(saveFileName('团队计划.v2','ooschedule'),'团队计划.v2.ooschedule')
+  for(const extension of ['ooschedule','json']) {
+    assert.equal(documentKindOf(encode(JSON.stringify(header)),extension),'schedule')
+    for(const value of [null,[],{}, {...header,version:2},{...header,calendar:[]},{...header,roles:{}},{...header,roles:Array(101).fill({})},{...header,events:Array(2001).fill({})}])assert.throws(()=>documentKindOf(encode(JSON.stringify(value)),extension))
+    assert.throws(()=>documentKindOf(encode(JSON.stringify({...header,title:'x'.repeat(4*1024*1024)})),extension))
+  }
 })

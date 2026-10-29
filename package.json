@@ -1,6 +1,6 @@
 {
   "name": "open-office",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -44,6 +44,7 @@
     "pdf:check": "node scripts/build-office-pdf.mjs --check",
     "test:browser:pdf": "node tests/browser/office-pdf-native-helper.cjs",
     "test:browser:notes": "node tests/browser/notebook-editor.cjs",
+    "test:browser:schedule": "node tests/browser/project-schedule.cjs",
     "test:browser:pdf-toolbar": "node tests/browser/office-pdf-toolbar.cjs",
     "test:browser:pdf-drafts": "node tests/browser/pdf-comment-drafts.cjs",
     "test:browser:ui-style": "node tests/browser/office-ui-style.cjs",

@@ -6,6 +6,8 @@
 
 画布与代码图表使用 `src/workflow/` 中的 TypeScript 文档模型、SVG 渲染器和编辑组件，以 `.owflow` 保存；格式导入与导出说明见[画布与代码图表](workflow.md)。两个工作区共享顶部文件操作、主题、标签生命周期和自动保存。
 
+计划排期使用 `src/schedule/` 中的本地 TypeScript 模型、日期投影和独立文档会话，由 `ScheduleEditor.vue` 与 `ScheduleTimeline.vue` 提供编辑，以 `.ooschedule` 保存。它复用现有 Vue 工作台，没有新增运行时依赖或 WASM 引擎；见[使用说明](project-scheduling.md)和[日期、格式说明](schedule-calendar.md)。
+
 ## 本地环境
 
 需要 Node.js 24、Rust stable（至少 1.95）和平台的 Tauri 构建依赖。独立兼容检查还使用 Python 3.12；它不是产品运行依赖。WASM 工具版本须与锁文件匹配：
@@ -47,6 +49,7 @@ npm run test:browser:ppt-engine
 npm run test:browser:pdf
 npm run test:browser:pdf-toolbar
 npm run test:browser:notes
+npm run test:browser:schedule
 node tests/browser/notebook-alignment.cjs
 node tests/browser/workflow-editors.cjs
 ```
@@ -64,16 +67,17 @@ Node 单测覆盖共享文件格式、会话隔离、保存收据、失败导入
 - 顶部新建、打开、保存、另存为、导出、打印与撤销重做针对当前标签。引擎内部不另设文件操作或主题入口。
 - 太阳、月亮、显示器按钮控制全局主题；切换标签或主题不能丢弃正在输入的文字。
 - 文档会话独立，关闭未保存文档需确认。批量关闭集中显示待保存文档，可全部保存、全部不保存或取消。只在文件写入成功且收据匹配导出快照时清除脏状态，较晚编辑保持未保存。
-- 打开前先解析并校验新会话，失败时保留现有文档。桌面版已打开的 DOCX/XLSX/PPTX/PDF/OONOTE 使用已授权路径直接保存；另存为不能覆盖其他打开标签的文件。CSV/TSV 转换另存为 XLSX，POTX/PPSX 转换另存为 PPTX。
+- 打开前先解析并校验新会话，失败时保留现有文档。桌面版已打开的 DOCX/XLSX/PPTX/PDF/OONOTE/OOSCHEDULE 使用已授权路径直接保存；另存为不能覆盖其他打开标签的文件。CSV/TSV 转换另存为 XLSX，POTX/PPSX 转换另存为 PPTX。排期 JSON 导入后另存为 OOSCHEDULE。
 - 主页文档列表独立滚动，长文件名省略显示且可查看完整名称。PDF 常用编辑与视图操作使用操作栏，高级菜单保留其余已接通功能；可视签名和图章保留直接入口。
 - 所有操作图标来源于 `src/icons/svg/`。`npm run icons:build` 生成 Rust 图形定义，`icons:check` 检查生成结果和别名一致性。原始开源版权保留在法律文档，正常界面使用 Open Office 命名。
 
 ## 目录
 
 ```text
-src/components/           四套 Rust 编辑器宿主与笔记本编辑界面
+src/components/           编辑器宿主、笔记本、排期与工作流编辑界面
 src/{word,sheet,presentation,pdf}/rust/  会话桥接与真实画布验收
 src/notes/                本地笔记本模型、会话与内容转换
+src/schedule/             项目排期模型、日历、会话与轨道组件
 src/pdf/                  PDF 公共处理
 src/shared/               文件格式与二进制辅助
 src/icons/                原创 SVG 图标与生成输入

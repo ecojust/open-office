@@ -9,6 +9,7 @@ import { baseParse } from '@vue/compiler-dom'
 import { zipSync, strToU8 } from 'fflate'
 import { createId } from '../src/shared/id.ts'
 import * as workflowFiles from '../src/workflow/core/files.ts'
+import * as scheduleModel from '../src/schedule/model.ts'
 
 // Run the real App.vue setup logic with Vue's real reactivity. Editors and native
 // file dialogs are controlled doubles: these are shell-state regressions, not
@@ -24,7 +25,7 @@ const mcpSources = Object.fromEntries(await Promise.all(['config', 'service', 'd
 )))
 const names = 'tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,rustPdfEntries,rustPdfHandles,setRustPdfHandle,rustWordEntries,rustWordHandles,setRustWordHandle,rustSheetEntries,rustSheetHandles,setRustSheetHandle,rustPresentationEntries,rustPresentationHandles,setRustPresentationHandle,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,browserFile,saveActive,closeTab,closeAllTabs,closeWindow,resolveClose,removeTab,removeTabs,task,editorTransaction,nativeTransactionalEditor,appearance,currentDocument,globalActionsBlocked,documentActionsDisabled,globalFileAction,globalNewDocument,keydown,rustEditorFileAction,previewSlides'
   + ',autosaveEnabled,autosave,autosaveWaiting,saveStateLabel,saveStateTitle,backgroundSaving,editorInputBlocked,noteEntries,noteHandles,setNoteHandle,activeNote'
-  + ',printDisabled,status'
+  + ',printDisabled,status,scheduleEntries,scheduleHandles,setScheduleHandle,activeSchedule'
   + ',mcpConfig,mcpSettingsOpen,mcpSettingsBusy,mcpSettingsError,mcpState,mcpWorking,mcpMutating,mcpService,toggleMcp,saveMcpSettings,openMcpSettings,workflowEntries,workflowHandles,setWorkflowHandle,composing'
 
 
@@ -183,6 +184,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     if (name === './smoke') return {smokeRequested:()=>smoke,smokeStage(){},smokeFeatures:()=>({}),smokeFailure:async(error,phase)=>{calls.push(['smoke-failure',phase,String(error)])},smokeAwait:async(_phase,action)=>action()}
     if (name === './shared/document') return helpers
     if (name === './workflow/core/files') return workflowFiles
+    if (name === './schedule/model') return scheduleModel
     if (name === './shared/id') return { createId }
     if (name === './shared/dialog-focus') return focus
     if (name === './shared/appearance') return appearance
@@ -257,7 +259,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
   const handle = {
     canBackgroundExport: async () => true,
     prepareDeactivate: async () => ({ documentId: 1, revision: 0, dirty: !!state.active.value?.dirty }),
-    exportFile: async () => ({ base64: 'TkVX', extension: helpers.defaultSaveExtension(state.active.value?.document.extension || 'docx'), dirty: false }),
+    exportFile: async () => ({ base64: 'TkVX', extension: helpers.defaultSaveExtension(state.active.value?.document.extension || 'docx',state.active.value?.document.kind), dirty: false }),
     discardChanges: async options => { calls.push(['discard', options]) },
     markSaved: async () => { calls.push(['marked']) },
   }
@@ -267,6 +269,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     stopPresentation: async () => { calls.push(['stop-presentation']) },
   })
   function attachHandles() {
+    for(const entry of state.scheduleEntries.value)if(!state.scheduleHandles.has(entry.document.id))state.setScheduleHandle(entry.document.id,Object.create(handle))
     for(const entry of state.noteEntries.value)if(!state.noteHandles.has(entry.document.id))state.setNoteHandle(entry.document.id,Object.create(handle))
     for(const entry of state.rustPdfEntries.value)if(!state.rustPdfHandles.has(entry.document.id))state.setRustPdfHandle(entry.document.id,Object.create(handle))
     for(const entry of state.rustWordEntries.value)if(!state.rustWordHandles.has(entry.document.id))state.setRustWordHandle(entry.document.id,rustWordHandle)
@@ -274,16 +277,16 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     for(const entry of state.rustPresentationEntries.value)if(!state.rustPresentationHandles.has(entry.document.id))state.setRustPresentationHandle(entry.document.id,presentationHandle)
     for(const entry of state.workflowEntries.value)if(!state.workflowHandles.has(entry.document.id))state.setWorkflowHandle(entry.document.id,Object.create(handle))
   }
-  scope.run(()=>vue.watch([state.rustWordEntries,state.rustSheetEntries,state.rustPresentationEntries,state.rustPdfEntries,state.noteEntries,state.workflowEntries],attachHandles,{flush:'sync'}))
+  scope.run(()=>vue.watch([state.rustWordEntries,state.rustSheetEntries,state.rustPresentationEntries,state.rustPdfEntries,state.noteEntries,state.workflowEntries,state.scheduleEntries],attachHandles,{flush:'sync'}))
   function tab(id, { ready = true, dirty = false, fileId = id, kind = 'word' } = {}) {
-    const extension = {word:'docx',sheet:'xlsx',presentation:'pptx',pdf:'pdf',note:'oonote',canvas:'owflow',diagram:'owflow'}[kind]
+    const extension = {word:'docx',sheet:'xlsx',presentation:'pptx',pdf:'pdf',note:'oonote',canvas:'owflow',diagram:'owflow',schedule:'ooschedule'}[kind]
     state.tabs.value.push({ key: id, ready, dirty, fileId, document: { id, kind, extension,
       name: `${id}.${extension}`, base64: 'T0xE', sha256: 'old-hash', sizeBytes: 3 } })
     return state.tabs.value.at(-1)
   }
   function active(tab) {
     state.activeKey.value = tab.key
-    const entries={word:state.rustWordEntries,sheet:state.rustSheetEntries,presentation:state.rustPresentationEntries,pdf:state.rustPdfEntries,note:state.noteEntries,canvas:state.workflowEntries,diagram:state.workflowEntries}[tab.document.kind]
+    const entries={word:state.rustWordEntries,sheet:state.rustSheetEntries,presentation:state.rustPresentationEntries,pdf:state.rustPdfEntries,note:state.noteEntries,canvas:state.workflowEntries,diagram:state.workflowEntries,schedule:state.scheduleEntries}[tab.document.kind]
     if(entries&&!entries.value.some(entry=>entry.document.id===tab.key))entries.value=[...entries.value,{document:tab.document}]
   }
   async function idle() {
@@ -616,7 +619,7 @@ test('editor input and global file controls bind to separate barriers throughout
   assert.equal(binding(byClass('tab-strip'),'inert'),'globalActionsBlocked')
   assert.equal(parents.get(byClass('tab-bar')),byClass('tab-strip'),'The scrolling list inherits the global file-control barrier')
   assert.equal(binding(elements.find(node=>attribute(node,'data-testid')==='global-toolbar'),'inert'),'globalActionsBlocked')
-  for(const tag of ['RustWordEditor','RustSheetEditor','RustPresentationEditor','RustPdfEditor','NotebookEditor']) {
+  for(const tag of ['RustWordEditor','RustSheetEditor','RustPresentationEditor','RustPdfEditor','NotebookEditor','ScheduleEditor']) {
     const editor=elements.find(node=>node.tag===tag)
     assert.equal(binding(editor,'disabled'),'editorInputBlocked',tag)
     for(let ancestor=parents.get(editor);ancestor;ancestor=parents.get(ancestor)) {
@@ -2373,4 +2376,95 @@ test('MCP shell unmount removes its heartbeat timer and detaches the request bri
   assert.equal(h.intervals.size, 0)
   assert.equal(h.state.mcpState.value.phase, 'stopped')
   assert.ok(h.mcpCalls.some(call => call[0] === 'unlisten'))
+})
+
+
+test('schedule creation uses its own live tab and shared undo, redo, save, close and cleanup controls',async()=>{
+  const h=shell()
+  try {
+    h.state.globalNewDocument('schedule');await h.idle()
+    const tab=h.state.active.value,handle=h.state.scheduleHandles.get(tab.key)
+    assert.equal(tab.document.kind,'schedule');assert.equal(tab.document.extension,'ooschedule')
+    assert.equal(h.state.activeSchedule.value,true);assert.equal(h.state.scheduleEntries.value.length,1)
+    assert.equal(tab.dirty,true);assert.equal(tab.ready,false);assert.equal(tab.fileId,undefined)
+    h.state.readyFor(tab.key)
+    handle.undo=async()=>h.calls.push(['schedule-undo'])
+    handle.redo=async()=>h.calls.push(['schedule-redo'])
+    h.state.globalFileAction('undo');await h.idle()
+    h.state.globalFileAction('redo');await h.idle()
+    assert.equal(h.calls.filter(call=>call[0]==='schedule-undo').length,1)
+    assert.equal(h.calls.filter(call=>call[0]==='schedule-redo').length,1)
+    h.state.openSaveAs()
+    assert.deepEqual(Array.from(h.state.saveAsOptions.value,option=>option.extension),['ooschedule'])
+    h.state.cancelSaveAs()
+    const other=h.tab('other')
+    await h.state.activate(other);h.state.readyFor(other.key);await h.state.activate(tab)
+    assert.equal(h.state.scheduleHandles.get(tab.key),handle,'Switching retains the same editor and history')
+    h.state.closeTab(tab)
+    assert.equal(h.state.closeTarget.value.key,tab.key,'Unsaved plans require a close decision')
+    h.state.closeTarget.value=null
+    assert.equal(await h.state.saveActive(),true)
+    const request=h.calls.find(call=>call[0]==='save')[1]
+    assert.equal(request.extension,'ooschedule');assert.equal(request.saveAs,true)
+    assert.equal(tab.document.kind,'schedule');assert.equal(tab.dirty,false)
+    await h.state.removeTab(tab)
+    assert.equal(h.state.scheduleEntries.value.length,0);assert.equal(h.state.scheduleHandles.size,0)
+  } finally {h.unmount()}
+})
+
+for(const route of ['native','recent','browser'])for(const extension of ['ooschedule','json'])test(`${route} ${extension} schedules open in the schedule editor and protect imported JSON`,async()=>{
+  const bytes=scheduleModel.encodeSchedule(scheduleModel.createSchedule('Launch plan'))
+  const source={id:'local-schedule',kind:'schedule',extension,name:`Launch.${extension}`,base64:Buffer.from(bytes).toString('base64'),sha256:'schedule-hash',sizeBytes:bytes.length}
+  const h=shell({nativeEnabled:route!=='browser'})
+  try {
+    if(route==='native'){h.native.openDocument=async()=>source;h.state.openFile();await h.idle()}
+    else if(route==='recent'){h.native.openRecent=async()=>source;h.state.openRecent({id:source.id});await h.idle()}
+    else await h.state.browserFile({target:{value:source.name,files:[{name:source.name,size:bytes.length,arrayBuffer:async()=>bytes.buffer}]}})
+    assert.equal(h.state.error.value,'')
+    const tab=h.state.active.value,handle=h.state.scheduleHandles.get(tab.key)
+    assert.equal(tab.document.kind,'schedule');assert.equal(tab.requiresSaveAs,extension==='json')
+    assert.equal(h.state.scheduleEntries.value[0].document.id,tab.key)
+    assert.equal(h.state.workflowEntries.value.length,0)
+    h.state.readyFor(tab.key);tab.dirty=true
+    handle.exportFile=async({format})=>{assert.equal(format,'ooschedule');return {base64:source.base64,extension:'ooschedule',dirty:true}}
+    h.state.openSaveAs();assert.equal(h.state.saveAsDraft.value.format,'ooschedule');assert.equal(h.state.saveAsCopy.value,false);h.state.cancelSaveAs()
+    assert.equal(await h.state.saveActive(),true)
+    if(route==='browser')assert.match(h.calls.find(call=>call[0]==='download')[1],/\.ooschedule$/)
+    else {
+      const request=h.calls.find(call=>call[0]==='save')[1]
+      assert.equal(request.documentId,extension==='json'?undefined:source.id)
+      assert.equal(request.expectedSha256,extension==='json'?undefined:source.sha256)
+      assert.equal(request.saveAs,extension==='json')
+      if(extension==='json')assert.deepEqual(Array.from(request.protectedDocumentIds),[source.id])
+    }
+    assert.equal(tab.document.extension,'ooschedule');assert.equal(tab.dirty,false)
+  } finally {h.unmount()}
+})
+
+test('invalid schedule details are rejected before settling or replacing the active draft',async()=>{
+  const h=shell(),original=h.tab('unsaved-word',{dirty:true});h.active(original)
+  h.rustWordHandle.prepareDeactivate=async()=>assert.fail('Invalid imports must not settle the active draft')
+  try {
+    const model=scheduleModel.createSchedule('Invalid plan');model.events=[{id:'invalid'}]
+    const bytes=new TextEncoder().encode(JSON.stringify(model))
+    for(const extension of ['ooschedule','json'])await assert.rejects(h.state.addDocument({id:'broken',kind:'schedule',extension,name:`Broken.${extension}`,base64:Buffer.from(bytes).toString('base64'),sha256:'',sizeBytes:bytes.length},'broken'))
+    assert.equal(h.state.activeKey.value,original.key);assert.equal(h.state.tabs.value.length,1)
+    assert.equal(h.state.scheduleEntries.value.length,0);assert.equal(original.dirty,true)
+  } finally {h.unmount()}
+})
+
+test('schedule autosave uses the selected file and retains changes made after the exported revision',async()=>{
+  const h=shell({storedAutosave:'true'}),tab=h.tab('automatic-plan',{kind:'schedule',dirty:true,fileId:'selected-plan'});h.active(tab);h.state.home.value=false
+  const handle=h.state.scheduleHandles.get(tab.key)
+  handle.inspect=async()=>({documentId:1,revision:2,dirty:true})
+  try {
+    await h.mount();await h.fireTimeout(10000);await h.idle()
+    const request=h.calls.find(call=>call[0]==='save')[1]
+    assert.equal(request.documentId,'selected-plan');assert.equal(request.extension,'ooschedule');assert.equal(request.saveAs,false)
+    assert.equal(tab.dirty,true,'Acknowledging the earlier snapshot leaves subsequent changes dirty')
+    await h.state.toggleMcp()
+    assert.equal(h.mcpCalls.some(call=>call[0]==='start'),false,'Unimplemented MCP entry is not active for schedules')
+    await h.state.removeTabs([tab],true)
+    assert.equal(h.state.scheduleHandles.size,0);assert.equal(h.state.scheduleEntries.value.length,0)
+  } finally {h.unmount()}
 })

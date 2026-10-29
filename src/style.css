@@ -221,6 +221,7 @@ a { color: var(--ui-accent); }
 .create-card.presentation { --accent: var(--ui-warning); --pale: var(--ui-warning-soft); }
 .create-card.pdf { --accent: var(--ui-danger); --pale: var(--ui-danger-soft); }
 .create-card.canvas { --accent: var(--ui-success); --pale: var(--ui-success-soft); }
+.create-card.schedule { --accent: var(--ui-warning); --pale: var(--ui-warning-soft); }
 .create-card.diagram { --accent: var(--ui-accent); --pale: var(--ui-accent-soft); }
 .create-card:hover { border-color: var(--accent); background: var(--pale); }
 .document-art { display: grid; place-items: center; width: 44px; height: 44px; background: var(--pale); color: var(--accent); border-radius: var(--ui-radius); }
@@ -256,6 +257,7 @@ a { color: var(--ui-accent); }
 .file-icon { display: grid; place-items: center; flex: none; width: 36px; height: 40px; border-radius: 4px; background: var(--ui-accent-soft); color: var(--ui-accent); }
 .file-icon.sheet { background: var(--ui-success-soft); color: var(--ui-success); }
 .file-icon.presentation { background: var(--ui-warning-soft); color: var(--ui-warning); }
+.file-icon.schedule { background: var(--ui-warning-soft); color: var(--ui-warning); }
 .file-icon.pdf { background: var(--ui-danger-soft); color: var(--ui-danger); }
 .recent-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ui-font-size); }
 .recent-name small { display: block; margin-top: 4px; color: var(--ui-muted); font-size: var(--ui-font-small); }

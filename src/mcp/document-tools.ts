@@ -21,6 +21,7 @@ const common = [
  tool('document_redo', '重做当前文档最后一次撤销的编辑。', false),
 ]
 const catalogs: Record<Kind, McpToolDefinition[]> = {
+ schedule: [],
  word: [tool('word_read', '读取文字文稿的纯文本（最多 100000 字符）。', true), tool('word_insert_text', '在当前光标处插入纯文本；有选区时替换选区，可撤销。', false, { text }, ['text'])],
  sheet: [
   tool('sheet_read_range', '读取工作表矩形区域的值，最多 1000 个单元格；工作表索引从 0 开始。', true, { range: { type: 'string', maxLength: 21, pattern: '^[A-Z]{1,3}[1-9][0-9]{0,6}(:[A-Z]{1,3}[1-9][0-9]{0,6})?$' }, sheet: index }, ['range']),
@@ -33,11 +34,13 @@ const catalogs: Record<Kind, McpToolDefinition[]> = {
  diagram: [tool('diagram_read_source', '读取代码图表源码。', true), tool('diagram_set_source', '更新当前代码图表源码，立即更新预览，可撤销；不能访问文件或网络。', false, { source: { ...text, maxLength: 50000 } }, ['source'])],
 }
 const editingTools: Record<Kind, McpToolDefinition[]> = {
+ schedule: [],
  word: wordEditingTools, sheet: sheetEditingTools, presentation: presentationEditingTools,
  pdf: pdfEditingTools, note: noteEditingTools, canvas: canvasEditingTools, diagram: diagramEditingTools,
 }
 for (const kind of Object.keys(catalogs) as Kind[]) catalogs[kind].push(...editingTools[kind])
 export function catalogForKind(kind: Kind): McpToolDefinition[] {
+ if(kind==='schedule')return []
  return structuredClone([...common, ...catalogs[kind]])
 }
 function cellPosition(address: string): [number, number] {
@@ -76,6 +79,7 @@ export function summarizeMcpValue(value: unknown, depth = 0): unknown {
 }
 export async function executeDocumentTool(kind: Kind, handle: EditorHandle, name: string, args: unknown, assertCurrent: () => void): Promise<unknown> {
  assertCurrent()
+ if(kind==='schedule')throw Error('计划排期暂不支持 MCP。')
  const definition = [...common, ...catalogs[kind]].find(tool => tool.name === name)
  if (!definition) throw Error('当前子软件不支持此 MCP 工具。')
  const validated = validate(definition, args)

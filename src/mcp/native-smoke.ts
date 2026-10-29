@@ -97,7 +97,8 @@ function toolValue(probe: ToolProbe, tool: string, sessionId: string, port: numb
 
 const extensions = { word: 'docx', sheet: 'xlsx', presentation: 'pptx', pdf: 'pdf', note: 'oonote', canvas: 'owflow', diagram: 'owflow' } as const
 const markers = { word: MCP_NATIVE_TEXT, sheet: 'NATIVE_MCP_SHEET', presentation: 'NATIVE_MCP_PRESENTATION', pdf: 'NATIVE_MCP_PDF', note: 'NATIVE_MCP_NOTE', canvas: 'NATIVE_MCP_CANVAS', diagram: 'NATIVE_MCP_DIAGRAM' } as const
-const blank = (kind: DocumentKind, name = `native-mcp-${kind}`): NativeDocument => ({ id: '', kind, extension: extensions[kind], name: `${name}.${extensions[kind]}`, base64: '', sha256: '', sizeBytes: 0 })
+type McpSmokeKind = Exclude<DocumentKind, 'schedule'>
+const blank = (kind: McpSmokeKind, name = `native-mcp-${kind}`): NativeDocument => ({ id: '', kind, extension: extensions[kind], name: `${name}.${extensions[kind]}`, base64: '', sha256: '', sizeBytes: 0 })
 const json = (value: unknown) => JSON.stringify(value)
 async function exportEvidence(editor: SmokeEditor) {
   const exported = await bounded(editor.exportFile({ background: true }), 'edited document export')
@@ -107,7 +108,7 @@ async function exportEvidence(editor: SmokeEditor) {
   return { base64: exported.base64, extension: exported.extension, sizeBytes: bytes.length,
     sha256: [...digest].map(value => value.toString(16).padStart(2, '0')).join('') }
 }
-async function editingEvidence(adapter: McpNativeSmokeAdapter, opened: Awaited<ReturnType<McpNativeSmokeAdapter['open']>>, kind: DocumentKind, status: McpStatus): Promise<McpNativeEditorEvidence> {
+async function editingEvidence(adapter: McpNativeSmokeAdapter, opened: Awaited<ReturnType<McpNativeSmokeAdapter['open']>>, kind: McpSmokeKind, status: McpStatus): Promise<McpNativeEditorEvidence> {
   assert(status.running && status.sessionId && status.port && status.documentId === opened.key, 'editing specimen service is not active')
   const sessionId = status.sessionId, port = status.port
   const probe = (toolName: string, args: Record<string, unknown>) => bounded(invoke<ToolProbe>('mcp_smoke_probe', {

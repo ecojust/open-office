@@ -3,9 +3,9 @@
   Open Office
 </h1>
 
-<p align="center">一个工作台，七种创作方式。</p>
+<p align="center">一个工作台，八种创作方式。</p>
 
-![Open Office 工作台：七个子软件入口与正在编辑的文档](docs/screenshots/home-0.16.0.png)
+![Open Office 工作台：八种创作工具入口](docs/screenshots/home-project-schedule.png)
 
 ## 文字文档
 
@@ -48,3 +48,15 @@
 用文本描述关系，让图表随代码变化。支持时序图、流程图、类图、甘特图等 22 类图表，提供 46 个示例与 10 种样式；源码与预览联动，支持鼠标缩放及 SVG、PNG、源码导出。
 
 ![代码图表：并排展示源码与包含条件分支、保存回执的文档交互时序图](docs/screenshots/diagram-0.16.0.png)
+
+## 计划排期
+
+为项目选择日期范围，添加人员、角色和颜色，按自然周 W1、W2…安排工作。人员模式每人一条轨道，全局模式按开始日期混排所有人的事件；整体计划始终固定在顶部。拖动事件可更换人员，左右拉伸按整天吸附，底边高度吸附到 100% 或 50%；半高只改变外观，同一人员的日期仍不能重叠。
+
+默认隐藏周末和中国大陆法定假日，按项目年份自动获取假日安排、定期更新并缓存，断网使用已有数据，也可手动调整。排期保存在本地 `.ooschedule` 文件，支持撤销、重做、自动保存和多标签编辑；联网只请求假日年份，不上传排期内容。
+
+![计划排期：固定的整体计划与按人员分配的事件轨道](docs/screenshots/project-schedule-people.png)
+
+![全局模式：按开始日期混排所有人员事件，保留负责人和颜色](docs/screenshots/project-schedule-global.png)
+
+[查看排期使用说明](docs/project-scheduling.md)
