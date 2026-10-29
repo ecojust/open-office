@@ -21,6 +21,8 @@ Open Office 包含具有独立版权和许可的第三方软件。根目录 MIT 
 
 ## 前端、依赖与素材
 
+计划排期的中国大陆节假日数据来自 [NateScarlet/holiday-cn](https://github.com/NateScarlet/holiday-cn)，MIT，Copyright (c) 2019 NateScarlet。内置兜底表按官方公告交叉核对；运行时可下载并缓存年度 JSON。[原始许可](holiday-cn-LICENSE.txt)随应用分发。
+
 Vue 和 Tauri 的原始许可保留在 `public/legal/npm`、`public/legal/rust`。fflate 用于画布图形 XML 的压缩页面解码；pdf-lib 和外部 Python PDF 检查器只用于开发测试。npm、原生 Rust 及四个 WASM 宿主各有依赖索引，精确版本由锁文件确定；清单中的开发或可选项不代表它们都进入每个平台安装包。
 
 `craft-ui` 等真实共享依赖保持原始包名、固定提交和许可。其 git 来源不是可以随产品改名而伪造的 URL。各编辑器的依赖索引记录这些提交及对应声明。

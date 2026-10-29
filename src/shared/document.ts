@@ -1,7 +1,7 @@
 import type { PrintOutcome } from './printing'
 
-export type Kind = 'word'|'sheet'|'presentation'|'pdf'|'note'|'canvas'|'diagram'
-export type Extension = 'docx'|'xlsx'|'csv'|'tsv'|'pptx'|'potx'|'ppsx'|'pdf'|'oonote'|'owflow'|'mmd'|'mermaid'|'drawio'|'xml'|'excalidraw'|'json'|'svg'|'png'
+export type Kind = 'word'|'sheet'|'presentation'|'pdf'|'note'|'canvas'|'diagram'|'schedule'
+export type Extension = 'docx'|'xlsx'|'csv'|'tsv'|'pptx'|'potx'|'ppsx'|'pdf'|'oonote'|'ooschedule'|'owflow'|'mmd'|'mermaid'|'drawio'|'xml'|'excalidraw'|'json'|'svg'|'png'
 export type SaveExtension = Exclude<Extension,'potx'|'ppsx'|'mermaid'|'xml'|'json'>
 export type SaveFormatOption = { extension: SaveExtension; title: string; description: string }
 /** Formats actually implemented by each active editor, not all import formats. */
@@ -14,6 +14,7 @@ export function saveFormats(kind: Kind): SaveFormatOption[] {
   sheet: [{ extension: 'xlsx', title: 'XLSX 工作簿', description: '保留工作表、公式和单元格格式' }, { extension: 'csv', title: 'CSV 数据副本', description: '仅导出当前工作表的显示值，不包含公式、格式和其他工作表' }, { extension: 'tsv', title: 'TSV 数据副本', description: '以制表符分隔当前工作表的显示值，不包含公式、格式和其他工作表' }, pdf],
   presentation: [{ extension: 'pptx', title: 'PPTX 演示文稿', description: '保留可编辑的幻灯片与对象' }, { ...pdf, description: '静态页面，不包含放映动画与音视频' }],
   pdf: [pdf],
+  schedule: [{ extension: 'ooschedule', title: 'Open Office 计划排期', description: '保留项目日期、角色轨道、事件与日历设置' }],
   note: [{ extension: 'oonote', title: 'Open Office 笔记本', description: '保留分区、页面、富文本、待办与图片' }],
   canvas: [editable, ...graphics, { extension: 'drawio', title: '图形 XML', description: '导出兼容的图形结构，部分画笔外观可能变化' }, { extension: 'excalidraw', title: '白板 JSON', description: '导出兼容的白板内容，部分样式可能变化' }],
   diagram: [editable, ...graphics, { extension: 'mmd', title: '图表源码', description: '仅保存源码，不包含预览样式' }],
@@ -45,14 +46,15 @@ export type EditorHandle = {
  search?(value:string):void|Promise<void>;
  print?():Promise<PrintOutcome>;
 }
-const supportedExtensions = ['docx','xlsx','csv','tsv','pptx','potx','ppsx','pdf','oonote','owflow','mmd','mermaid','drawio','xml','excalidraw','json'] as const
+const supportedExtensions = ['docx','xlsx','csv','tsv','pptx','potx','ppsx','pdf','oonote','ooschedule','owflow','mmd','mermaid','drawio','xml','excalidraw','json'] as const
 const workflowImports = ['mmd','mermaid','drawio','xml','excalidraw','json'] as const
 export function extensionOf(name:string):Extension {
  const extension=name.split('.').at(-1)?.toLowerCase()
- if(!(supportedExtensions as readonly string[]).includes(extension || ''))throw new Error('请选择受支持的办公文档、笔记本、画布或代码图表文件。其他格式请先转换；宏与加密文件暂不支持。')
+ if(!(supportedExtensions as readonly string[]).includes(extension || ''))throw new Error('请选择受支持的办公文档、笔记本、画布、代码图表或计划排期文件。其他格式请先转换；宏与加密文件暂不支持。')
  return extension as Extension
 }
 export function kindOf(extension:Extension):Kind {
+ if(extension==='ooschedule')return 'schedule'
  if(extension==='mmd'||extension==='mermaid')return 'diagram'
  if(extension==='owflow'||extension==='svg'||extension==='png'||(workflowImports as readonly string[]).includes(extension))return 'canvas'
  return extension==='oonote'?'note':extension==='pdf'?'pdf':['pptx','potx','ppsx'].includes(extension)?'presentation':['xlsx','csv','tsv'].includes(extension)?'sheet':'word'
@@ -62,12 +64,14 @@ export function documentKindOf(bytes:Uint8Array,extension:Extension):Kind {
  validateDocumentSignature(bytes,extension)
  if(extension==='owflow'||extension==='json') {
   const data=readJson(bytes)
+  if(data?.format==='open-office-schedule')return 'schedule'
   if(data?.format==='open-workflow'&&data.kind==='mermaid')return 'diagram'
  }
  return kindOf(extension)
 }
 export function isImportOnly(extension:Extension):boolean{return extension==='potx'||extension==='ppsx'||(workflowImports as readonly string[]).includes(extension)}
-export function defaultSaveExtension(extension:Extension):SaveExtension {
+export function defaultSaveExtension(extension:Extension,kind?:Kind):SaveExtension {
+ if(extension==='json'&&kind==='schedule')return 'ooschedule'
  if(extension==='csv'||extension==='tsv')return 'xlsx'
  if(extension==='potx'||extension==='ppsx')return 'pptx'
  if((workflowImports as readonly string[]).includes(extension))return 'owflow'
@@ -78,6 +82,13 @@ function readJson(bytes:Uint8Array):Record<string,unknown>|null {
   const value:unknown=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))
   return value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:null
  } catch {return null}
+}
+function validScheduleHeader(value:Record<string,unknown>|null):boolean {
+ if(!value||value.format!=='open-office-schedule'||value.version!==1)return false
+ const calendar=value.calendar
+ return typeof value.id==='string'&&typeof value.title==='string'&&typeof value.startDate==='string'&&typeof value.endDate==='string'
+  &&!!calendar&&typeof calendar==='object'&&!Array.isArray(calendar)
+  &&Array.isArray(value.roles)&&value.roles.length<=100&&Array.isArray(value.events)&&value.events.length<=2000
 }
 function validWorkflowHeader(value:Record<string,unknown>|null):boolean {
  if(!value||value.format!=='open-workflow'||value.version!==1||!['flow','board','mermaid'].includes(String(value.kind)))return false
@@ -118,9 +129,11 @@ export function validateDocumentSignature(bytes:Uint8Array,extension:Extension):
    const data:unknown=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))
    valid=!!data&&typeof data==='object'&&'format' in data&&data.format==='open-office-notebook'&&'version' in data&&(data.version===1||data.version===2)&&'sections' in data&&Array.isArray(data.sections)
   } catch {valid=false}
+ } else if(extension==='ooschedule') {
+  valid=bytes.length<=4*1024*1024&&validScheduleHeader(readJson(bytes))
  } else if(extension==='owflow'||extension==='json'||extension==='excalidraw') {
   const data=readJson(bytes)
-  valid=bytes.length<=50*1024*1024&&(extension==='owflow'?validWorkflowHeader(data):extension==='excalidraw'?validBoardHeader(data):validWorkflowHeader(data)||validBoardHeader(data))
+  valid=bytes.length<=50*1024*1024&&(extension==='owflow'?validWorkflowHeader(data):extension==='excalidraw'?validBoardHeader(data):validWorkflowHeader(data)||validBoardHeader(data)||(bytes.length<=4*1024*1024&&validScheduleHeader(data)))
  } else if(extension==='mmd'||extension==='mermaid'||extension==='drawio'||extension==='xml'||extension==='svg') {
   try {
    const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes)

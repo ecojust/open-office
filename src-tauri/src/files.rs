@@ -25,6 +25,7 @@ use tempfile::NamedTempFile;
 const DOCUMENT_LIMIT: u64 = 100 * 1024 * 1024;
 const IMAGE_LIMIT: u64 = 20 * 1024 * 1024;
 const NOTEBOOK_LIMIT: usize = 16 * 1024 * 1024;
+const SCHEDULE_LIMIT: usize = 4 * 1024 * 1024;
 const ENCODED_LIMIT: usize = ((DOCUMENT_LIMIT as usize + 2) / 3) * 4;
 const HISTORY_LIMIT: u64 = 2 * 1024 * 1024;
 const MAX_RECENT: usize = 100;
@@ -38,6 +39,7 @@ const EXTENSIONS: &[&str] = &[
     "ppsx",
     "pdf",
     "oonote",
+    "ooschedule",
     "owflow",
     "mmd",
     "mermaid",
@@ -69,6 +71,7 @@ pub enum DocExt {
     Ppt,
     Pdf,
     Oonote,
+    Ooschedule,
     Owflow,
     Mmd,
     Mermaid,
@@ -99,6 +102,7 @@ impl DocExt {
             Self::Ppt => "ppt",
             Self::Pdf => "pdf",
             Self::Oonote => "oonote",
+            Self::Ooschedule => "ooschedule",
             Self::Owflow => "owflow",
             Self::Mmd => "mmd",
             Self::Mermaid => "mermaid",
@@ -126,6 +130,7 @@ impl DocExt {
             "ppsx" => Ok(Self::Ppsx),
             "pdf" => Ok(Self::Pdf),
             "oonote" => Ok(Self::Oonote),
+            "ooschedule" => Ok(Self::Ooschedule),
             "owflow" => Ok(Self::Owflow),
             "mmd" => Ok(Self::Mmd),
             "mermaid" => Ok(Self::Mermaid),
@@ -133,9 +138,10 @@ impl DocExt {
             "xml" => Ok(Self::Xml),
             "excalidraw" => Ok(Self::Excalidraw),
             "json" => Ok(Self::Json),
-            _ => {
-                Err("请选择受支持的办公文档、笔记本、画布或代码图表文件；其他格式请先转换。".into())
-            }
+            _ => Err(
+                "请选择受支持的办公文档、笔记本、计划排期、画布或代码图表文件；其他格式请先转换。"
+                    .into(),
+            ),
         }
     }
 
@@ -148,6 +154,7 @@ impl DocExt {
             }
             Self::Pdf => DocumentKind::Pdf,
             Self::Oonote => DocumentKind::Note,
+            Self::Ooschedule => DocumentKind::Schedule,
             Self::Mmd | Self::Mermaid => DocumentKind::Diagram,
             Self::Owflow
             | Self::Drawio
@@ -169,6 +176,7 @@ impl DocExt {
                 | Self::Pptx
                 | Self::Pdf
                 | Self::Oonote
+                | Self::Ooschedule
                 | Self::Owflow
                 | Self::Mmd
                 | Self::Drawio
@@ -190,6 +198,7 @@ pub enum DocumentKind {
     Presentation,
     Pdf,
     Note,
+    Schedule,
     Canvas,
     Diagram,
 }
@@ -510,7 +519,7 @@ impl DocumentStore {
                 | DocExt::Excalidraw
                 | DocExt::Json
         ) {
-            return Err("导入的图形文件请另存为可编辑文档或导出副本；原文件将保留。".into());
+            return Err("导入的文件请另存为可编辑文档或导出副本；原文件将保留。".into());
         }
         let Some(expected) = expected_sha256 else {
             return Ok(SaveResult::Conflict {
@@ -961,14 +970,70 @@ fn valid_board_header(value: &serde_json::Value) -> bool {
             .is_some_and(|v| v.len() <= 5000)
 }
 
-fn document_kind(bytes: &[u8], extension: DocExt) -> DocumentKind {
-    if matches!(extension, DocExt::Owflow | DocExt::Json)
-        && workflow_json(bytes).is_some_and(|value| {
-            valid_workflow_header(&value)
-                && value.get("kind").and_then(|v| v.as_str()) == Some("mermaid")
+/// Bound the versioned schedule structure before the editor validates dates,
+/// identities, role references and project limits in its complete model parser.
+fn valid_schedule_header(value: &serde_json::Value) -> bool {
+    let string_fields = |value: &serde_json::Value, fields: &[&str]| {
+        fields
+            .iter()
+            .all(|field| value.get(*field).is_some_and(|v| v.is_string()))
+    };
+    value.get("format").and_then(|v| v.as_str()) == Some("open-office-schedule")
+        && value.get("version").and_then(|v| v.as_u64()) == Some(1)
+        && string_fields(value, &["id", "title", "startDate", "endDate"])
+        && value.get("calendar").is_some_and(|calendar| {
+            ["hideWeekends", "hideHolidays"]
+                .iter()
+                .all(|field| calendar.get(*field).is_some_and(|v| v.is_boolean()))
+                && ["extraHolidays", "excludedHolidays"].iter().all(|field| {
+                    calendar
+                        .get(*field)
+                        .and_then(|v| v.as_array())
+                        .is_some_and(|dates| dates.iter().all(|v| v.is_string()))
+                })
         })
-    {
-        return DocumentKind::Diagram;
+        && value
+            .get("roles")
+            .and_then(|v| v.as_array())
+            .is_some_and(|roles| {
+                roles.len() <= 100
+                    && roles
+                        .iter()
+                        .all(|role| string_fields(role, &["id", "name", "role", "color"]))
+            })
+        && value
+            .get("events")
+            .and_then(|v| v.as_array())
+            .is_some_and(|events| {
+                events.len() <= 2000
+                    && events.iter().all(|event| {
+                        string_fields(event, &["id", "title", "startDate", "endDate", "notes"])
+                            && event
+                                .get("roleId")
+                                .is_some_and(|v| v.is_null() || v.is_string())
+                            && event
+                                .get("height")
+                                .and_then(|v| v.as_f64())
+                                .is_some_and(|height| height == 0.5 || height == 1.0)
+                    })
+            })
+}
+
+fn document_kind(bytes: &[u8], extension: DocExt) -> DocumentKind {
+    if matches!(extension, DocExt::Owflow | DocExt::Json) {
+        if let Some(value) = workflow_json(bytes) {
+            if extension == DocExt::Json
+                && bytes.len() <= SCHEDULE_LIMIT
+                && valid_schedule_header(&value)
+            {
+                return DocumentKind::Schedule;
+            }
+            if valid_workflow_header(&value)
+                && value.get("kind").and_then(|v| v.as_str()) == Some("mermaid")
+            {
+                return DocumentKind::Diagram;
+            }
+        }
     }
     extension.kind()
 }
@@ -1088,9 +1153,16 @@ fn validate_document_signature(bytes: &[u8], extension: DocExt) -> Result<(), St
             .windows(5)
             .any(|window| window == b"%PDF-"),
         DocExt::Oonote => valid_notebook(bytes),
+        DocExt::Ooschedule => {
+            bytes.len() <= SCHEDULE_LIMIT
+                && workflow_json(bytes).is_some_and(|value| valid_schedule_header(&value))
+        }
         DocExt::Owflow => workflow_json(bytes).is_some_and(|value| valid_workflow_header(&value)),
-        DocExt::Json => workflow_json(bytes)
-            .is_some_and(|value| valid_workflow_header(&value) || valid_board_header(&value)),
+        DocExt::Json => workflow_json(bytes).is_some_and(|value| {
+            valid_workflow_header(&value)
+                || valid_board_header(&value)
+                || (bytes.len() <= SCHEDULE_LIMIT && valid_schedule_header(&value))
+        }),
         DocExt::Excalidraw => workflow_json(bytes).is_some_and(|value| valid_board_header(&value)),
         DocExt::Mmd | DocExt::Mermaid => plain_text(bytes).is_some_and(valid_code_header),
         DocExt::Drawio | DocExt::Xml => plain_text(bytes).is_some_and(valid_graph_header),
@@ -1513,6 +1585,189 @@ mod tests {
             "scene": { "elements": [] }, "source": "flowchart TD\n A-->B"
         }))
         .unwrap()
+    }
+
+    fn schedule_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "format": "open-office-schedule", "version": 1,
+            "id": "schedule-1", "title": "产品发布", "startDate": "2026-10-01", "endDate": "2026-10-31",
+            "calendar": { "hideWeekends": true, "hideHolidays": true, "extraHolidays": [], "excludedHolidays": [] },
+            "roles": [{ "id": "role-1", "name": "小李", "role": "设计", "color": "#5b73e8" }],
+            "events": [{ "id": "event-1", "roleId": "role-1", "title": "设计稿", "startDate": "2026-10-08", "endDate": "2026-10-12", "height": 0.5, "slot": 0, "notes": "评审后交付" }]
+        })
+    }
+
+    #[test]
+    fn schedule_format_survives_save_reopen_and_recent_history() {
+        assert!(EXTENSIONS.contains(&"ooschedule"));
+        assert_eq!(
+            DocExt::from_path(Path::new("产品发布.OOSCHEDULE")).unwrap(),
+            DocExt::Ooschedule
+        );
+        assert_eq!(DocExt::Ooschedule.kind(), DocumentKind::Schedule);
+        assert_eq!(
+            serde_json::to_value(DocExt::Ooschedule).unwrap(),
+            "ooschedule"
+        );
+        assert_eq!(
+            serde_json::to_value(DocumentKind::Schedule).unwrap(),
+            "schedule"
+        );
+        validate_file_name("产品发布.ooschedule", DocExt::Ooschedule).unwrap();
+        DocExt::Ooschedule.ensure_exportable().unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let path = directory.path().join("产品发布.ooschedule");
+        let store = DocumentStore::new(data.clone()).unwrap();
+        let original = serde_json::to_vec(&schedule_fixture()).unwrap();
+        validate_document_signature(&original, DocExt::Ooschedule).unwrap();
+        let saved = store
+            .save_to_target(
+                TargetSnapshot::capture(path.clone()).unwrap(),
+                DocExt::Ooschedule,
+                original.clone(),
+            )
+            .unwrap();
+        let SaveResult::Saved { document } = saved else {
+            panic!("expected schedule save")
+        };
+        assert_eq!(document.kind, DocumentKind::Schedule);
+        let opened = store.register_open(path.clone()).unwrap();
+        assert_eq!(opened.id, document.id);
+        assert_eq!(opened.kind, DocumentKind::Schedule);
+        assert_eq!(STANDARD.decode(&opened.base64).unwrap(), original);
+        let mut schedule = schedule_fixture();
+        schedule["events"][0]["startDate"] = "2026-10-09".into();
+        schedule["events"][0]["endDate"] = "2026-10-13".into();
+        schedule["events"][0]["roleId"] = serde_json::Value::Null;
+        let edited = serde_json::to_vec(&schedule).unwrap();
+        validate_document_signature(&edited, DocExt::Ooschedule).unwrap();
+        let saved = store
+            .save_existing(
+                &store.record(&opened.id).unwrap(),
+                DocExt::Ooschedule,
+                Some(&opened.sha256),
+                edited.clone(),
+            )
+            .unwrap();
+        let SaveResult::Saved { document } = saved else {
+            panic!("expected original schedule save")
+        };
+        assert_eq!(document.id, opened.id);
+        assert_eq!(document.kind, DocumentKind::Schedule);
+        assert_eq!(fs::read(&path).unwrap(), edited);
+        let reopened = store.register_open(path).unwrap();
+        assert_eq!(reopened.id, opened.id);
+        assert_eq!(reopened.sha256, document.sha256);
+        assert_eq!(STANDARD.decode(reopened.base64).unwrap(), edited);
+        let restored = DocumentStore::new(data).unwrap();
+        let recent = restored.record(&opened.id).unwrap();
+        assert_eq!(recent.kind, Some(DocumentKind::Schedule));
+        assert_eq!(recent.extension, DocExt::Ooschedule);
+    }
+
+    #[test]
+    fn schedule_json_import_preserves_its_source_and_saves_an_editable_copy() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let store = DocumentStore::new(data.clone()).unwrap();
+        let source = directory.path().join("导入排期.json");
+        let original = serde_json::to_vec(&schedule_fixture()).unwrap();
+        fs::write(&source, &original).unwrap();
+        let opened = store.register_open(source.clone()).unwrap();
+        assert_eq!(opened.kind, DocumentKind::Schedule);
+        assert_eq!(opened.extension, DocExt::Json);
+        assert!(DocExt::Json.ensure_exportable().is_err());
+        for extension in [DocExt::Json, DocExt::Ooschedule] {
+            assert!(store
+                .save_existing(
+                    &store.record(&opened.id).unwrap(),
+                    extension,
+                    Some(&opened.sha256),
+                    original.clone(),
+                )
+                .is_err());
+        }
+        assert_eq!(fs::read(&source).unwrap(), original);
+        let copy = directory.path().join("导入排期 - 副本.ooschedule");
+        let saved = store
+            .save_to_target(
+                TargetSnapshot::capture(copy.clone()).unwrap(),
+                DocExt::Ooschedule,
+                original.clone(),
+            )
+            .unwrap();
+        let SaveResult::Saved { document } = saved else {
+            panic!("expected schedule copy")
+        };
+        assert_ne!(document.id, opened.id);
+        assert_eq!(document.kind, DocumentKind::Schedule);
+        assert_eq!(fs::read(copy).unwrap(), original);
+        assert_eq!(fs::read(source).unwrap(), original);
+        let restored = DocumentStore::new(data).unwrap();
+        assert_eq!(
+            restored.record(&opened.id).unwrap().kind,
+            Some(DocumentKind::Schedule)
+        );
+    }
+
+    #[test]
+    fn schedule_envelope_bounds_structure_size_and_version() {
+        let fixture = schedule_fixture();
+        for extension in [DocExt::Ooschedule, DocExt::Json] {
+            let mut empty = fixture.clone();
+            empty["roles"] = serde_json::json!([]);
+            empty["events"] = serde_json::json!([]);
+            validate_document_signature(&serde_json::to_vec(&empty).unwrap(), extension).unwrap();
+            for (pointer, replacement) in [
+                ("/format", serde_json::json!("unrelated-json")),
+                ("/version", serde_json::json!(2)),
+                ("/version", serde_json::json!("1")),
+                ("/title", serde_json::Value::Null),
+                ("/startDate", serde_json::json!(20261001)),
+                ("/calendar", serde_json::json!([])),
+                ("/calendar/hideWeekends", serde_json::json!("true")),
+                ("/calendar/extraHolidays", serde_json::json!([1])),
+                ("/roles", serde_json::json!({})),
+                ("/roles/0", serde_json::json!(null)),
+                ("/roles/0/color", serde_json::json!(3)),
+                ("/events", serde_json::json!({})),
+                ("/events/0/roleId", serde_json::json!([])),
+                ("/events/0/height", serde_json::json!(0.75)),
+                ("/events/0/notes", serde_json::json!(false)),
+            ] {
+                let mut invalid = fixture.clone();
+                *invalid.pointer_mut(pointer).unwrap() = replacement;
+                assert!(
+                    validate_document_signature(&serde_json::to_vec(&invalid).unwrap(), extension)
+                        .is_err(),
+                    "{pointer} must fail for {}",
+                    extension.as_str()
+                );
+            }
+            for (field, count) in [("roles", 101), ("events", 2001)] {
+                let mut oversized = fixture.clone();
+                oversized[field] = serde_json::Value::Array(vec![fixture[field][0].clone(); count]);
+                assert!(validate_document_signature(
+                    &serde_json::to_vec(&oversized).unwrap(),
+                    extension
+                )
+                .is_err());
+            }
+            let mut boundary = serde_json::to_vec(&fixture).unwrap();
+            boundary.resize(SCHEDULE_LIMIT, b' ');
+            validate_document_signature(&boundary, extension).unwrap();
+            boundary.push(b' ');
+            assert!(validate_document_signature(&boundary, extension).is_err());
+            for invalid in [
+                b"{}".as_slice(),
+                b"[]".as_slice(),
+                b"".as_slice(),
+                &[0xc3, 0x28],
+            ] {
+                assert!(validate_document_signature(invalid, extension).is_err());
+            }
+        }
     }
 
     #[test]

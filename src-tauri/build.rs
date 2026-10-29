@@ -11,6 +11,8 @@ fn main() {
             "mcp_claim",
             "mcp_complete",
             "mcp_smoke_probe",
+            "load_schedule_holidays",
+            "save_schedule_holidays",
             "confirm_close",
             "smoke_report",
             "open_document",

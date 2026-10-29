@@ -18,7 +18,9 @@ use std::{
 
 const HEADER_LIMIT: usize = 16 * 1024;
 const CONNECTION_LIMIT: usize = 32;
-const CSP: &str = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data: blob:; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'";
+// Holiday fetches use CORS and only these repository directories. Keep remote
+// access out of script/default sources and retain the trailing path separators.
+const CSP: &str = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data: blob:; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/ https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'";
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -721,6 +723,57 @@ mod tests {
         .starts_with("HTTP/1.1 405"));
         assert!(request(&server, "/wrong/", "GET", "").starts_with("HTTP/1.1 404"));
         assert!(request(&server, &server.info.base_path, "HEAD", "").ends_with("\r\n\r\n"));
+    }
+
+    #[test]
+    fn actual_server_csp_only_allows_scoped_holiday_fetch_sources() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("index.html"), "home").unwrap();
+        let server = AssetServer::start(root.path()).unwrap();
+        for (path, method) in [
+            (server.info.base_path.as_str(), "GET"),
+            (server.info.base_path.as_str(), "HEAD"),
+            ("/wrong/", "GET"),
+        ] {
+            let response = request(&server, path, method, "");
+            let header = response.split_once("\r\n\r\n").unwrap().0;
+            let policies: Vec<_> = header
+                .split("\r\n")
+                .filter_map(|line| line.strip_prefix("Content-Security-Policy: "))
+                .collect();
+            assert_eq!(policies.len(), 1, "each response must send one CSP header");
+            let directives: Vec<Vec<_>> = policies[0]
+                .split(';')
+                .map(|directive| directive.split_whitespace().collect())
+                .collect();
+            let connections: Vec<_> = directives
+                .iter()
+                .filter(|directive| directive.first() == Some(&"connect-src"))
+                .collect();
+            assert_eq!(connections.len(), 1);
+            assert_eq!(
+                connections[0].as_slice(),
+                [
+                    "connect-src",
+                    "'self'",
+                    "ipc:",
+                    "http://ipc.localhost",
+                    "https://ipc.localhost",
+                    "https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/",
+                    "https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/",
+                ],
+                "remote fetches must not gain host-wide or wildcard permission"
+            );
+            for directive in directives
+                .iter()
+                .filter(|directive| directive.first() != Some(&"connect-src"))
+            {
+                assert!(
+                    !directive.iter().any(|source| source.starts_with("https:")),
+                    "holiday fetch permission must not allow remote scripts or assets"
+                );
+            }
+        }
     }
 
     #[test]

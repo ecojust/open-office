@@ -8,6 +8,7 @@ mod mcp;
 mod mcp_commands;
 mod mcp_probe;
 mod print;
+mod schedule_cache;
 mod server;
 mod smoke;
 
@@ -181,6 +182,8 @@ pub fn run() {
             mcp_commands::mcp_claim,
             mcp_commands::mcp_complete,
             mcp_commands::mcp_smoke_probe,
+            schedule_cache::load_schedule_holidays,
+            schedule_cache::save_schedule_holidays,
             confirm_close,
             smoke_report,
             files::open_document,
@@ -234,6 +237,9 @@ pub fn run() {
             };
             let asset_root = frontend_root(app.handle())?;
             app.manage(mcp::McpService::new(appdata.join("mcp.json"))?);
+            app.manage(schedule_cache::ScheduleHolidayCache::new(
+                appdata.join("schedule-holidays.json"),
+            ));
             app.manage(files::DocumentStore::new(appdata)?);
             let server = server::AssetServer::start_with_smoke(&asset_root, diagnostic.clone())?;
             let navigation = server.info.clone();
@@ -255,6 +261,8 @@ pub fn run() {
                 .permission("allow-mcp-heartbeat")
                 .permission("allow-mcp-claim")
                 .permission("allow-mcp-complete")
+                .permission("allow-load-schedule-holidays")
+                .permission("allow-save-schedule-holidays")
                 .permission("allow-confirm-close")
                 .permission("allow-smoke-report")
                 .permission("allow-open-document")
