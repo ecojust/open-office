@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { createSchedule, decodeSchedule, encodeSchedule, scheduleId, validateSchedule, SCHEDULE_MAX_BYTES } from '../src/schedule/model.ts'
+import { createSchedule, decodeSchedule, encodeSchedule, scheduleId, validateSchedule, SCHEDULE_MAX_BYTES, MAX_SCHEDULE_DAILY_RATE } from '../src/schedule/model.ts'
 import { addDays, buildCalendar, dateFromDayNumber, dayNumber, isoWeek, mondayOf, moveScheduledEvent, projectedSpan, resizeScheduledEvent } from '../src/schedule/calendar.ts'
 import { ScheduleSession } from '../src/schedule/session.ts'
 
@@ -25,6 +25,41 @@ test('UTF-8 round trip retains inclusive dates, half height, notes and the fixed
  assert.deepEqual(decodeSchedule(new Uint8Array([239, 187, 191, ...encodeSchedule(value)])), value)
  const enriched = { ...value, unsafe: 'ignored', roles: value.roles.map(role => ({ ...role, html: '<b>ignored</b>' })) }
  assert.equal(validateSchedule(enriched).unsafe, undefined); assert.equal(validateSchedule(enriched).roles[0].html, undefined)
+})
+
+test('optional project daily rate round trips without changing legacy files and validates cents', () => {
+ const legacy = project(), original = structuredClone(legacy)
+ assert.equal(Object.hasOwn(createSchedule(), 'dailyRate'), false)
+ assert.deepEqual(decodeSchedule(encodeSchedule(legacy)), original)
+ assert.equal(Object.hasOwn(validateSchedule(legacy), 'dailyRate'), false)
+ for (const dailyRate of [0, .01, .29, 1.1, 1200.35, 999999.99, MAX_SCHEDULE_DAILY_RATE]) {
+  const priced = { ...legacy, dailyRate }
+  assert.deepEqual(decodeSchedule(encodeSchedule(priced)), priced)
+ }
+ for (const dailyRate of [-1, -.01, NaN, Infinity, -Infinity, MAX_SCHEDULE_DAILY_RATE + .01, .001, 1.005, '100', '', null, false, {}]) {
+  assert.throws(() => validateSchedule({ ...legacy, dailyRate }), /工时价格/)
+ }
+ assert.deepEqual(legacy, original)
+})
+
+test('daily rate edits, removal and rejected changes participate in exact saving and undo', () => {
+ const value = project(); value.events = [event({ height: .5, slot: 1 })]
+ const session = sessionFor(value)
+ session.change(copy => { copy.dailyRate = 1234.56 })
+ assert.equal(session.inspect().dirty, true); assert.equal(session.model.dailyRate, 1234.56)
+ assert.deepEqual(session.model.events, value.events)
+ const beforeFailure = structuredClone(session.model), state = session.inspect()
+ assert.throws(() => session.change(copy => { copy.dailyRate = -10; copy.title = '不得写入' }), /工时价格/)
+ assert.deepEqual(session.model, beforeFailure); assert.deepEqual(session.inspect(), state)
+ session.undo(); assert.equal(Object.hasOwn(session.model, 'dailyRate'), false); assert.equal(session.inspect().dirty, false)
+ session.redo(); assert.equal(session.model.dailyRate, 1234.56)
+ const receipt = session.export(); session.markSaved(receipt.bytes)
+ assert.equal(session.inspect().dirty, false); assert.equal(decodeSchedule(receipt.bytes).dailyRate, 1234.56)
+ const reopened = new ScheduleSession(receipt.bytes); assert.equal(reopened.model.dailyRate, 1234.56)
+ session.change(copy => { copy.dailyRate = 0 }); assert.equal(decodeSchedule(session.export().bytes).dailyRate, 0)
+ session.change(copy => { delete copy.dailyRate }); assert.equal(Object.hasOwn(decodeSchedule(session.export().bytes), 'dailyRate'), false)
+ session.undo(); assert.equal(session.model.dailyRate, 0)
+ session.undo(); assert.deepEqual(session.model, beforeFailure); assert.equal(session.inspect().dirty, false)
 })
 
 test('morning and afternoon half-events round trip without changing legacy morning documents', () => {

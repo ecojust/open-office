@@ -6,11 +6,13 @@ export type ScheduleRole = { id: string; name: string; role: string; color: stri
 /** Half-height events use slot 0 for morning and 1 for afternoon; full height always uses 0. */
 export type ScheduleEvent = { id: string; roleId: string | null; title: string; startDate: string; endDate: string; height: 1 | 0.5; slot: 0 | 1; notes: string }
 /** Dates include both endpoints. null roleId denotes the permanent overall-plan track. */
-export type ScheduleProject = { format: 'open-office-schedule'; version: 1; id: string; title: string; startDate: string; endDate: string; calendar: ScheduleCalendarSettings; roles: ScheduleRole[]; events: ScheduleEvent[]; layout?: { trackHeights: Record<string, number> } }
+export type ScheduleProject = { format: 'open-office-schedule'; version: 1; id: string; title: string; startDate: string; endDate: string; dailyRate?: number; calendar: ScheduleCalendarSettings; roles: ScheduleRole[]; events: ScheduleEvent[]; layout?: { trackHeights: Record<string, number> } }
 export const SCHEDULE_MAX_BYTES = 4 * 1024 * 1024
 export const SCHEDULE_MAX_DAYS = 1096
 export const SCHEDULE_MAX_ROLES = 100
 export const SCHEDULE_MAX_EVENTS = 2000
+/** Project-wide price in CNY per person-day; omission means no price was set. */
+export const MAX_SCHEDULE_DAILY_RATE = 1_000_000
 let sequence = 0
 export function scheduleId(): string { return `s_${globalThis.crypto?.randomUUID?.().replaceAll('-', '') ?? `${Date.now().toString(36)}_${(++sequence).toString(36)}`}` }
 export function createSchedule(title = '项目排期'): ScheduleProject {
@@ -42,6 +44,10 @@ export function validateSchedule(value: unknown): ScheduleProject {
  const extraHolidays = holidayList(rawCalendar.extraHolidays), excludedHolidays = holidayList(rawCalendar.excludedHolidays)
  if (extraHolidays.some(day => excludedHolidays.includes(day))) throw Error('同一天不能同时添加和排除为假日。')
  const result: ScheduleProject = { format: 'open-office-schedule', version: 1, id: id(root.id), title: text(root.title, 200, '项目名称', true), startDate, endDate, calendar: { hideWeekends: rawCalendar.hideWeekends, hideHolidays: rawCalendar.hideHolidays, extraHolidays, excludedHolidays }, roles: [], events: [] }
+ if (root.dailyRate !== undefined) {
+  if (typeof root.dailyRate !== 'number' || !Number.isFinite(root.dailyRate) || root.dailyRate < 0 || root.dailyRate > MAX_SCHEDULE_DAILY_RATE || Math.round(root.dailyRate * 100) / 100 !== root.dailyRate) throw Error('工时价格须为 0 至 1,000,000 元/人天，最多保留两位小数。')
+  result.dailyRate = root.dailyRate === 0 ? 0 : root.dailyRate
+ }
  if (rawCalendar.weekNumbering !== undefined) result.calendar.weekNumbering = rawCalendar.weekNumbering
  result.roles = list(root.roles, SCHEDULE_MAX_ROLES, '角色').map(raw => {
   const role = object(raw)

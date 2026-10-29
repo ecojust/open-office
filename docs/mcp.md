@@ -30,6 +30,7 @@ Open Office 桌面版可作为本机 MCP 服务，供支持 Streamable HTTP 的 
 | 笔记本 | `note_read`、`note_read_page` | `note_edit`：分区/页面/子页增删改和移动，区域位置尺寸、富文本、待办及图片；`note_select_page` 显示指定页面 |
 | 画布 | `canvas_read`、`canvas_read_elements`、`canvas_list_templates` | `canvas_edit`：全部图形、连线、笔迹和图片的内容样式、位置尺寸、锁定、组合、层级、对齐布局及模板；`canvas_select_elements` 选择或定位元素 |
 | 代码图表 | `diagram_read`、`diagram_read_source`、`diagram_list_templates` | `diagram_update`：源码、标题、风格及模板；保留 `diagram_set_source` |
+| 计划排期 | `schedule_read`、`schedule_read_calendar`、`schedule_read_workload` | `schedule_edit`：项目、单价、人员、事件、日历、周号、轨道高度；`schedule_import` 导入完整排期，`schedule_export` 导出 JSON／PNG；`schedule_set_view` 切换视图、缩放、选择事件，`schedule_refresh_holidays` 更新假日 |
 
 原有新增文字、单元格、幻灯片、PDF 文字框、笔记页面和画布图形的快捷工具继续可用。
 
@@ -44,6 +45,36 @@ Open Office 桌面版可作为本机 MCP 服务，供支持 Streamable HTTP 的 
 ```
 
 笔记和画布的 `*_edit` 接收结构化 `operations` 数组；同一批次整体校验、整体提交，出错不保留前半批修改。工具定义包含全部操作和字段。画布锁定对象需先显式解锁。
+
+### 计划排期接口
+
+先打开或新建一份排期，再启用该文档的 MCP。`schedule_read` 返回完整 `project`、当前 `view` 和修订状态 `state`。`schedule_edit` 支持以下操作，一次最多 100 项，成功只占一次撤销，任何日期、冲突、人员引用或字段错误均整批回滚。
+
+| 操作 | 参数与用途 |
+| --- | --- |
+| `project.update` | `patch` 更新名称、起止日期、`dailyRate` 人天单价；单价 `null` 清空，`0` 为零单价 |
+| `role.add` / `role.update` / `role.delete` | 新增 `role`，或按 `roleId` 修改 `patch`／删除；有事件的人员须先移动或删除其事件 |
+| `role.reorder` | `roleIds` 列出所有人员 ID，调整轨道顺序 |
+| `event.add` / `event.update` / `event.delete` | 新增 `event`，或按 `eventId` 修改 `patch`／删除；`roleId:null` 为整体计划 |
+| `event.copy` | 按 `eventId` 复制，`patch` 可指定日期、负责人等；保留来源内容及行高 |
+| `calendar.update` | `patch` 调整周末／假日显示、`weekNumbering`、手动新增／排除假日 |
+| `track.height` / `track.reset` | `key` 为 `overall`、`person-人员ID` 或 `event-事件ID`；高度 84–336px，按 28px 刻度；重置不传 `key` 表示全部 |
+
+例如设置单价并安排一个下午任务：
+
+```json
+{"name":"schedule_edit","arguments":{"operations":[{"op":"project.update","patch":{"dailyRate":1000}},{"op":"event.add","event":{"roleId":"person_a","title":"界面评审","startDate":"2026-10-29","endDate":"2026-10-29","height":0.5,"slot":1}}]}}
+```
+
+示例中的人员 ID 须替换为 `schedule_read` 返回的真实值，日期须在项目范围内。新增人员或事件可显式指定 ID，也可使用返回的 `created`。全天为 `height:1, slot:0`，上午／下午为 `height:0.5, slot:0/1`；同一人员同一天仍只允许一个事件。
+
+`schedule_read_calendar` 返回可见日期、周号、假日和独立于显示过滤的 `workingDates`。`schedule_read_workload` 返回月度工时、人员和项目总人天及预算，金额单位为元；未设置单价时预算为 `null`。可按 `roleId` 筛选，或用 `basis:"month"` 读取完整月份容量；`projectTotalDays`、`projectBudget` 始终保留项目合计。默认 `basis:"project"` 与界面一致。
+
+`schedule_set_view` 接受 `mode:"people"`（人员）或 `"global"`（事件）、`dayWidth`（36–160）及 `selectedEventId`（`null` 清除选择），只改变显示，不修改保存状态。`schedule_refresh_holidays` 使用内置假日来源，最多等待 8 秒；返回 `refreshing:true` 时表示后台仍在更新，可稍后读取日历。更新失败时沿用缓存，返回实际状态。
+
+`schedule_import` 的 `project` 接收完整排期对象，原子替换内容并保留当前文档及项目 ID，可撤销。`schedule_export` 的 `format:"json"` 返回完整 `project`；`format:"png"` 返回 `mimeType`、`encoding:"base64"`、`base64`、`width`、`height`、`scale`，客户端解码后即可保存 PNG。可指定 `mode` 和 `dayWidth`，不改变当前界面。PNG 包含全部日期、轨道、非零月度胶囊及总工时；单次返回超过 7 MiB 会明确报错，可降低日宽或通过界面导出。
+
+所有排期接口沿用当前文档权限与会话。导出不写入文件或标记已保存；保存和自动保存继续由现有文件操作负责。
 
 文字文档的 `edit.copy` / `edit.cut`、无参数 `edit.paste` / `edit.pasteMerge` / `edit.pasteText` 使用当前文档的内部剪贴板，不访问系统剪贴板。`edit.clipboardItems` 可读取历史，`edit.pasteClipboardItem` / `edit.pasteAllClipboard` 可粘贴历史内容；`edit.repeat` 会重新检查被重复命令的文档权限与参数。`table.draw` 必须提供 page、x0、y0、x1、y1，`table.eraser` 必须提供 page、x、y，不能只打开画笔模式。
 

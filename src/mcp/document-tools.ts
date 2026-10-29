@@ -8,6 +8,10 @@ import { sheetEditingTools } from './sheet-tools.ts'
 import { presentationEditingTools } from './presentation-tools.ts'
 import { pdfEditingTools } from './pdf-tools.ts'
 import { noteEditingTools, canvasEditingTools, diagramEditingTools } from './notes-workflow-tools.ts'
+import { scheduleTools } from './schedule-tools.ts'
+import { SCHEDULE_PNG_MAX_PIXELS, SCHEDULE_PNG_MAX_SIDE } from '../schedule/png-export.ts'
+
+const MAX_RESULT_BYTES = 7 * 1024 * 1024
 
 const text: McpSchema = { type: 'string', maxLength: 20000, minLength: 1 }
 const optionalText: McpSchema = { type: 'string', maxLength: 20000 }
@@ -34,13 +38,12 @@ const catalogs: Record<Kind, McpToolDefinition[]> = {
  diagram: [tool('diagram_read_source', '读取代码图表源码。', true), tool('diagram_set_source', '更新当前代码图表源码，立即更新预览，可撤销；不能访问文件或网络。', false, { source: { ...text, maxLength: 50000 } }, ['source'])],
 }
 const editingTools: Record<Kind, McpToolDefinition[]> = {
- schedule: [],
+ schedule: scheduleTools,
  word: wordEditingTools, sheet: sheetEditingTools, presentation: presentationEditingTools,
  pdf: pdfEditingTools, note: noteEditingTools, canvas: canvasEditingTools, diagram: diagramEditingTools,
 }
 for (const kind of Object.keys(catalogs) as Kind[]) catalogs[kind].push(...editingTools[kind])
 export function catalogForKind(kind: Kind): McpToolDefinition[] {
- if(kind==='schedule')return []
  return structuredClone([...common, ...catalogs[kind]])
 }
 function cellPosition(address: string): [number, number] {
@@ -77,16 +80,35 @@ export function summarizeMcpValue(value: unknown, depth = 0): unknown {
  }
  return value
 }
+/** Explicit PNG exports may carry their generated image, unlike ordinary inspection.
+ * Whitelist the payload so this exception never exposes incidental editor state. */
+function schedulePngResult(value: unknown): Record<string, unknown> {
+ const invalid = () => Error('排期 PNG 导出结果无效，请重试。')
+ if (!value || typeof value !== 'object' || Array.isArray(value)) throw invalid()
+ const { format, mimeType, encoding, base64, width, height, scale } = value as Record<string, unknown>
+ if (typeof base64 === 'string' && base64.length > MAX_RESULT_BYTES) throw Error('排期 PNG 超过 MCP 的 7 MiB 返回上限，请降低日宽或通过界面导出。')
+ if (format !== 'png' || mimeType !== 'image/png' || encoding !== 'base64' || typeof base64 !== 'string' || base64.length < 44 || base64.length % 4 !== 0 ||
+     !/^[A-Za-z0-9+/]+={0,2}$/.test(base64) ||
+     typeof width !== 'number' || !Number.isInteger(width) || width < 1 || width > SCHEDULE_PNG_MAX_SIDE ||
+     typeof height !== 'number' || !Number.isInteger(height) || height < 1 || height > SCHEDULE_PNG_MAX_SIDE || width * height > SCHEDULE_PNG_MAX_PIXELS ||
+     typeof scale !== 'number' || !Number.isFinite(scale) || scale <= 0 || scale > 2) throw invalid()
+ const header = Uint8Array.from(atob(base64.slice(0, 44)), character => character.charCodeAt(0))
+ const data = new DataView(header.buffer)
+ if (data.getUint32(0) !== 0x89504e47 || data.getUint32(4) !== 0x0d0a1a0a || data.getUint32(8) !== 13 ||
+     data.getUint32(12) !== 0x49484452 || data.getUint32(16) !== width || data.getUint32(20) !== height ||
+     btoa(atob(base64.slice(-4))) !== base64.slice(-4)) throw invalid()
+ return { format, mimeType, encoding, base64, width, height, scale }
+}
 export async function executeDocumentTool(kind: Kind, handle: EditorHandle, name: string, args: unknown, assertCurrent: () => void): Promise<unknown> {
  assertCurrent()
- if(kind==='schedule')throw Error('计划排期暂不支持 MCP。')
  const definition = [...common, ...catalogs[kind]].find(tool => tool.name === name)
  if (!definition) throw Error('当前子软件不支持此 MCP 工具。')
  const validated = validate(definition, args)
  if (!handle.mcpExecute) throw Error('当前文档尚未准备好 MCP 编辑接口。')
  const result = await handle.mcpExecute(name, validated, assertCurrent)
  assertCurrent()
- const summary = summarizeMcpValue(result ?? null)
- if (new TextEncoder().encode(JSON.stringify(summary)).length > 7 * 1024 * 1024) throw Error('文档内容过多，请读取较小范围。')
+ const pngExport = kind === 'schedule' && name === 'schedule_export' && validated.format === 'png'
+ const summary = pngExport ? schedulePngResult(result) : summarizeMcpValue(result ?? null)
+ if (new TextEncoder().encode(JSON.stringify(summary)).length > MAX_RESULT_BYTES) throw Error(pngExport ? '排期 PNG 超过 MCP 的 7 MiB 返回上限，请降低日宽或通过界面导出。' : '文档内容过多，请读取较小范围。')
  return summary
 }
