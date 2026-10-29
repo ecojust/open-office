@@ -40,6 +40,51 @@ test('global PNG sorts all events and uses global-row heights independently from
  assert.equal(plan.rows.at(-1).color, '#7c3aed')
 })
 
+test('PNG includes the same person-month workload in people and event views without counting overall plans', () => {
+ const source = project()
+ source.events.push({ ...source.events[0], id: 'second_a', startDate: '2026-03-02', endDate: '2026-03-03', height: .5 })
+ const before = structuredClone(source), people = buildSchedulePngLayout(source, { mode: 'people' })
+ assert.deepEqual(people.rows[0].workload, [])
+ assert.deepEqual(people.rows[1].workload, [
+  { month: '2026-02', scheduledDays: 5, availableDays: 9, percentage: 5 / 9 * 100 },
+  { month: '2026-03', scheduledDays: 1, availableDays: 5, percentage: 20 },
+ ])
+ assert.deepEqual(people.rows[2].workload, [
+  { month: '2026-02', scheduledDays: 0, availableDays: 9, percentage: 0 },
+  { month: '2026-03', scheduledDays: 2.5, availableDays: 5, percentage: 50 },
+ ])
+ const events = buildSchedulePngLayout(source, { mode: 'global' })
+ assert.deepEqual(events.rows[0].workload, [])
+ for (const row of events.rows.slice(1)) assert.deepEqual(row.workload, people.rows.find(person => person.roleId === row.roleId).workload)
+ source.calendar.hideWeekends = false; source.calendar.hideHolidays = false
+ assert.deepEqual(buildSchedulePngLayout(source, { mode: 'people' }).rows.map(row => row.workload), people.rows.map(row => row.workload))
+ assert.deepEqual(people.project, before, 'Export captures data independently of subsequent display edits')
+})
+
+test('PNG expands short tracks to fit all 37 months without altering stored heights or afternoon placement', () => {
+ const source = project(); source.startDate = '2028-01-31'; source.endDate = '2031-01-30'
+ source.events = [{ ...source.events[1], id: 'long_half', startDate: source.startDate, endDate: source.endDate, slot: 1 }]
+ source.layout = { trackHeights: { overall: 84, 'person-a': 84, 'person-b': 84, 'event-long_half': 84 } }
+ const before = structuredClone(source)
+ for (const mode of ['people', 'global']) {
+  const plan = buildSchedulePngLayout(source, { mode, dayWidth: 160 })
+  assert.equal(plan.rows[0].height, 84)
+  for (const row of plan.rows.slice(1)) {
+   assert.equal(row.workload.length, 37)
+   assert.equal(row.workload[0].month, '2028-01'); assert.equal(row.workload.at(-1).month, '2031-01')
+   assert.ok(row.height > 336); assert.equal(row.height % 28, 0)
+   const tagsBottom = (mode === 'people' ? 36 : 56) + 18 * 22 + 18
+   assert.ok(tagsBottom + 8 <= row.height, 'Last two-column tag row fits completely before the track boundary')
+  }
+  const row = plan.rows.at(-1), half = getEventVerticalLayout(row.height, row.events[0].event)
+  assert.equal(half.top, row.height / 2); assert.equal(half.top + half.height, row.height - 9)
+  assert.equal(plan.tableBottom, plan.rows.at(-1).top + plan.rows.at(-1).height)
+  assert.ok(plan.width <= SCHEDULE_PNG_MAX_SIDE && plan.height <= SCHEDULE_PNG_MAX_SIDE)
+  assert.ok(plan.width * plan.height <= SCHEDULE_PNG_MAX_PIXELS)
+  assert.deepEqual(plan.project, before); assert.deepEqual(source, before)
+ }
+})
+
 test('afternoon PNG events use the lower half of their complete resized track in both modes', () => {
  const source = project(); source.events[1].slot = 1
  source.layout = { trackHeights: { 'person-b': 336, 'event-last': 280 } }
@@ -92,6 +137,7 @@ test('PNG remains a complete bounded table when all dates are hidden', () => {
  const source = project(); source.startDate = '2026-02-16'; source.endDate = '2026-02-20'; source.events = [source.events.at(-1)]
  const plan = buildSchedulePngLayout(source, { mode: 'people' })
  assert.equal(plan.calendar.days.length, 0); assert.equal(plan.rows.length, 3); assert.equal(plan.hiddenEvents, 1)
+ assert.deepEqual(plan.rows[1].workload, [{ month: '2026-02', scheduledDays: 0, availableDays: 0, percentage: null }])
  assert.ok(plan.width >= 600); assert.ok(plan.height > 0); assert.ok(plan.scale > 0)
 })
 

@@ -1,9 +1,10 @@
 import { buildCalendar, dayNumber } from './calendar.ts'
 import type { HolidayYears } from './holidays.ts'
-import { SCHEDULE_MAX_DAYS, type ScheduleProject } from './model.ts'
+import { SCHEDULE_MAX_DAYS, type ScheduleEvent, type ScheduleProject } from './model.ts'
 
 export type WorkloadBasis = 'project' | 'month'
 export type MonthlyWorkloadCell = { scheduledDays: number; availableDays: number; percentage: number | null }
+export const formatWorkloadPercentage = (value: number | null): string => value === null ? '—' : `${Number(value.toFixed(1))}%`
 export type MonthlyWorkload = {
  /** Bounds describe the denominator's actual interval, inclusive at both ends. */
  months: { key: string; startDate: string; endDate: string; workingDays: number }[]
@@ -24,6 +25,21 @@ function bound(dates: readonly string[], value: string, after: boolean): number 
  return low
 }
 
+/** Sorted working dates, independent of timeline display filters. */
+export function buildWorkloadDates(project: ScheduleProject, holidayYears: HolidayYears = {}): string[] {
+ const excluded = new Set(project.calendar.excludedHolidays)
+ const calendar = { ...project.calendar, hideWeekends: true, hideHolidays: true,
+  // Keep explicit exclusion precedence for intermediate callers as well.
+  extraHolidays: project.calendar.extraHolidays.filter(date => !excluded.has(date)),
+ }
+ return buildCalendar({ ...project, calendar }, holidayYears).days.map(day => day.date)
+}
+
+/** Inclusive event workload within the supplied sorted working dates. */
+export function eventWorkloadDays(event: Pick<ScheduleEvent, 'startDate' | 'endDate' | 'height'>, dates: readonly string[]): number {
+ return Math.max(0, bound(dates, event.endDate, true) - bound(dates, event.startDate, false)) * event.height
+}
+
 /** Monthly person-days: display filters never change capacity or scheduled work. */
 export function buildMonthlyWorkload(project: ScheduleProject, holidayYears: HolidayYears = {}, basis: WorkloadBasis = 'project'): MonthlyWorkload {
  if (basis !== 'project' && basis !== 'month') throw Error('工时统计口径无效，请选择项目范围或完整月份。')
@@ -31,12 +47,6 @@ export function buildMonthlyWorkload(project: ScheduleProject, holidayYears: Hol
  if (duration < 1 || duration > SCHEDULE_MAX_DAYS) throw Error('项目日期范围无效或超过 3 年。')
  const firstMonth = Number(project.startDate.slice(0, 4)) * 12 + Number(project.startDate.slice(5, 7)) - 1
  const lastMonth = Number(project.endDate.slice(0, 4)) * 12 + Number(project.endDate.slice(5, 7)) - 1
- const excluded = new Set(project.calendar.excludedHolidays)
- const workCalendar = { ...project.calendar, hideWeekends: true, hideHolidays: true,
-  // Valid saved documents cannot contain both; retaining explicit exclusion
-  // precedence also keeps calculation deterministic for intermediate callers.
-  extraHolidays: project.calendar.extraHolidays.filter(date => !excluded.has(date)),
- }
  const months: MonthlyWorkload['months'] = [], scheduledDates: string[][] = []
  for (let index = firstMonth; index <= lastMonth; index++) {
   const year = Math.floor(index / 12), month = index % 12 + 1
@@ -46,7 +56,7 @@ export function buildMonthlyWorkload(project: ScheduleProject, holidayYears: Hol
   const endDate = basis === 'project' && project.endDate < monthEnd ? project.endDate : monthEnd
   // Expand one month at a time: a maximum-length project can span portions of
   // 37 months whose full expansion exceeds the calendar's 1096-day limit.
-  const days = buildCalendar({ ...project, startDate, endDate, calendar: workCalendar }, holidayYears).days.map(day => day.date)
+  const days = buildWorkloadDates({ ...project, startDate, endDate }, holidayYears)
   months.push({ key, startDate, endDate, workingDays: days.length })
   scheduledDates.push(days.filter(date => date >= project.startDate && date <= project.endDate))
  }
@@ -63,8 +73,7 @@ export function buildMonthlyWorkload(project: ScheduleProject, holidayYears: Hol
   for (let index = 0; index < months.length; index++) {
    const dates = scheduledDates[index]
    if (!dates.length || event.endDate < dates[0] || event.startDate > dates[dates.length - 1]) continue
-   const count = Math.max(0, bound(dates, event.endDate, true) - bound(dates, event.startDate, false))
-   person.months[index].scheduledDays += count * event.height
+   person.months[index].scheduledDays += eventWorkloadDays(event, dates)
   }
  }
  for (const person of people) person.months = person.months.map(cell => percentage(cell.scheduledDays, cell.availableDays))

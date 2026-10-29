@@ -1,13 +1,16 @@
 import { buildCalendar, projectedSpan, type ScheduleCalendar } from './calendar.ts'
 import type { HolidayYears } from './holidays.ts'
-import { buildTimelineRows, getEventVerticalLayout, getTrackHeight, SCHEDULE_HEADER_HEIGHT, SCHEDULE_LABEL_WIDTH, type TimelineRow } from './layout.ts'
+import { buildTimelineRows, getEventVerticalLayout, getTrackHeight, SCHEDULE_HEADER_HEIGHT, SCHEDULE_LABEL_WIDTH, SCHEDULE_TRACK_STEP, type TimelineRow } from './layout.ts'
 import { validateSchedule, type ScheduleProject } from './model.ts'
+import { buildMonthlyWorkload, formatWorkloadPercentage, type MonthlyWorkloadCell } from './workload.ts'
 
 export type SchedulePngOptions = { mode: 'people' | 'global'; dayWidth?: number; holidayYears?: HolidayYears }
 export type SchedulePngResult = { bytes: Uint8Array; width: number; height: number; scale: number }
 export const SCHEDULE_PNG_MAX_SIDE = 16384
 export const SCHEDULE_PNG_MAX_PIXELS = 24_000_000
 const MARGIN = 24, TITLE_HEIGHT = 88, FOOTER_HEIGHT = 48, WEEK_HEIGHT = 28
+const WORKLOAD_TAG_HEIGHT = 18, WORKLOAD_TAG_GAP = 4, WORKLOAD_BOTTOM = 8
+const workloadTop = (mode: SchedulePngOptions['mode']) => mode === 'people' ? 36 : 56
 const FONT = '"Office UI", "Office UI CJK", "PingFang SC", "Microsoft YaHei", sans-serif'
 const COLOR = { text: '#202b3b', muted: '#647287', subtle: '#8390a1', line: '#e3e6eb', strong: '#cbd2dc', mutedSurface: '#f7f8fa', accent: '#315fd6', soft: '#edf2fd' }
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
@@ -25,7 +28,7 @@ export function fitSchedulePngDimensions(logicalWidth: number, logicalHeight: nu
 
 export type SchedulePngLayout = {
  project: ScheduleProject; mode: 'people' | 'global'; calendar: ScheduleCalendar
- rows: (TimelineRow & { top: number; height: number })[]; dayWidth: number
+ rows: (TimelineRow & { top: number; height: number; workload: (MonthlyWorkloadCell & { month: string })[] })[]; dayWidth: number
  tableWidth: number; tableBottom: number; logicalWidth: number; logicalHeight: number
  width: number; height: number; scale: number; hiddenEvents: number
 }
@@ -36,10 +39,17 @@ export function buildSchedulePngLayout(source: ScheduleProject, options: Schedul
  if (options.mode !== 'people' && options.mode !== 'global') throw Error('排期视图模式无效。')
  const dayWidth = Math.max(36, Math.min(160, Number.isFinite(options.dayWidth) ? options.dayWidth! : 64))
  const calendar = buildCalendar(project, options.holidayYears)
+ const workload = buildMonthlyWorkload(project, options.holidayYears)
+ const workloadByRole = new Map(workload.people.map(person => [person.roleId, person.months.map((cell, index) => ({ ...cell, month: workload.months[index].key }))]))
  const tableWidth = SCHEDULE_LABEL_WIDTH + Math.max(360, calendar.days.length * dayWidth)
  let top = TITLE_HEIGHT + SCHEDULE_HEADER_HEIGHT
  const rows = buildTimelineRows(project, options.mode, calendar.days).map(row => {
-  const height = getTrackHeight(project, row.key), result = { ...row, top, height }
+  const months = row.roleId === null ? [] : workloadByRole.get(row.roleId) ?? []
+  const tagRows = Math.ceil(months.length / 2)
+  const requiredHeight = tagRows ? workloadTop(options.mode) + tagRows * (WORKLOAD_TAG_HEIGHT + WORKLOAD_TAG_GAP) - WORKLOAD_TAG_GAP + WORKLOAD_BOTTOM : 0
+  // Images cannot scroll: expand only the exported row, without the UI's 336px cap.
+  const height = Math.max(getTrackHeight(project, row.key), Math.ceil(requiredHeight / SCHEDULE_TRACK_STEP) * SCHEDULE_TRACK_STEP)
+  const result = { ...row, top, height, workload: months }
   top += height
   return result
  })
@@ -89,7 +99,7 @@ function drawTable(context: CanvasRenderingContext2D, plan: SchedulePngLayout) {
  const left = MARGIN, datesLeft = left + SCHEDULE_LABEL_WIDTH, right = left + tableWidth
  fill(context, 0, 0, plan.logicalWidth, plan.logicalHeight, '#ffffff')
  font(context, 22, 600); text(context, project.title, left, 30, tableWidth)
- font(context, 12); text(context, `${project.startDate} — ${project.endDate}  ·  ${plan.mode === 'people' ? '人员模式' : '全局模式'}  ·  ${project.calendar.weekNumbering === 'project' ? '按项目计周' : '按年计周'}  ·  ${project.roles.length} 名人员 / ${project.events.length} 个事件`, left, 59, tableWidth, COLOR.muted)
+ font(context, 12); text(context, `${project.startDate} — ${project.endDate}  ·  ${plan.mode === 'people' ? '人员' : '事件'}  ·  ${project.calendar.weekNumbering === 'project' ? '按项目计周' : '按年计周'}  ·  ${project.roles.length} 名人员${plan.mode === 'global' ? '  ·  月度工时按负责人汇总' : ''}`, left, 59, tableWidth, COLOR.muted)
  fill(context, left, TITLE_HEIGHT, tableWidth, SCHEDULE_HEADER_HEIGHT, COLOR.mutedSurface)
  if (rows[0]) fill(context, left, rows[0].top, tableWidth, rows[0].height, COLOR.soft)
 
@@ -115,7 +125,7 @@ function drawTable(context: CanvasRenderingContext2D, plan: SchedulePngLayout) {
    font(context, 10); text(context, `${yearOrProject}${width >= 150 ? ` · ${calendar.days[week.startIndex].date.slice(5).replace('-', '/')}` : ''}`, x + 49, TITLE_HEIGHT + 14, width - 58, COLOR.muted)
   }
  }
- font(context, 12, 600); text(context, plan.mode === 'people' ? '人员 / 角色' : '全局事件', left + 15, TITLE_HEIGHT + 26, SCHEDULE_LABEL_WIDTH - 30)
+ font(context, 12, 600); text(context, plan.mode === 'people' ? '人员 / 角色' : '事件', left + 15, TITLE_HEIGHT + 26, SCHEDULE_LABEL_WIDTH - 30)
  font(context, 10); text(context, `${calendar.days.length} 个显示日 · 隐藏 ${calendar.hiddenCount} 天`, left + 15, TITLE_HEIGHT + 48, SCHEDULE_LABEL_WIDTH - 30, COLOR.muted)
  line(context, datesLeft, TITLE_HEIGHT + WEEK_HEIGHT, right, TITLE_HEIGHT + WEEK_HEIGHT)
  line(context, left, TITLE_HEIGHT + SCHEDULE_HEADER_HEIGHT, right, TITLE_HEIGHT + SCHEDULE_HEADER_HEIGHT, COLOR.strong)
@@ -124,9 +134,23 @@ function drawTable(context: CanvasRenderingContext2D, plan: SchedulePngLayout) {
   const color = /^#[\da-fA-F]{6}$/.test(row.color) ? row.color : COLOR.accent
   const textLeft = left + 30, textWidth = SCHEDULE_LABEL_WIDTH - 44
   context.beginPath(); context.arc(left + 17, row.top + 24, 4, 0, Math.PI * 2); context.fillStyle = color; context.fill()
-  font(context, 12, 600); text(context, row.name, textLeft, row.top + 24, textWidth)
-  font(context, 10); text(context, row.subtitle, textLeft, row.top + 43, textWidth, COLOR.muted)
-  font(context, 9); text(context, `${row.total} 个事件`, textLeft, row.top + 61, textWidth, COLOR.subtle)
+  if (plan.mode === 'people' && row.roleId !== null) {
+   font(context, 12, 600)
+   const nameWidth = Math.min(textWidth * .65, context.measureText(row.name).width)
+   text(context, row.name, textLeft, row.top + 24, nameWidth)
+   font(context, 10); text(context, row.subtitle, textLeft + nameWidth + 6, row.top + 24, textWidth - nameWidth - 6, COLOR.muted)
+  } else {
+   font(context, 12, 600); text(context, row.name, textLeft, row.top + 24, textWidth)
+   font(context, 10); text(context, row.subtitle, textLeft, row.top + 43, textWidth, COLOR.muted)
+  }
+  const tagWidth = (textWidth - WORKLOAD_TAG_GAP) / 2
+  row.workload.forEach((month, index) => {
+   const x = textLeft + (index % 2) * (tagWidth + WORKLOAD_TAG_GAP)
+   const y = row.top + workloadTop(plan.mode) + Math.floor(index / 2) * (WORKLOAD_TAG_HEIGHT + WORKLOAD_TAG_GAP)
+   rounded(context, x, y, tagWidth, WORKLOAD_TAG_HEIGHT)
+   context.fillStyle = tint(color, .07); context.fill(); context.strokeStyle = tint(color, .25); context.lineWidth = 1; context.stroke()
+   font(context, 10); text(context, `${month.month.slice(2).replace('-', '.')}-${formatWorkloadPercentage(month.percentage)}`, x + 3, y + WORKLOAD_TAG_HEIGHT / 2, tagWidth - 6, COLOR.text, 'center')
+  })
   line(context, left, row.top + row.height, right, row.top + row.height, row.key === 'overall' ? COLOR.strong : COLOR.line)
   for (const item of row.events) {
    const { event } = item, vertical = getEventVerticalLayout(row.height, event)
@@ -157,7 +181,7 @@ function drawTable(context: CanvasRenderingContext2D, plan: SchedulePngLayout) {
  line(context, datesLeft, TITLE_HEIGHT, datesLeft, tableBottom, COLOR.strong)
  context.strokeStyle = COLOR.strong; context.lineWidth = 1; context.strokeRect(left, TITLE_HEIGHT, tableWidth, tableBottom - TITLE_HEIGHT)
  const status = [project.calendar.hideWeekends ? '已隐藏周末' : '显示周末', project.calendar.hideHolidays ? '已隐藏法定假日' : '显示法定假日']
- if (plan.hiddenEvents) status.push(`${plan.hiddenEvents} 个事件仅在隐藏日期内`)
+ if (plan.hiddenEvents) status.push('部分事件仅在隐藏日期内')
  if (calendar.unknownHolidayYears.length) status.push(`${calendar.unknownHolidayYears.join('、')} 年假日待更新`)
  font(context, 10); text(context, status.join(' · '), left, tableBottom + 24, tableWidth, COLOR.muted)
 }
@@ -186,7 +210,7 @@ export async function exportSchedulePng(project: ScheduleProject, options: Sched
   fill(context, 0, 0, plan.width, plan.height, '#ffffff')
   context.scale(plan.scale, plan.scale)
   drawTable(context, plan)
-  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(Error('排期图片编码失败，请缩小日期范围或使用人员模式后重试。')), 'image/png'))
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(Error('排期图片编码失败，请缩小日期范围或切到「人员」后重试。')), 'image/png'))
   if (blob.type !== 'image/png' || !blob.size) throw Error('排期图片未生成有效的 PNG 数据。')
   return { bytes: new Uint8Array(await blob.arrayBuffer()), width: plan.width, height: plan.height, scale: plan.scale }
  } finally {
