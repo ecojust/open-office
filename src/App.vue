@@ -1520,14 +1520,6 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
             <div><h3>{{tool.name}}</h3><p>{{tool.description}}</p></div>
           </article>
         </div>
-        <div class="help-community" aria-labelledby="help-community-heading">
-          <img src="/software-community-qr.svg" width="180" height="180" alt="软件及交流群二维码，扫码访问软件下载与交流群页面"/>
-          <div>
-            <h3 id="help-community-heading">软件及交流群</h3>
-            <p>扫码获取软件与交流群</p>
-            <span class="help-extraction-code">提取码 <b>rhb3</b></span>
-          </div>
-        </div>
         <footer class="help-footer"><small>版本 {{appVersion}} · 构建 {{buildVersion}}</small><button class="primary" @click="help=false">开始工作</button></footer>
       </section>
     </div>
