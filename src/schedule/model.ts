@@ -1,10 +1,11 @@
 import { addDays, dayNumber, mondayOf, validateEventConflicts } from './calendar.ts'
+import { SCHEDULE_TRACK_MAX_HEIGHT, SCHEDULE_TRACK_MIN_HEIGHT, SCHEDULE_TRACK_STEP, trackKeys } from './layout.ts'
 
 export type ScheduleCalendarSettings = { hideWeekends: boolean; hideHolidays: boolean; extraHolidays: string[]; excludedHolidays: string[] }
 export type ScheduleRole = { id: string; name: string; role: string; color: string }
 export type ScheduleEvent = { id: string; roleId: string | null; title: string; startDate: string; endDate: string; height: 1 | 0.5; slot: 0 | 1; notes: string }
 /** Dates include both endpoints. null roleId denotes the permanent overall-plan track. */
-export type ScheduleProject = { format: 'open-office-schedule'; version: 1; id: string; title: string; startDate: string; endDate: string; calendar: ScheduleCalendarSettings; roles: ScheduleRole[]; events: ScheduleEvent[] }
+export type ScheduleProject = { format: 'open-office-schedule'; version: 1; id: string; title: string; startDate: string; endDate: string; calendar: ScheduleCalendarSettings; roles: ScheduleRole[]; events: ScheduleEvent[]; layout?: { trackHeights: Record<string, number> } }
 export const SCHEDULE_MAX_BYTES = 4 * 1024 * 1024
 export const SCHEDULE_MAX_DAYS = 1096
 export const SCHEDULE_MAX_ROLES = 100
@@ -53,6 +54,15 @@ export function validateSchedule(value: unknown): ScheduleProject {
   if (event.slot !== 0) throw Error('事件槽位无效；每条角色轨道只允许一层事件。')
   return { id: eventId, roleId: event.roleId as string | null, title: text(event.title, 200, '事件名称', true), startDate: eventStart, endDate: eventEnd, height: event.height, slot: event.slot, notes: text(event.notes, 20000, '事件备注') }
  })
+ if (root.layout !== undefined) {
+  const values = object(object(root.layout).trackHeights), keys = trackKeys(result), trackHeights: Record<string, number> = {}
+  for (const [key, height] of Object.entries(values)) {
+   if (!keys.has(key)) throw Error('轨道高度引用的人员或事件不存在。')
+   if (typeof height !== 'number' || !Number.isSafeInteger(height) || height < SCHEDULE_TRACK_MIN_HEIGHT || height > SCHEDULE_TRACK_MAX_HEIGHT || height % SCHEDULE_TRACK_STEP !== 0) throw Error(`轨道高度必须是 ${SCHEDULE_TRACK_STEP} 像素的整数倍，范围为 ${SCHEDULE_TRACK_MIN_HEIGHT} 至 ${SCHEDULE_TRACK_MAX_HEIGHT} 像素。`)
+   trackHeights[key] = height
+  }
+  result.layout = { trackHeights }
+ }
  validateEventConflicts(result)
  if (new TextEncoder().encode(JSON.stringify(result)).byteLength > SCHEDULE_MAX_BYTES) throw Error('排期文件不能超过 4 MiB。')
  return result

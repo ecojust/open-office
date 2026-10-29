@@ -2,7 +2,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import Icon from './Icon.vue'
 import ScheduleTimeline from '../schedule/components/ScheduleTimeline.vue'
-import { scheduleId, type ScheduleEvent, type ScheduleProject, type ScheduleRole } from '../schedule/model'
+import { encodeSchedule, scheduleId, type ScheduleEvent, type ScheduleProject, type ScheduleRole } from '../schedule/model'
+import { pruneTrackHeights, SCHEDULE_TRACK_HEIGHT } from '../schedule/layout'
+import { exportSchedulePng } from '../schedule/png-export'
 import { buildCalendar, projectedSpan } from '../schedule/calendar'
 import type { HolidayYears } from '../schedule/holidays'
 import { getHolidayClient, flushHolidayCache } from '../schedule/holiday-native'
@@ -13,7 +15,7 @@ import type { Appearance } from '../shared/appearance'
 import type { NativeDocument } from '../types'
 
 const props = withDefaults(defineProps<{ document: NativeDocument; active?: boolean; disabled?: boolean; theme?: Appearance }>(), { active: true, disabled: false, theme: 'system' })
-const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: 'new'|'open'|'save'|'saveAs'|'print'|'close'] }>()
+const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; import: []; export: [format: 'json'|'png']; 'file-action': [action: 'new'|'open'|'save'|'saveAs'|'print'|'close'] }>()
 const root = ref<HTMLElement>(), dialogElement = ref<HTMLElement>(), timeline = ref<InstanceType<typeof ScheduleTimeline>>()
 useDialogFocus(dialogElement)
 const model = shallowRef<ScheduleProject>(), mode = ref<'people'|'global'>('people'), selectedId = ref(''), dayWidth = ref(64)
@@ -45,6 +47,7 @@ const controlsReady = computed(() => editable.value && !dialog.value && !gesture
 const selected = computed(() => model.value?.events.find(event => event.id === selectedId.value))
 const hiddenEvents = computed(() => model.value?.events.filter(event => !projectedSpan(event, calendar.value.days)) ?? [])
 const overall = computed(() => model.value?.events.filter(event => event.roleId === null).length ?? 0)
+const holidayStatus = computed(() => holidayLoading.value ? '正在检查节假日更新…' : holidayMessage.value || (calendar.value.unknownHolidayYears.length && model.value?.calendar.hideHolidays ? `${calendar.value.unknownHolidayYears.join('、')} 年假日数据暂未取得，使用周末规则和手动假日。` : '自动更新中国大陆法定假日'))
 const eventOwner = (event: ScheduleEvent) => event.roleId === null ? '整体计划' : model.value?.roles.find(role => role.id === event.roleId)?.name ?? '未知人员'
 const dialogTitle = computed(() => dialog.value === 'project' ? creatingProject.value ? '新建项目排期' : '项目设置' : dialog.value === 'roles' ? '管理人员' : dialog.value === 'calendar' ? '假日设置' : dialog.value === 'delete' ? '删除事件' : editingEvent.value ? '编辑事件' : '添加事件')
 
@@ -91,7 +94,15 @@ function requireReady() {
  if (gestureBusy.value) throw Error('请先完成或取消当前拖动。')
  if (dialog.value) throw Error('请先完成或取消当前排期设置。')
 }
-function openDialog(kind: NonNullable<typeof dialog.value>) { dialogError.value = ''; problem.value = ''; dialog.value = kind }
+function closeMenus() { root.value?.querySelectorAll<HTMLDetailsElement>('.schedule-menu[open]').forEach(menu => { menu.open = false }) }
+function outsideMenu(event: PointerEvent) { if (!(event.target instanceof Element) || !event.target.closest('.schedule-menu')) closeMenus() }
+function toggleMenu(event: Event) {
+ const menu = event.target as HTMLDetailsElement
+ if (menu.open) root.value?.querySelectorAll<HTMLDetailsElement>('.schedule-menu[open]').forEach(other => { if (other !== menu) other.open = false })
+}
+function requestImport() { if (controlsReady.value) { closeMenus(); emit('import') } }
+function requestExport(format: 'json'|'png') { if (controlsReady.value) { closeMenus(); emit('export', format) } }
+function openDialog(kind: NonNullable<typeof dialog.value>) { closeMenus(); dialogError.value = ''; problem.value = ''; dialog.value = kind }
 function settings(create = false) {
  if (!model.value || (!create && !controlsReady.value)) return
  creatingProject.value = create
@@ -132,7 +143,7 @@ function submitDialog() {
  try {
   const kind = dialog.value
   if (kind === 'project') session.change(copy => { copy.title = projectDraft.value.title.trim(); copy.startDate = projectDraft.value.startDate; copy.endDate = projectDraft.value.endDate })
-  if (kind === 'roles') session.change(copy => { copy.roles = rolesDraft.value.map(role => ({ ...role, name: role.name.trim(), role: role.role.trim() })) })
+  if (kind === 'roles') session.change(copy => { copy.roles = rolesDraft.value.map(role => ({ ...role, name: role.name.trim(), role: role.role.trim() })); pruneTrackHeights(copy) })
   if (kind === 'calendar') {
    const dates = (value: string) => [...new Set(value.split(/[\s,，;；]+/).filter(Boolean))].sort()
    session.change(copy => { copy.calendar.extraHolidays = dates(holidayDraft.value.extra); copy.calendar.excludedHolidays = dates(holidayDraft.value.excluded) })
@@ -142,7 +153,7 @@ function submitDialog() {
    session.change(copy => { const index = copy.events.findIndex(value => value.id === event.id); if (index < 0) copy.events.push(event); else copy.events[index] = event })
    selectedId.value = event.id
   }
-  if (kind === 'delete' && selected.value) { const id = selected.value.id; session.change(copy => { copy.events = copy.events.filter(event => event.id !== id) }) }
+  if (kind === 'delete' && selected.value) { const id = selected.value.id; session.change(copy => { copy.events = copy.events.filter(event => event.id !== id); pruneTrackHeights(copy) }) }
   cancelDialog(); problem.value = ''; accept()
  } catch (cause) { dialogError.value = cause instanceof Error ? cause.message : String(cause) }
 }
@@ -154,6 +165,16 @@ function updateEvent(event: ScheduleEvent) {
 }
 function toggleCalendar(field: 'hideWeekends'|'hideHolidays', event: Event) {
  if (controlsReady.value) change(copy => { copy.calendar[field] = !(event.target as HTMLInputElement).checked })
+}
+function updateTrackHeight(key: string, height: number) {
+ if (!editable.value || dialog.value) return
+ if (change(copy => {
+  const trackHeights = { ...copy.layout?.trackHeights }
+  if (height === SCHEDULE_TRACK_HEIGHT) delete trackHeights[key]
+  else trackHeights[key] = height
+  if (Object.keys(trackHeights).length) copy.layout = { trackHeights }
+  else delete copy.layout
+ })) emit('status', `轨道高度 ${height}px，已对齐 28px 刻度。`)
 }
 function gesture(active: boolean) {
  gestureBusy.value = active; accept()
@@ -169,6 +190,12 @@ async function prepareDeactivate() { requireReady(); return session!.inspect() }
 async function canBackgroundExport() { return !!session && !disposed && !loading.value && !gestureBusy.value && !dialog.value }
 async function exportFile(options: { format?: Extension; background?: boolean } = {}): Promise<EditorExport> {
  requireReady()
+ if (options.format === 'json' || options.format === 'png') {
+  const current = generation, snapshot = session!.inspect(), project = session!.model
+  const bytes = options.format === 'json' ? encodeSchedule(project) : (await exportSchedulePng(project, { mode: mode.value, dayWidth: dayWidth.value, holidayYears: holidayYears.value })).bytes
+  if (disposed || current !== generation || snapshot.revision !== session?.revision) throw Error('导出期间排期已变化，请重试。')
+  return { base64: bytesToBase64(bytes), extension: options.format, saveAs: true, dirty: snapshot.dirty, revision: `${snapshot.documentId}:${snapshot.revision}` }
+ }
  if (options.format && options.format !== 'ooschedule') throw Error('排期支持保存为 .ooschedule。')
  const result = session!.export(), base64 = bytesToBase64(result.bytes)
  lastExport = { generation, base64 }
@@ -186,6 +213,10 @@ async function discardChanges(options: { force?: boolean } = {}) {
 function keydown(event: KeyboardEvent) {
  if (!props.active || event.defaultPrevented || event.isComposing) return
  if (event.key === 'Escape' && dialog.value) { event.preventDefault(); event.stopPropagation(); cancelDialog(); return }
+ if (event.key === 'Escape' && root.value?.querySelector('.schedule-menu[open]')) {
+  const menu = root.value.querySelector<HTMLDetailsElement>('.schedule-menu[open]')
+  closeMenus(); menu?.querySelector('summary')?.focus(); event.preventDefault(); event.stopPropagation(); return
+ }
  if (!controlsReady.value || (event.target as HTMLElement).closest('input,textarea,select,[contenteditable="true"]')) return
  if ((event.ctrlKey || event.metaKey) && !event.altKey && ['z','y'].includes(event.key.toLowerCase())) {
   event.preventDefault(); event.stopPropagation(); void ((event.shiftKey || event.key.toLowerCase() === 'y') ? redo() : undo()).catch(report)
@@ -204,9 +235,10 @@ watch(() => props.document.id, async () => {
   if (!bytes) settings(true)
  } catch (cause) { report(cause); loading.value = false; emit('error', problem.value) }
 }, { immediate: true })
-watch(() => props.active, active => { if (!active) timeline.value?.cancelGesture(); else void refreshHolidays() })
-onMounted(() => { holidayTimer = setInterval(() => { if (props.active) void refreshHolidays() }, 24 * 60 * 60 * 1000) })
-onBeforeUnmount(() => { disposed = true; generation++; holidayRequest++; clearInterval(holidayTimer); timeline.value?.cancelGesture(); session = undefined })
+watch(() => props.active, active => { if (!active) { timeline.value?.cancelGesture(); closeMenus() } else void refreshHolidays() })
+watch(controlsReady, ready => { if (!ready) closeMenus() })
+onMounted(() => { holidayTimer = setInterval(() => { if (props.active) void refreshHolidays() }, 24 * 60 * 60 * 1000); window.addEventListener('pointerdown', outsideMenu) })
+onBeforeUnmount(() => { disposed = true; generation++; holidayRequest++; clearInterval(holidayTimer); window.removeEventListener('pointerdown', outsideMenu); timeline.value?.cancelGesture(); session = undefined })
 defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, inspect, syncRevision: inspect, canBackgroundExport, undo, redo, focus })
 </script>
 
@@ -214,31 +246,30 @@ defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, inspect
  <section ref="root" class="schedule-editor" data-testid="schedule-editor" :data-document-id="document.id" :aria-label="model?.title || '计划排期'" tabindex="-1" @keydown="keydown">
   <div v-if="loading" class="schedule-loading">正在打开排期…</div>
   <template v-else-if="model">
-   <header class="schedule-heading">
+   <header class="schedule-heading" data-testid="schedule-toolbar" role="toolbar" aria-label="排期工具">
     <div class="schedule-project-name"><span class="schedule-heading-icon"><Icon name="schedule" :size="23"/></span><div><h1>{{model.title}}</h1><p>{{model.startDate}} — {{model.endDate}}<span> · {{calendar.days.length}} 个可见日</span></p></div></div>
-    <div class="schedule-actions"><button data-testid="schedule-settings" :disabled="!controlsReady" @click="settings()"><Icon name="settings" :size="15"/>项目设置</button><button data-testid="schedule-roles" :disabled="!controlsReady" @click="manageRoles()"><Icon name="plus" :size="15"/>管理人员 <span class="schedule-count">{{model.roles.length}}</span></button><button class="schedule-primary" data-testid="schedule-add-event" :disabled="!controlsReady" @click="openEvent()"><Icon name="plus" :size="16"/>添加事件</button></div>
-   </header>
-   <div class="schedule-toolbar" role="toolbar" aria-label="排期视图">
     <div class="schedule-modes" role="group" aria-label="排期模式"><button data-testid="schedule-mode-people" :aria-pressed="mode==='people'" :disabled="!controlsReady" @click="mode='people'">人员模式</button><button data-testid="schedule-mode-global" :aria-pressed="mode==='global'" :disabled="!controlsReady" @click="mode='global'">全局模式</button></div>
-    <span class="schedule-toolbar-divider"/>
-    <button data-testid="schedule-undo" title="撤销" aria-label="撤销排期修改" :disabled="!controlsReady || !canUndo" @click="undo().catch(report)"><Icon name="undo" :size="16"/></button><button data-testid="schedule-redo" title="重做" aria-label="重做排期修改" :disabled="!controlsReady || !canRedo" @click="redo().catch(report)"><Icon name="redo" :size="16"/></button>
-    <label class="schedule-check"><input data-testid="schedule-show-weekends" type="checkbox" :checked="!model.calendar.hideWeekends" :disabled="!controlsReady" @change="toggleCalendar('hideWeekends',$event)">显示周末</label>
-    <label class="schedule-check"><input data-testid="schedule-show-holidays" type="checkbox" :checked="!model.calendar.hideHolidays" :disabled="!controlsReady" @change="toggleCalendar('hideHolidays',$event)">显示法定假日</label>
-    <button data-testid="schedule-calendar-settings" :disabled="!controlsReady" @click="holidaySettings()">假日设置</button>
-    <button class="schedule-refresh-button" data-testid="schedule-refresh-holidays" :disabled="!controlsReady || holidayLoading" @click="refreshHolidays(true)">{{holidayLoading?'正在更新假日…':'更新假日'}}</button>
-    <label class="schedule-zoom">日宽 <select v-model.number="dayWidth" aria-label="日期列宽" :disabled="!controlsReady"><option :value="44">紧凑</option><option :value="64">标准</option><option :value="88">宽松</option></select></label>
-   </div>
-   <p v-if="calendar.unknownHolidayYears.length && model.calendar.hideHolidays" class="schedule-warning" data-testid="schedule-holiday-warning">{{calendar.unknownHolidayYears.join('、')}} 年官方假日数据尚不可用，正在自动检查或等待发布；这些年份使用当前周末显示规则和手动假日。可点击“更新假日”重试。</p>
-   <p class="schedule-holiday-status" role="status" data-testid="schedule-holiday-status" :title="holidayMessage">{{holidayLoading?'正在检查节假日更新…':holidayMessage || '自动更新中国大陆法定假日'}}</p>
+    <div class="schedule-history"><button data-testid="schedule-undo" title="撤销" aria-label="撤销排期修改" :disabled="!controlsReady || !canUndo" @click="undo().catch(report)"><Icon name="undo" :size="16"/></button><button data-testid="schedule-redo" title="重做" aria-label="重做排期修改" :disabled="!controlsReady || !canRedo" @click="redo().catch(report)"><Icon name="redo" :size="16"/></button></div>
+    <details class="schedule-menu" @toggle="toggleMenu"><summary data-testid="schedule-view-menu" :aria-disabled="!controlsReady" @click="!controlsReady && $event.preventDefault()">视图 <Icon name="chevron-down" :size="12"/></summary><div class="schedule-menu-panel schedule-view-panel">
+     <label class="schedule-check"><input data-testid="schedule-show-weekends" type="checkbox" :checked="!model.calendar.hideWeekends" :disabled="!controlsReady" @change="toggleCalendar('hideWeekends',$event)">显示周末</label>
+     <label class="schedule-check"><input data-testid="schedule-show-holidays" type="checkbox" :checked="!model.calendar.hideHolidays" :disabled="!controlsReady" @change="toggleCalendar('hideHolidays',$event)">显示法定假日</label>
+     <label class="schedule-zoom">日宽 <select v-model.number="dayWidth" aria-label="日期列宽" :disabled="!controlsReady"><option :value="44">紧凑</option><option :value="64">标准</option><option :value="88">宽松</option></select></label>
+     <button data-testid="schedule-calendar-settings" :disabled="!controlsReady" @click="holidaySettings()">假日设置</button>
+     <button data-testid="schedule-refresh-holidays" :disabled="!controlsReady || holidayLoading" @click="refreshHolidays(true)">{{holidayLoading?'正在更新假日…':'更新假日'}}</button>
+    </div></details>
+    <div class="schedule-actions"><button data-testid="schedule-settings" :disabled="!controlsReady" @click="settings()"><Icon name="settings" :size="15"/>项目设置</button><button data-testid="schedule-roles" :disabled="!controlsReady" @click="manageRoles()">管理人员 <span class="schedule-count">{{model.roles.length}}</span></button><button class="schedule-primary" data-testid="schedule-add-event" :disabled="!controlsReady" @click="openEvent()"><Icon name="plus" :size="16"/>添加事件</button></div>
+    <div class="schedule-data-actions"><button data-testid="schedule-import" title="导入 .ooschedule 或 JSON 排期，在新标签中打开" :disabled="!controlsReady" @click="requestImport"><Icon name="folder" :size="15"/>导入</button><details class="schedule-menu" @toggle="toggleMenu"><summary data-testid="schedule-export-menu" :aria-disabled="!controlsReady" @click="!controlsReady && $event.preventDefault()"><Icon name="download" :size="15"/>导出 <Icon name="chevron-down" :size="12"/></summary><div class="schedule-menu-panel schedule-export-panel"><button data-testid="schedule-export-json" :disabled="!controlsReady" @click="requestExport('json')">排期数据（JSON）<small>保留人员、事件、日历及轨道高度</small></button><button data-testid="schedule-export-png" :disabled="!controlsReady" @click="requestExport('png')">整张排期表（PNG）<small>当前模式的全部日期和轨道</small></button></div></details></div>
+   </header>
+   <p class="schedule-holiday-status" role="status" data-testid="schedule-holiday-status" :title="holidayStatus">{{holidayStatus}}</p>
    <p v-if="problem" class="schedule-error" role="alert" data-testid="schedule-error">{{problem}}<button aria-label="关闭提示" @click="problem=''">×</button></p>
    <div v-if="!model.roles.length && mode==='people'" class="schedule-empty-roles"><div><strong>为项目添加人员</strong><p>填写姓名、职能和颜色，每人拥有一条专属轨道。上方整体计划始终固定。</p></div><button :disabled="!controlsReady" @click="manageRoles()">添加第一位人员</button></div>
-   <ScheduleTimeline ref="timeline" :project="model" :holiday-years="holidayYears" :mode="mode" :active="active" :disabled="!editable || !!dialog" :selected-id="selectedId" :day-width="dayWidth" @select="selectedId=$event" @edit="openEvent($event)" @create="openEvent(undefined,$event)" @change="updateEvent" @error="report" @gesture="gesture" @delete="askDelete"/>
+   <ScheduleTimeline ref="timeline" :project="model" :holiday-years="holidayYears" :mode="mode" :active="active" :disabled="!editable || !!dialog" :selected-id="selectedId" :day-width="dayWidth" @select="selectedId=$event" @edit="openEvent($event)" @create="openEvent(undefined,$event)" @change="updateEvent" @track-height="updateTrackHeight" @error="report" @gesture="gesture" @delete="askDelete"/>
    <div class="schedule-selection" aria-live="polite">
     <template v-if="selected"><span class="schedule-selection-dot" :style="{background: model.roles.find(role=>role.id===selected?.roleId)?.color || 'var(--ui-accent)'}"/><strong>{{selected.title}}</strong><span>{{eventOwner(selected)}} · {{selected.startDate}} — {{selected.endDate}} · {{selected.height*100}}%</span><button data-testid="schedule-edit-event" :disabled="!controlsReady" @click="openEvent(selected.id)">编辑</button><button class="schedule-danger" data-testid="schedule-delete-event" :disabled="!controlsReady" @click="askDelete(selected.id)">删除</button></template>
     <template v-else><span>{{mode==='people'?'双击空白轨道添加事件，拖动可更换人员。':'所有人员的事件按开始日期汇总；双击事件编辑负责人。'}}</span><span class="schedule-selection-tail">{{overall}} 个整体计划 · {{model.events.length-overall}} 个人员事件</span></template>
    </div>
    <div v-if="hiddenEvents.length" class="schedule-hidden-events" data-testid="schedule-hidden-events"><span>{{hiddenEvents.length}} 个事件仅覆盖隐藏日期：</span><button v-for="event in hiddenEvents" :key="event.id" :disabled="!controlsReady" @click="openEvent(event.id)">{{event.title}} · {{event.startDate}}</button></div>
-   <footer class="schedule-hint">按自然周标注 W1、W2…，默认隐藏周末和中国大陆法定假日。左右拉伸按整天吸附；底边高度吸附至 100% 或 50%，不增加同一天的人员容量。</footer>
+   <footer class="schedule-hint">轨道底边按 28px 刻度调高；事件左右边按整天吸附，底边吸附至 100% 或 50%，半高仍占用当天。</footer>
   </template>
   <p v-else class="schedule-error" role="alert">{{problem || '无法打开排期。'}}</p>
 
@@ -259,11 +290,15 @@ defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, inspect
 
 <style scoped>
 .schedule-editor{height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;background:var(--ui-surface);color:var(--ui-text);font-family:var(--ui-font);position:relative;overflow:hidden;outline:none}
-.schedule-holiday-status{box-sizing:border-box;height:26px;line-height:15px;padding:5px 22px;margin:0;border-bottom:1px solid var(--ui-line);font-size:11px;color:var(--ui-muted);flex-shrink:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.schedule-refresh-button{width:112px;flex-shrink:0}
-.schedule-heading{padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:18px;border-bottom:1px solid var(--ui-line);flex-wrap:wrap;flex-shrink:0}.schedule-project-name{display:flex;align-items:center;gap:12px;min-width:0;flex:1}.schedule-project-name>div{min-width:0}.schedule-project-name h1{font-size:18px;line-height:1.4;margin:0 0 3px;font-weight:600;overflow-wrap:anywhere}.schedule-project-name p{color:var(--ui-muted);font-size:11px;margin:0}.schedule-heading-icon{display:grid;place-items:center;width:40px;height:40px;flex:none;background:var(--ui-accent-soft);color:var(--ui-accent);border-radius:8px}.schedule-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-.schedule-editor button{min-height:30px;padding:5px 9px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;gap:5px}.schedule-editor button:hover:not(:disabled){background:var(--ui-surface-muted)}.schedule-editor button.schedule-primary{background:var(--ui-accent);color:var(--ui-on-accent);padding:7px 13px}.schedule-count{font-size:10px;border-radius:4px;padding:0 5px;background:var(--ui-surface-muted);color:var(--ui-muted)}.schedule-toolbar{display:flex;align-items:center;gap:10px;padding:10px 22px;border-bottom:1px solid var(--ui-line);flex-wrap:wrap;flex-shrink:0}.schedule-modes{display:flex;background:var(--ui-surface-muted);padding:3px;border-radius:6px;border:1px solid var(--ui-line)}.schedule-modes button[aria-pressed=true]{background:var(--ui-surface);box-shadow:0 1px 3px #00000012;color:var(--ui-accent);font-weight:600}.schedule-toolbar-divider{height:21px;width:1px;background:var(--ui-line)}.schedule-check{display:flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap}.schedule-check input{margin:0}.schedule-zoom{display:flex;align-items:center;gap:6px;margin-left:auto;font-size:12px;color:var(--ui-muted)}.schedule-zoom select{height:29px;background:var(--ui-surface);color:var(--ui-text);border:1px solid var(--ui-line);border-radius:4px}.schedule-warning,.schedule-error{padding:9px 20px;margin:0;flex-shrink:0;font-size:12px}.schedule-warning{color:var(--ui-warning);background:var(--ui-warning-soft);border-bottom:1px solid var(--ui-line)}.schedule-error{color:var(--ui-danger);background:var(--ui-danger-soft);display:flex;justify-content:space-between;align-items:center;gap:12px}.schedule-empty-roles{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px 22px;background:var(--ui-surface-muted);border-bottom:1px solid var(--ui-line);flex-shrink:0}.schedule-empty-roles p{margin:3px 0 0;color:var(--ui-muted);font-size:12px}.schedule-empty-roles button{border:1px solid var(--ui-line-strong);white-space:nowrap}.schedule-loading{padding:40px;color:var(--ui-muted)}
+.schedule-heading{padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--ui-line);flex-wrap:wrap;flex-shrink:0;position:relative;z-index:20}
+.schedule-project-name{display:flex;align-items:center;gap:8px;min-width:180px;flex:1 1 200px;max-width:360px}.schedule-project-name>div{min-width:0}.schedule-project-name h1{font-size:15px;line-height:1.4;margin:0 0 2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.schedule-project-name p{color:var(--ui-muted);font-size:10px;margin:0;white-space:nowrap}.schedule-project-name p>span{display:none}.schedule-heading-icon{display:grid;place-items:center;width:32px;height:32px;flex:none;background:var(--ui-accent-soft);color:var(--ui-accent);border-radius:6px}
+.schedule-editor button,.schedule-menu>summary{min-height:30px;padding:5px 8px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;font-size:12px;line-height:18px}.schedule-editor button:hover:not(:disabled),.schedule-menu>summary:hover{background:var(--ui-surface-muted)}.schedule-editor button.schedule-primary{background:var(--ui-accent);color:var(--ui-on-accent);padding:5px 9px}.schedule-actions,.schedule-history,.schedule-data-actions{display:flex;align-items:center;gap:3px;flex:none}.schedule-data-actions{margin-left:auto;border-left:1px solid var(--ui-line);padding-left:6px}.schedule-count{font-size:10px;border-radius:4px;padding:0 4px;background:var(--ui-surface-muted);color:var(--ui-muted)}
+.schedule-modes{display:flex;background:var(--ui-surface-muted);padding:2px;border-radius:6px;border:1px solid var(--ui-line);flex:none}.schedule-modes button{min-height:26px;padding:3px 8px}.schedule-modes button[aria-pressed=true]{background:var(--ui-surface);box-shadow:0 1px 3px #00000012;color:var(--ui-accent);font-weight:600}
+.schedule-menu{position:relative;flex:none}.schedule-menu>summary{list-style:none;cursor:pointer;user-select:none}.schedule-menu>summary::-webkit-details-marker{display:none}.schedule-menu>summary[aria-disabled=true]{opacity:.45;cursor:default}.schedule-menu[open]>summary{background:var(--ui-surface-muted)}.schedule-menu-panel{position:absolute;top:calc(100% + 6px);right:0;min-width:190px;display:flex;flex-direction:column;gap:5px;padding:8px;border:1px solid var(--ui-line-strong);border-radius:8px;background:var(--ui-surface);box-shadow:0 8px 26px #0002;z-index:35}.schedule-view-panel{left:auto;right:0}.schedule-menu-panel>button{justify-content:flex-start}.schedule-check{display:flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap;min-height:30px;padding:4px 8px}.schedule-check input{margin:0}.schedule-zoom{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 8px;font-size:12px;color:var(--ui-muted);border-bottom:1px solid var(--ui-line);padding-bottom:9px;margin-bottom:3px}.schedule-zoom select{height:28px;background:var(--ui-surface);color:var(--ui-text);border:1px solid var(--ui-line);border-radius:4px}.schedule-export-panel{min-width:250px}.schedule-export-panel>button{display:flex;flex-direction:column;align-items:flex-start;padding:8px;gap:2px}.schedule-export-panel small{font-size:10px;color:var(--ui-muted);font-weight:400}
+.schedule-holiday-status{box-sizing:border-box;height:23px;line-height:15px;padding:4px 12px;margin:0;border-bottom:1px solid var(--ui-line);font-size:11px;color:var(--ui-muted);flex-shrink:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.schedule-error{padding:9px 20px;margin:0;flex-shrink:0;font-size:12px;color:var(--ui-danger);background:var(--ui-danger-soft);display:flex;justify-content:space-between;align-items:center;gap:12px}.schedule-empty-roles{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px 22px;background:var(--ui-surface-muted);border-bottom:1px solid var(--ui-line);flex-shrink:0}.schedule-empty-roles p{margin:3px 0 0;color:var(--ui-muted);font-size:12px}.schedule-empty-roles button{border:1px solid var(--ui-line-strong);white-space:nowrap}.schedule-loading{padding:40px;color:var(--ui-muted)}
 .schedule-selection{display:flex;align-items:center;gap:10px;padding:7px 18px;min-height:43px;border-top:1px solid var(--ui-line);flex-shrink:0;font-size:12px;flex-wrap:wrap}.schedule-selection strong{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.schedule-selection>span:not(.schedule-selection-dot){color:var(--ui-muted)}.schedule-selection-tail{margin-left:auto}.schedule-selection-dot{width:8px;height:8px;border-radius:3px;flex:none}.schedule-danger{color:var(--ui-danger)}.schedule-hint{padding:7px 18px;background:var(--ui-surface-muted);color:var(--ui-muted);font-size:11px;flex-shrink:0}.schedule-hidden-events{display:flex;align-items:center;flex-wrap:wrap;gap:3px;padding:4px 18px;font-size:11px;background:var(--ui-warning-soft);color:var(--ui-warning);max-height:80px;overflow:auto;flex-shrink:0}.schedule-hidden-events button{text-decoration:underline;min-height:23px;font-size:11px}
 .schedule-modal-backdrop{position:absolute;inset:0;background:#10182750;backdrop-filter:blur(3px);z-index:60;display:grid;place-items:center;padding:18px;overflow:auto}.schedule-dialog{background:var(--ui-surface);border:1px solid var(--ui-line-strong);border-radius:10px;box-shadow:0 18px 70px #00000025;width:min(460px,100%);max-height:100%;overflow:auto;padding:24px;display:flex;flex-direction:column;gap:14px}.schedule-dialog-wide{width:min(680px,100%)}.schedule-dialog>header{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}.schedule-eyebrow{text-transform:uppercase;letter-spacing:2px;color:var(--ui-subtle);font-size:10px}.schedule-dialog h2{font-size:19px;margin:4px 0 0}.schedule-dialog label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600}.schedule-dialog input,.schedule-dialog select,.schedule-dialog textarea{width:100%;border:1px solid var(--ui-line-strong);background:var(--ui-surface);color:var(--ui-text);border-radius:5px;padding:9px;font-size:13px;min-height:36px;outline-offset:2px}.schedule-dialog textarea{resize:vertical}.schedule-form-columns{display:grid;grid-template-columns:1fr 1fr;gap:12px}.schedule-form-hint{margin:0;font-size:12px;line-height:1.65;color:var(--ui-muted)}.schedule-dialog>footer{display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--ui-line);padding-top:15px;margin-top:3px}.schedule-dialog-error{margin:0;padding:10px;border-radius:5px;color:var(--ui-danger);background:var(--ui-danger-soft);font-size:12px}.schedule-role-list{max-height:330px;overflow:auto;display:grid;gap:8px}.schedule-role-labels,.schedule-role-draft{display:grid;grid-template-columns:minmax(90px,1fr) minmax(90px,1fr) 44px 30px;gap:10px;align-items:center}.schedule-role-labels{font-size:11px;color:var(--ui-muted)}.schedule-role-draft input[type=color]{height:36px;padding:3px}.schedule-add-role{border:1px dashed var(--ui-line-strong)}.schedule-editor .schedule-delete-confirm{background:var(--ui-danger)!important;color:white!important}
-@media(max-width:760px){.schedule-heading{padding:12px;gap:10px}.schedule-project-name{flex-basis:100%}.schedule-toolbar{padding:8px 12px;gap:7px}.schedule-actions{width:100%}.schedule-zoom{margin-left:0}.schedule-dialog{padding:18px}.schedule-hint{font-size:10px}.schedule-selection-tail{margin-left:0}.schedule-empty-roles{padding:10px 12px}.schedule-role-labels,.schedule-role-draft{gap:6px;grid-template-columns:minmax(70px,1fr) minmax(70px,1fr) 36px 25px}.schedule-selection{padding:6px 12px}}
+@media(max-width:760px){.schedule-heading{padding:8px;gap:6px}.schedule-project-name{flex-basis:100%;max-width:none}.schedule-menu-panel{position:fixed;top:auto;left:12px;right:12px;margin-top:6px;min-width:0}.schedule-data-actions{margin-left:0}.schedule-dialog{padding:18px}.schedule-hint{font-size:10px}.schedule-selection-tail{margin-left:0}.schedule-empty-roles{padding:10px 12px}.schedule-role-labels,.schedule-role-draft{gap:6px;grid-template-columns:minmax(70px,1fr) minmax(70px,1fr) 36px 25px}.schedule-selection{padding:6px 12px}}
 .schedule-selection{box-sizing:border-box;height:46px;min-height:46px;flex-wrap:nowrap;overflow:hidden}.schedule-selection button{flex-shrink:0}.schedule-selection>span:not(.schedule-selection-dot){min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.schedule-selection strong{min-width:0}
 </style>

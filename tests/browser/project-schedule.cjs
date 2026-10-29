@@ -2,6 +2,7 @@
  * Run: node tests/browser/project-schedule.cjs (owns Vite 5337 and Chromium).
  * Focused unknown-year regression: OFFICE_SCHEDULE_FOCUS=unknown-year node tests/browser/project-schedule.cjs
  * Automatic holiday regression: OFFICE_SCHEDULE_FOCUS=holiday-refresh node tests/browser/project-schedule.cjs
+ * Compact toolbar, track sizing and file/image export: OFFICE_SCHEDULE_FOCUS=layout-export node tests/browser/project-schedule.cjs
  * Synthetic project data only. No screen-capture, microphone or native I/O API.
  */
 const assert = require('node:assert/strict');
@@ -9,10 +10,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { chromium } = require('playwright');
+const { PNG } = require('pngjs');
 const root = path.resolve(__dirname, '../..');
 const focus = process.env.OFFICE_SCHEDULE_FOCUS || '';
-const output = path.resolve(process.env.OFFICE_SCHEDULE_OUTPUT || path.join(root, ['unknown-year', 'holiday-refresh'].includes(focus) ? `test-results/project-schedule-${focus}` : 'test-results/project-schedule'));
-const sources = ['src/App.vue', 'src/style.css', 'src/components/ScheduleEditor.vue', 'src/schedule/components/ScheduleTimeline.vue', 'src/schedule/model.ts', 'src/schedule/calendar.ts', 'src/schedule/holidays.ts', 'src/schedule/holiday-native.ts', 'src/schedule/session.ts', 'src/shared/document.ts'];
+const output = path.resolve(process.env.OFFICE_SCHEDULE_OUTPUT || path.join(root, ['unknown-year', 'holiday-refresh', 'layout-export'].includes(focus) ? `test-results/project-schedule-${focus}` : 'test-results/project-schedule'));
+const sources = ['src/App.vue', 'src/style.css', 'src/components/ScheduleEditor.vue', 'src/schedule/components/ScheduleTimeline.vue', 'src/schedule/model.ts', 'src/schedule/calendar.ts', 'src/schedule/holidays.ts', 'src/schedule/holiday-native.ts', 'src/schedule/session.ts', 'src/schedule/layout.ts', 'src/schedule/png-export.ts', 'src/shared/document.ts'];
 const hashes = () => Object.fromEntries(sources.map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex')]));
 const report = { ok: false, runtime: 'Real Vue schedule UI in system Chromium over local Vite HTTP; real browser downloads and file input; allowlisted public holiday responses are deterministic fixtures', checks: [], screenshots: [], gestures: [], errors: [], consoleErrors: [], externalRequests: [], holidayRequests: [], expectedNetworkErrors: [], limitations: ['Native file dialogs, desktop filesystem autosave and platform WebViews are not exercised.', 'Holiday fetches use the real browser fetch/client/cache path with fixture responses; live upstream availability is not asserted.', 'Pointer input is automated Chromium mouse input; physical touch and operating-system accessibility tools are not exercised.', 'Browser page screenshots require visual review.'] };
 let server, browser, page;
@@ -70,7 +72,9 @@ async function active() { return page.evaluate(() => { const a = document.queryS
 async function ready() { await poll(async () => { const a = await active(); return !a.busy && a.ready && a.kind === 'schedule'; }, 'schedule ready'); await frame(); }
 async function scheduleState() { return page.evaluate(async () => { const a = document.querySelector('#app').__vue_app__._instance.setupState; return a.scheduleHandles.get(a.activeKey).inspect(); }); }
 async function shownDates() { return timeline().locator('[data-date]').evaluateAll(elements => elements.map(element => element.getAttribute('data-date'))); }
-async function holidayIdle() { await poll(async () => (await editor().getByTestId('schedule-refresh-holidays').innerText()) === '更新假日', 'holiday refresh completes'); await frame(); }
+async function holidayIdle() { await poll(async () => (await editor().getByTestId('schedule-refresh-holidays').textContent()) === '更新假日', 'holiday refresh completes'); await frame(); }
+async function viewMenu(open = true) { const summary = editor().getByTestId('schedule-view-menu'), current = await summary.evaluate(element => element.parentElement.open); if (current !== open) await summary.click(); await frame(); }
+async function refreshHoliday() { await viewMenu(); await editor().getByTestId('schedule-refresh-holidays').click(); await viewMenu(false); }
 async function cachedHoliday(year) { return page.evaluate(key => localStorage.getItem(key), `${holidayCachePrefix}${year}`); }
 async function exportedModel() {
   return page.evaluate(async () => {
@@ -115,7 +119,11 @@ async function createEvent(value) {
 async function cancelDialog(dialog) { await dialog.getByRole('button', { name: '取消', exact: true }).click(); await dialog.waitFor({ state: 'hidden' }); }
 async function gesture(locator, dx, dy, cancel = false) {
   await locator.scrollIntoViewIfNeeded(); await frame(); const box = await locator.boundingBox(); assert.ok(box, 'Gesture target is visible');
-  const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 }, end = { x: start.x + dx, y: start.y + dy };
+  const viewport = await scroll().boundingBox(); assert.ok(viewport);
+  const visibleLeft = Math.max(box.x, viewport.x + 194), visibleRight = Math.min(box.x + box.width, viewport.x + viewport.width - 8);
+  assert.ok(visibleRight > visibleLeft, 'Gesture target has a visible part in the timeline');
+  const start = { x: (visibleLeft + visibleRight) / 2, y: box.y + box.height / 2 }, end = { x: start.x + dx, y: start.y + dy };
+  assert.equal(await locator.evaluate((element, point) => element.contains(document.elementFromPoint(point.x, point.y)), start), true, 'Pointer starts on the actual visible gesture target');
   report.gestures.push({ stage: report.stage, selector: await locator.getAttribute('data-testid'), start, end, cancel }); persist();
   await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(end.x, end.y, { steps: 10 });
   if (cancel) await page.keyboard.press('Escape');
@@ -157,21 +165,21 @@ async function holidayRefreshChecks() {
     const saved = await saveDownload('自动节假日验证.ooschedule', true); assert.deepEqual(saved.model, fixture); cleanState = await scheduleState(); assert.equal(cleanState.dirty, false); await capture('automatic-holiday-success');
   });
   await check('manual-refresh-bypasses-fresh-cache-without-changing-revision-or-dirty', async () => {
-    const beforeRequests = report.holidayRequests.length; holidayPlans.set(year, { payload: payload('07', '08') }); await editor().getByTestId('schedule-refresh-holidays').click(); await holidayIdle();
+    const beforeRequests = report.holidayRequests.length; holidayPlans.set(year, { payload: payload('07', '08') }); await refreshHoliday(); await holidayIdle();
     assert.ok(report.holidayRequests.length > beforeRequests); assert.ok(!(await shownDates()).includes(`${prefix}08`)); await sameDocument(); cached = await cachedHoliday(year); assert.ok(cached); assert.ok(JSON.parse(cached).days[`${prefix}08`]);
   });
   await check('empty-announcements-fail-without-replacing-known-holidays-or-cache', async () => {
-    const count = report.holidayRequests.length; holidayPlans.set(year, { payload: { year, papers: [], days: [] } }); await editor().getByTestId('schedule-refresh-holidays').click(); await holidayIdle();
+    const count = report.holidayRequests.length; holidayPlans.set(year, { payload: { year, papers: [], days: [] } }); await refreshHoliday(); await holidayIdle();
     assert.deepEqual(report.holidayRequests.slice(count).map(request => request.source), ['primary', 'fallback']); assert.match(await editor().getByTestId('schedule-holiday-status').innerText(), /继续使用本地|继续使用.*数据/);
     assert.ok(!(await shownDates()).includes(`${prefix}07`)); assert.ok(!(await shownDates()).includes(`${prefix}08`)); assert.equal(await cachedHoliday(year), cached); await sameDocument();
   });
   await check('fallback-source-can-refresh-after-primary-rejects-invalid-announcement', async () => {
     const count = report.holidayRequests.length; holidayPlans.set(year, { primary: { payload: { year, papers: [], days: [] } }, fallback: { payload: payload('07', '08', '09') } });
-    await editor().getByTestId('schedule-refresh-holidays').click(); await holidayIdle(); assert.deepEqual(report.holidayRequests.slice(count).map(request => request.source), ['primary', 'fallback']);
+    await refreshHoliday(); await holidayIdle(); assert.deepEqual(report.holidayRequests.slice(count).map(request => request.source), ['primary', 'fallback']);
     assert.ok(!(await shownDates()).includes(`${prefix}09`)); await sameDocument();
   });
   async function delayedGesture(days, closing) {
-    holidayPlans.set(year, { hold: true, payload: payload(...days) }); await editor().getByTestId('schedule-refresh-holidays').click(); await poll(async () => heldHolidays.some(item => item.details.year === year), 'annual response is held');
+    holidayPlans.set(year, { hold: true, payload: payload(...days) }); await refreshHoliday(); await poll(async () => heldHolidays.some(item => item.details.year === year), 'annual response is held');
     const beforeDates = await shownDates(), box = await eventElement(eventId).boundingBox(); assert.ok(box); const x = box.x + box.width / 2, y = box.y + box.height / 2, dayWidth = Number(await timeline().getAttribute('data-day-width'));
     report.gestures.push({ stage: report.stage, selector: `schedule-event-${eventId}`, start: { x, y }, end: { x: x + dayWidth * 0.2, y }, cancel: closing === 'escape', deferredHoliday: `${prefix}${days.at(-1)}` }); persist();
     await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + dayWidth * 0.2, y, { steps: 5 }); await frame(); assert.equal(await timeline().locator('.schedule-event-ghost').count(), 1);
@@ -212,6 +220,126 @@ async function holidayRefreshChecks() {
   });
 }
 
+
+async function toolbarExport(format, name) {
+  await editor().getByTestId('schedule-export-menu').click();
+  const pending = page.waitForEvent('download'); await editor().getByTestId(`schedule-export-${format}`).click(); const download = await pending;
+  assert.ok(download.suggestedFilename().endsWith(`.${format}`)); const target = path.join(output, name || download.suggestedFilename());
+  await download.saveAs(target); assert.equal(await download.failure(), null); await ready(); return { target, bytes: fs.readFileSync(target) };
+}
+async function toolbarImport(name, value) {
+  const pending = page.waitForEvent('filechooser'); await editor().getByTestId('schedule-import').click(); const chooser = await pending;
+  await chooser.setFiles({ name, mimeType: 'application/json', buffer: Buffer.from(typeof value === 'string' ? value : JSON.stringify(value)) });
+}
+function pixel(png, x, y) { const index = (Math.floor(y) * png.width + Math.floor(x)) * 4; return Array.from(png.data.subarray(index, index + 4)); }
+async function layoutExportChecks() {
+  const fixture = { format: 'open-office-schedule', version: 1, id: 'resize_project', title: '轨道高度与导入导出验证', startDate: '2026-09-21', endDate: '2026-11-13', calendar: { hideWeekends: true, hideHolidays: true, extraHolidays: [], excludedHolidays: [] }, roles: [{ id: 'alice', name: '林设计', role: '设计', color: '#2563eb' }, { id: 'bob', name: '陈开发', role: '开发', color: '#db2777' }], events: [{ id: 'overview', roleId: null, title: '整体阶段', startDate: '2026-09-21', endDate: '2026-09-30', height: 1, slot: 0, notes: '' }, { id: 'alice_work', roleId: 'alice', title: '设计交付', startDate: '2026-09-21', endDate: '2026-09-23', height: 1, slot: 0, notes: '' }, { id: 'bob_work', roleId: 'bob', title: '开发交付', startDate: '2026-10-26', endDate: '2026-10-27', height: 1, slot: 0, notes: '' }] };
+  let saved, beforeResize, originalKey;
+  const handle = key => editor().getByTestId(`track-resize-${key}`);
+  await check('compact-header-single-status-and-accessible-view-menu', async () => {
+    await openFixture('resize-project.ooschedule', fixture); await holidayIdle(); originalKey = (await active()).key;
+    await saveDownload('轨道高度验证.ooschedule', true); beforeResize = await exportedModel(); assert.equal((await active()).dirty, false);
+    assert.equal(await editor().getByTestId('schedule-holiday-warning').count(), 0);
+    for (const width of [1440, 1280]) {
+      await page.setViewportSize({ width, height: 900 }); await frame();
+      const heading = await editor().getByTestId('schedule-toolbar').boundingBox(), people = await editor().getByTestId('schedule-mode-people').boundingBox(), settings = await editor().getByTestId('schedule-settings').boundingBox();
+      assert.ok(heading && people && settings); assert.ok(Math.abs(people.y - settings.y) < 8, `${width}px: mode and project tools share a row`); assert.ok(heading.height <= 85, `${width}px: compact toolbar height is bounded`);
+      await capture(`compact-toolbar-${width}`);
+    }
+    await viewMenu(); assert.equal(await editor().getByTestId('schedule-show-weekends').isVisible(), true); await page.keyboard.press('Escape'); assert.equal(await editor().getByTestId('schedule-show-weekends').isVisible(), false); assert.equal(await editor().getByTestId('schedule-view-menu').evaluate(element => element === document.activeElement), true);
+    await page.setViewportSize({ width: 1360, height: 900 });
+  });
+  await check('track-pointer-snaps-to-ticks-and-undo-redo-is-one-edit', async () => {
+    await gesture(handle('alice'), 0, 45); const after = await exportedModel();
+    assert.equal(after.layout.trackHeights['person-alice'], 168); assert.equal(Number(await track('alice').getAttribute('data-track-height')), 168); assert.equal(Math.round((await track('alice').boundingBox()).height), 168); assert.deepEqual(after.events, beforeResize.events); assert.equal((await active()).dirty, true);
+    await undo(); assert.deepEqual(await exportedModel(), beforeResize); assert.equal((await scheduleState()).dirty, false); await redo(); assert.deepEqual(await exportedModel(), after);
+    await capture('track-resized-with-tick-snap');
+  });
+  await check('track-cancel-and-keyboard-respect-step-and-bounds', async () => {
+    const before = await exportedModel(), state = await scheduleState(); await gesture(handle('alice'), 0, 70, true); assert.deepEqual(await exportedModel(), before); assert.deepEqual(await scheduleState(), state);
+    await handle('bob').focus(); await page.keyboard.press('Home'); assert.equal(Number(await track('bob').getAttribute('data-track-height')), 84);
+    await page.keyboard.press('End'); assert.equal(Number(await track('bob').getAttribute('data-track-height')), 336);
+    await page.keyboard.press('ArrowDown'); assert.equal(Number(await track('bob').getAttribute('data-track-height')), 336, 'End bound cannot be exceeded');
+    await page.keyboard.press('Home'); assert.equal(Number(await track('bob').getAttribute('data-track-height')), 84);
+    await page.keyboard.press('ArrowUp'); assert.equal(Number(await track('bob').getAttribute('data-track-height')), 84, 'Home bound cannot be exceeded');
+    assert.equal((await exportedModel()).layout.trackHeights['person-bob'], 84);
+  });
+  await check('event-height-and-cross-track-drag-use-resized-lanes', async () => {
+    assert.equal(Math.round((await eventElement('alice_work').boundingBox()).height), 150);
+    await gesture(eventElement('alice_work').getByTestId('resize-height'), 0, -85); assert.equal((await eventState('alice_work')).height, .5); assert.equal(Math.round((await eventElement('alice_work').boundingBox()).height), 75);
+    const original = await eventState('alice_work'), item = await eventElement('alice_work').boundingBox(), lane = await editor().getByTestId('schedule-lane-bob').boundingBox(); assert.ok(item && lane);
+    const x = item.x + item.width / 2, y = item.y + item.height / 2, targetY = lane.y + lane.height / 2;
+    await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x, targetY, { steps: 8 }); await frame();
+    assert.equal(Math.round((await timeline().locator('.schedule-event-ghost').boundingBox()).height), 33, 'Ghost fits the half-height destination lane');
+    await page.mouse.up(); await frame(); const moved = await eventState('alice_work'); assert.equal(moved.roleId, 'bob'); assert.equal(moved.startDate, original.startDate); assert.equal(moved.endDate, original.endDate); assert.equal(Math.round((await eventElement('alice_work').boundingBox()).height), 33);
+    await undo(); assert.deepEqual(await eventState('alice_work'), original);
+    await capture('different-track-and-event-heights');
+  });
+  await check('track-heights-survive-ooschedule-save-and-reopen', async () => {
+    saved = await saveDownload('轨道高度验证.ooschedule'); assert.equal(saved.model.layout.trackHeights['person-alice'], 168); assert.equal(saved.model.layout.trackHeights['person-bob'], 84);
+    await page.getByTestId('document-open-input').setInputFiles(saved.target); await ready(); assert.deepEqual(await exportedModel(), saved.model); assert.equal(Math.round((await track('alice').boundingBox()).height), 168); assert.equal(Math.round((await track('bob').boundingBox()).height), 84);
+  });
+  await check('json-export-keeps-dirty-state-and-import-opens-independent-tab', async () => {
+    await gesture(handle('overall'), 0, 30); const before = await exportedModel(), state = await scheduleState(), identity = await active(), count = await page.locator('.document-tab').count(); assert.equal(identity.dirty, true);
+    const result = await toolbarExport('json', 'full-project-data.json'); assert.deepEqual(JSON.parse(result.bytes.toString('utf8')), before); assert.deepEqual(await scheduleState(), state); assert.deepEqual(await active(), identity);
+    await toolbarImport('imported-project.json', before); await ready(); assert.equal(await page.locator('.document-tab').count(), count + 1); assert.notEqual((await active()).key, identity.key); assert.deepEqual(await exportedModel(), before); assert.match((await active()).name, /\.json$/);
+    await gesture(handle('alice'), 0, 28); const importedIdentity = await active(), importedState = await scheduleState(), importedModel = await exportedModel(); assert.equal(importedIdentity.dirty, true);
+    const exportedAgain = await toolbarExport('json', 'json-import-then-export.json'); assert.deepEqual(JSON.parse(exportedAgain.bytes.toString('utf8')), importedModel); assert.deepEqual(await active(), importedIdentity); assert.deepEqual(await scheduleState(), importedState);
+    const roundTrip = await saveDownload('导入后另存排期.ooschedule', true); assert.deepEqual(roundTrip.model, importedModel); assert.equal((await active()).dirty, false);
+    await page.locator('.document-tab').first().locator('.tab-name').click(); await ready(); assert.equal((await active()).key, originalKey); assert.deepEqual(await exportedModel(), saved.model); assert.equal((await active()).dirty, false);
+  });
+  await check('toolbar-invalid-import-preserves-current-document-and-tab-count', async () => {
+    const before = await exportedModel(), identity = await active(), state = await scheduleState(), count = await page.locator('.document-tab').count();
+    const invalid = structuredClone(before); invalid.layout.trackHeights['person-alice'] = 113;
+    for (const [name, value] of [['broken.json', '{'], ['invalid-height.json', invalid], ['unrelated.json', { type: 'excalidraw', elements: [] }]]) {
+      await toolbarImport(name, value); await page.locator('.error-banner').waitFor(); await ready(); assert.equal(await page.locator('.document-tab').count(), count); assert.deepEqual(await active(), identity); assert.deepEqual(await scheduleState(), state); assert.deepEqual(await exportedModel(), before); await closeError();
+    }
+  });
+  const pngProject = { ...structuredClone(fixture), id: 'png_full_table', title: '整张排期表 PNG 中文验收', calendar: { hideWeekends: false, hideHolidays: false, extraHolidays: [], excludedHolidays: [] }, roles: Array.from({ length: 9 }, (_, i) => ({ id: `png_role_${i}`, name: `成员 ${i + 1}`, role: `工作轨道 ${i + 1}`, color: i === 8 ? '#cc0044' : '#2563eb' })), events: [], layout: { trackHeights: { overall: 140, 'person-png_role_0': 84, 'person-png_role_8': 168, 'event-png_event_8': 196 } } };
+  pngProject.events = pngProject.roles.map((role, i) => ({ id: `png_event_${i}`, roleId: role.id, title: i === 8 ? '离屏末日交付' : `第 ${i + 1} 项交付`, startDate: i === 8 ? '2026-11-11' : '2026-09-21', endDate: i === 8 ? '2026-11-13' : '2026-09-23', height: i === 8 ? .5 : 1, slot: 0, notes: '' }));
+  await check('full-png-includes-offscreen-final-row-and-final-date-columns', async () => {
+    await toolbarImport('complete-png-project.ooschedule', pngProject); await ready(); await holidayIdle(); const before = await exportedModel(), identity = await active(), state = await scheduleState();
+    assert.equal((await shownDates()).includes('2026-11-13'), false, 'Last date is outside virtualized viewport'); const bounds = await scroll().boundingBox(), last = await track('png_role_8').boundingBox(); assert.ok(last.y > bounds.y + bounds.height, 'Last row is below viewport');
+    const result = await toolbarExport('png', 'complete-people.png'), png = PNG.sync.read(result.bytes);
+    assert.equal(png.width, (240 + 54 * 64) * 2); assert.equal(png.height, (208 + 140 + 84 + 7 * 112 + 168) * 2);
+    const x = (24 + 192 + 51 * 64 + 4) * 2, y = (160 + 140 + 84 + 7 * 112 + 9 + 20) * 2;
+    assert.deepEqual(pixel(png, x, y), [204, 0, 68, 255], 'Final offscreen event is rendered in its own color at the expected final row/date');
+    const afterHalf = pixel(png, x + 30, (160 + 140 + 84 + 7 * 112 + 9 + 100) * 2); assert.deepEqual(afterHalf, [255, 255, 255, 255], 'Half-height event does not paint the lower half');
+    assert.deepEqual(await exportedModel(), before); assert.deepEqual(await active(), identity); assert.deepEqual(await scheduleState(), state);
+    report.png = { file: path.basename(result.target), width: png.width, height: png.height, bytes: result.bytes.length, offscreenColorPoint: { x, y } }; await capture('png-source-with-offscreen-content');
+  });
+  await check('global-png-preserves-owner-color-and-global-track-height', async () => {
+    await editor().getByTestId('schedule-mode-global').click(); await frame(); const before = await exportedModel(), state = await scheduleState();
+    const result = await toolbarExport('png', 'complete-global.png'), png = PNG.sync.read(result.bytes);
+    assert.equal(png.width, (240 + 54 * 64) * 2); assert.equal(png.height, (208 + 140 + 8 * 112 + 196) * 2);
+    assert.deepEqual(pixel(png, (24 + 192 + 51 * 64 + 4) * 2, (160 + 140 + 8 * 112 + 9 + 20) * 2), [204, 0, 68, 255]);
+    assert.deepEqual(await exportedModel(), before); assert.deepEqual(await scheduleState(), state); await capture('global-png-source');
+  });
+  await check('tall-overall-track-unpins-in-short-window-and-people-remain-editable', async () => {
+    await editor().getByTestId('schedule-mode-people').click(); await page.setViewportSize({ width: 1360, height: 600 });
+    await scroll().evaluate(element => { element.scrollLeft = 0; element.scrollTop = 0; }); await frame();
+    await handle('overall').focus(); await page.keyboard.press('End'); await frame(); assert.equal(Number(await track(null).getAttribute('data-track-height')), 336); assert.equal(await timeline().getAttribute('data-overall-sticky'), 'false');
+    const headerBefore = await timeline().locator('.schedule-calendar-header').boundingBox(), overallBefore = await track(null).boundingBox();
+    await scroll().evaluate(element => { element.scrollTop = 260; }); await frame();
+    const headerAfter = await timeline().locator('.schedule-calendar-header').boundingBox(), overallAfter = await track(null).boundingBox();
+    assert.ok(Math.abs(headerBefore.y - headerAfter.y) < 2, 'Date header stays pinned'); assert.ok(overallAfter.y < overallBefore.y - 200, 'Oversized overall row scrolls away to expose personnel');
+    const item = await eventElement('png_event_0').boundingBox(), lane = await editor().getByTestId('schedule-lane-png_role_1').boundingBox(), width = Number(await timeline().getAttribute('data-day-width')); assert.ok(item && lane);
+    const start = { x: item.x + item.width / 2, y: item.y + item.height / 2 }, end = { x: start.x + width * 3, y: lane.y + 28 };
+    await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(end.x, end.y, { steps: 8 }); await page.mouse.up(); await frame();
+    const moved = await eventState('png_event_0'); assert.equal(moved.roleId, 'png_role_1'); assert.equal(moved.startDate, '2026-09-24'); assert.equal(moved.endDate, '2026-09-26'); await capture('short-window-tall-overall-person-drag');
+    await gesture(handle('overall'), 0, -224); assert.equal(Number(await track(null).getAttribute('data-track-height')), 112);
+    await page.setViewportSize({ width: 1360, height: 900 }); await frame(); assert.equal(await timeline().getAttribute('data-overall-sticky'), 'true');
+    await capture('overall-restored-and-pinned');
+  });
+  await check('compact-controls-remain-contained-in-small-dark-window', async () => {
+    await page.getByTestId('theme-dark').click(); await page.setViewportSize({ width: 800, height: 640 }); await frame();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true); await viewMenu(); await capture('small-dark-view-menu');
+    const menu = await editor().locator('.schedule-view-panel').boundingBox(); assert.ok(menu.x >= 0 && menu.x + menu.width <= 800); await page.keyboard.press('Escape');
+    await editor().getByTestId('schedule-export-menu').click(); await capture('small-dark-export-menu'); const exportMenu = await editor().locator('.schedule-export-panel').boundingBox(); assert.ok(exportMenu.x >= 0 && exportMenu.x + exportMenu.width <= 800); await page.keyboard.press('Escape');
+    await page.setViewportSize({ width: 1360, height: 900 }); await page.getByTestId('theme-light').click();
+  });
+}
+
 (async () => {
   try {
     report.startedAt = new Date().toISOString(); report.sourcesBefore = hashes();
@@ -227,21 +355,22 @@ async function holidayRefreshChecks() {
       if (abortedHolidayUrls.has(url) && /^Failed to load resource: net::ERR_INTERNET_DISCONNECTED/.test(message.text())) report.expectedNetworkErrors.push({ url, message: message.text() });
       else report.consoleErrors.push(message.text());
     });
-    await page.goto(origin);
+    await page.goto(origin, { timeout: 60000 });
     if (focus === 'holiday-refresh') { await holidayRefreshChecks(); completeReport(); return; }
+    if (focus === 'layout-export') { await layoutExportChecks(); completeReport(); return; }
     if (focus === 'unknown-year') {
       await check('unknown-year-notice-respects-both-weekend-display-states', async () => {
         const value = { format: 'open-office-schedule', version: 1, id: 'unknown_year_toggle', title: '未知年份周末显示验证', startDate: '2035-06-04', endDate: '2035-06-29', calendar: { hideWeekends: true, hideHolidays: true, extraHolidays: ['2035-06-12'], excludedHolidays: [] }, roles: [], events: [{ id: 'unknown_year_event', roleId: null, title: '跨周工作安排', startDate: '2035-06-08', endDate: '2035-06-14', height: 1, slot: 0, notes: '合成测试数据' }] };
         await openFixture('unknown-year-weekends.ooschedule', value);
-        const warning = editor().getByTestId('schedule-holiday-warning');
-        assert.match(await warning.innerText(), /2035 年官方假日(?:尚未收录|数据尚不可用)/); assert.match(await warning.innerText(), /这些年份使用当前周末显示规则和手动(?:设置的)?假日/);
+        await holidayIdle(); const warning = editor().getByTestId('schedule-holiday-status');
+        assert.equal(await editor().getByTestId('schedule-holiday-warning').count(), 0, 'Unknown years use one neutral status instead of a duplicate yellow row'); assert.match(await warning.innerText(), /2035/); assert.match(await warning.innerText(), /本地|周末|手动/);
         const shownDates = async () => timeline().locator('[data-date]').evaluateAll(elements => elements.map(element => element.getAttribute('data-date')));
         const weekend = date => [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay());
         assert.ok((await shownDates()).every(date => !weekend(date))); assert.ok(!(await shownDates()).includes('2035-06-12'), 'A manually configured holiday stays hidden in an unknown year');
-        await editor().getByTestId('schedule-show-weekends').check(); await frame();
+        await viewMenu(); await editor().getByTestId('schedule-show-weekends').check(); await viewMenu(false); await frame();
         const expanded = await exportedModel(); assert.equal(expanded.calendar.hideWeekends, false); assert.deepEqual(expanded.events, value.events); assert.ok((await shownDates()).some(weekend), 'Checking the UI toggle renders real Saturday/Sunday columns');
-        assert.ok(!(await shownDates()).includes('2035-06-12')); assert.match(await warning.innerText(), /这些年份使用当前周末显示规则和手动(?:设置的)?假日/); assert.doesNotMatch(await warning.innerText(), /仅隐藏周末/); await capture('unknown-year-weekends-visible');
-        await editor().getByTestId('schedule-show-weekends').uncheck(); await frame(); assert.deepEqual(await exportedModel(), value); assert.ok((await shownDates()).every(date => !weekend(date))); await capture('unknown-year-weekends-hidden');
+        assert.ok(!(await shownDates()).includes('2035-06-12')); assert.match(await warning.innerText(), /本地|周末|手动/); assert.doesNotMatch(await warning.innerText(), /仅隐藏周末/); await capture('unknown-year-weekends-visible');
+        await viewMenu(); await editor().getByTestId('schedule-show-weekends').uncheck(); await viewMenu(false); await frame(); assert.deepEqual(await exportedModel(), value); assert.ok((await shownDates()).every(date => !weekend(date))); await capture('unknown-year-weekends-hidden');
       });
       await holidayIdle(); completeReport(); return;
     }
@@ -318,11 +447,11 @@ async function holidayRefreshChecks() {
     });
     await check('calendar-display-toggles-never-change-event-dates', async () => {
       const before = (await exportedModel()).events;
-      await editor().getByTestId('schedule-show-weekends').click(); await editor().getByTestId('schedule-show-holidays').click(); await frame();
+      await viewMenu(); await editor().getByTestId('schedule-show-weekends').click(); await editor().getByTestId('schedule-show-holidays').click(); await viewMenu(false); await frame();
       let value = await exportedModel(); assert.equal(value.calendar.hideWeekends, false); assert.equal(value.calendar.hideHolidays, false); assert.deepEqual(value.events, before);
       assert.equal(await timeline().locator('[data-date="2026-09-25"]').count(), 1); assert.equal(await timeline().locator('[data-date="2026-09-26"]').count(), 1);
       await capture('calendar-weekends-and-holidays-visible');
-      await editor().getByTestId('schedule-show-weekends').click(); await editor().getByTestId('schedule-show-holidays').click(); await frame();
+      await viewMenu(); await editor().getByTestId('schedule-show-weekends').click(); await editor().getByTestId('schedule-show-holidays').click(); await viewMenu(false); await frame();
       value = await exportedModel(); assert.equal(value.calendar.hideWeekends, true); assert.equal(value.calendar.hideHolidays, true); assert.deepEqual(value.events, before);
     });
     await check('browser-download-ooschedule-and-exact-json', async () => {
