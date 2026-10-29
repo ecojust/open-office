@@ -1,4 +1,4 @@
-/* Actual seven-editor MCP integration in Chromium.
+/* Actual eight-editor MCP integration in Chromium.
  * Commands travel through the production Rust HTTP server and App dispatcher;
  * independent engine queries, rendered content and exported documents verify the
  * effects. A stdio bridge replaces Tauri IPC only. No editor, document model or
@@ -18,28 +18,33 @@ const { PNG } = require('pngjs');
 
 const root = path.resolve(__dirname, '../..');
 const output = path.resolve(process.env.OFFICE_MCP_OUTPUT || path.join(root, 'test-results/mcp-editors'));
-const kinds = ['word', 'sheet', 'presentation', 'pdf', 'note', 'canvas', 'diagram'];
+const kinds = ['word', 'sheet', 'presentation', 'pdf', 'note', 'canvas', 'diagram', 'schedule'];
 const requestedKinds = process.env.OFFICE_MCP_KINDS?.split(',').map(value => value.trim());
 if (requestedKinds?.some(kind => !kinds.includes(kind))) throw Error('OFFICE_MCP_KINDS contains an unknown editor kind');
 const testedKinds = requestedKinds || kinds;
-const handleNames = { word: 'rustWordHandles', sheet: 'rustSheetHandles', presentation: 'rustPresentationHandles', pdf: 'rustPdfHandles', note: 'noteHandles', canvas: 'workflowHandles', diagram: 'workflowHandles' };
+const handleNames = { word: 'rustWordHandles', sheet: 'rustSheetHandles', presentation: 'rustPresentationHandles', pdf: 'rustPdfHandles', note: 'noteHandles', canvas: 'workflowHandles', diagram: 'workflowHandles', schedule: 'scheduleHandles' };
 const canvasIds = { word: 'office-word-canvas', sheet: 'office-sheet-canvas', presentation: 'office-presentation-canvas', pdf: 'pdf-canvas' };
 const sourceFiles = ['src/App.vue', 'src/style.css', 'src/shared/document.ts', 'src/mcp/config.ts', 'src/mcp/service.ts', 'src/mcp/native.ts', 'src/mcp/document-tools.ts',
   'src/mcp/tool-schema.ts', 'src/mcp/word-tools.ts', 'src/mcp/sheet-tools.ts', 'src/mcp/presentation-tools.ts', 'src/mcp/pdf-tools.ts', 'src/mcp/notes-workflow-tools.ts',
   'src/components/McpSettingsDialog.vue', 'src/components/NotebookEditor.vue', 'src/components/WorkflowEditor.vue',
   'src/notes/mcp.ts', 'src/workflow/mcp.ts',
+  'src/mcp/schedule-tools.ts', 'src/schedule/mcp.ts', 'src/components/ScheduleEditor.vue', 'src/schedule/components/ScheduleTimeline.vue',
+  ...['model', 'session', 'calendar', 'holidays', 'holiday-native', 'layout', 'workload', 'png-export'].map(name => `src/schedule/${name}.ts`),
   'src-tauri/src/mcp.rs', 'src-tauri/src/mcp_commands.rs',
   ...['Word', 'Sheet', 'Presentation', 'Pdf'].map(name => `src/components/Rust${name}Editor.vue`),
   ...['word', 'sheet', 'presentation', 'pdf'].map(name => `src/${name}/rust/client.ts`),
   ...['word', 'sheet', 'presentation', 'pdf'].flatMap(name => [`public/office-${name}/manifest.json`, `public/office-${name}/office${name === 'pdf' ? '_' : '-'}${name}_bg.wasm`])];
 const report = { ok: false, startedAtUtc: new Date().toISOString(),
   testedKinds, completeSuite: testedKinds.length === kinds.length && kinds.every(kind => testedKinds.includes(kind)),
-  runtime: 'Production Rust MCP HTTP server → stdio bridge replacing Tauri IPC → actual Vue App dispatcher and seven real editors in Chromium',
-  checks: [], operations: [], commandCatalogCounts: {}, visualUpdates: [], files: [], screenshots: [], pageErrors: [], consoleErrors: [], externalRequests: [],
+  runtime: 'Production Rust MCP HTTP server → stdio bridge replacing Tauri IPC → actual Vue App dispatcher and eight real editors in Chromium',
+  checks: [], operations: [], commandCatalogCounts: {}, visualUpdates: [], files: [], screenshots: [], pageErrors: [], consoleErrors: [], externalRequests: [], holidayRequests: [],
   limitations: ['The production Rust HTTP server runs on Linux and talks to Chromium through a stdio bridge replacing Tauri IPC; installed macOS/Windows WebViews and native IPC are separate checks.',
     'MCP edits are intentionally programmatic, as external client tools are; browser input is used for the shell, settings and undo controls.',
-    'Screenshots cover browser rendering, not platform-specific installed WebView rendering.'] };
+    'Screenshots cover browser rendering, not platform-specific installed WebView rendering.',
+    'Schedule holiday HTTP responses use deterministic fixtures through the real client/cache path; upstream availability is not asserted.'] };
 let server, browser, page, origin, kind, harness, harnessSequence = 0, rpcSequence = 0, endpoint, protocolSession, token;
+const scheduleHolidayUrl = /^https:\/\/(?:raw\.githubusercontent\.com\/NateScarlet\/holiday-cn\/master\/|cdn\.jsdelivr\.net\/gh\/NateScarlet\/holiday-cn@master\/)(\d{4})\.json$/;
+let scheduleHolidayGate, scheduleHolidayExtra;
 const pendingHarness = new Map();
 fs.mkdirSync(output, { recursive: true });
 const persist = () => fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
@@ -90,7 +95,9 @@ async function mcp(tool, arguments_ = {}) {
   assert.notEqual(response.result?.isError, true, response.result?.content?.map(item => item.text).join('\n'));
   const result = JSON.parse(response.result.content.find(item => item.type === 'text').text);
   const after = await call('inspect');
-  report.operations.push({ kind, tool, before: { documentId: before.documentId, revision: before.revision }, after: { documentId: after.documentId, revision: after.revision }, result });
+  const recordedResult = kind === 'schedule' && tool === 'schedule_export' && result.format === 'png'
+    ? { ...result, base64: undefined, bytes: Buffer.from(result.base64, 'base64').length, sha256: crypto.createHash('sha256').update(Buffer.from(result.base64, 'base64')).digest('hex') } : result;
+  report.operations.push({ kind, tool, before: { documentId: before.documentId, revision: before.revision }, after: { documentId: after.documentId, revision: after.revision }, result: recordedResult });
   persist(); return result;
 }
 async function exported(stem = kind + '-mcp') {
@@ -160,7 +167,7 @@ async function rejectedTool(name, args) {
 }
 async function passiveReadCheck() {
   const before = await call('inspect');
-  const focus = page.getByTestId(canvasIds[kind] || (kind === 'diagram' ? 'diagram-source' : kind === 'note' ? 'notebook-content' : 'canvas-stage')).first();
+  const focus = page.getByTestId(canvasIds[kind] || (kind === 'schedule' ? 'schedule-editor' : kind === 'diagram' ? 'diagram-source' : kind === 'note' ? 'notebook-content' : 'canvas-stage')).first();
   await focus.focus();
   await page.evaluate(() => { window.__mcpFocusBeforeRead = document.activeElement; });
   await mcp('document_inspect');
@@ -298,6 +305,56 @@ editorChecks.diagram = async () => {
   await poll(() => page.getByTestId('diagram-preview').textContent(), value => value.includes('MCP_DIAGRAM_REAL_HTTP'), 'MCP source update redraws actual SVG diagram');
   await historyRoundTrip(() => source.inputValue(), before, after);
   const model = JSON.parse((await exported()).bytes.toString('utf8')); assert.equal(model.source, after);
+};
+
+const scheduleEditor = () => page.getByTestId('schedule-editor').filter({ visible: true });
+const readScheduleFile = async () => JSON.parse(Buffer.from((await call('exportFile')).base64, 'base64').toString('utf8'));
+async function finishScheduleCreation(title = 'MCP 排期') {
+  const dialog = page.getByTestId('schedule-project-dialog'); await dialog.waitFor();
+  await dialog.getByTestId('schedule-project-title').fill(title);
+  await dialog.getByTestId('schedule-project-start').fill('2026-06-01');
+  await dialog.getByTestId('schedule-project-end').fill('2026-07-10');
+  await dialog.getByTestId('schedule-project-confirm').click(); await dialog.waitFor({ state: 'hidden' });
+  await scheduleHolidayIdle();
+}
+async function scheduleHolidayIdle() {
+  await poll(() => scheduleEditor().getByTestId('schedule-holiday-status').innerText(), text => !text.includes('正在'), 'Schedule holiday refresh settles');
+  await frame();
+}
+editorChecks.schedule = async () => {
+  const before = await readScheduleFile(), initial = await call('inspect');
+  const added = await mcp('schedule_edit', { operations: [
+    { op: 'project.update', patch: { title: 'MCP 交付排期', dailyRate: 1200.35 } },
+    { op: 'role.add', role: { id: 'alice', name: '小明', role: '研发', color: '#2563eb' } },
+    { op: 'role.add', role: { id: 'bob', name: '小红', role: '设计', color: '#7c3aed' } },
+    { op: 'role.add', role: { id: 'idle', name: '待安排人员', role: '测试' } },
+    { op: 'event.add', event: { id: 'plan', roleId: null, title: '整体交付计划', startDate: '2026-06-01', endDate: '2026-07-10' } },
+    { op: 'event.add', event: { id: 'full', roleId: 'alice', title: 'MCP_FULL_研发', startDate: '2026-06-01', endDate: '2026-06-03', notes: '原始备注' } },
+    { op: 'event.add', event: { id: 'half', roleId: 'alice', title: 'MCP_HALF_下午', startDate: '2026-06-04', endDate: '2026-06-04', height: .5, slot: 1 } },
+    { op: 'event.add', event: { id: 'design', roleId: 'bob', title: 'MCP_DESIGN', startDate: '2026-06-08', endDate: '2026-06-09' } },
+  ] });
+  assert.equal(added.revision, initial.revision + 1, 'Atomic multi-operation edit creates one history entry');
+  assert.equal(added.created.length, 7);
+  const after = await readScheduleFile(); assert.equal(after.roles.length, 3); assert.equal(after.events.length, 4);
+  assert.deepEqual((await mcp('schedule_read')).project, after, 'MCP read matches independently serialized editor data');
+  assert.equal(await scheduleEditor().getByTestId('schedule-event-half').getAttribute('data-slot'), '1');
+  assert.equal(await scheduleEditor().getByTestId('schedule-event-half').getAttribute('data-height'), '0.5');
+  assert.match(await scheduleEditor().getByTestId('schedule-workload-total-alice').getAttribute('title'), /3\.5 人天.*\n.*¥4,201\.23/);
+  assert.match(await scheduleEditor().getByTestId('schedule-total-workload').innerText(), /5\.5 人天/);
+  assert.equal(await scheduleEditor().getByTestId('schedule-workload-idle').count(), 0, 'Zero workload has no empty capsule list');
+  assert.equal(await scheduleEditor().locator('[data-month="2026-07"]').count(), 0, 'Zero-work month is hidden');
+  const capsule = scheduleEditor().getByTestId('schedule-workload-alice').locator('[data-month="2026-06"]');
+  assert.ok(parseFloat(await capsule.evaluate(element => getComputedStyle(element, '::before').width)) > 0, 'Actual progress capsule has visible fill');
+  await historyRoundTrip(readScheduleFile, before, after);
+  const work = await mcp('schedule_read_workload');
+  assert.equal(work.totalDays, 5.5); assert.equal(work.budget, 6601.93); assert.equal(work.currency, 'CNY');
+  assert.deepEqual(work.people.map(person => [person.roleId, person.totalDays, person.budget]), [['alice', 3.5, 4201.23], ['bob', 2, 2400.7], ['idle', 0, 0]]);
+  const selected = await mcp('schedule_read_workload', { roleId: 'alice', basis: 'month' });
+  assert.equal(selected.people.length, 1); assert.equal(selected.totalDays, 3.5); assert.equal(selected.projectTotalDays, 5.5); assert.equal(selected.projectBudget, 6601.93);
+  const calendar = await mcp('schedule_read_calendar');
+  assert.ok(calendar.workingDates.includes('2026-06-01')); assert.ok(!calendar.workingDates.includes('2026-06-06'));
+  assert.ok(calendar.weeks.length > 1);
+  pass('schedule: real HTTP atomic creation, actual DOM half-day/capsule/budget, calendar and filtered workload match independently saved model');
 };
 
 const editingChecks = {};
@@ -512,6 +569,144 @@ editingChecks.diagram = async () => {
   assert.equal(saved.diagramStyle, 'blueprint'); assert.equal(saved.source, source);
 };
 
+editingChecks.schedule = async () => {
+  let before = await readScheduleFile();
+  await mcp('schedule_edit', { operations: [
+    { op: 'role.update', roleId: 'alice', patch: { name: '小明（负责人）', role: '开发', color: '#009977' } },
+    { op: 'role.reorder', roleIds: ['bob', 'alice', 'idle'] },
+    { op: 'event.update', eventId: 'full', patch: { title: 'MCP_UPDATED_研发', startDate: '2026-06-02', endDate: '2026-06-05', notes: '已修改备注' } },
+    { op: 'event.update', eventId: 'half', patch: { startDate: '2026-06-08', endDate: '2026-06-09', slot: 1 } },
+    { op: 'track.height', key: 'person-alice', height: 168 },
+    { op: 'track.height', key: 'event-full', height: 140 },
+    { op: 'event.copy', eventId: 'full', id: 'copied', patch: { roleId: 'bob', startDate: '2026-06-10', endDate: '2026-06-15' } },
+  ] });
+  const updated = await readScheduleFile();
+  assert.deepEqual(updated.roles.map(role => role.id), ['bob', 'alice', 'idle']);
+  assert.equal(updated.events.find(event => event.id === 'copied').notes, '已修改备注');
+  assert.equal(updated.layout.trackHeights['event-copied'], 140, 'Copy preserves source event row height');
+  assert.equal(await scheduleEditor().getByTestId('schedule-track-alice').getAttribute('data-track-height'), '168');
+  assert.deepEqual(await scheduleEditor().locator('.schedule-track[data-track-key^="person-"]').evaluateAll(elements => elements.map(element => element.dataset.roleId)), ['bob', 'alice', 'idle']);
+  await historyRoundTrip(readScheduleFile, before, updated);
+  before = await readScheduleFile();
+  for (const operations of [
+    [{ op: 'project.update', patch: { title: 'MUST_NOT_COMMIT' } }, { op: 'event.copy', eventId: 'full', id: 'overlap' }],
+    [{ op: 'role.add', role: { id: 'rollback', name: 'MUST_NOT_ADD' } }, { op: 'event.update', eventId: 'missing', patch: { title: 'missing' } }],
+    [{ op: 'role.delete', roleId: 'alice' }],
+    [{ op: 'role.reorder', roleIds: ['alice', 'alice', 'idle'] }],
+    [{ op: 'track.height', key: 'person-alice', height: 85 }],
+    [{ op: 'project.update', patch: { dailyRate: 1.005 } }],
+    [{ op: 'event.update', eventId: 'half', patch: { height: 1, slot: 1 } }],
+  ]) { await rejectedTool('schedule_edit', { operations }); assert.deepEqual(await readScheduleFile(), before); }
+  await rejectedTool('schedule_edit', { operations: [{ op: 'file.open', path: '/tmp/must-not-open' }] });
+  await rejectedTool('schedule_read_workload', { roleId: 'missing' });
+  pass('schedule: real role/event update, cross-person copy, ordering and snapped heights; conflicting/invalid atomic batches preserve every field');
+
+  const viewBefore = await mcp('schedule_read'), stateBefore = await call('inspect');
+  const viewed = await mcp('schedule_set_view', { mode: 'global', dayWidth: 96, selectedEventId: 'copied' });
+  assert.deepEqual(viewed.view, { mode: 'global', dayWidth: 96, selectedEventId: 'copied' });
+  assert.equal(await scheduleEditor().getByTestId('schedule-mode-global').getAttribute('aria-pressed'), 'true');
+  assert.equal(await scheduleEditor().getByTestId('schedule-timeline').getAttribute('data-day-width'), '96');
+  assert.equal(await scheduleEditor().getByTestId('schedule-event-copied').getAttribute('aria-pressed'), 'true');
+  await rejectedTool('schedule_set_view', { mode: 'people', selectedEventId: 'missing' });
+  assert.deepEqual((await mcp('schedule_read')).view, viewed.view, 'Bad selection cannot partially switch mode');
+  assert.deepEqual(await readScheduleFile(), viewBefore.project); assert.deepEqual(await call('inspect'), stateBefore);
+  await capture('schedule-mcp-event-view');
+  await mcp('schedule_set_view', { mode: 'people', dayWidth: 48, selectedEventId: null });
+
+  const workloadBefore = await mcp('schedule_read_workload');
+  await mcp('schedule_edit', { operations: [{ op: 'calendar.update', patch: { hideWeekends: false, hideHolidays: false, weekNumbering: 'project', extraHolidays: ['2026-06-03'], excludedHolidays: [] } }] });
+  const calendar = await mcp('schedule_read_calendar');
+  assert.ok(calendar.days.some(day => day.date === '2026-06-06'));
+  assert.ok(!calendar.workingDates.includes('2026-06-03')); assert.ok(!calendar.workingDates.includes('2026-06-06'));
+  assert.equal(calendar.weeks[0].label, 'W1');
+  assert.equal((await mcp('schedule_read_workload')).totalDays, workloadBefore.totalDays - 1);
+  assert.equal(await scheduleEditor().locator('.schedule-week-header').getAttribute('data-week-numbering'), 'project');
+  await mcp('document_undo');
+  assert.deepEqual(await mcp('schedule_read_workload'), workloadBefore);
+  const beforeRefresh = await call('inspect'), refreshFile = await readScheduleFile(), requestsBefore = report.holidayRequests.length;
+  const refreshed = await mcp('schedule_refresh_holidays'); await scheduleHolidayIdle();
+  assert.equal(typeof refreshed.status, 'string'); assert.ok(refreshed.calendar.workingDates.length > 0);
+  assert.ok(report.holidayRequests.length > requestsBefore, 'Refresh uses the real holiday HTTP client');
+  assert.deepEqual(await call('inspect'), beforeRefresh); assert.deepEqual(await readScheduleFile(), refreshFile);
+  let releaseHoliday;
+  scheduleHolidayGate = new Promise(resolve => { releaseHoliday = resolve; }); scheduleHolidayExtra = '2026-06-02';
+  const slowState = await call('inspect'), slowStart = Date.now();
+  try {
+    const slow = await mcp('schedule_refresh_holidays');
+    assert.equal(slow.refreshing, true, 'Slow upstream refresh returns before the MCP deadline');
+    assert.ok(Date.now() - slowStart < 15000);
+    assert.deepEqual(await call('inspect'), slowState);
+  } finally { scheduleHolidayGate = undefined; releaseHoliday(); }
+  await scheduleHolidayIdle();
+  assert.ok(!(await mcp('schedule_read_calendar')).workingDates.includes('2026-06-02'), 'Background holiday response eventually updates the actual calendar');
+  assert.deepEqual(await readScheduleFile(), refreshFile); assert.deepEqual(await call('inspect'), slowState);
+  scheduleHolidayExtra = undefined; await mcp('schedule_refresh_holidays'); await scheduleHolidayIdle();
+  pass('schedule: mode, selection and zoom update actual view without history; calendar/workload rules, holiday refresh and undo remain consistent');
+
+  const deleteBefore = await readScheduleFile();
+  await mcp('schedule_edit', { operations: [{ op: 'event.delete', eventId: 'copied' }, { op: 'role.delete', roleId: 'idle' }, { op: 'track.reset', key: 'person-alice' }] });
+  const deleted = await readScheduleFile();
+  assert.ok(!deleted.events.some(event => event.id === 'copied')); assert.ok(!deleted.roles.some(role => role.id === 'idle'));
+  assert.equal(deleted.layout.trackHeights['event-copied'], undefined); assert.equal(deleted.layout.trackHeights['person-alice'], undefined);
+  await historyRoundTrip(readScheduleFile, deleteBefore, deleted); await mcp('document_undo');
+  await mcp('schedule_edit', { operations: [{ op: 'track.reset' }, { op: 'event.update', eventId: 'half', patch: { height: 1 } }, { op: 'project.update', patch: { dailyRate: null } }] });
+  const reset = await readScheduleFile(); assert.equal(reset.layout, undefined); assert.equal(reset.dailyRate, undefined);
+  assert.equal(reset.events.find(event => event.id === 'half').slot, 0); assert.equal((await mcp('schedule_read_workload')).budget, null);
+  await mcp('document_undo'); assert.deepEqual(await readScheduleFile(), deleteBefore);
+  await mcp('schedule_edit', { operations: [{ op: 'project.update', patch: { dailyRate: 0 } }] });
+  assert.equal((await mcp('schedule_read_workload')).budget, 0); await mcp('document_undo');
+
+  const original = await readScheduleFile();
+  const imported = structuredClone(original); imported.id = 'foreign_project'; imported.title = 'MCP_IMPORTED'; delete imported.dailyRate; delete imported.layout;
+  imported.events = [imported.events.find(event => event.id === 'half')];
+  await mcp('schedule_import', { project: imported });
+  const replaced = await readScheduleFile(); assert.equal(replaced.id, original.id); assert.equal(replaced.title, 'MCP_IMPORTED');
+  assert.equal(replaced.dailyRate, undefined); assert.equal(replaced.layout, undefined); assert.equal(replaced.events.length, 1);
+  await historyRoundTrip(readScheduleFile, original, replaced); await mcp('document_undo');
+  const invalid = structuredClone(original); invalid.events[0].startDate = '2026-02-30';
+  await rejectedTool('schedule_import', { project: invalid }); assert.deepEqual(await readScheduleFile(), original);
+  pass('schedule: event/person deletion cleans layouts; full-day conversion, cleared/zero rate, full reset and imported replacement are undoable');
+
+  const modalBefore = await readScheduleFile();
+  await scheduleEditor().getByTestId('schedule-settings').click();
+  await rejectedTool('schedule_edit', { operations: [{ op: 'project.update', patch: { title: 'BUSY_MUST_NOT_EDIT' } }] });
+  await scheduleEditor().getByTestId('schedule-project-cancel').click();
+  assert.deepEqual(await readScheduleFile(), modalBefore);
+  const exportState = await call('inspect'), json = await mcp('schedule_export', { format: 'json' });
+  assert.equal(json.format, 'json'); assert.equal(json.mimeType, 'application/json'); assert.deepEqual(json.project, modalBefore);
+  for (const mode of ['people', 'global']) {
+    const image = await mcp('schedule_export', { format: 'png', mode, dayWidth: 48 });
+    assert.equal(image.mimeType, 'image/png'); assert.equal(image.encoding, 'base64');
+    const bytes = Buffer.from(image.base64, 'base64'), decoded = PNG.sync.read(bytes);
+    assert.equal(decoded.width, image.width); assert.equal(decoded.height, image.height);
+    assert.ok(image.width > 1000 && image.height > 300 && image.width <= 16384 && image.width * image.height <= 24_000_000);
+    assert.ok(Buffer.byteLength(JSON.stringify(image)) <= 7 * 1024 * 1024);
+    let colored = 0; for (let index = 0; index < decoded.data.length; index += 4) if (Math.max(decoded.data[index], decoded.data[index + 1], decoded.data[index + 2]) - Math.min(decoded.data[index], decoded.data[index + 1], decoded.data[index + 2]) > 30) colored++;
+    assert.ok(colored > 1000, 'PNG contains actual colored schedule data');
+    const file = path.join(output, `schedule-mcp-export-${mode}.png`); fs.writeFileSync(file, bytes);
+    report.files.push({ path: path.relative(root, file), bytes: bytes.length, sha256: sha(file), width: image.width, height: image.height });
+  }
+  assert.deepEqual(await call('inspect'), exportState); assert.deepEqual(await readScheduleFile(), modalBefore);
+  await rejectedTool('schedule_export', { format: 'pdf' });
+  pass('schedule: project modal rejects concurrent edits; actual JSON and independently decoded PNG exports preserve state and obey payload bounds');
+
+  await page.getByTestId('shell-save-as').click(); await page.getByTestId('save-format-name').fill('MCP排期保存');
+  const pending = page.waitForEvent('download'); await page.getByTestId('save-format-confirm').click(); const download = await pending;
+  const savedPath = path.join(output, download.suggestedFilename()); assert.match(savedPath, /\.ooschedule$/);
+  await download.saveAs(savedPath); assert.equal(await download.failure(), null); await ready();
+  assert.equal((await active()).dirty, false); assert.deepEqual(JSON.parse(fs.readFileSync(savedPath, 'utf8')), modalBefore);
+  await page.getByTestId('document-open-input').setInputFiles(savedPath); await ready(); await scheduleHolidayIdle();
+  assert.deepEqual(await readScheduleFile(), modalBefore);
+  // Browser imports have no native fileId and the shell requests a save target;
+  // the actual schedule session still starts from an unchanged saved baseline.
+  assert.equal((await call('inspect')).dirty, false); assert.equal((await call('inspect')).revision, 0);
+  assert.equal((await harnessRequest({ op: 'status' })).running, false, 'Opening the saved schedule stops its previous document service');
+  await startMcp();
+  await mcp('schedule_edit', { operations: [{ op: 'event.update', eventId: 'half', patch: { notes: '保存重开后仍可编辑' } }] });
+  assert.equal((await readScheduleFile()).events.find(event => event.id === 'half').notes, '保存重开后仍可编辑');
+  pass('schedule: actual browser file download/save receipt and reopen preserve all edits, prices and layouts, with a fresh document-scoped service');
+};
+
 async function freePort() {
   const listener = net.createServer();
   await new Promise((resolve, reject) => { listener.once('error', reject); listener.listen(0, '127.0.0.1', resolve); });
@@ -600,13 +795,22 @@ async function launchSurface(surface) {
   browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || '/usr/bin/chromium',
     args: ['--no-sandbox', '--disable-dev-shm-usage', '--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'zh-CN', colorScheme: 'light', acceptDownloads: true });
-  context.on('request', request => { const url = request.url(); if (/^https?:/.test(url) && new URL(url).origin !== origin) report.externalRequests.push({ kind, url }); });
+  if (kind === 'schedule') await context.route(scheduleHolidayUrl, async route => {
+    const url = route.request().url(), year = Number(scheduleHolidayUrl.exec(url)[1]);
+    report.holidayRequests.push({ year, url, held: !!scheduleHolidayGate });
+    if (scheduleHolidayGate) await scheduleHolidayGate;
+    const days = [{ date: `${year}-01-01`, name: '测试元旦', isOffDay: true }];
+    if (year === 2026 && scheduleHolidayExtra) days.push({ date: scheduleHolidayExtra, name: '测试追加假日', isOffDay: true });
+    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ year, papers: ['https://example.test/holiday-announcement'], days }) });
+  });
+  context.on('request', request => { const url = request.url(); if (/^https?:/.test(url) && new URL(url).origin !== origin && !(kind === 'schedule' && scheduleHolidayUrl.test(url))) report.externalRequests.push({ kind, url }); });
   page = await context.newPage(); page.setDefaultTimeout(30000);
   await page.exposeFunction('__mcpHarness', harnessRequest);
   page.on('pageerror', error => report.pageErrors.push({ kind, message: error.message }));
   page.on('console', event => { if (event.type() === 'error') report.consoleErrors.push({ kind, message: event.text() }); });
   await page.goto(origin); await page.getByTestId('global-toolbar').waitFor();
   await page.locator('.create-card.' + kind).click(); await ready();
+  if (kind === 'schedule') await finishScheduleCreation();
 }
 async function rehearseInstalledHelper() {
   phase('installed-helper-rehearsal-with-stdio-ipc');
@@ -666,6 +870,34 @@ async function rehearseInstalledHelper() {
   report.rehearsalBytes=Buffer.byteLength(JSON.stringify(result));
   pass('Installed helper seven-editor arguments, history, actual state and independently parsed exports work over real Rust HTTP; native IPC remains for CI');
 }
+async function scheduleLifecycleCheck() {
+  const previous = await active(), original = await readScheduleFile(), oldSession = protocolSession;
+  await page.evaluate(async () => {
+    const { mcpTransport } = await import('/src/mcp/native.ts'), original = mcpTransport.claim;
+    const gate = new Promise(resolve => { window.__releaseMcpClaim = resolve; }); window.__mcpClaimHeld = false;
+    mcpTransport.claim = async (...args) => { window.__mcpClaimHeld = true; await gate; return original(...args); };
+    window.__restoreMcpClaim = () => { mcpTransport.claim = original; window.__releaseMcpClaim(); };
+  });
+  const pending = rpc('tools/call', { name: 'schedule_edit', arguments: { operations: [{ op: 'project.update', patch: { title: 'INFLIGHT_MUST_NOT_EDIT' } }] } })
+    .then(value => ({ value }), error => ({ error: error.message }));
+  await poll(() => page.evaluate(() => window.__mcpClaimHeld), Boolean, 'Schedule HTTP edit waits for document claim');
+  await page.getByTestId('shell-new').click(); await page.getByTestId('shell-new-schedule').click(); await ready(); await finishScheduleCreation('独立新排期');
+  assert.notEqual((await active()).key, previous.key);
+  await poll(() => harnessRequest({ op: 'status' }), status => !status.running, 'Schedule switch revokes old TCP service');
+  await page.evaluate(() => window.__restoreMcpClaim());
+  const cancelled = await pending; assert.equal(cancelled.error, undefined); assert.ok(cancelled.value?.error || cancelled.value?.result?.isError);
+  const next = await readScheduleFile(), state = await call('inspect'); assert.equal(next.title, '独立新排期'); assert.deepEqual(next.events, []);
+  await startMcp();
+  const stale = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${token}`, 'mcp-session-id': oldSession, 'mcp-protocol-version': '2025-06-18' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcSequence, method: 'tools/call', params: { name: 'schedule_edit', arguments: { operations: [{ op: 'project.update', patch: { title: 'STALE_MUST_NOT_EDIT' } }] } } }), signal: AbortSignal.timeout(3000) });
+  assert.equal(stale.status, 404); assert.deepEqual(await call('inspect'), state); assert.deepEqual(await readScheduleFile(), next);
+  // Select the exact previously open tab; same saved filenames can appear twice.
+  const previousIndex = await page.evaluate(key => document.querySelector('#app').__vue_app__._instance.setupState.tabs.findIndex(tab => tab.key === key), previous.key);
+  assert.ok(previousIndex >= 0); await page.locator('.document-tab .tab-name').nth(previousIndex).click();
+  await ready(); assert.deepEqual(await readScheduleFile(), original);
+  assert.equal((await harnessRequest({ op: 'status' })).running, false);
+  pass('schedule: actual navigation cancels in-flight edits, rejects the old protocol session and preserves both document models');
+}
 async function main() {
   try {
     report.sourceHashesBefore = sourceHashes();
@@ -697,7 +929,24 @@ async function main() {
         await poll(() => harnessRequest({ op: 'status' }), value => !value.running, 'Stop button closes actual read-only HTTP server');
         pass('Actual Rust HTTP initialize/list and read-only tool enforcement; Running reflects listener, stop button closes it');
       }
-      await startMcp();
+      if (surface === 'schedule') {
+        const before = await call('inspect'), tools = await startMcp(false);
+        assert.ok(tools.every(tool => tool.annotations.readOnlyHint === true));
+        assert.ok(tools.some(tool => tool.name === 'schedule_read') && tools.some(tool => tool.name === 'schedule_export'));
+        for (const [name, arguments_] of [['schedule_edit', { operations: [{ op: 'project.update', patch: { title: 'MUST_NOT_EDIT' } }] }], ['schedule_import', { project: await readScheduleFile() }], ['document_undo', {}]]) {
+          const denied = await rpc('tools/call', { name, arguments: arguments_ }); assert.ok(denied.error || denied.result?.isError);
+        }
+        assert.deepEqual(await call('inspect'), before);
+        await mcp('schedule_set_view', { dayWidth: 64 });
+        await page.getByTestId('document-mcp-toggle').click();
+        await poll(() => harnessRequest({ op: 'status' }), status => !status.running, 'Schedule stop button closes read-only service');
+        pass('schedule: actual read-only HTTP catalog permits queries and view changes but rejects edits, imports and undo');
+      }
+      const tools = await startMcp();
+      if (surface === 'schedule') {
+        assert.deepEqual(tools.map(tool => tool.name).sort(), ['document_inspect', 'document_undo', 'document_redo', 'schedule_read', 'schedule_read_calendar', 'schedule_read_workload', 'schedule_edit', 'schedule_set_view', 'schedule_import', 'schedule_export', 'schedule_refresh_holidays'].sort());
+        report.commandCatalogCounts.schedule = tools.length;
+      }
       const inspected = await mcp('document_inspect'); assert.equal(inspected.documentId, (await call('inspect')).documentId);
       assert.equal(typeof editorChecks[surface], 'function', 'Acceptance scenario is defined for ' + surface);
       await editorChecks[surface]();
@@ -752,6 +1001,7 @@ async function main() {
         assert.ok(!(await call('inspect')).text.includes('INFLIGHT_MUST_NOT_EDIT_EITHER_DOCUMENT'));
         pass('Real document switch cancels an in-flight HTTP edit and invalidates the old client session; returning preserves original edits');
       }
+      if (surface === 'schedule') await scheduleLifecycleCheck();
       await page.locator('.home-tab').click();
       await poll(() => harnessRequest({ op: 'status' }), value => !value.running, kind + ' home navigation stops real TCP service');
       await assert.rejects(() => fetch(endpoint, { signal: AbortSignal.timeout(3000) }), 'Closed MCP port refuses further connections');

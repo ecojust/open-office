@@ -434,6 +434,7 @@ fn validate_document(document: &McpDocument) -> Result<(), String> {
             "note",
             "canvas",
             "diagram",
+            "schedule",
         ]
         .contains(&document.kind.as_str())
     {
@@ -1206,6 +1207,54 @@ mod tests {
         assert!(service
             .complete(&session, &event.request_id, result)
             .is_err());
+    }
+
+    #[test]
+    fn schedule_tools_use_current_document_permissions_and_real_http_dispatch() {
+        let (_, service) = service();
+        let mut config = config();
+        let schedule = McpDocument {
+            id: "schedule-project".into(),
+            kind: "schedule".into(),
+            title: "项目排期.ooschedule".into(),
+        };
+        let read = json!({"name":"schedule_read", "inputSchema":{"type":"object"}, "annotations":{"readOnlyHint":true}});
+        let edit = json!({"name":"schedule_edit", "inputSchema":{"type":"object"}, "annotations":{"readOnlyHint":false}});
+        assert!(service
+            .start(config.clone(), schedule.clone(), vec![read.clone(), edit.clone()], Arc::new(|_| Ok(())))
+            .is_err());
+
+        for allow_edits in [false, true] {
+            config.allow_edits = allow_edits;
+            let catalog = if allow_edits { vec![read.clone(), edit.clone()] } else { vec![read.clone()] };
+            let (sender, events) = mpsc::channel();
+            let status = service.start(config.clone(), schedule.clone(), catalog.clone(),
+                Arc::new(move |event| sender.send(event).map_err(|_| "closed".into()))).unwrap();
+            let session = status.session_id.unwrap();
+            assert_eq!(status.document_id.as_deref(), Some("schedule-project"));
+            assert_eq!(rpc(&config, json!({"jsonrpc":"2.0","id":1,"method":"tools/list"}))["result"]["tools"], json!(catalog));
+            if !allow_edits {
+                assert_eq!(rpc(&config, json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"schedule_edit","arguments":{"operations":[]}}}))["error"]["code"], -32602);
+                assert!(events.try_recv().is_err());
+            }
+            assert_eq!(request(&config, "POST", "{}", "", "bad-token").0, 401);
+            let client_config = config.clone();
+            let name = if allow_edits { "schedule_edit" } else { "schedule_read" };
+            let arguments = if allow_edits { json!({"operations":[{"op":"project.update","patch":{"dailyRate":1234.56}}]}) } else { json!({}) };
+            let expected_arguments = arguments.clone();
+            let client = thread::spawn(move || rpc(&client_config, json!({"jsonrpc":"2.0","id":"schedule-call","method":"tools/call","params":{"name":name,"arguments":arguments}})));
+            let event = events.recv_timeout(Duration::from_secs(2)).unwrap();
+            assert_eq!(event.document_id, schedule.id);
+            assert_eq!(event.tool_name, name);
+            assert_eq!(event.arguments, expected_arguments);
+            assert!(!service.claim("stale-session", &event.request_id).unwrap());
+            assert!(service.claim(&session, &event.request_id).unwrap());
+            let result = json!({"content":[{"type":"text","text":"{\"totalDays\":3.5,\"dailyRate\":1234.56}"}]});
+            service.complete(&session, &event.request_id, result.clone()).unwrap();
+            assert_eq!(client.join().unwrap()["result"], result);
+            service.stop(Some(&session)).unwrap();
+            assert!(!service.claim(&session, &event.request_id).unwrap());
+        }
     }
 
     #[test]

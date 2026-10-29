@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { catalogForKind, executeDocumentTool, summarizeMcpValue } from '../src/mcp/document-tools.ts'
 
-const kinds = ['word','sheet','presentation','pdf','note','canvas','diagram']
+const kinds = ['word','sheet','presentation','pdf','note','canvas','diagram','schedule']
 function harness() {
  const calls = []
  let stopped = false
@@ -84,9 +84,40 @@ test('inspection removes binary images and local paths, rejects oversized output
 })
 
 
-test('schedule does not advertise or dispatch unimplemented MCP tools',async()=>{
+test('schedule advertises its operations and dispatches only validated tools for the active document',async()=>{
  const h=harness()
- assert.deepEqual(catalogForKind('schedule'),[])
- await assert.rejects(executeDocumentTool('schedule',h.handle,'document_inspect',{},h.guard),/暂不支持/)
- assert.equal(h.calls.length,0)
+ const catalog = catalogForKind('schedule')
+ for (const name of ['document_inspect', 'document_undo', 'document_redo', 'schedule_read', 'schedule_edit', 'schedule_read_calendar', 'schedule_read_workload', 'schedule_set_view', 'schedule_import', 'schedule_export']) assert.ok(catalog.some(tool => tool.name === name), name)
+ await executeDocumentTool('schedule',h.handle,'document_inspect',{},h.guard)
+ await executeDocumentTool('schedule',h.handle,'schedule_read',{},h.guard)
+ assert.deepEqual(h.calls.map(call => call.name), ['document_inspect', 'schedule_read'])
+ await assert.rejects(executeDocumentTool('schedule',h.handle,'word_read',{},h.guard))
+ await assert.rejects(executeDocumentTool('schedule',h.handle,'schedule_edit',{operations:[]},h.guard))
+ await assert.rejects(executeDocumentTool('schedule',h.handle,'schedule_read',{path:'/private/project.ooschedule'},h.guard))
+ assert.equal(h.calls.length,2)
+ h.stop()
+ await assert.rejects(executeDocumentTool('schedule',h.handle,'schedule_read',{},h.guard), /stopped/)
+})
+
+test('explicit schedule PNG export preserves only a bounded generated PNG; ordinary inspection still strips binary data', async () => {
+ const h = harness()
+ const png = { format:'png', mimeType:'image/png', encoding:'base64', base64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jhS8AAAAASUVORK5CYII=', width:1, height:1, scale:2 }
+ h.handle.mcpExecute = async () => ({ ...png, path:'/private/project.png', ui:{secret:true}, additional:'not part of the export' })
+ assert.deepEqual(await executeDocumentTool('schedule', h.handle, 'schedule_export', {format:'png'}, h.guard), png)
+ const inspected = await executeDocumentTool('schedule', h.handle, 'schedule_read', {}, h.guard)
+ assert.equal('base64' in inspected, false); assert.equal('path' in inspected, false); assert.equal('ui' in inspected, false)
+ for (const invalid of [
+  {...png,mimeType:'text/html'}, {...png,encoding:'url'}, {...png,base64:'https://example.com/image.png'},
+  {...png,width:2}, {...png,height:0}, {...png,width:16385}, {...png,width:16000,height:16000},
+  {...png,scale:Infinity}, {...png,scale:0}, {...png,scale:3},
+  {...png,base64:'not-a-png'.repeat(100)}, {...png,base64:png.base64.replace('iVBOR', 'aVBOR')},
+  {...png,base64:png.base64.slice(0,-2)+'J='},
+ ]) {
+  h.handle.mcpExecute = async () => invalid
+  await assert.rejects(executeDocumentTool('schedule',h.handle,'schedule_export',{format:'png'},h.guard), /PNG/)
+ }
+ h.handle.mcpExecute = async () => ({...png,base64:'A'.repeat(7 * 1024 * 1024 + 1)})
+ await assert.rejects(executeDocumentTool('schedule',h.handle,'schedule_export',{format:'png'},h.guard), /7 MiB/)
+ h.handle.mcpExecute = async () => { h.stop(); return png }
+ await assert.rejects(executeDocumentTool('schedule',h.handle,'schedule_export',{format:'png'},h.guard), /stopped/)
 })

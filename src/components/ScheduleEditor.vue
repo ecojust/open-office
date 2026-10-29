@@ -2,10 +2,12 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import Icon from './Icon.vue'
 import ScheduleTimeline from '../schedule/components/ScheduleTimeline.vue'
-import { encodeSchedule, scheduleId, type ScheduleEvent, type ScheduleProject, type ScheduleRole } from '../schedule/model'
+import { encodeSchedule, scheduleId, validateSchedule, MAX_SCHEDULE_DAILY_RATE, type ScheduleEvent, type ScheduleProject, type ScheduleRole } from '../schedule/model'
 import { pruneTrackHeights, SCHEDULE_TRACK_HEIGHT } from '../schedule/layout'
 import { exportSchedulePng } from '../schedule/png-export'
 import { buildCalendar, projectedSpan } from '../schedule/calendar'
+import { buildMonthlyWorkload, workloadTotalTitle } from '../schedule/workload'
+import { editSchedule, importSchedule, readScheduleCalendar, readScheduleWorkload, type ScheduleEditOperation } from '../schedule/mcp'
 import type { HolidayYears } from '../schedule/holidays'
 import { getHolidayClient, flushHolidayCache } from '../schedule/holiday-native'
 import { ScheduleSession } from '../schedule/session'
@@ -21,7 +23,7 @@ useDialogFocus(dialogElement)
 const model = shallowRef<ScheduleProject>(), mode = ref<'people'|'global'>('people'), selectedId = ref(''), dayWidth = ref(64)
 const loading = ref(true), problem = ref(''), gestureBusy = ref(false), canUndo = ref(false), canRedo = ref(false)
 const dialog = ref<'project'|'roles'|'calendar'|'event'|'delete'|null>(null), dialogError = ref(''), creatingProject = ref(false)
-const projectDraft = ref({ title: '', startDate: '', endDate: '' }), rolesDraft = ref<ScheduleRole[]>([])
+const projectDraft = ref({ title: '', startDate: '', endDate: '', dailyRate: '' as number | string }), rolesDraft = ref<ScheduleRole[]>([])
 const holidayDraft = ref({ extra: '', excluded: '' }), eventDraft = ref<ScheduleEvent>(), editingEvent = ref(false)
 const palette = ['#4376d4', '#2f9b7f', '#9b66c9', '#de8d37', '#c46180', '#438fba']
 const holidayYears = shallowRef<HolidayYears>({}), holidayLoading = ref(false), holidayMessage = ref('')
@@ -30,6 +32,7 @@ let holidayTimer: ReturnType<typeof setInterval> | undefined
 let session: ScheduleSession | undefined, disposed = false, generation = 0
 let lastExport: { generation: number; base64: string } | undefined
 const calendar = computed(() => model.value ? buildCalendar(model.value, holidayYears.value) : { days: [], weeks: [], hiddenCount: 0, unknownHolidayYears: [] })
+const workload = computed(() => model.value ? buildMonthlyWorkload(model.value, holidayYears.value) : undefined)
 const projectYears = computed(() => {
  if (!model.value) return []
  const first = Number(model.value.startDate.slice(0, 4)), last = Number(model.value.endDate.slice(0, 4))
@@ -106,7 +109,7 @@ function openDialog(kind: NonNullable<typeof dialog.value>) { closeMenus(); dial
 function settings(create = false) {
  if (!model.value || (!create && !controlsReady.value)) return
  creatingProject.value = create
- projectDraft.value = { title: model.value.title, startDate: model.value.startDate, endDate: model.value.endDate }
+ projectDraft.value = { title: model.value.title, startDate: model.value.startDate, endDate: model.value.endDate, dailyRate: model.value.dailyRate ?? '' }
  openDialog('project')
 }
 function manageRoles() {
@@ -142,7 +145,11 @@ function submitDialog() {
  if (!session || !editable.value) return
  try {
   const kind = dialog.value
-  if (kind === 'project') session.change(copy => { copy.title = projectDraft.value.title.trim(); copy.startDate = projectDraft.value.startDate; copy.endDate = projectDraft.value.endDate })
+  if (kind === 'project') session.change(copy => {
+   copy.title = projectDraft.value.title.trim(); copy.startDate = projectDraft.value.startDate; copy.endDate = projectDraft.value.endDate
+   if (projectDraft.value.dailyRate === '') delete copy.dailyRate
+   else copy.dailyRate = Number(projectDraft.value.dailyRate)
+  })
   if (kind === 'roles') session.change(copy => { copy.roles = rolesDraft.value.map(role => ({ ...role, name: role.name.trim(), role: role.role.trim() })); pruneTrackHeights(copy) })
   if (kind === 'calendar') {
    const dates = (value: string) => [...new Set(value.split(/[\s,，;；]+/).filter(Boolean))].sort()
@@ -238,6 +245,58 @@ function keydown(event: KeyboardEvent) {
  }
 }
 function focus() { root.value?.focus({ preventScroll: true }) }
+async function mcpExecute(name: string, args: Record<string, unknown>, assertCurrent: () => void): Promise<unknown> {
+ const owner = generation
+ const guard = () => {
+  assertCurrent()
+  if (disposed || owner !== generation || !props.active) throw Error('MCP 文档已切换，请重新开启服务。')
+ }
+ guard(); requireReady()
+ const current = session!
+ const view = () => ({ mode: mode.value, dayWidth: dayWidth.value, selectedEventId: selectedId.value || null })
+ if (name === 'document_inspect') return { ...current.inspect(), view: view() }
+ if (name === 'schedule_read') return { project: structuredClone(current.model), view: view(), state: current.inspect() }
+ if (name === 'schedule_read_calendar') return readScheduleCalendar(current.model, holidayYears.value)
+ if (name === 'schedule_read_workload') return readScheduleWorkload(current.model, holidayYears.value, args)
+ if (name === 'schedule_export') {
+  if (args.format === 'json') return { format: 'json', mimeType: 'application/json', project: validateSchedule(current.model) }
+  const revision = current.revision
+  const result = await exportSchedulePng(current.model, { mode: (args.mode as 'people' | 'global' | undefined) ?? mode.value, dayWidth: (args.dayWidth as number | undefined) ?? dayWidth.value, holidayYears: holidayYears.value })
+  guard()
+  if (revision !== current.revision) throw Error('导出期间排期已变化，请重试。')
+  return { format: 'png', mimeType: 'image/png', encoding: 'base64', base64: bytesToBase64(result.bytes), width: result.width, height: result.height, scale: result.scale }
+ }
+ if (name === 'schedule_refresh_holidays') {
+  // A cold multi-year refresh can exceed the MCP request deadline on slow
+  // networks. Continue it normally in the background and return current data.
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try { await Promise.race([refreshHolidays(true), new Promise<void>(resolve => { timer = setTimeout(resolve, 8000) })]) }
+  finally { clearTimeout(timer) }
+  guard(); requireReady()
+  return { refreshing: holidayLoading.value, status: holidayStatus.value, calendar: readScheduleCalendar(current.model, holidayYears.value) }
+ }
+ if (name === 'schedule_set_view') {
+  // Check the whole view update before changing any selection or display state.
+  if (args.selectedEventId !== undefined && args.selectedEventId !== null && !current.model.events.some(event => event.id === args.selectedEventId)) throw Error('事件不存在。')
+  guard()
+  if (args.mode !== undefined) mode.value = args.mode as 'people' | 'global'
+  if (args.dayWidth !== undefined) dayWidth.value = args.dayWidth as number
+  if (args.selectedEventId !== undefined) selectedId.value = (args.selectedEventId as string | null) ?? ''
+  closeMenus(); await nextTick(); guard()
+  if (args.selectedEventId) root.value?.querySelector<HTMLElement>(`[data-event-id="${selectedId.value}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  return { ...current.inspect(), view: view() }
+ }
+ let result: ReturnType<typeof editSchedule> | undefined
+ guard()
+ if (name === 'schedule_edit') current.change(copy => { result = editSchedule(copy, args.operations as ScheduleEditOperation[]) })
+ else if (name === 'schedule_import') current.change(copy => importSchedule(copy, args.project))
+ else if (name === 'document_undo') current.undo()
+ else if (name === 'document_redo') current.redo()
+ else throw Error('计划排期不支持此 MCP 工具。')
+ // Use the live session and history so local edits, autosave, and MCP agree.
+ accept(); problem.value = ''; closeMenus(); await nextTick(); guard()
+ return { ...current.inspect(), view: view(), ...(result ? { created: result.created } : {}) }
+}
 watch(() => props.document.id, async () => {
  const current = ++generation
  timeline.value?.cancelGesture(); loading.value = true; problem.value = ''; dialog.value = null; selectedId.value = ''; lastExport = undefined
@@ -254,15 +313,15 @@ watch(() => props.active, active => { if (!active) { timeline.value?.cancelGestu
 watch(controlsReady, ready => { if (!ready) closeMenus() })
 onMounted(() => { holidayTimer = setInterval(() => { if (props.active) void refreshHolidays() }, 24 * 60 * 60 * 1000); window.addEventListener('pointerdown', outsideMenu) })
 onBeforeUnmount(() => { disposed = true; generation++; holidayRequest++; clearInterval(holidayTimer); window.removeEventListener('pointerdown', outsideMenu); timeline.value?.cancelGesture(); session = undefined })
-defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, inspect, syncRevision: inspect, canBackgroundExport, undo, redo, focus })
+defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, inspect, syncRevision: inspect, canBackgroundExport, undo, redo, focus })
 </script>
 
 <template>
  <section ref="root" class="schedule-editor" data-testid="schedule-editor" :data-document-id="document.id" :aria-label="model?.title || '计划排期'" tabindex="-1" @keydown="keydown">
   <div v-if="loading" class="schedule-loading">正在打开排期…</div>
-  <template v-else-if="model">
+  <template v-else-if="model && workload">
    <header class="schedule-heading" data-testid="schedule-toolbar" role="toolbar" aria-label="排期工具">
-    <div class="schedule-project-name"><span class="schedule-heading-icon"><Icon name="schedule" :size="23"/></span><div><h1>{{model.title}}</h1><p>{{model.startDate}} — {{model.endDate}}<span> · {{calendar.days.length}} 个可见日</span></p></div></div>
+    <div class="schedule-project-name"><span class="schedule-heading-icon"><Icon name="schedule" :size="23"/></span><div><h1>{{model.title}}</h1><p><span class="schedule-project-dates" :title="`${model.startDate} — ${model.endDate}`">{{model.startDate}} — {{model.endDate}}</span><span data-testid="schedule-total-workload" tabindex="0" :title="workloadTotalTitle(workload.totalDays, model.dailyRate)" :aria-label="workloadTotalTitle(workload.totalDays, model.dailyRate)">总工时 {{workload.totalDays}} 人天</span></p></div></div>
     <div class="schedule-modes" role="group" aria-label="排期视图"><button data-testid="schedule-mode-people" :aria-pressed="mode==='people'" :disabled="!controlsReady" @click="mode='people'">人员</button><button data-testid="schedule-mode-global" :aria-pressed="mode==='global'" :disabled="!controlsReady" @click="mode='global'">事件</button></div>
     <div class="schedule-history"><button data-testid="schedule-undo" title="撤销" aria-label="撤销排期修改" :disabled="!controlsReady || !canUndo" @click="undo().catch(report)"><Icon name="undo" :size="16"/></button><button data-testid="schedule-redo" title="重做" aria-label="重做排期修改" :disabled="!controlsReady || !canRedo" @click="redo().catch(report)"><Icon name="redo" :size="16"/></button></div>
     <details class="schedule-menu" @toggle="toggleMenu"><summary data-testid="schedule-view-menu" :aria-disabled="!controlsReady" @click="!controlsReady && $event.preventDefault()">视图 <Icon name="chevron-down" :size="12"/></summary><div class="schedule-menu-panel schedule-view-panel">
@@ -279,7 +338,7 @@ defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, inspect
    <p class="schedule-holiday-status" role="status" data-testid="schedule-holiday-status" :title="holidayStatus">{{holidayStatus}}</p>
    <p v-if="problem" class="schedule-error" role="alert" data-testid="schedule-error">{{problem}}<button aria-label="关闭提示" @click="problem=''">×</button></p>
    <div v-if="!model.roles.length && mode==='people'" class="schedule-empty-roles"><div><strong>为项目添加人员</strong><p>填写姓名、职能和颜色，每人拥有一条专属轨道。上方整体计划始终固定。</p></div><button :disabled="!controlsReady" @click="manageRoles()">添加第一位人员</button></div>
-   <ScheduleTimeline ref="timeline" :project="model" :holiday-years="holidayYears" :mode="mode" :active="active" :disabled="!editable || !!dialog" :selected-id="selectedId" :day-width="dayWidth" @select="selectedId=$event" @edit="openEvent($event)" @create="openEvent(undefined,$event)" @change="updateEvent" @copy="copyEvent" @track-height="updateTrackHeight" @zoom="zoom" @error="report" @gesture="gesture" @delete="askDelete"/>
+   <ScheduleTimeline ref="timeline" :project="model" :workload="workload" :holiday-years="holidayYears" :mode="mode" :active="active" :disabled="!editable || !!dialog" :selected-id="selectedId" :day-width="dayWidth" @select="selectedId=$event" @edit="openEvent($event)" @create="openEvent(undefined,$event)" @change="updateEvent" @copy="copyEvent" @track-height="updateTrackHeight" @zoom="zoom" @error="report" @gesture="gesture" @delete="askDelete"/>
    <div class="schedule-selection" aria-live="polite">
     <template v-if="selected"><span class="schedule-selection-dot" :style="{background: model.roles.find(role=>role.id===selected?.roleId)?.color || 'var(--ui-accent)'}"/><strong>{{selected.title}}</strong><span>{{eventOwner(selected)}} · {{selected.startDate}} — {{selected.endDate}} · {{selected.height===1?'全天':selected.slot===1?'下午':'上午'}} · {{selected.height*100}}%</span><button data-testid="schedule-edit-event" :disabled="!controlsReady" @click="openEvent(selected.id)">编辑</button><button class="schedule-danger" data-testid="schedule-delete-event" :disabled="!controlsReady" @click="askDelete(selected.id)">删除</button></template>
     <template v-else><span>{{mode==='people'?'双击空白轨道添加事件，拖动可更换人员。':'所有人员的事件按开始日期汇总；双击事件编辑负责人。'}}</span><span class="schedule-selection-tail">{{overall}} 个整体计划 · {{model.events.length-overall}} 个人员事件</span></template>
@@ -292,7 +351,7 @@ defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, inspect
   <div v-if="dialog" class="schedule-modal-backdrop" @keydown.esc.stop.prevent="cancelDialog">
    <form ref="dialogElement" class="schedule-dialog" :class="{'schedule-dialog-wide':dialog==='roles'}" role="dialog" aria-modal="true" :aria-label="dialogTitle" :data-testid="`schedule-${dialog}-dialog`" @submit.prevent="submitDialog">
     <header><div><span class="schedule-eyebrow">项目排期</span><h2>{{dialogTitle}}</h2></div><button type="button" aria-label="取消并关闭" @click="cancelDialog"><Icon name="close" :size="18"/></button></header>
-    <template v-if="dialog==='project'"><label>项目名称<input v-model="projectDraft.title" data-testid="schedule-project-title" required maxlength="200" autocomplete="off" placeholder="例如：新产品上线计划"></label><div class="schedule-form-columns"><label>开始日期<input v-model="projectDraft.startDate" data-testid="schedule-project-start" type="date" required></label><label>结束日期<input v-model="projectDraft.endDate" data-testid="schedule-project-end" type="date" required></label></div><p class="schedule-form-hint">周号可在「视图」中选择按年或按项目，两种模式均从周一开周。缩小范围时，已有事件必须仍在项目日期内。</p></template>
+    <template v-if="dialog==='project'"><label>项目名称<input v-model="projectDraft.title" data-testid="schedule-project-title" required maxlength="200" autocomplete="off" placeholder="例如：新产品上线计划"></label><div class="schedule-form-columns"><label>开始日期<input v-model="projectDraft.startDate" data-testid="schedule-project-start" type="date" required></label><label>结束日期<input v-model="projectDraft.endDate" data-testid="schedule-project-end" type="date" required></label></div><label>工时单价（元 / 人天）<input v-model.number="projectDraft.dailyRate" data-testid="schedule-project-daily-rate" type="number" min="0" :max="MAX_SCHEDULE_DAILY_RATE" step="0.01" inputmode="decimal" aria-describedby="schedule-rate-hint" placeholder="可选，例如 1000"></label><p id="schedule-rate-hint" class="schedule-form-hint">所有人员使用同一单价；总预算 = 已排总人天 × 单价。悬停人员总工时可查看预算，留空表示暂未设置。</p><p class="schedule-form-hint">周号可在「视图」中选择按年或按项目，两种模式均从周一开周。缩小范围时，已有事件必须仍在项目日期内。</p></template>
     <template v-if="dialog==='roles'"><p class="schedule-form-hint">每位人员一条轨道，事件沿用人员颜色。角色可以填写产品、设计、开发等职能。</p><div class="schedule-role-labels"><span>名称</span><span>角色 / 职能</span><span>颜色</span><span/></div><div class="schedule-role-list"><div v-for="role in rolesDraft" :key="role.id" class="schedule-role-draft" :data-role-draft="role.id"><input v-model="role.name" data-testid="role-name" aria-label="人员名称" required maxlength="100" placeholder="姓名"><input v-model="role.role" data-testid="role-job" aria-label="角色职能" maxlength="100" placeholder="例如：设计"><input v-model="role.color" data-testid="role-color" aria-label="人员颜色" type="color"><button type="button" :aria-label="`移除 ${role.name || '人员'}`" @click="removeRole(role.id)"><Icon name="close" :size="15"/></button></div></div><p v-if="!rolesDraft.length" class="schedule-form-hint">还没有人员，点击下方按钮添加。</p><button type="button" data-testid="schedule-role-add" class="schedule-add-role" @click="addRole"><Icon name="plus" :size="15"/>添加人员</button></template>
     <template v-if="dialog==='calendar'"><p class="schedule-form-hint">自动获取中国大陆官方放假安排，每 24 小时检查更新；断网使用缓存或内置数据。周末开关独立生效，调休上班的周六、周日也默认隐藏。</p><label>新增假日<textarea v-model="holidayDraft.extra" data-testid="schedule-extra-holidays" rows="4" placeholder="每行一个日期，例如 2027-01-01"/></label><label>排除已收录的假日<textarea v-model="holidayDraft.excluded" data-testid="schedule-excluded-holidays" rows="3" placeholder="需要显示为普通日期的官方假日，每行一个"/></label><p class="schedule-form-hint">日期格式为 YYYY-MM-DD。手动设置优先于自动数据；更新和显示开关不改写事件的起止日期。</p></template>
     <template v-if="dialog==='event' && eventDraft"><label>事件名称<input v-model="eventDraft.title" data-testid="schedule-event-title" required maxlength="200" autocomplete="off" placeholder="例如：完成交互设计"></label><label>负责人 / 轨道<select v-model="eventDraft.roleId" data-testid="schedule-event-role"><option :value="null">整体计划（固定轨道）</option><option v-for="role in model?.roles" :key="role.id" :value="role.id">{{role.name}}{{role.role?' · '+role.role:''}}</option></select></label><div class="schedule-form-columns"><label>开始日期<input v-model="eventDraft.startDate" data-testid="schedule-event-start" type="date" :min="model?.startDate" :max="model?.endDate" required></label><label>结束日期<input v-model="eventDraft.endDate" data-testid="schedule-event-end" type="date" :min="model?.startDate" :max="model?.endDate" required></label></div><label>显示高度<select v-model.number="eventDraft.height" data-testid="schedule-event-height" @change="eventDraft.height===1 && (eventDraft.slot=0)"><option :value="1">100% · 全天</option><option :value="0.5">50% · 上午或下午</option></select></label><label v-if="eventDraft.height===0.5">时段<select v-model.number="eventDraft.slot" data-testid="schedule-event-slot"><option :value="0">上午 · 轨道上半部</option><option :value="1">下午 · 轨道下半部</option></select></label><label>备注<textarea v-model="eventDraft.notes" data-testid="schedule-event-notes" rows="3" maxlength="20000" placeholder="可选，记录交付要求或协作事项"/></label><p class="schedule-form-hint">起止日期包含当天。半高事件可选择上午或下午；同一人员同一天仍只允许一个事件。</p></template>
@@ -307,7 +366,7 @@ defineExpose({ prepareDeactivate, exportFile, markSaved, discardChanges, inspect
 <style scoped>
 .schedule-editor{height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;background:var(--ui-surface);color:var(--ui-text);font-family:var(--ui-font);position:relative;overflow:hidden;outline:none}
 .schedule-heading{padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--ui-line);flex-wrap:wrap;flex-shrink:0;position:relative;z-index:20}
-.schedule-project-name{display:flex;align-items:center;gap:8px;min-width:180px;flex:1 1 200px;max-width:360px}.schedule-project-name>div{min-width:0}.schedule-project-name h1{font-size:15px;line-height:1.4;margin:0 0 2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.schedule-project-name p{color:var(--ui-muted);font-size:10px;margin:0;white-space:nowrap}.schedule-project-name p>span{display:none}.schedule-heading-icon{display:grid;place-items:center;width:32px;height:32px;flex:none;background:var(--ui-accent-soft);color:var(--ui-accent);border-radius:6px}
+.schedule-project-name{display:flex;align-items:center;gap:8px;min-width:180px;flex:1 1 290px;max-width:390px}.schedule-project-name>div{min-width:0}.schedule-project-name h1{font-size:15px;line-height:1.4;margin:0 0 2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.schedule-project-name p{display:flex;gap:8px;color:var(--ui-muted);font-size:10px;margin:0;white-space:nowrap}.schedule-project-dates{min-width:0;overflow:hidden;text-overflow:ellipsis}.schedule-project-name [data-testid=schedule-total-workload]{flex:none;font-variant-numeric:tabular-nums;cursor:help;outline-offset:1px}.schedule-heading-icon{display:grid;place-items:center;width:32px;height:32px;flex:none;background:var(--ui-accent-soft);color:var(--ui-accent);border-radius:6px}
 .schedule-editor button,.schedule-menu>summary{min-height:30px;padding:5px 8px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;font-size:12px;line-height:18px}.schedule-editor button:hover:not(:disabled),.schedule-menu>summary:hover{background:var(--ui-surface-muted)}.schedule-editor button.schedule-primary{background:var(--ui-accent);color:var(--ui-on-accent);padding:5px 9px}.schedule-actions,.schedule-history,.schedule-data-actions{display:flex;align-items:center;gap:3px;flex:none}.schedule-data-actions{margin-left:auto;border-left:1px solid var(--ui-line);padding-left:6px}.schedule-count{font-size:10px;border-radius:4px;padding:0 4px;background:var(--ui-surface-muted);color:var(--ui-muted)}
 .schedule-modes{display:flex;background:var(--ui-surface-muted);padding:2px;border-radius:6px;border:1px solid var(--ui-line);flex:none}.schedule-modes button{min-height:26px;padding:3px 8px}.schedule-modes button[aria-pressed=true]{background:var(--ui-surface);box-shadow:0 1px 3px #00000012;color:var(--ui-accent);font-weight:600}
 .schedule-menu{position:relative;flex:none}.schedule-menu>summary{list-style:none;cursor:pointer;user-select:none}.schedule-menu>summary::-webkit-details-marker{display:none}.schedule-menu>summary[aria-disabled=true]{opacity:.45;cursor:default}.schedule-menu[open]>summary{background:var(--ui-surface-muted)}.schedule-menu-panel{position:absolute;top:calc(100% + 6px);right:0;min-width:190px;display:flex;flex-direction:column;gap:5px;padding:8px;border:1px solid var(--ui-line-strong);border-radius:8px;background:var(--ui-surface);box-shadow:0 8px 26px #0002;z-index:35}.schedule-view-panel{left:auto;right:0}.schedule-menu-panel>button{justify-content:flex-start}.schedule-check{display:flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap;min-height:30px;padding:4px 8px}.schedule-check input{margin:0}.schedule-week-numbering,.schedule-zoom{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 8px;font-size:12px;color:var(--ui-muted);border-bottom:1px solid var(--ui-line);padding-bottom:9px;margin-bottom:3px}.schedule-week-numbering select,.schedule-zoom select{height:28px;background:var(--ui-surface);color:var(--ui-text);border:1px solid var(--ui-line);border-radius:4px}.schedule-zoom-hint{font-size:10px;color:var(--ui-muted);padding:0 8px 5px}.schedule-export-panel{min-width:250px}.schedule-export-panel>button{display:flex;flex-direction:column;align-items:flex-start;padding:8px;gap:2px}.schedule-export-panel small{font-size:10px;color:var(--ui-muted);font-weight:400}

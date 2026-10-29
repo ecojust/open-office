@@ -281,7 +281,8 @@ a { color: var(--ui-accent); }
 .dirty-dot { display: inline-block; width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--ui-warning); }
 .separator { width: 1px; height: 18px; flex: none; margin: 0 4px; background: var(--ui-line); }
 .save-state { display: flex; align-items: center; gap: 7px; padding: 0 6px; white-space: nowrap; font-size: var(--ui-font-small); color: var(--ui-muted); }
-.editor-content { flex: 1; min-height: 0; min-width: 0; position: relative; overflow: hidden; }
+/* Keep editor sticky headers and menus below shell menus and dialogs. */
+.editor-content { flex: 1; min-height: 0; min-width: 0; position: relative; overflow: hidden; isolation: isolate; }
 .editor-content > section { height: 100%; min-height: 0; }
 .editor-status { display: flex; justify-content: space-between; align-items: center; gap: 16px; height: 28px; flex: none; padding: 0 16px; border-top: 1px solid var(--ui-line); background: var(--ui-surface); font-size: var(--ui-font-small); color: var(--ui-muted); }
 .editor-status span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

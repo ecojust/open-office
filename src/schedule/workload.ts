@@ -5,11 +5,27 @@ import { SCHEDULE_MAX_DAYS, type ScheduleEvent, type ScheduleProject } from './m
 export type WorkloadBasis = 'project' | 'month'
 export type MonthlyWorkloadCell = { scheduledDays: number; availableDays: number; percentage: number | null }
 export const formatWorkloadPercentage = (value: number | null): string => value === null ? '—' : `${Number(value.toFixed(1))}%`
+export const workloadProgress = (value: number | null): number => value !== null && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0
+
+/** Sum person-days before rounding: half days can produce half a cent. */
+export function calculateWorkloadBudget(days: number, dailyRate?: number): number | null {
+ if (dailyRate === undefined || !Number.isFinite(dailyRate) || dailyRate < 0 || !Number.isFinite(days) || days < 0) return null
+ const cents = Math.round(dailyRate * 100), totalCents = Math.round(cents * days)
+ return Number.isSafeInteger(totalCents) ? totalCents / 100 : null
+}
+export function formatWorkloadBudget(value: number | null): string {
+ return value === null || !Number.isFinite(value) ? '未设置' : `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+export function workloadTotalTitle(days: number, dailyRate?: number): string {
+ const total = calculateWorkloadBudget(days, dailyRate)
+ return `总工时：${days} 人天\n${total === null ? '尚未设置工时价格，请在「项目设置」中填写。' : `总预算：${days} 人天 × ${formatWorkloadBudget(dailyRate!)} / 人天 = ${formatWorkloadBudget(total)}`}`
+}
 export type MonthlyWorkload = {
  /** Bounds describe the denominator's actual interval, inclusive at both ends. */
  months: { key: string; startDate: string; endDate: string; workingDays: number }[]
- people: { roleId: string; name: string; role: string; color: string; months: MonthlyWorkloadCell[] }[]
+ people: { roleId: string; name: string; role: string; color: string; totalDays: number; months: MonthlyWorkloadCell[] }[]
  team: MonthlyWorkloadCell[]
+ totalDays: number
 }
 
 function percentage(scheduledDays: number, availableDays: number): MonthlyWorkloadCell {
@@ -60,7 +76,7 @@ export function buildMonthlyWorkload(project: ScheduleProject, holidayYears: Hol
   months.push({ key, startDate, endDate, workingDays: days.length })
   scheduledDates.push(days.filter(date => date >= project.startDate && date <= project.endDate))
  }
- const people = project.roles.map(role => ({ roleId: role.id, name: role.name, role: role.role, color: role.color,
+ const people = project.roles.map(role => ({ roleId: role.id, name: role.name, role: role.role, color: role.color, totalDays: 0,
   months: months.map(month => percentage(0, month.workingDays)),
  }))
  const peopleById = new Map(people.map(person => [person.roleId, person]))
@@ -76,7 +92,10 @@ export function buildMonthlyWorkload(project: ScheduleProject, holidayYears: Hol
    person.months[index].scheduledDays += eventWorkloadDays(event, dates)
   }
  }
- for (const person of people) person.months = person.months.map(cell => percentage(cell.scheduledDays, cell.availableDays))
+ for (const person of people) {
+  person.months = person.months.map(cell => percentage(cell.scheduledDays, cell.availableDays))
+  person.totalDays = person.months.reduce((sum, cell) => sum + cell.scheduledDays, 0)
+ }
  const team = months.map((month, index) => percentage(people.reduce((sum, person) => sum + person.months[index].scheduledDays, 0), month.workingDays * people.length))
- return { months, people, team }
+ return { months, people, team, totalDays: people.reduce((sum, person) => sum + person.totalDays, 0) }
 }

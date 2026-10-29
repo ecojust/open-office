@@ -10,6 +10,8 @@ import { zipSync, strToU8 } from 'fflate'
 import { createId } from '../src/shared/id.ts'
 import * as workflowFiles from '../src/workflow/core/files.ts'
 import * as scheduleModel from '../src/schedule/model.ts'
+import * as scheduleLayout from '../src/schedule/layout.ts'
+import * as schedulePng from '../src/schedule/png-export.ts'
 
 // Run the real App.vue setup logic with Vue's real reactivity. Editors and native
 // file dialogs are controlled doubles: these are shell-state regressions, not
@@ -20,7 +22,7 @@ const utilities = await readFile(new URL('../src/shared/document.ts', import.met
 const dialogFocus = await readFile(new URL('../src/shared/dialog-focus.ts', import.meta.url), 'utf8')
 const appearanceSource = await readFile(new URL('../src/shared/appearance.ts', import.meta.url), 'utf8')
 const autosaveSource = await readFile(new URL('../src/shared/autosave.ts', import.meta.url), 'utf8')
-const mcpSources = Object.fromEntries(await Promise.all(['config', 'service', 'document-tools', 'tool-schema', 'word-tools', 'sheet-tools', 'presentation-tools', 'pdf-tools', 'notes-workflow-tools'].map(async name =>
+const mcpSources = Object.fromEntries(await Promise.all(['config', 'service', 'document-tools', 'tool-schema', 'word-tools', 'sheet-tools', 'presentation-tools', 'pdf-tools', 'notes-workflow-tools', 'schedule-tools'].map(async name =>
   [`./mcp/${name}`, await readFile(new URL(`../src/mcp/${name}.ts`, import.meta.url), 'utf8')]
 )))
 const names = 'tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,rustPdfEntries,rustPdfHandles,setRustPdfHandle,rustWordEntries,rustWordHandles,setRustWordHandle,rustSheetEntries,rustSheetHandles,setRustSheetHandle,rustPresentationEntries,rustPresentationHandles,setRustPresentationHandle,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,browserFile,saveActive,closeTab,closeAllTabs,closeWindow,resolveClose,removeTab,removeTabs,task,editorTransaction,nativeTransactionalEditor,appearance,currentDocument,globalActionsBlocked,documentActionsDisabled,globalFileAction,globalNewDocument,keydown,rustEditorFileAction,previewSlides'
@@ -156,6 +158,11 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     if (!source) throw Error(`Unexpected MCP module import ${name}`)
     const result = compile(source, dependency => {
       if (dependency === '../shared/document') return helpers
+      // Keep the real schedule schemas and shared constraints in this shell
+      // harness; these modules do not require a rendered canvas at import time.
+      if (dependency === '../schedule/model.ts') return scheduleModel
+      if (dependency === '../schedule/layout.ts') return scheduleLayout
+      if (dependency === '../schedule/png-export.ts') return schedulePng
       if (dependency.startsWith('./')) return mcpModule(dependency.replace(/^\.\//, './mcp/'))
       throw Error(`Unexpected MCP dependency ${dependency}`)
     }, browser)
@@ -2074,7 +2081,7 @@ for (const replaceHandle of [false,true]) test(`switching rejects a ${replaceHan
   } finally {h.unmount()}
 })
 
-for (const kind of ['word', 'sheet', 'presentation', 'pdf', 'note', 'canvas', 'diagram']) test(`${kind} shell starts MCP only for its ready active document and advertises its own tools`, async () => {
+for (const kind of ['word', 'sheet', 'presentation', 'pdf', 'note', 'canvas', 'diagram', 'schedule']) test(`${kind} shell starts MCP only for its ready active document and advertises its own tools`, async () => {
   const h = shell(), tab = h.tab(`mcp-${kind}`, { kind })
   try {
     h.active(tab)
@@ -2463,8 +2470,14 @@ test('schedule autosave uses the selected file and retains changes made after th
     assert.equal(request.documentId,'selected-plan');assert.equal(request.extension,'ooschedule');assert.equal(request.saveAs,false)
     assert.equal(tab.dirty,true,'Acknowledging the earlier snapshot leaves subsequent changes dirty')
     await h.state.toggleMcp()
-    assert.equal(h.mcpCalls.some(call=>call[0]==='start'),false,'Unimplemented MCP entry is not active for schedules')
+    const start=h.mcpCalls.find(call=>call[0]==='start')
+    assert.equal(start[2].kind,'schedule');assert.equal(start[2].id,tab.key)
+    assert.ok(start[3].some(tool=>tool.name==='schedule_read'))
+    assert.ok(start[3].some(tool=>tool.name==='schedule_edit'))
+    assert.equal(h.state.mcpState.value.documentId,tab.key)
+    assert.equal(tab.dirty,true,'Starting MCP does not acknowledge or discard pending schedule edits')
     await h.state.removeTabs([tab],true)
+    await settleShell();assert.equal(h.state.mcpState.value.phase,'stopped')
     assert.equal(h.state.scheduleHandles.size,0);assert.equal(h.state.scheduleEntries.value.length,0)
   } finally {h.unmount()}
 })

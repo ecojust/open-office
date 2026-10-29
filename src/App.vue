@@ -308,7 +308,6 @@ async function saveMcpSettings(config:McpConfig) {
 async function toggleMcp() {
   try {
     if (mcpState.value.phase !== 'stopped' && mcpState.value.phase !== 'error') { await mcpService.stop(); return }
-    if (currentDocument.value?.document.kind === 'schedule') return
     if (!native.isTauri()) { openMcpSettings(); return }
     if (documentActionsDisabled.value || !currentDocument.value) return
     if (!mcpConfigReady.value) await readMcpSettings()
@@ -1438,7 +1437,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <button class="new-tab" @click="home=true" aria-label="新建文档" title="新建文档"><Icon name="plus" :size="18"/></button>
         <button class="close-all-tabs" data-testid="tabs-close-all" :disabled="globalActionsBlocked||!tabs.length" @click="closeAllTabs" title="批量关闭所有文档"><Icon name="close" :size="15"/><span>全部关闭</span></button>
       </div>
-      <div v-if="currentDocument&&currentDocument.document.kind!=='schedule'" class="document-mcp-bar" role="toolbar" :aria-label="kindNames[currentDocument.document.kind]+' MCP 服务'">
+      <div v-if="currentDocument" class="document-mcp-bar" role="toolbar" :aria-label="kindNames[currentDocument.document.kind]+' MCP 服务'">
         <span class="document-mcp-kind"><Icon :name="icons[currentDocument.document.kind]" :size="14"/>{{kindNames[currentDocument.document.kind]}}<small>当前文档</small></span>
         <span v-if="mcpState.phase==='running'" class="document-mcp-detail" role="status">{{mcpWorking?'正在处理…':'修改实时显示 · 切换文档后关闭'}}</span>
         <button v-if="mcpConfigReady" class="document-mcp-permission" data-testid="document-mcp-permission" :disabled="globalActionsBlocked" aria-label="MCP 读写权限设置" :title="mcpConfig.allowEdits?'已开放当前文档编辑，点击调整权限':'当前仅提供读取工具；点击设置中开启编辑权限'" @click="openMcpSettings">{{mcpConfig.allowEdits?'允许编辑':'只读'}}<Icon name="chevron-down" :size="12"/></button>

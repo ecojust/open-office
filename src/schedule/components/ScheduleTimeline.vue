@@ -5,11 +5,12 @@ import type { HolidayYears } from '../holidays.ts'
 import { buildCalendar, moveScheduledEvent, projectedSpan, resizeScheduledEvent } from '../calendar.ts'
 import { clampDayWidth, wheelDayWidth, zoomAnchorScroll } from '../zoom.ts'
 import { eventPointerAction, eventResizeInsets, type EventPointerAction } from '../interaction.ts'
-import { buildMonthlyWorkload, buildWorkloadDates, eventWorkloadDays, formatWorkloadPercentage as workloadPercent, type MonthlyWorkloadCell } from '../workload.ts'
+import { buildWorkloadDates, eventWorkloadDays, formatWorkloadPercentage as workloadPercent, workloadProgress, workloadTotalTitle, type MonthlyWorkload, type MonthlyWorkloadCell } from '../workload.ts'
 import { buildTimelineRows, getTrackHeight, getEventVerticalLayout, snapTrackHeight, SCHEDULE_LABEL_WIDTH as LABEL_WIDTH, SCHEDULE_HEADER_HEIGHT as HEADER_HEIGHT, SCHEDULE_EVENT_PADDING as PADDING, SCHEDULE_TRACK_HEIGHT as TRACK_HEIGHT, SCHEDULE_TRACK_STEP as TRACK_STEP, SCHEDULE_TRACK_MIN_HEIGHT as MIN_TRACK_HEIGHT, SCHEDULE_TRACK_MAX_HEIGHT as MAX_TRACK_HEIGHT, type DisplayEvent, type TimelineRow } from '../layout.ts'
 
 const props = withDefaults(defineProps<{
  project: ScheduleProject
+ workload: MonthlyWorkload
  mode: 'people' | 'global'
  disabled?: boolean
  active?: boolean
@@ -52,10 +53,12 @@ const rows = computed(() => buildTimelineRows(props.project, props.mode, calenda
 const workloadDates = computed(() => buildWorkloadDates(props.project, props.holidayYears))
 type WorkloadItem = MonthlyWorkloadCell & { month: string }
 const workloadByRole = computed(() => {
- if (props.mode !== 'people') return new Map<string, WorkloadItem[]>()
- const result = buildMonthlyWorkload(props.project, props.holidayYears)
- return new Map(result.people.map(person => [person.roleId, person.months.map((cell, index) => ({ ...cell, month: result.months[index]!.key }))]))
+ const result = props.workload
+ return new Map(result.people.map(person => [person.roleId, { totalDays: person.totalDays,
+  months: person.months.map((cell, index) => ({ ...cell, month: result.months[index]!.key })).filter(cell => cell.scheduledDays > 0),
+ }]))
 })
+const personTotalDays = (roleId: string) => workloadByRole.value.get(roleId)?.totalDays ?? 0
 function workloadTitle(item: WorkloadItem): string {
  return `${item.month} 月度工时 ${workloadPercent(item.percentage)}\n已排 ${item.scheduledDays} 天 / 可排 ${item.availableDays} 天\n按当月项目范围内的工作日计算；全天 1 天，半天 0.5 天；不计周末和假日。${item.percentage === null ? '\n本月无可排工作日。' : ''}`
 }
@@ -467,9 +470,12 @@ defineExpose({ cancelGesture, zoomTo })
     <div v-for="row in rows" :key="row.key" class="schedule-track" :class="{ 'schedule-overall-track': row.key === 'overall', 'schedule-overall-pinned': row.key === 'overall' && overallSticky, 'track-resizing': trackPreview?.key === row.key }" :style="{ '--schedule-track-height': `${rowHeight(row.key)}px` }" :data-track-height="rowHeight(row.key)" :data-sticky="row.key === 'overall' && overallSticky" :data-testid="`schedule-track-${rowTestKey(row)}`" :data-role-id="row.roleId ?? 'overall'" :data-track-key="row.key">
      <div class="schedule-track-label" :class="{ 'has-workload': mode === 'people' && row.roleId !== null }" :data-testid="`schedule-label-${rowTestKey(row)}`" :style="{ '--role-color': row.color }"><span class="schedule-role-dot" /><div>
       <div class="schedule-label-heading"><strong :title="`${row.name} · ${row.total} 个事件${row.total > row.events.length ? ` · ${row.total - row.events.length} 个已隐藏` : ''}`">{{ row.name }}</strong><span :title="row.subtitle">{{ row.subtitle }}</span></div>
-      <ul v-if="mode === 'people' && row.roleId !== null" class="schedule-workload-list" :data-testid="`schedule-workload-${row.roleId}`" :aria-label="`${row.name}的月度工时占比`" title="月度工时：已排工作天数 / 当月项目范围内的工作日；月份较多时可滚动查看" tabindex="0">
-       <li v-for="item in workloadByRole.get(row.roleId)" :key="item.month" class="schedule-workload-tag" :data-month="item.month" :data-scheduled-days="item.scheduledDays" :data-available-days="item.availableDays" :data-percentage="item.percentage" :title="workloadTitle(item)" :aria-label="workloadTitle(item)"><span>{{ item.month.slice(2).replace('-', '.') }}-</span><strong>{{ workloadPercent(item.percentage) }}</strong></li>
-      </ul>
+      <template v-if="mode === 'people' && row.roleId !== null">
+       <span class="schedule-workload-total" :data-testid="`schedule-workload-total-${row.roleId}`" tabindex="0" :title="workloadTotalTitle(personTotalDays(row.roleId), project.dailyRate)" :aria-label="workloadTotalTitle(personTotalDays(row.roleId), project.dailyRate)">总工时 <strong>{{personTotalDays(row.roleId)}}</strong> 天</span>
+       <ul v-if="workloadByRole.get(row.roleId)?.months.length" class="schedule-workload-list" :data-testid="`schedule-workload-${row.roleId}`" :aria-label="`${row.name}的月度工时占比`" title="月度工时：已排工作天数 / 当月项目范围内的工作日；仅显示有工时的月份，月份较多时可滚动查看" tabindex="0">
+        <li v-for="item in workloadByRole.get(row.roleId)?.months" :key="item.month" class="schedule-workload-tag" :style="{ '--workload-progress': `${workloadProgress(item.percentage)}%` }" :data-month="item.month" :data-scheduled-days="item.scheduledDays" :data-available-days="item.availableDays" :data-percentage="item.percentage" :title="workloadTitle(item)" :aria-label="workloadTitle(item)"><span>{{ item.month.slice(2).replace('-', '.') }}-</span><strong>{{ workloadPercent(item.percentage) }}</strong></li>
+       </ul>
+      </template>
       <small v-else-if="row.key === 'overall'">{{ row.total }} 个事件<span v-if="row.total > row.events.length"> · {{ row.total - row.events.length }} 个已隐藏</span></small>
      </div><div class="schedule-track-ruler" aria-hidden="true"><span v-for="tick in (trackPreview?.key === row.key ? rowHeight(row.key) / TRACK_STEP - 1 : 0)" :key="tick" :style="{ top: `${tick * TRACK_STEP}px` }">{{ tick }}</span></div><span class="schedule-track-height-label" aria-hidden="true">{{ rowHeight(row.key) / TRACK_STEP }} × {{ TRACK_STEP }} px</span></div>
      <div :ref="element => setLane(row.key, element)" class="schedule-track-lane" :style="{ width: `${calendarWidth}px` }" :data-testid="`schedule-lane-${rowTestKey(row)}`" :data-role-id="row.roleId ?? 'overall'" @dblclick="createEvent($event, row)">
@@ -527,13 +533,16 @@ defineExpose({ cancelGesture, zoomTo })
 .schedule-label-heading { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: none; }
 .schedule-label-heading>span { font-size: 10px; color: var(--ui-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .schedule-track-label small { font-size: 9px; color: var(--ui-subtle); margin-top: 0; }
-.schedule-track-label.has-workload { padding-top: 8px; padding-bottom: 20px; }
+.schedule-track-label.has-workload { padding-top: 8px; padding-right: 12px; padding-bottom: 20px; }
 .schedule-track-label.has-workload>div:not(.schedule-track-ruler) { height: 100%; min-height: 0; gap: 2px; }
 .has-workload .schedule-label-heading { flex-direction: row; align-items: baseline; gap: 6px; line-height: 16px; }
 .has-workload .schedule-label-heading>strong { min-width: 0; max-width: 65%; flex: 0 1 auto; }
 .has-workload .schedule-label-heading>span { min-width: 0; flex: 1; }
 .schedule-workload-list { list-style: none; margin: 2px 0 0; padding: 0 2px 0 0; min-height: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 18px; align-content: start; gap: 4px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; outline-offset: 1px; font-variant-numeric: tabular-nums; }
-.schedule-workload-tag { min-width: 0; display: flex; align-items: center; justify-content: center; padding: 0 2px; border: 1px solid color-mix(in srgb, var(--role-color) 22%, var(--ui-line)); border-radius: 4px; background: color-mix(in srgb, var(--role-color) 7%, var(--ui-surface)); color: var(--ui-muted); font-size: 10px; line-height: 16px; white-space: nowrap; }
+.schedule-workload-total { flex: none; font-size: 10px; line-height: 14px; color: var(--ui-muted); white-space: nowrap; font-variant-numeric: tabular-nums; cursor: help; outline-offset: 1px; }
+.schedule-workload-total>strong { font-size: inherit; color: var(--ui-text); }
+.schedule-workload-tag { min-width: 0; position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 0 1px; border: 1px solid color-mix(in srgb, var(--role-color) 22%, var(--ui-line)); border-radius: 999px; background: color-mix(in srgb, var(--role-color) 5%, var(--ui-surface)); color: var(--ui-text); font-size: 10px; line-height: 16px; white-space: nowrap; }
+.schedule-workload-tag::before { content: ''; position: absolute; inset: 0 auto 0 0; width: var(--workload-progress, 0%); background: color-mix(in srgb, var(--role-color) 24%, transparent); pointer-events: none; z-index: -1; }
 .schedule-workload-tag>span,.schedule-workload-tag>strong { flex: none; }
 .schedule-workload-tag>strong { font-size: inherit; line-height: inherit; color: var(--ui-text); }
 .schedule-role-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--role-color); }
