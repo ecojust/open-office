@@ -89,7 +89,7 @@ function drawTable(context: CanvasRenderingContext2D, plan: SchedulePngLayout) {
  const left = MARGIN, datesLeft = left + SCHEDULE_LABEL_WIDTH, right = left + tableWidth
  fill(context, 0, 0, plan.logicalWidth, plan.logicalHeight, '#ffffff')
  font(context, 22, 600); text(context, project.title, left, 30, tableWidth)
- font(context, 12); text(context, `${project.startDate} — ${project.endDate}  ·  ${plan.mode === 'people' ? '人员模式' : '全局模式'}  ·  ${project.roles.length} 名人员 / ${project.events.length} 个事件`, left, 59, tableWidth, COLOR.muted)
+ font(context, 12); text(context, `${project.startDate} — ${project.endDate}  ·  ${plan.mode === 'people' ? '人员模式' : '全局模式'}  ·  ${project.calendar.weekNumbering === 'project' ? '按项目计周' : '按年计周'}  ·  ${project.roles.length} 名人员 / ${project.events.length} 个事件`, left, 59, tableWidth, COLOR.muted)
  fill(context, left, TITLE_HEIGHT, tableWidth, SCHEDULE_HEADER_HEIGHT, COLOR.mutedSurface)
  if (rows[0]) fill(context, left, rows[0].top, tableWidth, rows[0].height, COLOR.soft)
 
@@ -104,9 +104,16 @@ function drawTable(context: CanvasRenderingContext2D, plan: SchedulePngLayout) {
  if (calendar.days.length) line(context, datesLeft + calendar.days.length * dayWidth, TITLE_HEIGHT + WEEK_HEIGHT, datesLeft + calendar.days.length * dayWidth, tableBottom)
  for (const week of calendar.weeks) {
   const x = datesLeft + week.startIndex * dayWidth, width = week.count * dayWidth
+  const yearOrProject = project.calendar.weekNumbering === 'project' ? '项目周' : String(week.weekYear)
   line(context, x, TITLE_HEIGHT, x, TITLE_HEIGHT + SCHEDULE_HEADER_HEIGHT, COLOR.strong)
-  font(context, 11, 600); text(context, week.label, x + 9, TITLE_HEIGHT + 14, width - 18, COLOR.accent)
-  if (width > 110) { font(context, 10); text(context, calendar.days[week.startIndex].date.slice(5).replace('-', '/'), x + 52, TITLE_HEIGHT + 14, width - 61, COLOR.muted) }
+  if (width < 96) {
+   // A partial week may contain just one 36px day; retain both year and W53.
+   font(context, 9); text(context, yearOrProject, x + 3, TITLE_HEIGHT + 7, width - 6, COLOR.muted, 'center')
+   font(context, 11, 600); text(context, week.label, x + 3, TITLE_HEIGHT + 21, width - 6, COLOR.accent, 'center')
+  } else {
+   font(context, 11, 600); text(context, week.label, x + 9, TITLE_HEIGHT + 14, 33, COLOR.accent)
+   font(context, 10); text(context, `${yearOrProject}${width >= 150 ? ` · ${calendar.days[week.startIndex].date.slice(5).replace('-', '/')}` : ''}`, x + 49, TITLE_HEIGHT + 14, width - 58, COLOR.muted)
+  }
  }
  font(context, 12, 600); text(context, plan.mode === 'people' ? '人员 / 角色' : '全局事件', left + 15, TITLE_HEIGHT + 26, SCHEDULE_LABEL_WIDTH - 30)
  font(context, 10); text(context, `${calendar.days.length} 个显示日 · 隐藏 ${calendar.hiddenCount} 天`, left + 15, TITLE_HEIGHT + 48, SCHEDULE_LABEL_WIDTH - 30, COLOR.muted)

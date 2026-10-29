@@ -1,7 +1,7 @@
 import { addDays, dayNumber, mondayOf, validateEventConflicts } from './calendar.ts'
 import { SCHEDULE_TRACK_MAX_HEIGHT, SCHEDULE_TRACK_MIN_HEIGHT, SCHEDULE_TRACK_STEP, trackKeys } from './layout.ts'
 
-export type ScheduleCalendarSettings = { hideWeekends: boolean; hideHolidays: boolean; extraHolidays: string[]; excludedHolidays: string[] }
+export type ScheduleCalendarSettings = { hideWeekends: boolean; hideHolidays: boolean; extraHolidays: string[]; excludedHolidays: string[]; weekNumbering?: 'year' | 'project' }
 export type ScheduleRole = { id: string; name: string; role: string; color: string }
 /** Half-height events use slot 0 for morning and 1 for afternoon; full height always uses 0. */
 export type ScheduleEvent = { id: string; roleId: string | null; title: string; startDate: string; endDate: string; height: 1 | 0.5; slot: 0 | 1; notes: string }
@@ -33,6 +33,7 @@ export function validateSchedule(value: unknown): ScheduleProject {
  if (duration < 1 || duration > SCHEDULE_MAX_DAYS) throw Error('项目结束日期不能早于开始日期，且项目范围最多为 3 年（1096 天）。')
  const rawCalendar = object(root.calendar)
  if (typeof rawCalendar.hideWeekends !== 'boolean' || typeof rawCalendar.hideHolidays !== 'boolean') throw Error('排期日历隐藏设置无效。')
+ if (rawCalendar.weekNumbering !== undefined && rawCalendar.weekNumbering !== 'year' && rawCalendar.weekNumbering !== 'project') throw Error('周编号模式无效，请选择按年或按项目。')
  const holidayList = (raw: unknown): string[] => {
   const dates = list(raw, SCHEDULE_MAX_DAYS, '自定义假日').map(date)
   if (new Set(dates).size !== dates.length) throw Error('自定义假日日期不能重复。')
@@ -41,6 +42,7 @@ export function validateSchedule(value: unknown): ScheduleProject {
  const extraHolidays = holidayList(rawCalendar.extraHolidays), excludedHolidays = holidayList(rawCalendar.excludedHolidays)
  if (extraHolidays.some(day => excludedHolidays.includes(day))) throw Error('同一天不能同时添加和排除为假日。')
  const result: ScheduleProject = { format: 'open-office-schedule', version: 1, id: id(root.id), title: text(root.title, 200, '项目名称', true), startDate, endDate, calendar: { hideWeekends: rawCalendar.hideWeekends, hideHolidays: rawCalendar.hideHolidays, extraHolidays, excludedHolidays }, roles: [], events: [] }
+ if (rawCalendar.weekNumbering !== undefined) result.calendar.weekNumbering = rawCalendar.weekNumbering
  result.roles = list(root.roles, SCHEDULE_MAX_ROLES, '角色').map(raw => {
   const role = object(raw)
   if (typeof role.color !== 'string' || !/^#[\da-fA-F]{6}$/.test(role.color)) throw Error('角色颜色必须为 #RRGGBB。')

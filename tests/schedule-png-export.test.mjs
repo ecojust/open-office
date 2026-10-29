@@ -64,6 +64,30 @@ test('PNG uses the current loaded/manual holiday projection without modifying ev
  assert.equal(plan.rows.at(-1).events[0].count, 3)
 })
 
+test('PNG carries annual week years even for single-column partial weeks and across December', () => {
+ const source = project(); source.startDate = '2027-01-01'; source.endDate = '2027-01-04'; source.events = []
+ const plan = buildSchedulePngLayout(source, { mode: 'people', dayWidth: 36 })
+ assert.deepEqual(plan.calendar.weeks.map(week => [week.label, week.weekYear, week.count * plan.dayWidth]), [['W53', 2026, 36], ['W1', 2027, 36]])
+ source.startDate = '2024-12-30'; source.endDate = '2024-12-31'
+ const december = buildSchedulePngLayout(source, { mode: 'global' })
+ assert.deepEqual(december.calendar.weeks.map(week => [week.label, week.weekYear]), [['W1', 2025]])
+})
+
+test('PNG follows saved project numbering without relabeling it as an annual ISO week', () => {
+ const source = project(); source.calendar.weekNumbering = 'project'
+ const relative = buildSchedulePngLayout(source, { mode: 'people' })
+ assert.equal(relative.project.calendar.weekNumbering, 'project')
+ assert.deepEqual(relative.calendar.weeks.map(week => week.label), ['W1', 'W3', 'W4'])
+ source.calendar.weekNumbering = 'year'
+ const annual = buildSchedulePngLayout(source, { mode: 'people' })
+ assert.equal(annual.project.calendar.weekNumbering, 'year')
+ assert.deepEqual(annual.calendar.weeks.map(week => week.label), ['W7', 'W9', 'W10'])
+ assert.deepEqual(relative.rows, annual.rows); assert.equal(relative.width, annual.width); assert.equal(relative.height, annual.height)
+ source.startDate = '2027-01-01'; source.endDate = '2027-01-04'; source.events = []; source.calendar.weekNumbering = 'project'
+ const partial = buildSchedulePngLayout(source, { mode: 'global', dayWidth: 36 })
+ assert.deepEqual(partial.calendar.weeks.map(week => [week.label, week.weekYear, week.count * partial.dayWidth]), [['W1', 2026, 36], ['W2', 2027, 36]])
+})
+
 test('PNG remains a complete bounded table when all dates are hidden', () => {
  const source = project(); source.startDate = '2026-02-16'; source.endDate = '2026-02-20'; source.events = [source.events.at(-1)]
  const plan = buildSchedulePngLayout(source, { mode: 'people' })

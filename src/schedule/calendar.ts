@@ -2,8 +2,10 @@ import type { ScheduleEvent, ScheduleProject } from './model.ts'
 import type { HolidayYears } from './holidays.ts'
 
 const DAY = 86_400_000
-export type CalendarDay = { date: string; weekday: 0 | 1 | 2 | 3 | 4 | 5 | 6; weekIndex: number; holiday?: string }
-export type CalendarWeek = { key: string; label: string; startIndex: number; count: number }
+export type IsoWeek = { weekYear: number; weekIndex: number }
+/** weekIndex follows the selected numbering mode; weekYear always denotes the ISO week year. */
+export type CalendarDay = { date: string; weekday: 0 | 1 | 2 | 3 | 4 | 5 | 6; weekYear: number; weekIndex: number; holiday?: string }
+export type CalendarWeek = { key: string; label: string; weekYear: number; startIndex: number; count: number }
 export type ScheduleCalendar = { days: CalendarDay[]; weeks: CalendarWeek[]; hiddenCount: number; unknownHolidayYears: number[] }
 /** Strict, timezone-independent civil dates; UTC is only the arithmetic representation. */
 export function dayNumber(value: string): number {
@@ -21,6 +23,15 @@ export function dateFromDayNumber(value: number): string {
 }
 export function addDays(date: string, delta: number): string { if (!Number.isSafeInteger(delta)) throw Error('只能按整天调整日期。'); return dateFromDayNumber(dayNumber(date) + delta) }
 export function mondayOf(date: string): string { const day = dayNumber(date), weekday = new Date(day * DAY).getUTCDay(); return dateFromDayNumber(day - ((weekday + 6) % 7)) }
+function weekFromDayNumber(day: number): IsoWeek {
+ // ISO weeks belong to the year containing their Thursday. Arithmetic stays in
+ // UTC day numbers so neither local DST nor out-of-range civil strings are used.
+ const weekday = new Date(day * DAY).getUTCDay(), thursday = day + 3 - ((weekday + 6) % 7)
+ const weekYear = new Date(thursday * DAY).getUTCFullYear()
+ return { weekYear, weekIndex: Math.floor((thursday - Date.UTC(weekYear, 0, 1) / DAY) / 7) + 1 }
+}
+/** ISO 8601: Monday starts the week; W1 contains January 4, independent of project range. */
+export function isoWeek(date: string): IsoWeek { return weekFromDayNumber(dayNumber(date)) }
 
 // Mainland China official days off, inclusive. Weekend make-up workdays remain
 // weekends here. Sources and the holiday-cn MIT notice: docs/schedule-calendar.md.
@@ -31,7 +42,8 @@ const holidayRanges: Record<number, readonly (readonly [string, string, string])
 export function buildCalendar(project: ScheduleProject, loaded: HolidayYears = {}): ScheduleCalendar {
  const start = dayNumber(project.startDate), end = dayNumber(project.endDate)
  if (end < start || end - start >= 1096) throw Error('项目日期范围无效或超过 3 年。')
- const anchor = dayNumber(mondayOf(project.startDate)), extra = new Set(project.calendar.extraHolidays), excluded = new Set(project.calendar.excludedHolidays)
+ const extra = new Set(project.calendar.extraHolidays), excluded = new Set(project.calendar.excludedHolidays)
+ const projectWeekAnchor = project.calendar.weekNumbering === 'project' ? dayNumber(mondayOf(project.startDate)) : undefined
  const days: CalendarDay[] = [], weeks: CalendarWeek[] = [], unknown = new Set<number>()
  const official = new Map<string, string | null>()
  // Include built-in fallbacks in source-year order too: an older downloaded
@@ -55,10 +67,12 @@ export function buildCalendar(project: ScheduleProject, loaded: HolidayYears = {
   const knownHoliday = official.get(date) ?? undefined
   const holiday = extra.has(date) ? '自定义假日' : excluded.has(date) ? undefined : knownHoliday
   if ((project.calendar.hideWeekends && (weekday === 0 || weekday === 6)) || (project.calendar.hideHolidays && holiday !== undefined)) { hiddenCount++; continue }
-  const weekIndex = Math.floor((number - anchor) / 7) + 1, key = dateFromDayNumber(anchor + (weekIndex - 1) * 7)
+  const annual = weekFromDayNumber(number), weekYear = annual.weekYear
+  const weekIndex = projectWeekAnchor === undefined ? annual.weekIndex : Math.floor((number - projectWeekAnchor) / 7) + 1
+  const key = dateFromDayNumber(number - ((weekday + 6) % 7))
   if (weeks.at(-1)?.key === key) weeks.at(-1)!.count++
-  else weeks.push({ key, label: `W${weekIndex}`, startIndex: days.length, count: 1 })
-  days.push({ date, weekday, weekIndex, ...(holiday ? { holiday } : {}) })
+  else weeks.push({ key, label: `W${weekIndex}`, weekYear, startIndex: days.length, count: 1 })
+  days.push({ date, weekday, weekYear, weekIndex, ...(holiday ? { holiday } : {}) })
  }
  return { days, weeks, hiddenCount, unknownHolidayYears: [...unknown] }
 }

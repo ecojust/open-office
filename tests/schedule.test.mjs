@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createSchedule, decodeSchedule, encodeSchedule, scheduleId, validateSchedule, SCHEDULE_MAX_BYTES } from '../src/schedule/model.ts'
-import { addDays, buildCalendar, dateFromDayNumber, dayNumber, mondayOf, moveScheduledEvent, projectedSpan, resizeScheduledEvent } from '../src/schedule/calendar.ts'
+import { addDays, buildCalendar, dateFromDayNumber, dayNumber, isoWeek, mondayOf, moveScheduledEvent, projectedSpan, resizeScheduledEvent } from '../src/schedule/calendar.ts'
 import { ScheduleSession } from '../src/schedule/session.ts'
 
 function project(startDate = '2026-02-09', endDate = '2026-03-06') {
@@ -50,10 +50,91 @@ test('civil date functions reject normalized invalid dates and fractional day ch
 })
 
 test('date arithmetic and week labels remain stable across DST and host timezones', () => {
- const script = `import {addDays,mondayOf,dayNumber} from './src/schedule/calendar.ts'; console.log(JSON.stringify([addDays('2026-03-07',2),addDays('2026-10-31',2),mondayOf('2026-03-08'),dayNumber('2026-11-02')-dayNumber('2026-10-31')]))`
+ const script = `import {addDays,mondayOf,dayNumber,isoWeek} from './src/schedule/calendar.ts'; console.log(JSON.stringify([addDays('2026-03-07',2),addDays('2026-10-31',2),mondayOf('2026-03-08'),dayNumber('2026-11-02')-dayNumber('2026-10-31'),isoWeek('2027-01-01'),isoWeek('2024-12-30')]))`
  const values = ['UTC', 'America/New_York', 'Europe/Berlin', 'Asia/Shanghai'].map(TZ => execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: new URL('..', import.meta.url), env: { ...process.env, TZ }, encoding: 'utf8' }).trim())
  assert.equal(new Set(values).size, 1)
- assert.deepEqual(JSON.parse(values[0]), ['2026-03-09', '2026-11-02', '2026-03-02', 2])
+ assert.deepEqual(JSON.parse(values[0]), ['2026-03-09', '2026-11-02', '2026-03-02', 2, { weekYear: 2026, weekIndex: 53 }, { weekYear: 2025, weekIndex: 1 }])
+})
+
+test('annual ISO weeks cross years correctly and remain independent of project start', () => {
+ for (const [date, weekYear, weekIndex] of [
+  ['2020-12-28', 2020, 53], ['2021-01-01', 2020, 53], ['2021-01-03', 2020, 53], ['2021-01-04', 2021, 1],
+  ['2026-12-28', 2026, 53], ['2027-01-01', 2026, 53], ['2027-01-03', 2026, 53], ['2027-01-04', 2027, 1],
+  ['2024-12-29', 2024, 52], ['2024-12-30', 2025, 1], ['2025-01-01', 2025, 1], ['2026-09-28', 2026, 40],
+ ]) assert.deepEqual(isoWeek(date), { weekYear, weekIndex }, date)
+ const early = project('2026-09-01', '2026-10-12'), late = project('2026-09-29', '2026-10-12')
+ const earlierDay = buildCalendar(early).days.find(day => day.date === '2026-09-30'), laterDay = buildCalendar(late).days.find(day => day.date === '2026-09-30')
+ assert.deepEqual(laterDay, earlierDay); assert.equal(laterDay.weekIndex, 40); assert.equal(laterDay.weekYear, 2026)
+ const crossYear = project('2020-12-30', '2021-01-06')
+ const calendar = buildCalendar(crossYear)
+ assert.deepEqual(calendar.weeks.map(({ key, label, weekYear, count }) => ({ key, label, weekYear, count })), [
+  { key: '2020-12-28', label: 'W53', weekYear: 2020, count: 3 },
+  { key: '2021-01-04', label: 'W1', weekYear: 2021, count: 3 },
+ ])
+ const december = buildCalendar(project('2024-12-30', '2024-12-31'))
+ assert.deepEqual(december.weeks.map(week => [week.label, week.weekYear]), [['W1', 2025]])
+})
+
+test('ISO week arithmetic respects minimum and maximum civil-date boundaries', () => {
+ assert.deepEqual(isoWeek('1900-01-01'), { weekYear: 1900, weekIndex: 1 })
+ assert.deepEqual(isoWeek('9999-12-31'), { weekYear: 9999, weekIndex: 52 })
+ for (const [start, end, expected] of [['1900-01-01', '1900-01-07', ['1900-01-01', 'W1', 1900]], ['9999-12-27', '9999-12-31', ['9999-12-27', 'W52', 9999]]]) {
+  const calendar = buildCalendar(project(start, end))
+  assert.deepEqual(calendar.weeks.map(week => [week.key, week.label, week.weekYear]), [expected])
+  assert.equal(calendar.days.length, 5)
+ }
+ for (const value of ['1899-12-31', '10000-01-01', '2026-02-30']) assert.throws(() => isoWeek(value))
+})
+
+test('project weeks start at the project Monday, skip hidden weeks and continue across years', () => {
+ const value = project(); value.calendar.weekNumbering = 'project'
+ const calendar = buildCalendar(value)
+ assert.deepEqual(calendar.weeks.map(week => week.label), ['W1', 'W3', 'W4'])
+ assert.deepEqual(calendar.weeks.map(week => week.weekYear), [2026, 2026, 2026])
+ assert.deepEqual(calendar.weeks.map(week => [week.startIndex, week.count]), [[0, 5], [5, 4], [9, 5]])
+ const crossYear = project('2026-12-30', '2027-01-15'); crossYear.calendar.weekNumbering = 'project'
+ const crossed = buildCalendar(crossYear)
+ assert.deepEqual(crossed.weeks.map(week => [week.key, week.label, week.weekYear]), [['2026-12-28', 'W1', 2026], ['2027-01-04', 'W2', 2027], ['2027-01-11', 'W3', 2027]])
+ assert.equal(crossed.days.find(day => day.date === '2027-01-04').weekIndex, 2)
+ for (const [startDate, endDate] of [['1900-01-01', '1900-01-08'], ['9999-12-20', '9999-12-31']]) {
+  const boundary = project(startDate, endDate); boundary.calendar.weekNumbering = 'project'
+  assert.deepEqual(buildCalendar(boundary).weeks.map(week => week.label), ['W1', 'W2'])
+ }
+})
+
+test('week mode persists explicitly while omitted legacy mode remains unchanged and defaults to year', () => {
+ const legacy = project(), original = structuredClone(legacy)
+ assert.deepEqual(decodeSchedule(encodeSchedule(legacy)), original)
+ assert.equal(Object.hasOwn(validateSchedule(legacy).calendar, 'weekNumbering'), false)
+ assert.deepEqual(buildCalendar(legacy).weeks.map(week => week.label), ['W7', 'W9', 'W10'])
+ for (const mode of ['year', 'project']) {
+  const value = project(); value.calendar.weekNumbering = mode
+  assert.deepEqual(decodeSchedule(encodeSchedule(value)), value)
+ }
+ for (const mode of ['', 'annual', 'PROJECT', false, 1, null, {}]) {
+  const value = project(); value.calendar.weekNumbering = mode
+  assert.throws(() => validateSchedule(value), /周编号模式无效/)
+ }
+})
+
+test('switching week mode changes only labels and participates in undo and exact saving', () => {
+ const value = project(); value.events = [event({ height: .5, slot: 1 })]
+ const session = sessionFor(value), year = buildCalendar(session.model), originalEvents = structuredClone(session.model.events)
+ session.change(copy => { copy.calendar.weekNumbering = 'project' })
+ const relative = buildCalendar(session.model)
+ assert.deepEqual(relative.days.map(day => day.date), year.days.map(day => day.date))
+ assert.deepEqual(relative.weeks.map(week => week.key), year.weeks.map(week => week.key))
+ assert.deepEqual(relative.weeks.map(week => week.weekYear), year.weeks.map(week => week.weekYear))
+ assert.deepEqual(session.model.events, originalEvents); assert.equal(session.inspect().dirty, true)
+ assert.deepEqual(projectedSpan(session.model.events[0], relative.days), projectedSpan(originalEvents[0], year.days))
+ session.undo(); assert.equal(Object.hasOwn(session.model.calendar, 'weekNumbering'), false); assert.equal(session.inspect().dirty, false)
+ session.redo(); assert.equal(session.model.calendar.weekNumbering, 'project')
+ const receipt = session.export(); session.markSaved(receipt.bytes)
+ assert.equal(decodeSchedule(receipt.bytes).calendar.weekNumbering, 'project'); assert.deepEqual(session.model.events, originalEvents)
+ const later = { ...session.model, startDate: '2026-02-12' }
+ assert.equal(buildCalendar(later).days.find(day => day.date === '2026-02-24').weekIndex, 3)
+ const followingWeek = { ...session.model, startDate: '2026-02-16' }
+ assert.equal(buildCalendar(followingWeek).days.find(day => day.date === '2026-02-24').weekIndex, 2)
 })
 
 test('holiday and weekend filtering retains actual week numbers and hides makeup Saturdays', () => {
@@ -61,7 +142,8 @@ test('holiday and weekend filtering retains actual week numbers and hides makeup
  assert.equal(calendar.days.some(day => day.date === '2026-02-14'), false)
  assert.equal(calendar.days.some(day => day.date === '2026-02-28'), false)
  assert.equal(calendar.days.some(day => day.date === '2026-02-23'), false)
- assert.deepEqual(calendar.weeks.map(week => week.label), ['W1', 'W3', 'W4'])
+ assert.deepEqual(calendar.weeks.map(week => week.label), ['W7', 'W9', 'W10'])
+ assert.deepEqual(calendar.weeks.map(week => week.weekYear), [2026, 2026, 2026])
  assert.deepEqual(calendar.weeks.map(week => [week.startIndex, week.count]), [[0, 5], [5, 4], [9, 5]])
  assert.deepEqual(projectedSpan(event(), calendar.days), { start: 4, count: 2 })
  assert.equal(projectedSpan(event({ startDate: '2026-02-15', endDate: '2026-02-23' }), calendar.days), null)
@@ -89,7 +171,7 @@ test('unknown years are reported without invented holiday data, including cross-
  const value = project('2026-12-28', '2027-01-08'), calendar = buildCalendar(value)
  assert.deepEqual(calendar.unknownHolidayYears, [2027])
  assert.equal(calendar.days.some(day => day.date === '2027-01-01'), true)
- assert.deepEqual(calendar.weeks.map(week => week.label), ['W1', 'W2'])
+ assert.deepEqual(calendar.weeks.map(week => [week.weekYear, week.label]), [[2026, 'W53'], [2027, 'W1']])
  value.calendar.extraHolidays.push('2027-01-01')
  assert.equal(buildCalendar(value).days.some(day => day.date === '2027-01-01'), false)
 })

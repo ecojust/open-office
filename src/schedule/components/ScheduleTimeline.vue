@@ -4,6 +4,7 @@ import type { ScheduleEvent, ScheduleProject } from '../model.ts'
 import type { HolidayYears } from '../holidays.ts'
 import { buildCalendar, moveScheduledEvent, projectedSpan, resizeScheduledEvent } from '../calendar.ts'
 import { clampDayWidth, wheelDayWidth, zoomAnchorScroll } from '../zoom.ts'
+import { eventPointerAction, eventResizeInsets, type EventPointerAction } from '../interaction.ts'
 import { buildTimelineRows, getTrackHeight, getEventVerticalLayout, snapTrackHeight, SCHEDULE_LABEL_WIDTH as LABEL_WIDTH, SCHEDULE_HEADER_HEIGHT as HEADER_HEIGHT, SCHEDULE_EVENT_PADDING as PADDING, SCHEDULE_TRACK_HEIGHT as TRACK_HEIGHT, SCHEDULE_TRACK_STEP as TRACK_STEP, SCHEDULE_TRACK_MIN_HEIGHT as MIN_TRACK_HEIGHT, SCHEDULE_TRACK_MAX_HEIGHT as MAX_TRACK_HEIGHT, type DisplayEvent, type TimelineRow } from '../layout.ts'
 
 const props = withDefaults(defineProps<{
@@ -19,6 +20,7 @@ const emit = defineEmits<{
  select: [id: string]
  edit: [id: string]
  change: [event: ScheduleEvent]
+ copy: [event: ScheduleEvent]
  create: [position: { roleId: string | null; date: string; slot: 0 | 1 }]
  delete: [id: string]
  error: [message: string]
@@ -31,10 +33,12 @@ const root = ref<HTMLElement>(), viewport = ref<HTMLElement>()
 const scrollLeft = ref(0), viewportWidth = ref(900), viewportHeight = ref(0), zoomWidth = ref<number>()
 let zoomScroll: number | undefined, zoomGeneration = 0
 const preview = shallowRef<ScheduleEvent>(), previewPixels = ref<number>(), ghostStyle = ref<Record<string, string>>({})
-const dragKind = ref<GestureKind>(), announcement = ref('')
+const dragKind = ref<GestureKind>(), dragEventId = ref(''), copyMode = ref(false), announcement = ref('')
+const hoverHit = shallowRef<{ id: string; kind: GestureKind; copy: boolean }>()
 const lanes = new Map<string, HTMLElement>()
 const daysOfWeek = ['日', '一', '二', '三', '四', '五', '六']
 const calendar = computed(() => buildCalendar(props.project, props.holidayYears))
+const weekNumbering = computed(() => props.project.calendar.weekNumbering ?? 'year')
 const columnWidth = computed(() => clampDayWidth(zoomWidth.value ?? props.dayWidth))
 const calendarWidth = computed(() => Math.max(columnWidth.value, calendar.value.days.length * columnWidth.value))
 const contentWidth = computed(() => LABEL_WIDTH + calendarWidth.value)
@@ -52,7 +56,7 @@ const hiddenEvents = computed(() => props.project.events.filter(event => !projec
 const previewColor = computed(() => preview.value?.roleId ? roleById.value.get(preview.value.roleId)?.color ?? 'var(--ui-accent)' : 'var(--ui-accent)')
 const previewOwner = computed(() => preview.value?.roleId ? roleById.value.get(preview.value.roleId)?.name : '整体计划')
 const today = (() => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` })()
-type GestureKind = 'move' | 'start' | 'end' | 'height'
+type GestureKind = EventPointerAction
 type PointerGesture = {
  kind: GestureKind; pointerId: number; element: HTMLElement; original: ScheduleEvent; base: ScheduleProject
  sourceKey: string; targetKey: string; startX: number; startY: number; x: number; y: number
@@ -61,6 +65,7 @@ type PointerGesture = {
 type TrackGesture = { pointerId: number; element: HTMLElement; key: string; name: string; base: ScheduleProject; startY: number; startHeight: number; moved: boolean }
 let trackGesture: TrackGesture | undefined
 let gesture: PointerGesture | undefined, frame = 0, frameTime = 0, observer: ResizeObserver | undefined, suppressClickUntil = 0
+let suppressControlMenu: { id: string; until: number } | undefined
 
 function setLane(key: string, element: unknown) {
  if (element instanceof HTMLElement) lanes.set(key, element)
@@ -72,9 +77,22 @@ function rowTestKey(row: TimelineRow): string {
 function rowHeight(key: string): number { return trackPreview.value?.key === key ? trackPreview.value.height : getTrackHeight(props.project, key) }
 function fullHeight(key: string): number { return rowHeight(key) - PADDING * 2 }
 function eventStyle(item: DisplayEvent, color: string, key: string) {
- const vertical = getEventVerticalLayout(rowHeight(key), item.event)
- return { top: `${vertical.top}px`, left: `${item.start * columnWidth.value + 3}px`, width: `${Math.max(10, item.count * columnWidth.value - 6)}px`, height: `${vertical.height}px`, '--event-color': color }
+ const vertical = getEventVerticalLayout(rowHeight(key), item.event), width = Math.max(10, item.count * columnWidth.value - 6)
+ const insets = eventResizeInsets(width, vertical.height)
+ const hit = dragEventId.value === item.event.id ? { kind: dragKind.value, copy: copyMode.value } : hoverHit.value?.id === item.event.id ? hoverHit.value : undefined
+ const cursor = hit?.kind === 'start' || hit?.kind === 'end' ? 'ew-resize' : hit?.kind === 'height' ? 'ns-resize' : hit?.copy ? 'copy' : dragEventId.value === item.event.id ? 'grabbing' : 'grab'
+ return { top: `${vertical.top}px`, left: `${item.start * columnWidth.value + 3}px`, width: `${width}px`, height: `${vertical.height}px`, cursor, '--event-color': color, '--resize-side-width': `${insets.side}px`, '--resize-bottom-height': `${insets.bottom}px` }
 }
+function hoverEvent(event: PointerEvent, item: ScheduleEvent) {
+ if (gesture || trackGesture) return
+ if (!canEdit()) { hoverHit.value = undefined; return }
+ const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect()
+ const kind = eventPointerAction(bounds.width, bounds.height, event.clientX - bounds.left, event.clientY - bounds.top)
+ const copy = kind === 'move' && event.ctrlKey
+ if (hoverHit.value?.id === item.id && hoverHit.value.kind === kind && hoverHit.value.copy === copy) return
+ hoverHit.value = { id: item.id, kind, copy }
+}
+function leaveEvent(id: string) { if (!gesture && hoverHit.value?.id === id) hoverHit.value = undefined }
 function eventTitle(event: ScheduleEvent): string {
  const name = event.roleId ? roleById.value.get(event.roleId)?.name ?? '' : '整体计划'
  return `${event.title}\n${name} · ${event.startDate} 至 ${event.endDate}\n${event.height === 1 ? '全天' : event.slot === 1 ? '下午 · 半高' : '上午 · 半高'}${event.notes ? `\n${event.notes}` : ''}`
@@ -200,15 +218,20 @@ function autoScroll(now: number) {
  }
  frame = requestAnimationFrame(autoScroll)
 }
-function startGesture(event: PointerEvent, item: ScheduleEvent, rowKey: string, kind: GestureKind) {
- if (!canEdit() || gesture || trackGesture || event.button !== 0 || !event.isPrimary) return
- event.preventDefault(); event.stopPropagation()
+function startGesture(event: PointerEvent, item: ScheduleEvent, rowKey: string) {
+ if (!canEdit() || gesture || trackGesture || !event.isPrimary) return
  const element = (event.currentTarget as HTMLElement).closest<HTMLElement>('[data-event-id]')
  if (!element) return
- emit('select', item.id); element.focus({ preventScroll: true })
  const bounds = element.getBoundingClientRect(), grabRatio = Math.max(0, Math.min(1, (event.clientY - bounds.top) / Math.max(1, bounds.height)))
+ const kind = eventPointerAction(bounds.width, bounds.height, event.clientX - bounds.left, event.clientY - bounds.top)
+ // macOS can report Control + primary click as button 2. Accept that only for
+ // the requested body-copy gesture; ordinary right-clicks keep native behavior.
+ if (event.button !== 0 && !(event.button === 2 && event.ctrlKey && kind === 'move')) return
+ event.preventDefault(); event.stopPropagation()
+ emit('select', item.id); element.focus({ preventScroll: true })
+ if (kind === 'move' && event.ctrlKey) suppressControlMenu = { id: item.id, until: performance.now() + 400 }
  gesture = { kind, pointerId: event.pointerId, element, original: { ...item }, base: props.project, sourceKey: rowKey, targetKey: rowKey, startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY, startScrollLeft: viewport.value?.scrollLeft ?? 0, startHeight: fullHeight(rowKey) * item.height, grabRatio, moved: false, width: columnWidth.value }
- dragKind.value = kind; announcement.value = ''
+ dragKind.value = kind; dragEventId.value = item.id; copyMode.value = kind === 'move' && event.ctrlKey; announcement.value = ''
  try { element.setPointerCapture(event.pointerId) } catch { /* Window listeners cover devices without pointer capture. */ }
  element.addEventListener('lostpointercapture', cancelPointer)
  window.addEventListener('pointermove', movePointer, { passive: false })
@@ -216,6 +239,7 @@ function startGesture(event: PointerEvent, item: ScheduleEvent, rowKey: string, 
  window.addEventListener('pointercancel', cancelPointer)
  window.addEventListener('blur', cancelGesture)
  window.addEventListener('keydown', gestureKeyboard)
+ window.addEventListener('keyup', gestureModifier)
  frameTime = 0; frame = requestAnimationFrame(autoScroll)
  emit('gesture', true)
 }
@@ -223,19 +247,21 @@ function movePointer(event: PointerEvent) {
  const drag = gesture
  if (!drag || event.pointerId !== drag.pointerId) return
  if (!canEdit() || event.buttons === 0) { cancelGesture(); return }
- event.preventDefault(); drag.x = event.clientX; drag.y = event.clientY
+ event.preventDefault(); drag.x = event.clientX; drag.y = event.clientY; updateCopyMode(event.ctrlKey)
  if (!drag.moved && Math.hypot(drag.x - drag.startX, drag.y - drag.startY) < 4) return
  drag.moved = true; updatePreview()
 }
 function releaseGesture() {
  const drag = gesture
- gesture = undefined; preview.value = undefined; previewPixels.value = undefined; dragKind.value = undefined
+ if (drag?.kind === 'move' && copyMode.value) suppressControlMenu = { id: drag.original.id, until: performance.now() + 400 }
+ gesture = undefined; preview.value = undefined; previewPixels.value = undefined; dragKind.value = undefined; dragEventId.value = ''; copyMode.value = false; hoverHit.value = undefined
  cancelAnimationFrame(frame); frame = 0; frameTime = 0
  window.removeEventListener('pointermove', movePointer)
  window.removeEventListener('pointerup', finishPointer)
  window.removeEventListener('pointercancel', cancelPointer)
  window.removeEventListener('blur', cancelGesture)
  window.removeEventListener('keydown', gestureKeyboard)
+ window.removeEventListener('keyup', gestureModifier)
  if (drag) {
   drag.element.removeEventListener('lostpointercapture', cancelPointer)
   try { if (drag.element.hasPointerCapture(drag.pointerId)) drag.element.releasePointerCapture(drag.pointerId) } catch { /* Capture may already have ended. */ }
@@ -246,12 +272,16 @@ function releaseGesture() {
 function finishPointer(event: PointerEvent) {
  const drag = gesture
  if (!drag || event.pointerId !== drag.pointerId) return
- drag.x = event.clientX; drag.y = event.clientY
+ drag.x = event.clientX; drag.y = event.clientY; updateCopyMode(event.ctrlKey)
  if (drag.moved) updatePreview()
- const changed = preview.value, valid = canEdit() && drag.base === props.project
+ const changed = preview.value, valid = canEdit() && drag.base === props.project, copying = drag.kind === 'move' && copyMode.value
  if (drag.moved) suppressClickUntil = performance.now() + 300
  releaseGesture()
- if (valid && changed && !sameEvent(changed, drag.original)) {
+ if (valid && drag.moved && changed && copying) {
+  // The parent assigns a new ID and validates the copy against the unchanged
+  // source, then focuses the new block. Never focus or mutate the source here.
+  emit('copy', { ...changed })
+ } else if (valid && changed && !sameEvent(changed, drag.original)) {
   emit('change', { ...changed })
   announcement.value = `${changed.title}：${changed.startDate} 至 ${changed.endDate}，${changed.height === 1 ? '全天' : changed.slot === 1 ? '下午' : '上午'}。`
   void nextTick(() => root.value?.querySelector<HTMLElement>(`[data-event-id="${changed.id}"]`)?.focus({ preventScroll: true }))
@@ -262,9 +292,23 @@ function cancelGesture() {
  if (trackGesture) { releaseTrackGesture(); announcement.value = '已取消轨道高度调整。' }
 }
 function cancelPointer(event: PointerEvent) { if (event.pointerId === gesture?.pointerId) cancelGesture() }
-function gestureKeyboard(event: KeyboardEvent) { if (event.key === 'Escape' && gesture) { event.preventDefault(); event.stopPropagation(); cancelGesture() } }
+function updateCopyMode(ctrlKey: boolean) {
+ const next = gesture?.kind === 'move' && ctrlKey
+ if (copyMode.value === next) return
+ copyMode.value = next
+ if (gesture?.moved) announcement.value = next ? '复制事件：松开鼠标创建副本，原事件保留。' : '移动事件：松开鼠标调整原事件。'
+}
+function gestureModifier(event: KeyboardEvent) { if (gesture) updateCopyMode(event.ctrlKey) }
+function gestureKeyboard(event: KeyboardEvent) {
+ if (event.key === 'Escape' && gesture) { event.preventDefault(); event.stopPropagation(); cancelGesture(); return }
+ gestureModifier(event)
+}
 function selectEvent(event: MouseEvent, id: string) { event.stopPropagation(); if (performance.now() >= suppressClickUntil) emit('select', id) }
 function editEvent(event: MouseEvent, id: string) { event.stopPropagation(); if (canEdit() && performance.now() >= suppressClickUntil) emit('edit', id) }
+function eventContextMenu(event: MouseEvent, id: string) {
+ const copying = gesture?.kind === 'move' && gesture.original.id === id
+ if (event.ctrlKey && (copying || (suppressControlMenu?.id === id && performance.now() < suppressControlMenu.until))) event.preventDefault()
+}
 function createEvent(event: MouseEvent, row: TimelineRow) {
  if (!canEdit() || gesture || trackGesture || !calendar.value.days.length || (event.target as HTMLElement).closest('[data-event-id]')) return
  const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect()
@@ -395,13 +439,17 @@ defineExpose({ cancelGesture, zoomTo })
 </script>
 
 <template>
- <section ref="root" class="schedule-timeline" :class="{ 'is-dragging': preview || trackPreview, 'is-disabled': disabled }" :data-day-width="columnWidth" :data-track-height="TRACK_HEIGHT" :data-track-step="TRACK_STEP" :data-overall-sticky="overallSticky" :data-viewport-height="viewportHeight" data-testid="schedule-timeline" :style="{ '--schedule-label-width': `${LABEL_WIDTH}px`, '--schedule-day-width': `${columnWidth}px` }" aria-label="项目排期时间线">
+ <section ref="root" class="schedule-timeline" :class="{ 'is-dragging': preview || trackPreview, 'is-copying': copyMode && dragKind === 'move', 'is-disabled': disabled }" :data-day-width="columnWidth" :data-track-height="TRACK_HEIGHT" :data-track-step="TRACK_STEP" :data-copy="copyMode" :data-gesture="dragKind" :data-overall-sticky="overallSticky" :data-viewport-height="viewportHeight" data-testid="schedule-timeline" :style="{ '--schedule-label-width': `${LABEL_WIDTH}px`, '--schedule-day-width': `${columnWidth}px` }" aria-label="项目排期时间线">
   <div ref="viewport" class="schedule-timeline-scroll" data-testid="schedule-timeline-scroll" tabindex="0" @scroll="onScroll">
    <div class="schedule-timeline-content" :style="{ width: `${contentWidth}px` }">
     <div class="schedule-calendar-header">
      <div class="schedule-calendar-corner"><strong>{{ mode === 'people' ? '人员 / 角色' : '全局事件' }}</strong><span>{{ calendar.days.length }} 个显示日<span v-if="calendar.hiddenCount"> · 隐藏 {{ calendar.hiddenCount }} 天</span></span></div>
      <div class="schedule-date-header" :style="{ width: `${calendarWidth}px` }">
-      <div class="schedule-week-header"><div v-for="week in visibleWeeks" :key="week.key" class="schedule-week" :style="{ left: `${week.startIndex * columnWidth}px`, width: `${week.count * columnWidth}px` }" :data-week="week.label"><strong>{{ week.label }}</strong><span>{{ calendar.days[week.startIndex]?.date.slice(5).replace('-', '/') }}</span></div></div>
+      <div class="schedule-week-header" :data-week-numbering="weekNumbering">
+       <div v-for="week in visibleWeeks" :key="week.key" class="schedule-week" :style="{ left: `${week.startIndex * columnWidth}px`, width: `${week.count * columnWidth}px` }" :class="{ 'schedule-week-compact': week.count * columnWidth < 96 }" :data-week="week.label" :data-week-year="weekNumbering === 'year' ? week.weekYear : undefined" :title="weekNumbering === 'year' ? `${week.weekYear} · ${week.label}（ISO 周历，周一开周）` : `项目 ${week.label}（开始日期所在周为 W1，周一开周）`" :aria-label="weekNumbering === 'year' ? `${week.weekYear} 年 ${week.label}` : `项目 ${week.label}`">
+        <strong>{{ week.label }}</strong><span v-if="weekNumbering === 'year'">{{ week.count * columnWidth < 96 ? week.weekYear : `${week.weekYear} · ${calendar.days[week.startIndex]?.date.slice(5).replace('-', '/')}` }}</span><span v-else>{{ week.count * columnWidth < 96 ? '项目' : `项目 · ${calendar.days[week.startIndex]?.date.slice(5).replace('-', '/')}` }}</span>
+       </div>
+      </div>
       <div class="schedule-day-header"><div v-for="day in visibleDays" :key="day.date" class="schedule-day" :class="{ weekend: day.weekday === 0 || day.weekday === 6, holiday: day.holiday, today: day.date === today }" :style="{ left: `${day.index * columnWidth}px`, width: `${columnWidth}px` }" :data-date="day.date" :title="`${day.date} 周${daysOfWeek[day.weekday]}${day.holiday ? ` · ${day.holiday}` : ''}`"><span>{{ day.date.slice(5).replace('-', '/') }}</span><small>周{{ daysOfWeek[day.weekday] }}</small></div></div>
      </div>
     </div>
@@ -411,13 +459,13 @@ defineExpose({ cancelGesture, zoomTo })
       <span class="schedule-lane-midline" aria-hidden="true"/><span class="schedule-period-hint period-morning" aria-hidden="true">上午</span><span class="schedule-period-hint period-afternoon" aria-hidden="true">下午</span>
       <span v-if="!row.total && calendar.days.length" class="schedule-lane-hint">双击日期空白处添加{{ row.key === 'overall' ? '整体计划' : '事件' }}</span>
       <span v-else-if="row.total && !row.events.length" class="schedule-lane-hint">事件日期已隐藏，可在事件列表中编辑</span>
-      <button v-for="item in row.events" :key="item.event.id" type="button" class="schedule-event" :class="{ selected: selectedId === item.event.id, 'event-half': item.event.height === .5, 'event-drag-source': preview?.id === item.event.id }" :style="eventStyle(item, row.color, row.key)" :data-testid="`schedule-event-${item.event.id}`" :data-event-id="item.event.id" :data-role-id="item.event.roleId ?? 'overall'" :data-height="item.event.height" :data-slot="item.event.slot" :data-start-date="item.event.startDate" :data-end-date="item.event.endDate" :aria-label="eventTitle(item.event)" :aria-pressed="selectedId === item.event.id" :title="eventTitle(item.event)" :disabled="disabled || !active" @pointerdown="startGesture($event, item.event, row.key, 'move')" @click="selectEvent($event, item.event.id)" @dblclick="editEvent($event, item.event.id)" @keydown="eventKeyboard($event, item.event)">
-       <span class="schedule-resize-handle resize-start" data-testid="resize-start" data-resize="start" title="拖动调整开始日期" @pointerdown.stop="startGesture($event, item.event, row.key, 'start')" />
+      <button v-for="item in row.events" :key="item.event.id" type="button" class="schedule-event" :class="{ selected: selectedId === item.event.id, 'event-half': item.event.height === .5, 'event-drag-source': preview?.id === item.event.id && !copyMode }" :style="eventStyle(item, row.color, row.key)" :data-testid="`schedule-event-${item.event.id}`" :data-event-id="item.event.id" :data-role-id="item.event.roleId ?? 'overall'" :data-height="item.event.height" :data-slot="item.event.slot" :data-start-date="item.event.startDate" :data-end-date="item.event.endDate" :aria-label="eventTitle(item.event)" :aria-pressed="selectedId === item.event.id" :title="eventTitle(item.event)" :disabled="disabled || !active" @pointerdown="startGesture($event, item.event, row.key)" @pointerenter="hoverEvent($event, item.event)" @pointermove="hoverEvent($event, item.event)" @pointerleave="leaveEvent(item.event.id)" @contextmenu="eventContextMenu($event, item.event.id)" @click="selectEvent($event, item.event.id)" @dblclick="editEvent($event, item.event.id)" @keydown="eventKeyboard($event, item.event)">
+       <span class="schedule-resize-handle resize-start" data-testid="resize-start" data-resize="start" title="拖动调整开始日期" aria-hidden="true" />
        <strong class="schedule-event-title">{{ item.event.title }}</strong>
        <span class="schedule-event-dates">{{ item.event.startDate.slice(5).replace('-', '/') }} — {{ item.event.endDate.slice(5).replace('-', '/') }}</span>
        <span v-if="mode === 'global' && item.event.roleId" class="schedule-event-owner">{{ roleById.get(item.event.roleId)?.name }}</span>
-       <span class="schedule-resize-handle resize-end" data-testid="resize-end" data-resize="end" title="拖动调整结束日期" @pointerdown.stop="startGesture($event, item.event, row.key, 'end')" />
-       <span class="schedule-resize-handle resize-height" data-testid="resize-height" data-resize="height" title="拖动调整为整行或半行高度" @pointerdown.stop="startGesture($event, item.event, row.key, 'height')" />
+       <span class="schedule-resize-handle resize-end" data-testid="resize-end" data-resize="end" title="拖动调整结束日期" aria-hidden="true" />
+       <span class="schedule-resize-handle resize-height" data-testid="resize-height" data-resize="height" title="拖动调整为整行或半行高度" aria-hidden="true" />
       </button>
      </div>
      <button type="button" role="separator" aria-orientation="horizontal" class="schedule-track-resize" :data-testid="`track-resize-${rowTestKey(row)}`" :data-track-key="row.key" :aria-label="`调整${row.name}轨道高度`" :aria-valuemin="MIN_TRACK_HEIGHT" :aria-valuemax="MAX_TRACK_HEIGHT" :aria-valuenow="rowHeight(row.key)" :aria-valuetext="`${rowHeight(row.key) / TRACK_STEP} 格，每格 ${TRACK_STEP} 像素`" :title="`拖动调整轨道高度（每格 ${TRACK_STEP} px）；方向键逐格调整，Home / End 最小 / 最大`" :disabled="disabled || !active" @pointerdown="startTrackGesture($event, row)" @keydown="trackKeyboard($event, row)" @dblclick.stop @click.stop><span /></button>
@@ -427,8 +475,8 @@ defineExpose({ cancelGesture, zoomTo })
     <div v-else-if="mode === 'global' && rows.length === 1" class="schedule-timeline-empty">人员事件会按开始日期汇总显示在这里。</div>
    </div>
   </div>
-  <div v-if="preview" class="schedule-preview-overlay" aria-hidden="true"><div class="schedule-event schedule-event-ghost" :class="{ 'event-half': preview.height === .5 }" :style="ghostStyle" :data-slot="preview.slot"><strong class="schedule-event-title">{{ preview.title }}</strong><span class="schedule-event-dates">{{ preview.startDate.slice(5).replace('-', '/') }} — {{ preview.endDate.slice(5).replace('-', '/') }}</span><span class="schedule-event-owner">{{ dragKind === 'height' ? `${preview.height * 100}% · ${preview.height === 1 ? '全天' : preview.slot === 1 ? '下午' : '上午'}` : `${previewOwner} · ${preview.height === 1 ? '全天' : preview.slot === 1 ? '下午' : '上午'}` }}</span></div></div>
-  <div class="schedule-timeline-help"><span>双击添加或编辑 · 拖动移动 · 左右拉伸日期 · 事件底边调整比例 · 轨道底边按 28 px 吸附</span><span v-if="hiddenEvents">{{ hiddenEvents }} 个事件日期已隐藏</span><span v-else>Shift+↑↓ 切换上下午 · Ctrl+滚轮缩放</span></div>
+  <div v-if="preview" class="schedule-preview-overlay" aria-hidden="true"><div class="schedule-event schedule-event-ghost" :class="{ 'event-half': preview.height === .5, 'event-copy-ghost': copyMode }" :style="ghostStyle" :data-slot="preview.slot" :data-copy="copyMode"><strong class="schedule-event-title">{{ preview.title }}</strong><span class="schedule-event-dates">{{ preview.startDate.slice(5).replace('-', '/') }} — {{ preview.endDate.slice(5).replace('-', '/') }}</span><span class="schedule-event-owner">{{ dragKind === 'height' ? `${preview.height * 100}% · ${preview.height === 1 ? '全天' : preview.slot === 1 ? '下午' : '上午'}` : `${previewOwner} · ${preview.height === 1 ? '全天' : preview.slot === 1 ? '下午' : '上午'}` }}</span></div><span v-if="copyMode" class="schedule-copy-preview" data-testid="schedule-copy-preview" :style="{ left: ghostStyle.left, top: ghostStyle.top }">复制</span></div>
+  <div class="schedule-timeline-help"><span>双击添加或编辑 · 拖动移动 · Ctrl+拖动复制 · 边缘拉伸日期 · 事件底边调整比例 · 轨道底边按 28 px 吸附</span><span v-if="hiddenEvents">{{ hiddenEvents }} 个事件日期已隐藏</span><span v-else>Shift+↑↓ 切换上下午 · Ctrl+滚轮缩放</span></div>
   <span class="schedule-sr-only" role="status" aria-live="polite">{{ announcement }}</span>
  </section>
 </template>
@@ -446,6 +494,7 @@ defineExpose({ cancelGesture, zoomTo })
 .schedule-week { position: absolute; height: 28px; border-right: 1px solid var(--ui-line-strong); display: flex; align-items: center; gap: 8px; padding: 0 10px; overflow: hidden; white-space: nowrap; }
 .schedule-week strong { font-size: 11px; color: var(--ui-accent); }
 .schedule-week>span { color: var(--ui-subtle); font-size: 10px; }
+.schedule-week-compact { flex-direction: column-reverse; justify-content: center; gap: 0; padding: 1px 3px; line-height: 12px; }.schedule-week-compact>span { font-size: 9px; line-height: 11px; }.schedule-week-compact strong { font-size: 11px; line-height: 12px; }
 .schedule-day-header { height: 44px; position: relative; }
 .schedule-day { position: absolute; height: 44px; border-right: 1px solid var(--ui-line); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.35; gap: 3px; font-size: 11px; font-variant-numeric: tabular-nums; }
 .schedule-day small { color: var(--ui-subtle); font-size: 9px; }
@@ -478,14 +527,17 @@ defineExpose({ cancelGesture, zoomTo })
 .schedule-event.event-half .schedule-event-owner { position: absolute; right: 8px; top: 5px; max-width: 42%; }
 .schedule-event.event-half:has(.schedule-event-owner) .schedule-event-title { padding-right: 45%; }
 .schedule-event.event-drag-source { opacity: .22; }
-.schedule-resize-handle { position: absolute; z-index: 4; touch-action: none; }
-.resize-start,.resize-end { top: 0; bottom: 5px; width: 8px; cursor: ew-resize; }
+.schedule-resize-handle { position: absolute; z-index: 4; pointer-events: none; }
+.resize-start,.resize-end { top: 0; bottom: var(--resize-bottom-height); width: var(--resize-side-width); }
 .resize-start { left: 0; }.resize-end { right: 0; }
-.resize-start::after,.resize-end::after { content: ''; position: absolute; top: 35%; bottom: 35%; width: 2px; background: var(--event-color); opacity: .6; border-radius: 2px; }
+.resize-start::after,.resize-end::after { content: ''; position: absolute; top: 35%; bottom: 35%; width: 3px; background: var(--event-color); opacity: .65; border-radius: 2px; }
 .resize-start::after { left: 2px; }.resize-end::after { right: 2px; }
-.resize-height { height: 7px; bottom: 0; left: 8px; right: 8px; cursor: ns-resize; }
-.resize-height::after { content: ''; position: absolute; left: calc(50% - 8px); width: 16px; height: 2px; bottom: 2px; border-radius: 2px; background: var(--event-color); opacity: .55; }
+.resize-height { height: var(--resize-bottom-height); bottom: 0; left: var(--resize-side-width); right: var(--resize-side-width); }
+.resize-height::after { content: ''; position: absolute; left: 50%; width: min(20px, 70%); transform: translateX(-50%); height: 3px; bottom: 2px; border-radius: 2px; background: var(--event-color); opacity: .65; }
+.schedule-event:hover .schedule-resize-handle::after,.schedule-event:focus-visible .schedule-resize-handle::after { opacity: 1; }
 .schedule-preview-overlay { position: absolute; inset: 0 0 27px; overflow: hidden; pointer-events: none; z-index: 20; clip-path: inset(72px 0 0 192px); }
+.schedule-copy-preview { position: absolute; transform: translate(4px, 4px); padding: 2px 6px; border-radius: 4px; background: var(--ui-accent); color: white; font-size: 10px; font-weight: 600; box-shadow: 0 1px 4px #0002; white-space: nowrap; }
+.event-copy-ghost { outline-style: dashed !important; }
 .schedule-event-ghost { pointer-events: none; outline: 2px solid var(--event-color); outline-offset: 1px; box-shadow: 0 4px 12px #0002; opacity: .95; }
 .schedule-calendar-empty,.schedule-timeline-empty { position: sticky; left: 0; width: min(100%, 800px); padding: 30px 22px; font-size: 12px; color: var(--ui-muted); }
 .schedule-timeline-help { flex: none; height: 27px; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 0 12px; border-top: 1px solid var(--ui-line); background: var(--ui-surface-muted); color: var(--ui-subtle); font-size: 9px; }
@@ -505,6 +557,7 @@ defineExpose({ cancelGesture, zoomTo })
 .schedule-track-resize:disabled { cursor: default; }
 .track-resizing .schedule-track-label { background-color: var(--ui-accent-soft); }
 .is-dragging { user-select: none; }
+.is-copying .schedule-timeline-scroll,.is-copying .schedule-timeline-scroll * { cursor: copy !important; }
 .is-disabled .schedule-track-lane { cursor: default; }
 @media (max-width: 650px) { .schedule-timeline-help>span:last-child { display: none; } }
 </style>

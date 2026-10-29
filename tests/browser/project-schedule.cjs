@@ -4,6 +4,8 @@
  * Automatic holiday regression: OFFICE_SCHEDULE_FOCUS=holiday-refresh node tests/browser/project-schedule.cjs
  * Compact toolbar, track sizing and file/image export: OFFICE_SCHEDULE_FOCUS=layout-export node tests/browser/project-schedule.cjs
  * Half-day slots and pointer-anchored wheel zoom: OFFICE_SCHEDULE_FOCUS=daypart-zoom node tests/browser/project-schedule.cjs
+ * Direct event-edge resizing and Ctrl-drag copies: OFFICE_SCHEDULE_FOCUS=resize-copy node tests/browser/project-schedule.cjs
+ * ISO annual/project-relative week numbering: OFFICE_SCHEDULE_FOCUS=annual-weeks node tests/browser/project-schedule.cjs
  * Synthetic project data only. No screen-capture, microphone or native I/O API.
  */
 const assert = require('node:assert/strict');
@@ -14,8 +16,8 @@ const { chromium } = require('playwright');
 const { PNG } = require('pngjs');
 const root = path.resolve(__dirname, '../..');
 const focus = process.env.OFFICE_SCHEDULE_FOCUS || '';
-const output = path.resolve(process.env.OFFICE_SCHEDULE_OUTPUT || path.join(root, ['unknown-year', 'holiday-refresh', 'layout-export', 'daypart-zoom'].includes(focus) ? `test-results/project-schedule-${focus}` : 'test-results/project-schedule'));
-const sources = ['src/App.vue', 'src/style.css', 'src/components/ScheduleEditor.vue', 'src/schedule/components/ScheduleTimeline.vue', 'src/schedule/model.ts', 'src/schedule/calendar.ts', 'src/schedule/holidays.ts', 'src/schedule/holiday-native.ts', 'src/schedule/session.ts', 'src/schedule/layout.ts', 'src/schedule/zoom.ts', 'src/schedule/png-export.ts', 'src/shared/document.ts'];
+const output = path.resolve(process.env.OFFICE_SCHEDULE_OUTPUT || path.join(root, ['unknown-year', 'holiday-refresh', 'layout-export', 'daypart-zoom', 'resize-copy', 'annual-weeks'].includes(focus) ? `test-results/project-schedule-${focus}` : 'test-results/project-schedule'));
+const sources = ['src/App.vue', 'src/style.css', 'src/components/ScheduleEditor.vue', 'src/schedule/components/ScheduleTimeline.vue', 'src/schedule/model.ts', 'src/schedule/calendar.ts', 'src/schedule/holidays.ts', 'src/schedule/holiday-native.ts', 'src/schedule/session.ts', 'src/schedule/layout.ts', 'src/schedule/interaction.ts', 'src/schedule/zoom.ts', 'src/schedule/png-export.ts', 'src/shared/document.ts'];
 const hashes = () => Object.fromEntries(sources.map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex')]));
 const report = { ok: false, runtime: 'Real Vue schedule UI in system Chromium over local Vite HTTP; real browser downloads and file input; allowlisted public holiday responses are deterministic fixtures', checks: [], screenshots: [], gestures: [], errors: [], consoleErrors: [], externalRequests: [], holidayRequests: [], expectedNetworkErrors: [], limitations: ['Native file dialogs, desktop filesystem autosave and platform WebViews are not exercised.', 'Holiday fetches use the real browser fetch/client/cache path with fixture responses; live upstream availability is not asserted.', 'Pointer input is automated Chromium mouse input; physical touch and operating-system accessibility tools are not exercised.', 'Browser page screenshots require visual review.'] };
 let server, browser, page;
@@ -125,9 +127,11 @@ async function gesture(locator, dx, dy, cancel = false) {
   const visibleLeft = Math.max(box.x, viewport.x + 194), visibleRight = Math.min(box.x + box.width, viewport.x + viewport.width - 8);
   assert.ok(visibleRight > visibleLeft, 'Gesture target has a visible part in the timeline');
   const start = { x: (visibleLeft + visibleRight) / 2, y: box.y + box.height / 2 }, end = { x: start.x + dx, y: start.y + dy };
-  assert.equal(await locator.evaluate((element, point) => element.contains(document.elementFromPoint(point.x, point.y)), start), true, 'Pointer starts on the actual visible gesture target');
+  assert.equal(await locator.evaluate((element, point) => element.contains(document.elementFromPoint(point.x, point.y)) || (element.matches('[data-resize]') && element.closest('[data-event-id]') === document.elementFromPoint(point.x, point.y)?.closest('[data-event-id]')), start), true, 'Pointer starts on the actual visible gesture target');
   report.gestures.push({ stage: report.stage, selector: await locator.getAttribute('data-testid'), start, end, cancel }); persist();
-  await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(end.x, end.y, { steps: 10 });
+  await page.mouse.move(start.x, start.y); await page.mouse.down();
+  const expectedKind = await locator.getAttribute('data-resize'); if (expectedKind) assert.equal(await timeline().getAttribute('data-gesture'), expectedKind, 'Visual grip coordinates start the intended resize action');
+  await page.mouse.move(end.x, end.y, { steps: 10 });
   if (cancel) await page.keyboard.press('Escape');
   await page.mouse.up(); await frame();
 }
@@ -455,6 +459,191 @@ async function daypartZoomChecks() {
   });
 }
 
+
+async function eventPoint(id, edge = 'center') {
+  await eventElement(id).scrollIntoViewIfNeeded(); await frame(); const box = await eventElement(id).boundingBox(); assert.ok(box);
+  return { x: edge === 'start' ? box.x + .5 : edge === 'end' ? box.x + box.width - .5 : box.x + box.width / 2, y: edge === 'height' ? box.y + box.height - .5 : box.y + box.height / 2 };
+}
+async function hoverCursor(id, edge) {
+  const point = await eventPoint(id, edge); await page.mouse.move(point.x, point.y); await frame();
+  return page.evaluate(point => { const target = document.elementFromPoint(point.x, point.y); return { cursor: getComputedStyle(target).cursor, event: target.closest('[data-event-id]')?.getAttribute('data-event-id') }; }, point);
+}
+async function directEdgeDrag(id, edge, dx, dy, ctrl = false) {
+  const start = await eventPoint(id, edge); await page.mouse.move(start.x, start.y); if (ctrl) await page.keyboard.down('Control');
+  try {
+    await page.mouse.down(); assert.equal(await timeline().getAttribute('data-gesture'), edge); await page.mouse.move(start.x + dx, start.y + dy, { steps: 8 }); await frame();
+    assert.equal(await timeline().locator('.schedule-event-ghost').getAttribute('data-copy'), 'false', 'An edge drag always resizes, including with Ctrl');
+    await page.mouse.up();
+  } finally { if (ctrl) await page.keyboard.up('Control'); }
+  await frame();
+}
+async function copyDrag(id, { days = 4, role, slot, initialCtrl = true, finalCtrl = true, cancel = false, click = false, button = 'left' } = {}) {
+  const item = await eventState(id), start = await eventPoint(id), width = Number(await timeline().getAttribute('data-day-width'));
+  let y = start.y;
+  if (role !== undefined || slot !== undefined) {
+    const target = role === undefined ? item.roleId : role, lane = await editor().getByTestId(`schedule-lane-${target || 'overall'}`).boundingBox(); assert.ok(lane);
+    y = lane.y + 9 + (lane.height - 18) * ((slot ?? item.slot) ? .75 : .25);
+  }
+  const end = { x: start.x + (click ? 0 : days * width), y: click ? start.y : y };
+  if (initialCtrl) await page.keyboard.down('Control'); await page.mouse.move(start.x, start.y);
+  try {
+    await page.mouse.down({ button }); if (!click) await page.mouse.move(end.x, end.y, { steps: 8 }); await frame();
+    if (initialCtrl !== finalCtrl) { await page.keyboard[finalCtrl ? 'down' : 'up']('Control'); await frame(); }
+    if (!click) {
+      assert.equal(await timeline().locator('.schedule-event-ghost').getAttribute('data-copy'), String(finalCtrl));
+      assert.equal(await editor().getByTestId('schedule-copy-preview').isVisible(), finalCtrl);
+      if (finalCtrl) assert.ok(Number(await eventElement(id).evaluate(element => getComputedStyle(element).opacity)) > .8, 'The original stays visibly intact during a copy preview');
+    }
+    if (cancel) await page.keyboard.press('Escape'); await page.mouse.up({ button });
+  } finally { await page.keyboard.up('Control'); }
+  await frame();
+}
+async function resizeCopyChecks() {
+  const edgeFixture = { format: 'open-office-schedule', version: 1, id: 'edge_project', title: '未选中直接拉伸', startDate: '2026-09-21', endDate: '2026-10-30', calendar: { hideWeekends: false, hideHolidays: false, extraHolidays: [], excludedHolidays: [] }, roles: [{ id: 'edge_a', name: '结束边验证', role: '半高', color: '#2563eb' }, { id: 'edge_b', name: '开始边验证', role: '半高', color: '#cc0044' }, { id: 'edge_c', name: '高度边验证', role: '全天', color: '#00aa88' }], events: [{ id: 'right_event', roleId: 'edge_a', title: '先不选中，直接拉结束边', startDate: '2026-09-23', endDate: '2026-09-25', height: .5, slot: 1, notes: '' }, { id: 'left_event', roleId: 'edge_b', title: '直接拉开始边', startDate: '2026-09-23', endDate: '2026-09-25', height: .5, slot: 0, notes: '' }, { id: 'height_event', roleId: 'edge_c', title: '直接拉高度边', startDate: '2026-09-23', endDate: '2026-09-25', height: 1, slot: 0, notes: '' }, { id: 'tiny_event', roleId: 'edge_a', title: '小块', startDate: '2026-09-29', endDate: '2026-09-29', height: .5, slot: 1, notes: '' }], layout: { trackHeights: { 'person-edge_a': 84, 'person-edge_b': 84, 'person-edge_c': 168 } } };
+  await check('unselected-real-border-hover-displays-resize-cursors', async () => {
+    await openFixture('unselected-edges.ooschedule', edgeFixture); await holidayIdle(); assert.equal(await eventElement('right_event').getAttribute('aria-pressed'), 'false');
+    for (const [edge, cursor] of [['start', 'ew-resize'], ['end', 'ew-resize'], ['height', 'ns-resize'], ['center', 'grab']]) { const result = await hoverCursor('right_event', edge); assert.equal(result.event, 'right_event'); assert.equal(result.cursor, cursor, `${edge}: outer border has the intended pointer cursor before any click`); assert.equal(await eventElement('right_event').getAttribute('aria-pressed'), 'false'); }
+  });
+  await check('first-pointer-down-on-each-unselected-border-resizes-instead-of-moving', async () => {
+    let before = await eventState('right_event'); assert.equal(await eventElement('right_event').getAttribute('aria-pressed'), 'false'); await directEdgeDrag('right_event', 'end', 64, 0);
+    let after = await eventState('right_event'); assert.equal(after.startDate, before.startDate); assert.equal(after.endDate, '2026-09-26'); assert.equal(after.slot, 1); assert.equal(after.roleId, before.roleId);
+    before = await eventState('left_event'); assert.equal(await eventElement('left_event').getAttribute('aria-pressed'), 'false'); await directEdgeDrag('left_event', 'start', 64, 0); after = await eventState('left_event'); assert.equal(after.startDate, '2026-09-24'); assert.equal(after.endDate, before.endDate); assert.equal(after.slot, 0);
+    before = await eventState('height_event'); assert.equal(await eventElement('height_event').getAttribute('aria-pressed'), 'false'); await directEdgeDrag('height_event', 'height', 0, -100); after = await eventState('height_event'); assert.equal(after.height, .5); assert.equal(after.slot, 0); assert.equal(after.startDate, before.startDate); assert.equal(after.endDate, before.endDate); assert.equal((await exportedModel()).events.length, 4); await capture('unselected-borders-resized');
+  });
+  await check('minimum-width-half-height-block-retains-move-and-all-resize-targets', async () => {
+    const view = await zoomState(); await wheelAt(view.x + 192 + 300, view.y + 100, 1200); assert.equal((await zoomState()).width, 36);
+    const box = await eventElement('tiny_event').boundingBox(); assert.equal(Math.round(box.width), 30); assert.equal(Math.round(box.height), 33); assert.equal(await eventElement('tiny_event').getAttribute('aria-pressed'), 'false');
+    for (const [edge, cursor] of [['start', 'ew-resize'], ['end', 'ew-resize'], ['height', 'ns-resize'], ['center', 'grab']]) assert.equal((await hoverCursor('tiny_event', edge)).cursor, cursor);
+    await gesture(eventElement('tiny_event'), 36, 0); let event = await eventState('tiny_event'); assert.equal(event.startDate, '2026-09-30'); assert.equal(event.endDate, '2026-09-30'); assert.equal(event.slot, 1);
+    await directEdgeDrag('tiny_event', 'start', 36, 0); event = await eventState('tiny_event'); assert.equal(event.startDate, '2026-09-30'); assert.equal(event.endDate, '2026-09-30', 'Resizing a one-day block cannot make it empty');
+    await directEdgeDrag('tiny_event', 'end', 36, 0); event = await eventState('tiny_event'); assert.equal(event.startDate, '2026-09-30'); assert.equal(event.endDate, '2026-10-01'); assert.equal(event.slot, 1);
+    await directEdgeDrag('tiny_event', 'start', 36, 0); event = await eventState('tiny_event'); assert.equal(event.startDate, '2026-10-01'); assert.equal(event.endDate, '2026-10-01'); assert.equal(event.slot, 1);
+    await directEdgeDrag('tiny_event', 'height', 0, 40); event = await eventState('tiny_event'); assert.equal(event.height, 1); assert.equal(event.slot, 0); await capture('minimum-size-resize-and-move');
+  });
+  const fixture = { format: 'open-office-schedule', version: 1, id: 'copy_project', title: 'Ctrl 拖动复制事件', startDate: '2026-09-21', endDate: '2026-10-30', calendar: { hideWeekends: false, hideHolidays: false, extraHolidays: [], excludedHolidays: [] }, roles: [{ id: 'alice', name: '林设计', role: '设计', color: '#cc0044' }, { id: 'bob', name: '陈开发', role: '开发', color: '#00aa88' }, { id: 'carol', name: '罗测试', role: '测试', color: '#2563eb' }], events: [{ id: 'copy_source', roleId: 'alice', title: '保留名称的交付事件', startDate: '2026-09-23', endDate: '2026-09-24', height: .5, slot: 1, notes: '说明必须完整保留\n第二行备注。' }, { id: 'copy_blocker', roleId: 'bob', title: '已有上午任务', startDate: '2026-09-30', endDate: '2026-10-01', height: .5, slot: 0, notes: '' }], layout: { trackHeights: { 'person-alice': 168, 'person-bob': 84, 'event-copy_source': 196 } } };
+  let baseline, source, finalCopy, finalProject;
+  const newCopy = async before => { const after = await exportedModel(), ids = new Set(before.events.map(event => event.id)), copies = after.events.filter(event => !ids.has(event.id)); assert.equal(copies.length, 1); assert.equal(after.events.length, before.events.length + 1); assert.deepEqual(after.events.find(event => event.id === source.id), source); assert.equal(copies[0].title, source.title); assert.equal(copies[0].notes, source.notes); assert.equal(copies[0].height, source.height); return copies[0]; };
+  await check('ctrl-drag-creates-a-new-id-on-new-dates-and-one-undo-removes-only-copy', async () => {
+    await toolbarImport('ctrl-copy.ooschedule', fixture); await ready(); await saveDownload('复制交互验证.ooschedule', true); baseline = await exportedModel(); source = baseline.events.find(event => event.id === 'copy_source');
+    await copyDrag(source.id); const copy = await newCopy(baseline); assert.equal(copy.roleId, 'alice'); assert.equal(copy.startDate, '2026-09-27'); assert.equal(copy.endDate, '2026-09-28'); assert.equal(copy.slot, 1);
+    const after = await exportedModel(); await undo(); assert.deepEqual(await exportedModel(), baseline); await redo(); assert.deepEqual(await exportedModel(), after); await capture('ctrl-copied-new-date'); await undo();
+  });
+  await check('ctrl-copy-across-different-height-tracks-can-change-daypart', async () => {
+    await copyDrag(source.id, { days: 0, role: 'bob', slot: 0 }); const copy = await newCopy(baseline); assert.equal(copy.roleId, 'bob'); assert.equal(copy.slot, 0); assert.equal(copy.startDate, source.startDate); assert.equal(copy.endDate, source.endDate);
+    const item = await eventElement(copy.id).boundingBox(), lane = await editor().getByTestId('schedule-lane-bob').boundingBox(); assert.equal(Math.round(item.height), 33); assert.ok(Math.abs(item.y - lane.y - 9) < 1); await undo(); assert.deepEqual(await exportedModel(), baseline);
+  });
+  await check('copy-conflicts-preserve-both-events-and-afternoon-does-not-bypass-date-conflict', async () => {
+    await copyDrag(source.id, { days: 7, role: 'bob', slot: 1 }); assert.deepEqual(await exportedModel(), baseline); assert.match(await editor().getByTestId('schedule-error').innerText(), /重叠|冲突|占用/); await closeError();
+    await copyDrag(source.id, { days: 0, role: 'alice', slot: 0 }); assert.deepEqual(await exportedModel(), baseline); assert.match(await editor().getByTestId('schedule-error').innerText(), /重叠|冲突|占用/); await closeError();
+  });
+  await check('ctrl-click-and-escape-cancel-never-create-a-copy', async () => {
+    const state = await scheduleState(); await copyDrag(source.id, { click: true }); assert.deepEqual(await exportedModel(), baseline); assert.deepEqual(await scheduleState(), state);
+    await copyDrag(source.id, { cancel: true }); assert.deepEqual(await exportedModel(), baseline); assert.deepEqual(await scheduleState(), state); assert.equal(await timeline().locator('.schedule-event-ghost').count(), 0);
+  });
+  await check('pressing-control-during-a-drag-switches-preview-and-release-to-copy', async () => {
+    await copyDrag(source.id, { initialCtrl: false, finalCtrl: true }); const copy = await newCopy(baseline); assert.equal(copy.startDate, '2026-09-27'); assert.equal(copy.slot, 1); await undo(); assert.deepEqual(await exportedModel(), baseline);
+  });
+  await check('releasing-control-during-a-drag-switches-final-action-back-to-move', async () => {
+    await copyDrag(source.id, { initialCtrl: true, finalCtrl: false }); let after = await exportedModel(); assert.equal(after.events.length, baseline.events.length); const moved = after.events.find(event => event.id === source.id); assert.equal(moved.startDate, '2026-09-27'); assert.equal(moved.endDate, '2026-09-28'); assert.equal(moved.slot, 1); await undo(); assert.deepEqual(await exportedModel(), baseline);
+    await copyDrag(source.id, { initialCtrl: false, finalCtrl: false }); after = await exportedModel(); assert.equal(after.events.length, baseline.events.length); assert.equal(after.events.find(event => event.id === source.id).startDate, '2026-09-27'); await undo(); assert.deepEqual(await exportedModel(), baseline);
+  });
+  await check('simulated-control-right-button-copies-and-only-its-context-menu-is-suppressed', async () => {
+    await page.evaluate(() => { window.__scheduleContextEvents = []; window.__scheduleContextObserver = event => { setTimeout(() => window.__scheduleContextEvents.push({ prevented: event.defaultPrevented, control: event.ctrlKey, button: event.button, trusted: event.isTrusted, target: event.target?.closest('[data-event-id]')?.getAttribute('data-event-id') }), 0); }; document.addEventListener('contextmenu', window.__scheduleContextObserver, true); });
+    try {
+      await copyDrag(source.id, { button: 'right' }); await newCopy(baseline); const controlled = await page.evaluate(() => window.__scheduleContextEvents.slice()); report.controlContextEvents = controlled; assert.ok(controlled.some(event => event.control && event.trusted && event.prevented), 'Control + right-button mapping suppresses only the copy context menu'); await undo();
+      const point = await eventPoint(source.id); await page.mouse.move(point.x, point.y); await page.mouse.click(point.x, point.y, { button: 'right' }); await frame(); assert.deepEqual(await exportedModel(), baseline); assert.equal(await timeline().locator('.schedule-event-ghost').count(), 0);
+      const events = await page.evaluate(() => window.__scheduleContextEvents); assert.ok(events.some(event => !event.control && event.trusted && !event.prevented), 'Ordinary right-click preserves native context-menu behavior');
+    } finally { await page.evaluate(() => { document.removeEventListener('contextmenu', window.__scheduleContextObserver, true); delete window.__scheduleContextObserver; delete window.__scheduleContextEvents; }); }
+    report.limitations.push('macOS Control-click button 2 mapping used real Chromium right-button input and its trusted contextmenu event, sampled after full event dispatch; this is not a physical Mac/WebKit test.');
+  });
+  await check('control-on-an-event-edge-resizes-without-duplicating', async () => {
+    await directEdgeDrag(source.id, 'end', 64, 0, true); const after = await exportedModel(); assert.equal(after.events.length, baseline.events.length); const event = after.events.find(event => event.id === source.id); assert.equal(event.startDate, source.startDate); assert.equal(event.endDate, '2026-09-25'); assert.equal(event.slot, 1); await undo(); assert.deepEqual(await exportedModel(), baseline);
+  });
+  await check('global-copy-retains-owner-and-source-row-height-in-one-transaction', async () => {
+    await editor().getByTestId('schedule-mode-global').click(); await frame(); await copyDrag(source.id); finalCopy = await newCopy(baseline); finalProject = await exportedModel(); assert.equal(finalCopy.roleId, source.roleId); assert.equal(finalCopy.slot, source.slot); assert.equal(finalProject.layout.trackHeights[`event-${finalCopy.id}`], 196); assert.equal(Number(await track(`event-${finalCopy.id}`).getAttribute('data-track-height')), 196);
+    await undo(); assert.deepEqual(await exportedModel(), baseline); await redo(); assert.deepEqual(await exportedModel(), finalProject); await capture('global-duplicate-retains-row-height');
+  });
+  await check('copied-events-survive-json-png-and-editable-file-round-trip', async () => {
+    const state = await scheduleState(), identity = await active(); const json = await toolbarExport('json', 'copied-project.json'); assert.deepEqual(JSON.parse(json.bytes), finalProject); assert.deepEqual(await scheduleState(), state); assert.deepEqual(await active(), identity);
+    const png = PNG.sync.read((await toolbarExport('png', 'copied-global.png')).bytes), x = (24 + 192 + 6 * 64 + 4) * 2, y = (160 + 112 + 196 + 9 + 89 + 20) * 2;
+    assert.deepEqual(pixel(png, x, y), [204, 0, 68, 255], 'PNG includes the copied afternoon event in its separate 196px global row');
+    const saved = await saveDownload('复制交互验证.ooschedule'); assert.deepEqual(saved.model, finalProject); await toolbarImport('copied-import.json', JSON.parse(json.bytes)); await ready(); assert.deepEqual(await exportedModel(), finalProject); assert.notEqual(finalCopy.id, source.id); assert.equal((await exportedModel()).events.filter(event => event.title === source.title).length, 2);
+    await capture('copied-json-reopened');
+  });
+}
+
+
+async function weekLabels() {
+  return timeline().locator('[data-week]').evaluateAll(elements => elements.map(element => ({ label: element.getAttribute('data-week'), year: element.getAttribute('data-week-year') })));
+}
+async function numbering(mode) { await viewMenu(); await editor().getByTestId('schedule-week-numbering').selectOption(mode); await viewMenu(false); await frame(); }
+async function weekAt(date) {
+  const day = await timeline().locator(`[data-date="${date}"]`).boundingBox(); assert.ok(day, `Date ${date} is rendered`);
+  return timeline().locator('[data-week]').evaluateAll((elements, x) => { const week = elements.find(element => { const bounds = element.getBoundingClientRect(); return x >= bounds.left && x < bounds.right; }); return week ? { label: week.getAttribute('data-week'), year: week.getAttribute('data-week-year') } : null; }, day.x + day.width / 2);
+}
+async function pngWithText(name) {
+  await page.evaluate(() => { window.__schedulePngText = []; window.__scheduleOriginalFillText = CanvasRenderingContext2D.prototype.fillText; CanvasRenderingContext2D.prototype.fillText = function(value, x, y, ...rest) { window.__schedulePngText.push({ text: String(value), x, y, font: this.font, scale: this.getTransform().a }); return window.__scheduleOriginalFillText.call(this, value, x, y, ...rest); }; });
+  try { const result = await toolbarExport('png', name); return { ...result, png: PNG.sync.read(result.bytes), texts: await page.evaluate(() => window.__schedulePngText.slice()) }; }
+  finally { await page.evaluate(() => { CanvasRenderingContext2D.prototype.fillText = window.__scheduleOriginalFillText; delete window.__scheduleOriginalFillText; delete window.__schedulePngText; }); }
+}
+function darkPixels(png, x0, y0, x1, y1) { let count = 0; for (let y = Math.ceil(y0); y < Math.floor(y1); y++) for (let x = Math.ceil(x0); x < Math.floor(x1); x++) { const at = (y * png.width + x) * 4; if (png.data[at] < 170 && png.data[at + 1] < 180 && png.data[at + 2] < 240 && png.data[at + 3] > 200) count++; } return count; }
+async function annualWeekChecks() {
+  const fixture = { format: 'open-office-schedule', version: 1, id: 'annual_week_project', title: '按年与按项目计周', startDate: '2026-09-21', endDate: '2026-10-02', calendar: { hideWeekends: false, hideHolidays: false, extraHolidays: [], excludedHolidays: [] }, roles: [{ id: 'alice', name: '林设计', role: '设计', color: '#2563eb' }], events: [{ id: 'annual_task', roleId: 'alice', title: '跨周任务', startDate: '2026-09-29', endDate: '2026-10-02', height: .5, slot: 1, notes: '模式切换不改日期。' }] };
+  let annualBefore, projectModel, referenceWeek;
+  await check('legacy-project-defaults-to-annual-iso-weeks-without-adding-data', async () => {
+    await openFixture('annual-default.ooschedule', fixture); await holidayIdle(); annualBefore = await exportedModel(); assert.deepEqual(annualBefore, fixture); assert.equal(Object.hasOwn(annualBefore.calendar, 'weekNumbering'), false);
+    assert.deepEqual(await weekLabels(), [{ label: 'W39', year: '2026' }, { label: 'W40', year: '2026' }]); referenceWeek = await weekAt('2026-09-29'); assert.deepEqual(referenceWeek, { label: 'W40', year: '2026' });
+    assert.equal(await timeline().locator('.schedule-week-header').getAttribute('data-week-numbering'), 'year'); await saveDownload('周号模式验证.ooschedule', true); await capture('annual-default-weeks');
+  });
+  await check('project-numbering-switch-is-undoable-and-does-not-rewrite-dates', async () => {
+    const before = await scheduleState(); await numbering('project'); projectModel = await exportedModel(); assert.equal(projectModel.calendar.weekNumbering, 'project'); assert.deepEqual(projectModel.events, fixture.events); assert.equal(projectModel.startDate, fixture.startDate); assert.equal(projectModel.endDate, fixture.endDate);
+    assert.deepEqual(await weekLabels(), [{ label: 'W1', year: null }, { label: 'W2', year: null }]); assert.equal(await timeline().locator('.schedule-week-header').getAttribute('data-week-numbering'), 'project'); assert.equal((await scheduleState()).revision, before.revision + 1);
+    await undo(); assert.deepEqual(await exportedModel(), annualBefore); assert.deepEqual(await weekAt('2026-09-29'), referenceWeek); await redo(); assert.deepEqual(await exportedModel(), projectModel);
+    const sameState = await scheduleState(); await numbering('project'); assert.deepEqual(await scheduleState(), sameState, 'Choosing the already selected mode is a no-op'); await capture('project-relative-weeks');
+  });
+  await check('week-numbering-survives-json-export-import-and-native-format-reopen', async () => {
+    const saved = await saveDownload('周号模式验证.ooschedule'); assert.deepEqual(saved.model, projectModel); const json = await toolbarExport('json', 'project-weeks.json'); assert.deepEqual(JSON.parse(json.bytes), projectModel);
+    await toolbarImport('project-weeks-import.json', JSON.parse(json.bytes)); await ready(); assert.deepEqual(await exportedModel(), projectModel); assert.deepEqual(await weekLabels(), [{ label: 'W1', year: null }, { label: 'W2', year: null }]);
+    await saveDownload('导入项目周.ooschedule', true); await page.getByTestId('document-open-input').setInputFiles(saved.target); await ready(); assert.deepEqual(await exportedModel(), projectModel); assert.equal(await timeline().locator('.schedule-week-header').getAttribute('data-week-numbering'), 'project');
+  });
+  await check('same-date-has-the-same-annual-week-in-projects-with-different-starts', async () => {
+    const later = { ...structuredClone(fixture), id: 'later_start_week_project', title: '较晚开始的同一年度周', startDate: '2026-09-28' };
+    await openFixture('later-start.ooschedule', later); await holidayIdle(); assert.deepEqual(await weekAt('2026-09-29'), referenceWeek); assert.deepEqual(await weekLabels(), [{ label: 'W40', year: '2026' }]);
+    await numbering('project'); assert.deepEqual(await weekAt('2026-09-29'), { label: 'W1', year: null }); assert.deepEqual((await exportedModel()).events, later.events);
+  });
+  await check('iso-year-boundary-uses-previous-year-w53-then-new-year-w1', async () => {
+    const boundary = { ...structuredClone(fixture), id: 'iso_year_boundary', title: '2026 / 2027 跨年排期', startDate: '2026-12-28', endDate: '2027-01-08', events: [{ ...fixture.events[0], id: 'boundary_task', startDate: '2026-12-31', endDate: '2027-01-05' }] };
+    await openFixture('year-boundary.ooschedule', boundary); await holidayIdle(); assert.deepEqual(await weekAt('2026-12-28'), { label: 'W53', year: '2026' }); assert.deepEqual(await weekAt('2027-01-01'), { label: 'W53', year: '2026' }); assert.deepEqual(await weekAt('2027-01-04'), { label: 'W1', year: '2027' }); await capture('iso-year-boundary');
+    await numbering('project'); assert.deepEqual(await weekAt('2026-12-28'), { label: 'W1', year: null }); assert.deepEqual(await weekAt('2027-01-01'), { label: 'W1', year: null }); assert.deepEqual(await weekAt('2027-01-04'), { label: 'W2', year: null }); assert.deepEqual((await exportedModel()).events, boundary.events); await capture('project-weeks-across-year');
+  });
+  await check('late-december-can-belong-to-the-next-iso-week-year', async () => {
+    const earlier = { ...structuredClone(fixture), id: 'iso_next_year', title: '十二月属于下一周年', startDate: '2024-12-30', endDate: '2025-01-10', events: [] };
+    await openFixture('next-week-year.ooschedule', earlier); await holidayIdle(); assert.deepEqual(await weekAt('2024-12-30'), { label: 'W1', year: '2025' }); assert.deepEqual(await weekAt('2025-01-06'), { label: 'W2', year: '2025' }); assert.deepEqual(await exportedModel(), earlier);
+  });
+  await check('hidden-entire-weeks-do-not-renumber-annual-or-project-weeks', async () => {
+    const hidden = { ...structuredClone(fixture), id: 'hidden_whole_week', title: '隐藏整周保留周序', startDate: '2026-06-01', endDate: '2026-06-26', calendar: { hideWeekends: true, hideHolidays: true, extraHolidays: ['2026-06-08', '2026-06-09', '2026-06-10', '2026-06-11', '2026-06-12'], excludedHolidays: [] }, events: [{ ...fixture.events[0], id: 'hidden_week_task', startDate: '2026-06-16', endDate: '2026-06-18' }] };
+    await openFixture('hidden-week.ooschedule', hidden); await holidayIdle(); assert.deepEqual(await weekLabels(), [{ label: 'W23', year: '2026' }, { label: 'W25', year: '2026' }, { label: 'W26', year: '2026' }]); const beforeDates = await shownDates();
+    await numbering('project'); assert.deepEqual(await weekLabels(), [{ label: 'W1', year: null }, { label: 'W3', year: null }, { label: 'W4', year: null }]); assert.deepEqual(await shownDates(), beforeDates); assert.deepEqual((await exportedModel()).events, hidden.events);
+  });
+  await check('single-visible-day-weeks-show-complete-year-and-week-at-minimum-zoom', async () => {
+    // Close the older imported tab before adding another project: preserve the app's eight-tab limit.
+    const narrow = { ...structuredClone(fixture), id: 'narrow_week_headers', title: '窄列周号与PNG验证', startDate: '2027-01-01', endDate: '2027-01-04', calendar: { hideWeekends: true, hideHolidays: false, extraHolidays: [], excludedHolidays: [] }, events: [] };
+    await page.locator('.document-tab').first().locator('.tab-name').click(); await ready(); await page.locator('.document-tab').first().getByRole('button').last().click(); await frame();
+    await openFixture('narrow-weeks.ooschedule', narrow); await holidayIdle(); const view = await zoomState(); await wheelAt(view.x + 192 + 100, view.y + 100, 1200); assert.equal((await zoomState()).width, 36); assert.deepEqual(await weekLabels(), [{ label: 'W53', year: '2026' }, { label: 'W1', year: '2027' }]);
+    const cells = await timeline().locator('[data-week]').evaluateAll(elements => elements.map(element => { const title = element.querySelector('strong'), caption = element.querySelector('span'), t = title.getBoundingClientRect(), c = caption.getBoundingClientRect(); return { width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height, title: title.textContent, caption: caption.textContent, captionAbove: c.top < t.top, titleFits: title.scrollWidth <= title.clientWidth, captionFits: caption.scrollWidth <= caption.clientWidth }; }));
+    assert.equal(cells.length, 2); for (const cell of cells) { assert.equal(cell.width, 36); assert.equal(cell.height, 28); assert.equal(cell.captionAbove, true); assert.equal(cell.titleFits, true); assert.equal(cell.captionFits, true); } assert.deepEqual(cells.map(cell => cell.caption), ['2026', '2027']); await capture('narrow-annual-week-headers');
+  });
+  await check('png-uses-current-week-mode-and-renders-narrow-headings-without-truncation', async () => {
+    const yearModel = await exportedModel(), yearState = await scheduleState(), year = await pngWithText('narrow-annual-weeks.png'); assert.deepEqual(await exportedModel(), yearModel); assert.deepEqual(await scheduleState(), yearState);
+    assert.ok(year.texts.some(entry => entry.text.includes('按年计周'))); const headerText = result => result.texts.filter(entry => entry.y >= 88 && entry.y < 116 && entry.x >= 216);
+    assert.deepEqual(headerText(year).map(entry => entry.text), ['2026', 'W53', '2027', 'W1']);
+    for (const column of [0, 1]) for (const [top, bottom] of [[89, 101], [101, 115]]) assert.ok(darkPixels(year.png, (216 + column * 36) * 2, top * 2, (252 + column * 36) * 2, bottom * 2) > 2, 'PNG contains both caption and week text pixels inside every narrow column');
+    await numbering('project'); const project = await pngWithText('narrow-project-weeks.png'); assert.ok(project.texts.some(entry => entry.text.includes('按项目计周'))); assert.deepEqual(headerText(project).map(entry => entry.text), ['项目周', 'W1', '项目周', 'W2']); assert.equal(project.png.width, year.png.width); assert.equal(project.png.height, year.png.height);
+    assert.deepEqual(await weekLabels(), [{ label: 'W1', year: null }, { label: 'W2', year: null }]); assert.deepEqual(await timeline().locator('[data-week] span').allTextContents(), ['项目', '项目']); assert.deepEqual((await exportedModel()).events, yearModel.events); await capture('narrow-project-week-headers');
+    report.weekPng = { annual: path.basename(year.target), project: path.basename(project.target), annualText: headerText(year), projectText: headerText(project) };
+  });
+}
+
 (async () => {
   try {
     report.startedAt = new Date().toISOString(); report.sourcesBefore = hashes();
@@ -474,6 +663,8 @@ async function daypartZoomChecks() {
     if (focus === 'holiday-refresh') { await holidayRefreshChecks(); completeReport(); return; }
     if (focus === 'layout-export') { await layoutExportChecks(); completeReport(); return; }
     if (focus === 'daypart-zoom') { await daypartZoomChecks(); completeReport(); return; }
+    if (focus === 'resize-copy') { await resizeCopyChecks(); completeReport(); return; }
+    if (focus === 'annual-weeks') { await annualWeekChecks(); completeReport(); return; }
     if (focus === 'unknown-year') {
       await check('unknown-year-notice-respects-both-weekend-display-states', async () => {
         const value = { format: 'open-office-schedule', version: 1, id: 'unknown_year_toggle', title: '未知年份周末显示验证', startDate: '2035-06-04', endDate: '2035-06-29', calendar: { hideWeekends: true, hideHolidays: true, extraHolidays: ['2035-06-12'], excludedHolidays: [] }, roles: [], events: [{ id: 'unknown_year_event', roleId: null, title: '跨周工作安排', startDate: '2035-06-08', endDate: '2035-06-14', height: 1, slot: 0, notes: '合成测试数据' }] };
@@ -505,7 +696,7 @@ async function daypartZoomChecks() {
       const dates = await timeline().locator('[data-date]').evaluateAll(elements => elements.map(element => element.getAttribute('data-date')));
       for (const day of ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-28']) assert.ok(dates.includes(day), `Working date ${day} appears`);
       for (const day of ['2026-09-25', '2026-09-26', '2026-09-27', '2026-10-01']) assert.ok(!dates.includes(day), `Hidden date ${day} is absent`);
-      assert.match(await timeline().innerText(), /W1/); assert.match(await timeline().innerText(), /W2/);
+      assert.equal(await timeline().locator('[data-week="W39"][data-week-year="2026"]').count(), 1); assert.equal(await timeline().locator('[data-week="W40"][data-week-year="2026"]').count(), 1);
     });
     await check('create-overall-event-and-person-event-from-empty-track', async () => {
       overall = await createEvent({ title: '版本整体计划', roleId: null, startDate: '2026-09-21', endDate: '2026-09-30', notes: '合成测试项目：设计、实现与验证。' });
