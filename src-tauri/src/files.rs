@@ -1739,7 +1739,12 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let data = directory.path().join("data");
         let store = DocumentStore::new(data.clone()).unwrap();
-        let source = directory.path().join("项目排期.ooschedule");
+        // Keep an unnormalized input path so every platform exercises the
+        // canonical identity used by the document store (including macOS /var
+        // aliases and Windows extended-length paths).
+        let alias = directory.path().join("input-alias");
+        fs::create_dir(&alias).unwrap();
+        let source = alias.join("..").join("项目排期.ooschedule");
         let original = serde_json::to_vec(&schedule_fixture()).unwrap();
         fs::write(&source, &original).unwrap();
         let opened = store.register_open(source.clone()).unwrap();
@@ -1767,7 +1772,10 @@ mod tests {
         assert_eq!(document.sha256, hash_bytes(&exported));
         assert_eq!(document.size_bytes, exported.len() as u64);
         assert!(store.record(&document.id).is_err());
-        assert_eq!(store.record(&opened.id).unwrap().path, source);
+        assert_eq!(
+            store.record(&opened.id).unwrap().path,
+            fs::canonicalize(&source).unwrap()
+        );
         assert_eq!(store.record(&opened.id).unwrap().sha256, opened.sha256);
         assert_eq!(fs::read(&source).unwrap(), original);
         assert_eq!(fs::read(&copy).unwrap(), exported);
