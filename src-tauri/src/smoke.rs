@@ -256,6 +256,49 @@ mod tests {
     }
 
     #[test]
+    fn editing_report_preserves_captured_time_origin_across_json_round_trips() {
+        for token in [
+            "1793268980221.5203",
+            "1793268980221.5205",
+            "1793268980221.5208",
+        ] {
+            // The boot detail is a nested JSON string; the report arrives as a
+            // numeric IPC value. Both must preserve the same captured binary64.
+            let expected = token.parse::<f64>().unwrap().to_bits();
+            let boot_id = "382e2a51-7a2a-43e1-8d10-4e28cf122ba1";
+            let detail = format!(r#"{{"bootId":"{boot_id}","timeOrigin":{token}}}"#);
+            let raw = format!(r#"{{"ok":true,"editing":{detail}}}"#);
+            let report: Value = serde_json::from_str(&raw).unwrap();
+            assert_eq!(
+                report["editing"]["timeOrigin"].as_f64().unwrap().to_bits(),
+                expected
+            );
+
+            let directory = tempfile::tempdir().unwrap();
+            let output = directory.path().join("report.json");
+            let mut smoke = Smoke::new(output.clone(), || {});
+            smoke.scope = "macos-editing";
+            smoke.note("document-start", &detail);
+            assert!(smoke.report(&report).unwrap());
+            let saved: Value = serde_json::from_slice(&std::fs::read(output).unwrap()).unwrap();
+            assert_eq!(
+                saved["editing"]["timeOrigin"].as_f64().unwrap().to_bits(),
+                expected
+            );
+            assert_eq!(saved["editing"]["bootId"], boot_id);
+            assert_eq!(
+                saved["nativeLifecycle"],
+                json!({"generation":1,"terminations":0})
+            );
+            let diagnostics: Value = serde_json::from_slice(
+                &std::fs::read(directory.path().join("diagnostics.json")).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(diagnostics["events"][0]["detail"], detail);
+        }
+    }
+
+    #[test]
     fn full_diagnostic_requires_one_host_observed_document_and_preserves_failures() {
         let directory = tempfile::tempdir().unwrap();
         let output = directory.path().join("report.json");
