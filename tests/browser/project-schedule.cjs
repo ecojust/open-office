@@ -654,19 +654,64 @@ async function monthlyValue(role, month, scheduled, available) {
   const percentage = await cell.getAttribute('data-percentage');
   if (available) { assert.ok(Math.abs(Number(percentage) - scheduled / available * 100) < .051); assert.equal(await cell.locator('strong').innerText(), `${Number((scheduled / available * 100).toFixed(1))}%`); }
   else { assert.equal(percentage, null); assert.equal(await cell.locator('strong').innerText(), '—'); }
+  assert.equal(await cell.textContent(), `${month.slice(2).replace('-', '.')}-${available ? `${Number((scheduled / available * 100).toFixed(1))}%` : '—'}`);
+  assert.equal(await cell.getAttribute('aria-label'), await cell.getAttribute('title'));
+  assert.equal(await cell.evaluate(element => { const bounds = element.getBoundingClientRect(); return element.scrollWidth <= element.clientWidth + 1 && Array.from(element.children).every(child => { const box = child.getBoundingClientRect(); return box.left >= bounds.left && box.right <= bounds.right; }); }), true, 'Compact month and full percentage fit inside the tag');
   assert.match(await cell.getAttribute('title'), new RegExp(`已排 ${scheduled} 天 / 可排 ${available} 天`));
+}
+async function personHeading(role, truncated = false) {
+  const layout = await editor().getByTestId(`schedule-label-${role}`).evaluate(label => {
+    const heading = label.querySelector('.schedule-label-heading'), name = heading.querySelector('strong'), role = heading.querySelector('span');
+    const box = element => { const { x, y, width, height } = element.getBoundingClientRect(); return { x, y, width, height }; };
+    return { label: box(label), heading: box(heading), name: box(name), role: box(role), truncated: [name, role].map(element => element.scrollWidth > element.clientWidth && getComputedStyle(element).textOverflow === 'ellipsis'), title: role.title, text: role.textContent };
+  });
+  assert.equal(layout.label.width, 192); assert.ok(layout.heading.height <= 18);
+  assert.ok(Math.abs(layout.name.y - layout.role.y) <= 3 && layout.role.x >= layout.name.x + layout.name.width, 'Name and role share one line');
+  assert.ok(layout.role.x + layout.role.width <= layout.label.x + layout.label.width); assert.equal(layout.title, layout.text, 'Truncated role retains its full hover text');
+  if (truncated) assert.deepEqual(layout.truncated, [true, true], 'Long names and roles use ellipsis without widening the label');
+}
+async function reachEveryMonth(list) {
+  const months = await list.evaluate(element => Array.from(element.querySelectorAll('[data-month]'), item => {
+    element.scrollTop += item.getBoundingClientRect().top - element.getBoundingClientRect().top;
+    const area = element.getBoundingClientRect(), box = item.getBoundingClientRect();
+    return { month: item.getAttribute('data-month'), visible: box.top >= area.top - 1 && box.bottom <= area.bottom + 1 };
+  }));
+  assert.equal(months.length, 37); assert.equal(months.at(-1).month, '2031-01'); assert.ok(months.every(item => item.visible), 'Every month can be fully exposed by scrolling its tag list');
 }
 async function monthlySnapshot() {
   return editor().locator('.schedule-workload-list').evaluateAll(lists => lists.map(list => ({ role: list.getAttribute('data-testid'), months: Array.from(list.querySelectorAll('[data-month]'), item => ({ month: item.getAttribute('data-month'), scheduled: item.getAttribute('data-scheduled-days'), available: item.getAttribute('data-available-days'), percentage: item.getAttribute('data-percentage') })) })));
 }
+async function eventWorkload(id, days) {
+  const block = eventElement(id); await block.hover();
+  assert.equal(await block.evaluate(element => element.matches(':hover')), true);
+  const title = await block.getAttribute('title');
+  assert.ok(title.split('\n').includes(`工时：${days} 天`), `${id} shows ${days} working days on hover`);
+  assert.equal(await block.getAttribute('aria-label'), title, 'Accessible event description includes the same workload');
+}
 async function monthlyWorkloadChecks() {
   const fixture = { format: 'open-office-schedule', version: 1, id: 'monthly_workload_project', title: '跨月人员工时占比', startDate: '2025-12-29', endDate: '2026-01-06', calendar: { hideWeekends: true, hideHolidays: true, extraHolidays: ['2026-01-05'], excludedHolidays: ['2026-01-02'] }, roles: [{ id: 'alice', name: '林设计', role: '设计', color: '#cc0044' }, { id: 'bob', name: '陈开发', role: '开发', color: '#00aa88' }], events: [{ id: 'monthly_overall', roleId: null, title: '整体计划不计人员工时', startDate: '2025-12-29', endDate: '2026-01-06', height: 1, slot: 0, notes: '' }, { id: 'monthly_cross', roleId: 'alice', title: '跨月整天任务', startDate: '2025-12-30', endDate: '2026-01-02', height: 1, slot: 0, notes: '' }, { id: 'monthly_half', roleId: 'alice', title: '下午半天任务', startDate: '2026-01-06', endDate: '2026-01-06', height: .5, slot: 1, notes: '' }, { id: 'monthly_bob', roleId: 'bob', title: '上午半天跨月', startDate: '2025-12-29', endDate: '2026-01-06', height: .5, slot: 0, notes: '' }], layout: { trackHeights: { 'person-bob': 84 } } };
   let initialMatrix, baseline;
+  const personTags = role => monthlyList(role).locator('[data-month]').evaluateAll(elements => elements.map(element => element.textContent));
+  async function monthlyPng(name, expected) {
+    const model = await exportedModel(), state = await scheduleState(), identity = await active(), result = await pngWithText(name);
+    const tags = result.texts.filter(item => /^\d{2}\.\d{2}-(?:\d+(?:\.\d+)?%|—)$/.test(item.text));
+    assert.deepEqual(tags.map(item => item.text).sort(), expected.slice().sort(), 'PNG draws every monthly tag exactly as shown in the person list');
+    assert.ok(result.texts.every(item => !/\d+\s*(?:个|项)?\s*事件|事件\s*[：:]?\s*\d+/.test(item.text)), 'PNG has no generated event counts in its heading, rows, or footer');
+    for (const tag of tags) {
+      assert.ok((tag.y + 9) * tag.scale < result.png.height && (tag.x - 36) * tag.scale >= 0, 'The entire monthly tag lies inside the downloaded image');
+      assert.ok(darkPixels(result.png, (tag.x - 33) * tag.scale, (tag.y - 6) * tag.scale, (tag.x + 33) * tag.scale, (tag.y + 6) * tag.scale) > 0, 'Actual PNG contains dark text pixels for every tag');
+    }
+    assert.deepEqual(await exportedModel(), model); assert.deepEqual(await scheduleState(), state); assert.deepEqual(await active(), identity);
+    report.monthlyPng ??= []; report.monthlyPng.push({ file: path.basename(result.target), width: result.png.width, height: result.png.height, bytes: result.bytes.length, tags: tags.length }); persist();
+    return { ...result, tags };
+  }
   await check('inline-person-lists-split-cross-month-events-and-count-workdays-and-halves', async () => {
     await openFixture('monthly-workload.ooschedule', fixture); await holidayIdle(); baseline = await exportedModel(); assert.deepEqual(baseline, fixture);
     assert.equal(await editor().locator('.schedule-workload-list').count(), 2); assert.equal(await track(null).locator('.schedule-workload-list').count(), 0, 'Overall plans do not receive or add person workload'); assert.equal(await editor().getByTestId('schedule-monthly-workload').count(), 0, 'No extra modal/table entry is introduced');
     assert.deepEqual(await monthlyList('alice').locator('[data-month]').evaluateAll(items => items.map(item => item.getAttribute('data-month'))), ['2025-12', '2026-01']);
     await monthlyValue('alice', '2025-12', 2, 3); await monthlyValue('alice', '2026-01', 1.5, 2); await monthlyValue('bob', '2025-12', 1.5, 3); await monthlyValue('bob', '2026-01', 1, 2);
+    await personHeading('alice'); await personHeading('bob');
+    const firstTag = await monthlyCell('alice', '2025-12').boundingBox(), secondTag = await monthlyCell('alice', '2026-01').boundingBox(); assert.equal(firstTag.y, secondTag.y); assert.ok(secondTag.x > firstTag.x + firstTag.width, 'Two month tags share each row');
     initialMatrix = await monthlySnapshot(); await saveDownload('月度工时验证.ooschedule', true); await capture('inline-monthly-workload');
   });
   await check('reading-and-scrolling-monthly-list-never-edits-the-saved-document', async () => {
@@ -674,27 +719,50 @@ async function monthlyWorkloadChecks() {
     await monthlyList('bob').focus(); await page.keyboard.press('ArrowDown'); await frame(); const cell = monthlyCell('bob', '2026-01'); await cell.hover(); assert.match(await cell.getAttribute('title'), /当月项目范围内的工作日/);
     assert.deepEqual(await exportedModel(), before); assert.deepEqual(await scheduleState(), state); assert.deepEqual(await active(), identity); assert.deepEqual(await monthlySnapshot(), initialMatrix);
   });
+  await check('event-hover-shows-full-half-and-overall-workdays-without-editing', async () => {
+    const state = await scheduleState(), identity = await active();
+    await eventWorkload('monthly_cross', 3); await eventWorkload('monthly_half', .5); await eventWorkload('monthly_bob', 2.5); await eventWorkload('monthly_overall', 5);
+    assert.match(await eventElement('monthly_cross').getAttribute('title'), /跨月整天任务\n林设计 · 2025-12-30 至 2026-01-02\n全天/);
+    assert.deepEqual(await exportedModel(), baseline); assert.deepEqual(await scheduleState(), state); assert.deepEqual(await active(), identity);
+  });
+  await check('people-and-global-png-draw-ui-month-tags-without-event-counts', async () => {
+    const alice = await personTags('alice'), bob = await personTags('bob');
+    assert.ok(alice.includes('25.12-66.7%')); await monthlyPng('monthly-tags-people.png', [...alice, ...bob]);
+    await editor().getByTestId('schedule-mode-global').click(); await frame();
+    const global = await monthlyPng('monthly-tags-global.png', [...alice, ...alice, ...bob]);
+    assert.ok(global.texts.some(item => item.text.includes('月度工时按负责人汇总')));
+    await editor().getByTestId('schedule-mode-people').click(); await frame(); assert.deepEqual(await exportedModel(), baseline);
+  });
   await check('editing-event-height-and-undo-recompute-inline-percentage-immediately', async () => {
     await eventElement('monthly_half').click(); await editor().getByTestId('schedule-edit-event').click(); await eventDialog().waitFor(); await eventDialog().getByTestId('schedule-event-height').selectOption('1'); await eventDialog().getByTestId('schedule-event-confirm').click(); await eventDialog().waitFor({ state: 'hidden' }); await frame();
     await monthlyValue('alice', '2026-01', 2, 2); await monthlyValue('alice', '2025-12', 2, 3); await monthlyValue('bob', '2026-01', 1, 2); assert.equal((await eventState('monthly_half')).height, 1);
-    await undo(); assert.deepEqual(await exportedModel(), baseline); assert.deepEqual(await monthlySnapshot(), initialMatrix); await capture('monthly-after-undo');
+    await eventWorkload('monthly_half', 1); const fullTags = await personTags('alice'); assert.ok(fullTags.includes('26.01-100%')); await monthlyPng('monthly-tags-full-capacity.png', [...fullTags, ...await personTags('bob')]);
+    await undo(); assert.deepEqual(await exportedModel(), baseline); assert.deepEqual(await monthlySnapshot(), initialMatrix); await eventWorkload('monthly_half', .5); await capture('monthly-after-undo');
+  });
+  await check('editing-event-date-and-undo-update-hover-workdays', async () => {
+    await eventElement('monthly_cross').click(); await editor().getByTestId('schedule-edit-event').click(); await eventDialog().waitFor(); await eventDialog().getByTestId('schedule-event-start').fill('2025-12-29'); await eventDialog().getByTestId('schedule-event-confirm').click(); await eventDialog().waitFor({ state: 'hidden' }); await frame();
+    await eventWorkload('monthly_cross', 4); await monthlyValue('alice', '2025-12', 3, 3);
+    await undo(); await eventWorkload('monthly_cross', 3); assert.deepEqual(await exportedModel(), baseline); assert.deepEqual(await monthlySnapshot(), initialMatrix);
   });
   await check('display-switches-and-week-numbering-do-not-change-workload-and-global-has-no-duplicates', async () => {
     await viewMenu(); await editor().getByTestId('schedule-show-weekends').check(); await editor().getByTestId('schedule-show-holidays').check(); await viewMenu(false); await numbering('project');
-    assert.deepEqual(await monthlySnapshot(), initialMatrix); assert.deepEqual((await exportedModel()).events, fixture.events);
+    assert.deepEqual(await monthlySnapshot(), initialMatrix); assert.deepEqual((await exportedModel()).events, fixture.events); await eventWorkload('monthly_cross', 3); await eventWorkload('monthly_half', .5);
     await editor().getByTestId('schedule-mode-global').click(); await frame(); assert.equal(await editor().locator('.schedule-workload-list').count(), 0, 'Global event rows do not repeat person-level monthly totals');
+    await eventWorkload('monthly_bob', 2.5); await eventWorkload('monthly_overall', 5);
     await editor().getByTestId('schedule-mode-people').click(); await frame(); assert.deepEqual(await monthlySnapshot(), initialMatrix);
     await undo(); await undo(); await undo(); assert.deepEqual(await exportedModel(), baseline); assert.deepEqual(await monthlySnapshot(), initialMatrix);
   });
   await check('manual-holiday-overrides-change-capacity-and-undo-restores-it', async () => {
     await viewMenu(); await editor().getByTestId('schedule-calendar-settings').click(); const dialog = editor().getByTestId('schedule-calendar-dialog'); await dialog.waitFor(); await dialog.getByTestId('schedule-excluded-holidays').fill(''); await dialog.getByTestId('schedule-calendar-confirm').click(); await dialog.waitFor({ state: 'hidden' }); await frame();
-    await monthlyValue('alice', '2026-01', .5, 1); await monthlyValue('bob', '2026-01', .5, 1); assert.deepEqual((await exportedModel()).events, fixture.events);
-    await undo(); assert.deepEqual(await exportedModel(), baseline); assert.deepEqual(await monthlySnapshot(), initialMatrix);
+    await monthlyValue('alice', '2026-01', .5, 1); await monthlyValue('bob', '2026-01', .5, 1); assert.deepEqual((await exportedModel()).events, fixture.events); await eventWorkload('monthly_cross', 2);
+    await undo(); assert.deepEqual(await exportedModel(), baseline); assert.deepEqual(await monthlySnapshot(), initialMatrix); await eventWorkload('monthly_cross', 3);
   });
   await check('late-holiday-refresh-updates-inline-workload-without-changing-project-or-revision', async () => {
     const before = await exportedModel(), state = await scheduleState(), identity = await active();
     holidayPlans.set(2026, { hold: true, payload: holidayFixture(2026, ['2026-01-06']) }); await refreshHoliday(); await poll(async () => heldHolidays.some(item => item.details.year === 2026), 'annual workload holiday response is held'); assert.deepEqual(await monthlySnapshot(), initialMatrix);
     await releaseHoliday(2026); await holidayIdle(); await monthlyValue('alice', '2026-01', 1, 1); await monthlyValue('bob', '2026-01', .5, 1); await monthlyValue('alice', '2025-12', 2, 3);
+    await eventWorkload('monthly_overall', 4); await eventWorkload('monthly_bob', 2);
+    const hidden = await monthlyPng('monthly-tags-hidden-event.png', [...await personTags('alice'), ...await personTags('bob')]); assert.ok(hidden.texts.some(item => item.text.includes('部分事件仅在隐藏日期内')));
     assert.deepEqual(await exportedModel(), before); assert.deepEqual(await scheduleState(), state); assert.deepEqual(await active(), identity); await capture('monthly-after-holiday-refresh');
   });
   await check('projects-without-people-show-no-empty-workload-widgets', async () => {
@@ -703,19 +771,39 @@ async function monthlyWorkloadChecks() {
   });
   await check('zero-working-day-month-shows-a-dash-even-when-weekends-are-visible', async () => {
     const zero = { ...structuredClone(fixture), id: 'workload_zero_days', title: '周末范围无工作日', startDate: '2026-09-26', endDate: '2026-09-27', calendar: { hideWeekends: false, hideHolidays: false, extraHolidays: [], excludedHolidays: [] }, events: [{ ...fixture.events[1], id: 'weekend_person', startDate: '2026-09-26', endDate: '2026-09-27' }] };
-    await openFixture('zero-workdays.ooschedule', zero); await holidayIdle(); await monthlyValue('alice', '2026-09', 0, 0); await monthlyValue('bob', '2026-09', 0, 0); assert.match(await monthlyCell('alice', '2026-09').getAttribute('title'), /无可排工作日/); assert.doesNotMatch(await editor().innerText(), /NaN|Infinity/); assert.deepEqual(await exportedModel(), zero); await capture('zero-month-capacity');
+    await openFixture('zero-workdays.ooschedule', zero); await holidayIdle(); await monthlyValue('alice', '2026-09', 0, 0); await monthlyValue('bob', '2026-09', 0, 0); await eventWorkload('weekend_person', 0); assert.match(await monthlyCell('alice', '2026-09').getAttribute('title'), /无可排工作日/); assert.doesNotMatch(await editor().innerText(), /NaN|Infinity/); assert.deepEqual(await exportedModel(), zero); await capture('zero-month-capacity');
+    await monthlyPng('monthly-tags-no-workdays.png', ['26.09-—', '26.09-—']);
   });
   await check('one-hundred-persons-and-thirty-seven-months-stay-readable-at-minimum-track-height', async () => {
     const end = new Date('2028-01-31T00:00:00Z'); end.setUTCDate(end.getUTCDate() + 1095);
     const large = { ...structuredClone(fixture), id: 'maximum_monthly_lists', title: '100 人 · 37 个月工时列表', startDate: '2028-01-31', endDate: end.toISOString().slice(0, 10), calendar: { hideWeekends: true, hideHolidays: true, extraHolidays: [], excludedHolidays: [] }, roles: Array.from({ length: 100 }, (_, i) => ({ id: `workload_person_${i}`, name: `成员 ${i + 1}`, role: '长期项目', color: i % 2 ? '#00aa88' : '#2563eb' })), events: [], layout: { trackHeights: { 'person-workload_person_0': 84, 'person-workload_person_99': 84 } } };
+    large.roles[0].name = '这是需要省略显示的很长的人员姓名'; large.roles[0].role = '这是需要省略显示的很长的项目角色';
     await openFixture('maximum-monthly-lists.ooschedule', large); await holidayIdle(); await page.setViewportSize({ width: 1280, height: 600 }); await frame();
     const before = await exportedModel(), state = await scheduleState(), first = monthlyList('workload_person_0'); assert.equal(await editor().locator('.schedule-workload-list').count(), 100); assert.equal(await first.locator('[data-month]').count(), 37); assert.equal(Number(await track('workload_person_0').getAttribute('data-track-height')), 84);
     const area = await first.boundingBox(), row = await first.locator('[data-month]').first().boundingBox(); assert.ok(area && row); assert.ok(area.height >= 18, 'An 84px track exposes at least one complete monthly row'); assert.ok(row.y >= area.y - 1 && row.y + row.height <= area.y + area.height + 1); assert.equal(await first.evaluate(element => element.scrollHeight > element.clientHeight), true);
+    await personHeading('workload_person_0', true); const pair = await first.locator('[data-month]').nth(1).boundingBox(), nextRow = await first.locator('[data-month]').nth(2).boundingBox(); assert.equal(row.y, pair.y); assert.ok(pair.x > row.x + row.width); assert.equal(nextRow.x, row.x); assert.ok(nextRow.y >= row.y + row.height + 3); await capture('two-column-tags-long-heading');
     const outerTop = await scroll().evaluate(element => element.scrollTop); await page.mouse.move(area.x + area.width / 2, area.y + area.height / 2); await page.mouse.wheel(0, 280); await poll(async () => first.evaluate(element => element.scrollTop > 0), 'monthly list scrolls independently'); assert.equal(await scroll().evaluate(element => element.scrollTop), outerTop);
-    await first.evaluate(element => { element.scrollTop = element.scrollHeight; }); await frame(); const final = await first.locator('[data-month="2031-01"]').boundingBox(), scrolled = await first.boundingBox(); assert.ok(final.y >= scrolled.y - 1 && final.y + final.height <= scrolled.y + scrolled.height + 1); await capture('minimum-track-monthly-scroll');
+    await reachEveryMonth(first); await frame(); const final = await first.locator('[data-month="2031-01"]').boundingBox(), scrolled = await first.boundingBox(); assert.ok(final.y >= scrolled.y - 1 && final.y + final.height <= scrolled.y + scrolled.height + 1); await capture('minimum-track-monthly-scroll');
+    const regular = monthlyList('workload_person_1'); await regular.scrollIntoViewIfNeeded(); assert.equal(Number(await track('workload_person_1').getAttribute('data-track-height')), 112); await reachEveryMonth(regular); await frame(); await capture('default-track-monthly-scroll');
     await page.setViewportSize({ width: 800, height: 640 }); await page.getByTestId('theme-dark').click(); await scroll().evaluate(element => { element.scrollTop = element.scrollHeight; }); await frame();
     const last = monthlyList('workload_person_99'); await last.scrollIntoViewIfNeeded(); await last.evaluate(element => { element.scrollTop = element.scrollHeight; }); await frame(); const lastBox = await last.boundingBox(), lastMonth = await last.locator('[data-month="2031-01"]').boundingBox(); assert.ok(lastBox.height >= 18); assert.ok(lastMonth.y >= lastBox.y - 1 && lastMonth.y + lastMonth.height <= lastBox.y + lastBox.height + 1); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     assert.deepEqual(await exportedModel(), before); assert.deepEqual(await scheduleState(), state); await capture('one-hundred-person-lists-dark-small-window'); await page.setViewportSize({ width: 1360, height: 900 }); await page.getByTestId('theme-light').click();
+  });
+  await check('png-expands-short-tracks-to-show-all-thirty-seven-months-and-preserves-afternoon', async () => {
+    const end = new Date('2028-01-31T00:00:00Z'); end.setUTCDate(end.getUTCDate() + 1095);
+    const long = { ...structuredClone(fixture), id: 'complete_months_png', title: '完整月度工时与下午排期', startDate: '2028-01-31', endDate: end.toISOString().slice(0, 10), calendar: { hideWeekends: true, hideHolidays: true, extraHolidays: [], excludedHolidays: [] }, events: [{ ...fixture.events[2], id: 'long_afternoon', title: '跨月下午任务', startDate: '2028-01-31', endDate: end.toISOString().slice(0, 10) }], layout: { trackHeights: { 'person-alice': 84, 'person-bob': 112 } } };
+    await openFixture('complete-monthly-tags.ooschedule', long); await holidayIdle(); const view = await zoomState(); await wheelAt(view.x + 192 + 100, view.y + 100, 1200); assert.equal((await zoomState()).width, 36);
+    const alice = await personTags('alice'), bob = await personTags('bob'); assert.equal(alice.length, 37); assert.equal(bob.length, 37); assert.ok(alice.every(tag => tag.endsWith('-50%'))); assert.ok(bob.every(tag => tag.endsWith('-0%')));
+    const people = await monthlyPng('monthly-tags-all-37-months.png', [...alice, ...bob]);
+    const name = people.texts.find(item => item.text === '林设计' && item.x < 216), nextName = people.texts.find(item => item.text === '陈开发' && item.x < 216), rowTop = name.y - 24, rowBottom = nextName.y - 24, height = rowBottom - rowTop;
+    assert.ok(height > 336 && height % 28 === 0, 'Export expands beyond the UI height cap using track increments');
+    const finalTag = people.tags.find(item => item.text === '31.01-50%'); assert.ok(finalTag.y + 9 < rowBottom, 'Last month fits completely inside the expanded row');
+    const afternoon = people.texts.find(item => item.text === '下午' && item.x >= 216); assert.ok(afternoon.y > rowTop + height / 2 && afternoon.y < rowBottom, 'Afternoon event stays in the lower half of the expanded export row');
+    assert.deepEqual(pixel(people.png, 220 * afternoon.scale, (rowTop + height / 4) * afternoon.scale), [255, 255, 255, 255], 'Morning half remains empty in the actual PNG');
+    const stripe = pixel(people.png, 220 * afternoon.scale, (rowTop + height * .75) * afternoon.scale); assert.ok(stripe[0] > 170 && stripe[1] < 100 && stripe[2] < 120, 'Afternoon event color appears in the lower half of the actual PNG');
+    assert.equal(Number(await track('alice').getAttribute('data-track-height')), 84); assert.equal(Number(await track('bob').getAttribute('data-track-height')), 112); assert.deepEqual(await exportedModel(), long);
+    await editor().getByTestId('schedule-mode-global').click(); await frame(); const global = await monthlyPng('monthly-tags-global-all-37-months.png', alice); assert.equal(global.tags.at(-1).text, '31.01-50%');
+    assert.deepEqual(await exportedModel(), long);
   });
 }
 
