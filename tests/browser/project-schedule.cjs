@@ -6,6 +6,7 @@
  * Half-day slots and pointer-anchored wheel zoom: OFFICE_SCHEDULE_FOCUS=daypart-zoom node tests/browser/project-schedule.cjs
  * Direct event-edge resizing and Ctrl-drag copies: OFFICE_SCHEDULE_FOCUS=resize-copy node tests/browser/project-schedule.cjs
  * ISO annual/project-relative week numbering: OFFICE_SCHEDULE_FOCUS=annual-weeks node tests/browser/project-schedule.cjs
+ * Inline per-person monthly workload: OFFICE_SCHEDULE_FOCUS=monthly-workload node tests/browser/project-schedule.cjs
  * Synthetic project data only. No screen-capture, microphone or native I/O API.
  */
 const assert = require('node:assert/strict');
@@ -16,8 +17,8 @@ const { chromium } = require('playwright');
 const { PNG } = require('pngjs');
 const root = path.resolve(__dirname, '../..');
 const focus = process.env.OFFICE_SCHEDULE_FOCUS || '';
-const output = path.resolve(process.env.OFFICE_SCHEDULE_OUTPUT || path.join(root, ['unknown-year', 'holiday-refresh', 'layout-export', 'daypart-zoom', 'resize-copy', 'annual-weeks'].includes(focus) ? `test-results/project-schedule-${focus}` : 'test-results/project-schedule'));
-const sources = ['src/App.vue', 'src/style.css', 'src/components/ScheduleEditor.vue', 'src/schedule/components/ScheduleTimeline.vue', 'src/schedule/model.ts', 'src/schedule/calendar.ts', 'src/schedule/holidays.ts', 'src/schedule/holiday-native.ts', 'src/schedule/session.ts', 'src/schedule/layout.ts', 'src/schedule/interaction.ts', 'src/schedule/zoom.ts', 'src/schedule/png-export.ts', 'src/shared/document.ts'];
+const output = path.resolve(process.env.OFFICE_SCHEDULE_OUTPUT || path.join(root, ['unknown-year', 'holiday-refresh', 'layout-export', 'daypart-zoom', 'resize-copy', 'annual-weeks', 'monthly-workload'].includes(focus) ? `test-results/project-schedule-${focus}` : 'test-results/project-schedule'));
+const sources = ['src/App.vue', 'src/style.css', 'src/components/ScheduleEditor.vue', 'src/schedule/components/ScheduleTimeline.vue', 'src/schedule/model.ts', 'src/schedule/calendar.ts', 'src/schedule/holidays.ts', 'src/schedule/holiday-native.ts', 'src/schedule/session.ts', 'src/schedule/workload.ts', 'src/schedule/layout.ts', 'src/schedule/interaction.ts', 'src/schedule/zoom.ts', 'src/schedule/png-export.ts', 'src/shared/document.ts'];
 const hashes = () => Object.fromEntries(sources.map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex')]));
 const report = { ok: false, runtime: 'Real Vue schedule UI in system Chromium over local Vite HTTP; real browser downloads and file input; allowlisted public holiday responses are deterministic fixtures', checks: [], screenshots: [], gestures: [], errors: [], consoleErrors: [], externalRequests: [], holidayRequests: [], expectedNetworkErrors: [], limitations: ['Native file dialogs, desktop filesystem autosave and platform WebViews are not exercised.', 'Holiday fetches use the real browser fetch/client/cache path with fixture responses; live upstream availability is not asserted.', 'Pointer input is automated Chromium mouse input; physical touch and operating-system accessibility tools are not exercised.', 'Browser page screenshots require visual review.'] };
 let server, browser, page;
@@ -644,6 +645,80 @@ async function annualWeekChecks() {
   });
 }
 
+
+const monthlyList = role => editor().getByTestId(`schedule-workload-${role}`);
+const monthlyCell = (role, month) => monthlyList(role).locator(`[data-month="${month}"]`);
+async function monthlyValue(role, month, scheduled, available) {
+  const cell = monthlyCell(role, month); assert.equal(await cell.count(), 1);
+  assert.equal(Number(await cell.getAttribute('data-scheduled-days')), scheduled); assert.equal(Number(await cell.getAttribute('data-available-days')), available);
+  const percentage = await cell.getAttribute('data-percentage');
+  if (available) { assert.ok(Math.abs(Number(percentage) - scheduled / available * 100) < .051); assert.equal(await cell.locator('strong').innerText(), `${Number((scheduled / available * 100).toFixed(1))}%`); }
+  else { assert.equal(percentage, null); assert.equal(await cell.locator('strong').innerText(), '—'); }
+  assert.match(await cell.getAttribute('title'), new RegExp(`已排 ${scheduled} 天 / 可排 ${available} 天`));
+}
+async function monthlySnapshot() {
+  return editor().locator('.schedule-workload-list').evaluateAll(lists => lists.map(list => ({ role: list.getAttribute('data-testid'), months: Array.from(list.querySelectorAll('[data-month]'), item => ({ month: item.getAttribute('data-month'), scheduled: item.getAttribute('data-scheduled-days'), available: item.getAttribute('data-available-days'), percentage: item.getAttribute('data-percentage') })) })));
+}
+async function monthlyWorkloadChecks() {
+  const fixture = { format: 'open-office-schedule', version: 1, id: 'monthly_workload_project', title: '跨月人员工时占比', startDate: '2025-12-29', endDate: '2026-01-06', calendar: { hideWeekends: true, hideHolidays: true, extraHolidays: ['2026-01-05'], excludedHolidays: ['2026-01-02'] }, roles: [{ id: 'alice', name: '林设计', role: '设计', color: '#cc0044' }, { id: 'bob', name: '陈开发', role: '开发', color: '#00aa88' }], events: [{ id: 'monthly_overall', roleId: null, title: '整体计划不计人员工时', startDate: '2025-12-29', endDate: '2026-01-06', height: 1, slot: 0, notes: '' }, { id: 'monthly_cross', roleId: 'alice', title: '跨月整天任务', startDate: '2025-12-30', endDate: '2026-01-02', height: 1, slot: 0, notes: '' }, { id: 'monthly_half', roleId: 'alice', title: '下午半天任务', startDate: '2026-01-06', endDate: '2026-01-06', height: .5, slot: 1, notes: '' }, { id: 'monthly_bob', roleId: 'bob', title: '上午半天跨月', startDate: '2025-12-29', endDate: '2026-01-06', height: .5, slot: 0, notes: '' }], layout: { trackHeights: { 'person-bob': 84 } } };
+  let initialMatrix, baseline;
+  await check('inline-person-lists-split-cross-month-events-and-count-workdays-and-halves', async () => {
+    await openFixture('monthly-workload.ooschedule', fixture); await holidayIdle(); baseline = await exportedModel(); assert.deepEqual(baseline, fixture);
+    assert.equal(await editor().locator('.schedule-workload-list').count(), 2); assert.equal(await track(null).locator('.schedule-workload-list').count(), 0, 'Overall plans do not receive or add person workload'); assert.equal(await editor().getByTestId('schedule-monthly-workload').count(), 0, 'No extra modal/table entry is introduced');
+    assert.deepEqual(await monthlyList('alice').locator('[data-month]').evaluateAll(items => items.map(item => item.getAttribute('data-month'))), ['2025-12', '2026-01']);
+    await monthlyValue('alice', '2025-12', 2, 3); await monthlyValue('alice', '2026-01', 1.5, 2); await monthlyValue('bob', '2025-12', 1.5, 3); await monthlyValue('bob', '2026-01', 1, 2);
+    initialMatrix = await monthlySnapshot(); await saveDownload('月度工时验证.ooschedule', true); await capture('inline-monthly-workload');
+  });
+  await check('reading-and-scrolling-monthly-list-never-edits-the-saved-document', async () => {
+    const state = await scheduleState(), identity = await active(), before = await exportedModel(); assert.equal(identity.dirty, false);
+    await monthlyList('bob').focus(); await page.keyboard.press('ArrowDown'); await frame(); const cell = monthlyCell('bob', '2026-01'); await cell.hover(); assert.match(await cell.getAttribute('title'), /当月项目范围内的工作日/);
+    assert.deepEqual(await exportedModel(), before); assert.deepEqual(await scheduleState(), state); assert.deepEqual(await active(), identity); assert.deepEqual(await monthlySnapshot(), initialMatrix);
+  });
+  await check('editing-event-height-and-undo-recompute-inline-percentage-immediately', async () => {
+    await eventElement('monthly_half').click(); await editor().getByTestId('schedule-edit-event').click(); await eventDialog().waitFor(); await eventDialog().getByTestId('schedule-event-height').selectOption('1'); await eventDialog().getByTestId('schedule-event-confirm').click(); await eventDialog().waitFor({ state: 'hidden' }); await frame();
+    await monthlyValue('alice', '2026-01', 2, 2); await monthlyValue('alice', '2025-12', 2, 3); await monthlyValue('bob', '2026-01', 1, 2); assert.equal((await eventState('monthly_half')).height, 1);
+    await undo(); assert.deepEqual(await exportedModel(), baseline); assert.deepEqual(await monthlySnapshot(), initialMatrix); await capture('monthly-after-undo');
+  });
+  await check('display-switches-and-week-numbering-do-not-change-workload-and-global-has-no-duplicates', async () => {
+    await viewMenu(); await editor().getByTestId('schedule-show-weekends').check(); await editor().getByTestId('schedule-show-holidays').check(); await viewMenu(false); await numbering('project');
+    assert.deepEqual(await monthlySnapshot(), initialMatrix); assert.deepEqual((await exportedModel()).events, fixture.events);
+    await editor().getByTestId('schedule-mode-global').click(); await frame(); assert.equal(await editor().locator('.schedule-workload-list').count(), 0, 'Global event rows do not repeat person-level monthly totals');
+    await editor().getByTestId('schedule-mode-people').click(); await frame(); assert.deepEqual(await monthlySnapshot(), initialMatrix);
+    await undo(); await undo(); await undo(); assert.deepEqual(await exportedModel(), baseline); assert.deepEqual(await monthlySnapshot(), initialMatrix);
+  });
+  await check('manual-holiday-overrides-change-capacity-and-undo-restores-it', async () => {
+    await viewMenu(); await editor().getByTestId('schedule-calendar-settings').click(); const dialog = editor().getByTestId('schedule-calendar-dialog'); await dialog.waitFor(); await dialog.getByTestId('schedule-excluded-holidays').fill(''); await dialog.getByTestId('schedule-calendar-confirm').click(); await dialog.waitFor({ state: 'hidden' }); await frame();
+    await monthlyValue('alice', '2026-01', .5, 1); await monthlyValue('bob', '2026-01', .5, 1); assert.deepEqual((await exportedModel()).events, fixture.events);
+    await undo(); assert.deepEqual(await exportedModel(), baseline); assert.deepEqual(await monthlySnapshot(), initialMatrix);
+  });
+  await check('late-holiday-refresh-updates-inline-workload-without-changing-project-or-revision', async () => {
+    const before = await exportedModel(), state = await scheduleState(), identity = await active();
+    holidayPlans.set(2026, { hold: true, payload: holidayFixture(2026, ['2026-01-06']) }); await refreshHoliday(); await poll(async () => heldHolidays.some(item => item.details.year === 2026), 'annual workload holiday response is held'); assert.deepEqual(await monthlySnapshot(), initialMatrix);
+    await releaseHoliday(2026); await holidayIdle(); await monthlyValue('alice', '2026-01', 1, 1); await monthlyValue('bob', '2026-01', .5, 1); await monthlyValue('alice', '2025-12', 2, 3);
+    assert.deepEqual(await exportedModel(), before); assert.deepEqual(await scheduleState(), state); assert.deepEqual(await active(), identity); await capture('monthly-after-holiday-refresh');
+  });
+  await check('projects-without-people-show-no-empty-workload-widgets', async () => {
+    const empty = { ...structuredClone(fixture), id: 'workload_no_people', title: '无人员工时', roles: [], events: [fixture.events[0]] }; delete empty.layout;
+    await openFixture('no-people-workload.ooschedule', empty); await holidayIdle(); assert.equal(await editor().locator('.schedule-workload-list').count(), 0); assert.doesNotMatch(await editor().innerText(), /NaN|Infinity/); assert.deepEqual(await exportedModel(), empty);
+  });
+  await check('zero-working-day-month-shows-a-dash-even-when-weekends-are-visible', async () => {
+    const zero = { ...structuredClone(fixture), id: 'workload_zero_days', title: '周末范围无工作日', startDate: '2026-09-26', endDate: '2026-09-27', calendar: { hideWeekends: false, hideHolidays: false, extraHolidays: [], excludedHolidays: [] }, events: [{ ...fixture.events[1], id: 'weekend_person', startDate: '2026-09-26', endDate: '2026-09-27' }] };
+    await openFixture('zero-workdays.ooschedule', zero); await holidayIdle(); await monthlyValue('alice', '2026-09', 0, 0); await monthlyValue('bob', '2026-09', 0, 0); assert.match(await monthlyCell('alice', '2026-09').getAttribute('title'), /无可排工作日/); assert.doesNotMatch(await editor().innerText(), /NaN|Infinity/); assert.deepEqual(await exportedModel(), zero); await capture('zero-month-capacity');
+  });
+  await check('one-hundred-persons-and-thirty-seven-months-stay-readable-at-minimum-track-height', async () => {
+    const end = new Date('2028-01-31T00:00:00Z'); end.setUTCDate(end.getUTCDate() + 1095);
+    const large = { ...structuredClone(fixture), id: 'maximum_monthly_lists', title: '100 人 · 37 个月工时列表', startDate: '2028-01-31', endDate: end.toISOString().slice(0, 10), calendar: { hideWeekends: true, hideHolidays: true, extraHolidays: [], excludedHolidays: [] }, roles: Array.from({ length: 100 }, (_, i) => ({ id: `workload_person_${i}`, name: `成员 ${i + 1}`, role: '长期项目', color: i % 2 ? '#00aa88' : '#2563eb' })), events: [], layout: { trackHeights: { 'person-workload_person_0': 84, 'person-workload_person_99': 84 } } };
+    await openFixture('maximum-monthly-lists.ooschedule', large); await holidayIdle(); await page.setViewportSize({ width: 1280, height: 600 }); await frame();
+    const before = await exportedModel(), state = await scheduleState(), first = monthlyList('workload_person_0'); assert.equal(await editor().locator('.schedule-workload-list').count(), 100); assert.equal(await first.locator('[data-month]').count(), 37); assert.equal(Number(await track('workload_person_0').getAttribute('data-track-height')), 84);
+    const area = await first.boundingBox(), row = await first.locator('[data-month]').first().boundingBox(); assert.ok(area && row); assert.ok(area.height >= 18, 'An 84px track exposes at least one complete monthly row'); assert.ok(row.y >= area.y - 1 && row.y + row.height <= area.y + area.height + 1); assert.equal(await first.evaluate(element => element.scrollHeight > element.clientHeight), true);
+    const outerTop = await scroll().evaluate(element => element.scrollTop); await page.mouse.move(area.x + area.width / 2, area.y + area.height / 2); await page.mouse.wheel(0, 280); await poll(async () => first.evaluate(element => element.scrollTop > 0), 'monthly list scrolls independently'); assert.equal(await scroll().evaluate(element => element.scrollTop), outerTop);
+    await first.evaluate(element => { element.scrollTop = element.scrollHeight; }); await frame(); const final = await first.locator('[data-month="2031-01"]').boundingBox(), scrolled = await first.boundingBox(); assert.ok(final.y >= scrolled.y - 1 && final.y + final.height <= scrolled.y + scrolled.height + 1); await capture('minimum-track-monthly-scroll');
+    await page.setViewportSize({ width: 800, height: 640 }); await page.getByTestId('theme-dark').click(); await scroll().evaluate(element => { element.scrollTop = element.scrollHeight; }); await frame();
+    const last = monthlyList('workload_person_99'); await last.scrollIntoViewIfNeeded(); await last.evaluate(element => { element.scrollTop = element.scrollHeight; }); await frame(); const lastBox = await last.boundingBox(), lastMonth = await last.locator('[data-month="2031-01"]').boundingBox(); assert.ok(lastBox.height >= 18); assert.ok(lastMonth.y >= lastBox.y - 1 && lastMonth.y + lastMonth.height <= lastBox.y + lastBox.height + 1); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    assert.deepEqual(await exportedModel(), before); assert.deepEqual(await scheduleState(), state); await capture('one-hundred-person-lists-dark-small-window'); await page.setViewportSize({ width: 1360, height: 900 }); await page.getByTestId('theme-light').click();
+  });
+}
+
 (async () => {
   try {
     report.startedAt = new Date().toISOString(); report.sourcesBefore = hashes();
@@ -665,6 +740,7 @@ async function annualWeekChecks() {
     if (focus === 'daypart-zoom') { await daypartZoomChecks(); completeReport(); return; }
     if (focus === 'resize-copy') { await resizeCopyChecks(); completeReport(); return; }
     if (focus === 'annual-weeks') { await annualWeekChecks(); completeReport(); return; }
+    if (focus === 'monthly-workload') { await monthlyWorkloadChecks(); completeReport(); return; }
     if (focus === 'unknown-year') {
       await check('unknown-year-notice-respects-both-weekend-display-states', async () => {
         const value = { format: 'open-office-schedule', version: 1, id: 'unknown_year_toggle', title: '未知年份周末显示验证', startDate: '2035-06-04', endDate: '2035-06-29', calendar: { hideWeekends: true, hideHolidays: true, extraHolidays: ['2035-06-12'], excludedHolidays: [] }, roles: [], events: [{ id: 'unknown_year_event', roleId: null, title: '跨周工作安排', startDate: '2035-06-08', endDate: '2035-06-14', height: 1, slot: 0, notes: '合成测试数据' }] };

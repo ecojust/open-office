@@ -5,6 +5,7 @@ import type { HolidayYears } from '../holidays.ts'
 import { buildCalendar, moveScheduledEvent, projectedSpan, resizeScheduledEvent } from '../calendar.ts'
 import { clampDayWidth, wheelDayWidth, zoomAnchorScroll } from '../zoom.ts'
 import { eventPointerAction, eventResizeInsets, type EventPointerAction } from '../interaction.ts'
+import { buildMonthlyWorkload, type MonthlyWorkloadCell } from '../workload.ts'
 import { buildTimelineRows, getTrackHeight, getEventVerticalLayout, snapTrackHeight, SCHEDULE_LABEL_WIDTH as LABEL_WIDTH, SCHEDULE_HEADER_HEIGHT as HEADER_HEIGHT, SCHEDULE_EVENT_PADDING as PADDING, SCHEDULE_TRACK_HEIGHT as TRACK_HEIGHT, SCHEDULE_TRACK_STEP as TRACK_STEP, SCHEDULE_TRACK_MIN_HEIGHT as MIN_TRACK_HEIGHT, SCHEDULE_TRACK_MAX_HEIGHT as MAX_TRACK_HEIGHT, type DisplayEvent, type TimelineRow } from '../layout.ts'
 
 const props = withDefaults(defineProps<{
@@ -48,6 +49,16 @@ const visibleDays = computed(() => calendar.value.days.slice(firstVisible.value,
 const visibleWeeks = computed(() => calendar.value.weeks.filter(week => week.startIndex < lastVisible.value && week.startIndex + week.count > firstVisible.value))
 const roleById = computed(() => new Map(props.project.roles.map(role => [role.id, role])))
 const rows = computed(() => buildTimelineRows(props.project, props.mode, calendar.value.days))
+type WorkloadItem = MonthlyWorkloadCell & { month: string }
+const workloadByRole = computed(() => {
+ if (props.mode !== 'people') return new Map<string, WorkloadItem[]>()
+ const result = buildMonthlyWorkload(props.project, props.holidayYears)
+ return new Map(result.people.map(person => [person.roleId, person.months.map((cell, index) => ({ ...cell, month: result.months[index]!.key }))]))
+})
+const workloadPercent = (value: number | null) => value === null ? '—' : `${Number(value.toFixed(1))}%`
+function workloadTitle(item: WorkloadItem): string {
+ return `${item.month} 月度工时 ${workloadPercent(item.percentage)}\n已排 ${item.scheduledDays} 天 / 可排 ${item.availableDays} 天\n按当月项目范围内的工作日计算；全天 1 天，半天 0.5 天；不计周末和假日。${item.percentage === null ? '\n本月无可排工作日。' : ''}`
+}
 const trackPreview = shallowRef<{ key: string; height: number }>()
 // Keep at least one minimum-height personnel row reachable below the fixed plan.
 // In a short window the plan scrolls normally, so its resize handle stays reachable.
@@ -454,7 +465,13 @@ defineExpose({ cancelGesture, zoomTo })
      </div>
     </div>
     <div v-for="row in rows" :key="row.key" class="schedule-track" :class="{ 'schedule-overall-track': row.key === 'overall', 'schedule-overall-pinned': row.key === 'overall' && overallSticky, 'track-resizing': trackPreview?.key === row.key }" :style="{ '--schedule-track-height': `${rowHeight(row.key)}px` }" :data-track-height="rowHeight(row.key)" :data-sticky="row.key === 'overall' && overallSticky" :data-testid="`schedule-track-${rowTestKey(row)}`" :data-role-id="row.roleId ?? 'overall'" :data-track-key="row.key">
-     <div class="schedule-track-label" :data-testid="`schedule-label-${rowTestKey(row)}`" :style="{ '--role-color': row.color }"><span class="schedule-role-dot" /><div><strong :title="row.name">{{ row.name }}</strong><span :title="row.subtitle">{{ row.subtitle }}</span><small v-if="mode === 'people' || row.key === 'overall'">{{ row.total }} 个事件<span v-if="row.total > row.events.length"> · {{ row.total - row.events.length }} 个已隐藏</span></small></div><div class="schedule-track-ruler" aria-hidden="true"><span v-for="tick in (trackPreview?.key === row.key ? rowHeight(row.key) / TRACK_STEP - 1 : 0)" :key="tick" :style="{ top: `${tick * TRACK_STEP}px` }">{{ tick }}</span></div><span class="schedule-track-height-label" aria-hidden="true">{{ rowHeight(row.key) / TRACK_STEP }} × {{ TRACK_STEP }} px</span></div>
+     <div class="schedule-track-label" :class="{ 'has-workload': mode === 'people' && row.roleId !== null }" :data-testid="`schedule-label-${rowTestKey(row)}`" :style="{ '--role-color': row.color }"><span class="schedule-role-dot" /><div>
+      <strong :title="`${row.name} · ${row.total} 个事件${row.total > row.events.length ? ` · ${row.total - row.events.length} 个已隐藏` : ''}`">{{ row.name }}</strong><span :title="row.subtitle">{{ row.subtitle }}</span>
+      <ul v-if="mode === 'people' && row.roleId !== null" class="schedule-workload-list" :data-testid="`schedule-workload-${row.roleId}`" :aria-label="`${row.name}的月度工时占比`" title="月度工时：已排工作天数 / 当月项目范围内的工作日；月份较多时可滚动查看" tabindex="0">
+       <li v-for="item in workloadByRole.get(row.roleId)" :key="item.month" :data-month="item.month" :data-scheduled-days="item.scheduledDays" :data-available-days="item.availableDays" :data-percentage="item.percentage" :title="workloadTitle(item)"><span>{{item.month}}</span><strong>{{workloadPercent(item.percentage)}}</strong></li>
+      </ul>
+      <small v-else-if="row.key === 'overall'">{{ row.total }} 个事件<span v-if="row.total > row.events.length"> · {{ row.total - row.events.length }} 个已隐藏</span></small>
+     </div><div class="schedule-track-ruler" aria-hidden="true"><span v-for="tick in (trackPreview?.key === row.key ? rowHeight(row.key) / TRACK_STEP - 1 : 0)" :key="tick" :style="{ top: `${tick * TRACK_STEP}px` }">{{ tick }}</span></div><span class="schedule-track-height-label" aria-hidden="true">{{ rowHeight(row.key) / TRACK_STEP }} × {{ TRACK_STEP }} px</span></div>
      <div :ref="element => setLane(row.key, element)" class="schedule-track-lane" :style="{ width: `${calendarWidth}px` }" :data-testid="`schedule-lane-${rowTestKey(row)}`" :data-role-id="row.roleId ?? 'overall'" @dblclick="createEvent($event, row)">
       <span class="schedule-lane-midline" aria-hidden="true"/><span class="schedule-period-hint period-morning" aria-hidden="true">上午</span><span class="schedule-period-hint period-afternoon" aria-hidden="true">下午</span>
       <span v-if="!row.total && calendar.days.length" class="schedule-lane-hint">双击日期空白处添加{{ row.key === 'overall' ? '整体计划' : '事件' }}</span>
@@ -509,6 +526,8 @@ defineExpose({ cancelGesture, zoomTo })
 .schedule-track-label strong { font-size: 12px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .schedule-track-label>div:not(.schedule-track-ruler)>span { font-size: 10px; color: var(--ui-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .schedule-track-label small { font-size: 9px; color: var(--ui-subtle); margin-top: 0; }
+.schedule-track-label.has-workload{padding-top:8px;padding-bottom:20px}.schedule-track-label.has-workload>div:not(.schedule-track-ruler){height:100%;min-height:0;gap:2px}.has-workload>div>strong{line-height:16px;flex:none}.has-workload>div>span{line-height:12px;flex:none}
+.schedule-workload-list{list-style:none;margin:2px 0 0;padding:0 3px 0 0;min-height:18px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;outline-offset:1px;font-variant-numeric:tabular-nums}.schedule-workload-list li{height:18px;display:flex;align-items:center;justify-content:space-between;gap:5px;white-space:nowrap;color:var(--ui-muted);font-size:10px}.schedule-workload-list li strong{font-size:10px;line-height:18px;color:var(--ui-text);flex:none}
 .schedule-role-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--role-color); }
 .schedule-track-lane { position: relative; flex: none; height: var(--schedule-track-height); border-bottom: 1px solid var(--ui-line); background-color: var(--ui-surface); background-image: linear-gradient(to right, transparent calc(100% - 1px), var(--ui-line) calc(100% - 1px)); background-size: var(--schedule-day-width) 100%; }
 .schedule-overall-track .schedule-track-lane { background-color: color-mix(in srgb, var(--ui-accent-soft) 35%, var(--ui-surface)); }
