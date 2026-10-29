@@ -89,7 +89,7 @@ export function validateEventConflicts(project: ScheduleProject): void {
 }
 function placedEvent(project: ScheduleProject, event: ScheduleEvent): ScheduleEvent {
  if (event.roleId !== null && !project.roles.some(role => role.id === event.roleId)) throw Error('目标角色不存在。')
- if (event.slot !== 0) throw Error('事件槽位无效；每条角色轨道只允许一层事件。')
+ if ((event.height !== 1 && event.height !== .5) || (event.slot !== 0 && event.slot !== 1) || (event.height === 1 && event.slot !== 0)) throw Error('事件时段无效；整行事件使用全天，半高事件只能选择上午或下午。')
  if (event.startDate < project.startDate || event.endDate > project.endDate || event.startDate > event.endDate) throw Error('事件起止日期无效或超出项目范围。')
  const other = project.events.find(other => other.id !== event.id && overlaps(event, other))
  if (other) throw conflictError(project, event, other)
@@ -97,7 +97,8 @@ function placedEvent(project: ScheduleProject, event: ScheduleEvent): ScheduleEv
 }
 export function moveScheduledEvent(project: ScheduleProject, event: ScheduleEvent, deltaCols: number, targetRoleId: string | null, slot: 0 | 1, days: readonly CalendarDay[]): ScheduleEvent {
  if (!Number.isSafeInteger(deltaCols)) throw Error('只能按整天移动事件。')
- const candidate = { ...event, roleId: targetRoleId, slot: 0 as const }
+ if (slot !== 0 && slot !== 1) throw Error('目标时段无效，请选择上午或下午。')
+ const candidate = { ...event, roleId: targetRoleId, slot: event.height === .5 ? slot : 0 as const }
  // A track-only move must preserve hidden endpoints exactly.
  if (deltaCols === 0) return placedEvent(project, candidate)
  const span = projectedSpan(event, days)

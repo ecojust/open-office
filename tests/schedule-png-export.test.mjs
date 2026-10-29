@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildSchedulePngLayout, fitSchedulePngDimensions, SCHEDULE_PNG_MAX_PIXELS, SCHEDULE_PNG_MAX_SIDE } from '../src/schedule/png-export.ts'
-import { SCHEDULE_HEADER_HEIGHT } from '../src/schedule/layout.ts'
+import { getEventVerticalLayout, SCHEDULE_HEADER_HEIGHT } from '../src/schedule/layout.ts'
 
 function project() {
  return { format: 'open-office-schedule', version: 1, id: 'png_project', title: '完整排期导出', startDate: '2026-02-09', endDate: '2026-03-06', calendar: { hideWeekends: true, hideHolidays: true, extraHolidays: [], excludedHolidays: [] }, roles: [{ id: 'a', name: '小明', role: '研发', color: '#2563eb' }, { id: 'b', name: '小红', role: '设计', color: '#7c3aed' }], events: [
@@ -38,6 +38,19 @@ test('global PNG sorts all events and uses global-row heights independently from
  assert.deepEqual(plan.rows.map(row => row.height), [112, 112, 280])
  assert.equal(plan.rows.at(-1).subtitle, '小红 · 设计')
  assert.equal(plan.rows.at(-1).color, '#7c3aed')
+})
+
+test('afternoon PNG events use the lower half of their complete resized track in both modes', () => {
+ const source = project(); source.events[1].slot = 1
+ source.layout = { trackHeights: { 'person-b': 336, 'event-last': 280 } }
+ for (const [mode, height] of [['people', 336], ['global', 280]]) {
+  const plan = buildSchedulePngLayout(source, { mode }), row = plan.rows.at(-1), event = row.events[0].event
+  assert.equal(event.slot, 1); assert.equal(event.height, .5); assert.equal(row.height, height)
+  const afternoon = getEventVerticalLayout(row.height, event), morning = getEventVerticalLayout(row.height, { ...event, slot: 0 })
+  assert.equal(afternoon.top, 9 + (height - 18) / 2); assert.equal(afternoon.height, (height - 18) / 2)
+  assert.equal(afternoon.top + afternoon.height, height - 9)
+  assert.equal(morning.top, 9); assert.equal(afternoon.top - morning.top, afternoon.height)
+ }
 })
 
 test('PNG uses the current loaded/manual holiday projection without modifying event endpoints', () => {

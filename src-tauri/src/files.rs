@@ -1028,7 +1028,12 @@ fn valid_schedule_header(value: &serde_json::Value) -> bool {
                             && event
                                 .get("height")
                                 .and_then(|v| v.as_f64())
-                                .is_some_and(|height| height == 0.5 || height == 1.0)
+                                .is_some_and(|height| {
+                                    (height == 0.5 || height == 1.0)
+                                        && event.get("slot").and_then(|v| v.as_f64()).is_some_and(
+                                            |slot| slot == 0.0 || (height == 0.5 && slot == 1.0),
+                                        )
+                                })
                     })
             })
 }
@@ -1654,6 +1659,7 @@ mod tests {
         schedule["events"][0]["startDate"] = "2026-10-09".into();
         schedule["events"][0]["endDate"] = "2026-10-13".into();
         schedule["events"][0]["roleId"] = serde_json::Value::Null;
+        schedule["events"][0]["slot"] = 1.into();
         let edited = serde_json::to_vec(&schedule).unwrap();
         validate_document_signature(&edited, DocExt::Ooschedule).unwrap();
         let saved = store
@@ -1740,6 +1746,7 @@ mod tests {
         let history = fs::read(data.join("recent-files.json")).unwrap();
         let mut changed = schedule_fixture();
         changed["title"] = "调整后的项目".into();
+        changed["events"][0]["slot"] = 1.into();
         changed["layout"] = serde_json::json!({"trackHeights": {"overall": 140}});
         let exported = serde_json::to_vec(&changed).unwrap();
         validate_document_signature(&exported, DocExt::Json).unwrap();
@@ -1818,6 +1825,57 @@ mod tests {
                 .is_err());
             assert!(!target.exists());
             assert!(store.records().unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn schedule_half_day_slots_have_matching_import_and_export_contracts() {
+        let fixture = schedule_fixture();
+        for (height, slot) in [(1.0, 0.0), (0.5, 0.0), (0.5, 1.0)] {
+            let mut valid = fixture.clone();
+            valid["events"][0]["height"] = serde_json::json!(height);
+            valid["events"][0]["slot"] = serde_json::json!(slot);
+            let bytes = serde_json::to_vec(&valid).unwrap();
+            for extension in [DocExt::Ooschedule, DocExt::Json] {
+                validate_document_signature(&bytes, extension).unwrap();
+                extension.ensure_exportable_content(&bytes).unwrap();
+                assert_eq!(document_kind(&bytes, extension), DocumentKind::Schedule);
+            }
+        }
+        for height in [1.0, 0.5] {
+            for slot in [
+                serde_json::json!(-1),
+                serde_json::json!(2),
+                serde_json::json!(0.5),
+                serde_json::json!("0"),
+                serde_json::json!("1"),
+                serde_json::json!(true),
+                serde_json::Value::Null,
+            ] {
+                let mut invalid = fixture.clone();
+                invalid["events"][0]["height"] = serde_json::json!(height);
+                invalid["events"][0]["slot"] = slot;
+                let bytes = serde_json::to_vec(&invalid).unwrap();
+                for extension in [DocExt::Ooschedule, DocExt::Json] {
+                    assert!(validate_document_signature(&bytes, extension).is_err());
+                }
+                assert!(DocExt::Json.ensure_exportable_content(&bytes).is_err());
+            }
+        }
+        let mut full_afternoon = fixture.clone();
+        full_afternoon["events"][0]["height"] = 1.into();
+        full_afternoon["events"][0]["slot"] = 1.into();
+        let mut missing_slot = fixture;
+        missing_slot["events"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("slot");
+        for invalid in [full_afternoon, missing_slot] {
+            let bytes = serde_json::to_vec(&invalid).unwrap();
+            for extension in [DocExt::Ooschedule, DocExt::Json] {
+                assert!(validate_document_signature(&bytes, extension).is_err());
+            }
+            assert!(DocExt::Json.ensure_exportable_content(&bytes).is_err());
         }
     }
 

@@ -1,6 +1,6 @@
 import { buildCalendar, projectedSpan, type ScheduleCalendar } from './calendar.ts'
 import type { HolidayYears } from './holidays.ts'
-import { buildTimelineRows, getTrackHeight, SCHEDULE_EVENT_PADDING, SCHEDULE_HEADER_HEIGHT, SCHEDULE_LABEL_WIDTH, type TimelineRow } from './layout.ts'
+import { buildTimelineRows, getEventVerticalLayout, getTrackHeight, SCHEDULE_HEADER_HEIGHT, SCHEDULE_LABEL_WIDTH, type TimelineRow } from './layout.ts'
 import { validateSchedule, type ScheduleProject } from './model.ts'
 
 export type SchedulePngOptions = { mode: 'people' | 'global'; dayWidth?: number; holidayYears?: HolidayYears }
@@ -122,12 +122,19 @@ function drawTable(context: CanvasRenderingContext2D, plan: SchedulePngLayout) {
   font(context, 9); text(context, `${row.total} 个事件`, textLeft, row.top + 61, textWidth, COLOR.subtle)
   line(context, left, row.top + row.height, right, row.top + row.height, row.key === 'overall' ? COLOR.strong : COLOR.line)
   for (const item of row.events) {
-   const { event } = item, x = datesLeft + item.start * dayWidth + 3, y = row.top + SCHEDULE_EVENT_PADDING
-   const width = Math.max(10, item.count * dayWidth - 6), height = (row.height - SCHEDULE_EVENT_PADDING * 2) * event.height
+   const { event } = item, vertical = getEventVerticalLayout(row.height, event)
+   const x = datesLeft + item.start * dayWidth + 3, y = row.top + vertical.top
+   const width = Math.max(10, item.count * dayWidth - 6), height = vertical.height
    context.save(); rounded(context, x, y, width, height); context.fillStyle = tint(color, .13); context.fill(); context.strokeStyle = tint(color, .55); context.lineWidth = 1; context.stroke(); context.clip()
    fill(context, x, y, 3, height, color)
-   font(context, 11, 600); text(context, event.title, x + 10, y + (event.height === .5 ? 14 : 18), width - 20)
-   if (height >= 39) { font(context, 9); text(context, `${event.startDate.slice(5).replace('-', '/')} — ${event.endDate.slice(5).replace('-', '/')}`, x + 10, y + (event.height === .5 ? 30 : 38), width - 20, COLOR.muted) }
+   if (event.height === .5) {
+    font(context, 9, 600); text(context, event.slot === 1 ? '下午' : '上午', x + 6, y + 10, width - 10, color)
+    font(context, 11, 600); text(context, event.title, x + 6, y + 25, width - 12)
+    if (height >= 47) { font(context, 9); text(context, `${event.startDate.slice(5).replace('-', '/')} — ${event.endDate.slice(5).replace('-', '/')}`, x + 6, y + 40, width - 12, COLOR.muted) }
+   } else {
+    font(context, 11, 600); text(context, event.title, x + 10, y + 18, width - 20)
+    font(context, 9); text(context, `${event.startDate.slice(5).replace('-', '/')} — ${event.endDate.slice(5).replace('-', '/')}`, x + 10, y + 38, width - 20, COLOR.muted)
+   }
    if (plan.mode === 'global' && event.roleId && height >= 68) {
     const owner = project.roles.find(role => role.id === event.roleId)
     font(context, 9); text(context, owner?.name ?? '', x + 10, y + height - 13, width - 20, COLOR.muted)

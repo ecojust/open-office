@@ -3,7 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import type { ScheduleEvent, ScheduleProject } from '../model.ts'
 import type { HolidayYears } from '../holidays.ts'
 import { buildCalendar, moveScheduledEvent, projectedSpan, resizeScheduledEvent } from '../calendar.ts'
-import { buildTimelineRows, getTrackHeight, snapTrackHeight, SCHEDULE_LABEL_WIDTH as LABEL_WIDTH, SCHEDULE_HEADER_HEIGHT as HEADER_HEIGHT, SCHEDULE_EVENT_PADDING as PADDING, SCHEDULE_TRACK_HEIGHT as TRACK_HEIGHT, SCHEDULE_TRACK_STEP as TRACK_STEP, SCHEDULE_TRACK_MIN_HEIGHT as MIN_TRACK_HEIGHT, SCHEDULE_TRACK_MAX_HEIGHT as MAX_TRACK_HEIGHT, type DisplayEvent, type TimelineRow } from '../layout.ts'
+import { clampDayWidth, wheelDayWidth, zoomAnchorScroll } from '../zoom.ts'
+import { buildTimelineRows, getTrackHeight, getEventVerticalLayout, snapTrackHeight, SCHEDULE_LABEL_WIDTH as LABEL_WIDTH, SCHEDULE_HEADER_HEIGHT as HEADER_HEIGHT, SCHEDULE_EVENT_PADDING as PADDING, SCHEDULE_TRACK_HEIGHT as TRACK_HEIGHT, SCHEDULE_TRACK_STEP as TRACK_STEP, SCHEDULE_TRACK_MIN_HEIGHT as MIN_TRACK_HEIGHT, SCHEDULE_TRACK_MAX_HEIGHT as MAX_TRACK_HEIGHT, type DisplayEvent, type TimelineRow } from '../layout.ts'
 
 const props = withDefaults(defineProps<{
  project: ScheduleProject
@@ -23,16 +24,18 @@ const emit = defineEmits<{
  error: [message: string]
  gesture: [value: boolean]
  'track-height': [key: string, height: number]
+ zoom: [width: number]
 }>()
 
 const root = ref<HTMLElement>(), viewport = ref<HTMLElement>()
-const scrollLeft = ref(0), viewportWidth = ref(900), viewportHeight = ref(0)
+const scrollLeft = ref(0), viewportWidth = ref(900), viewportHeight = ref(0), zoomWidth = ref<number>()
+let zoomScroll: number | undefined, zoomGeneration = 0
 const preview = shallowRef<ScheduleEvent>(), previewPixels = ref<number>(), ghostStyle = ref<Record<string, string>>({})
 const dragKind = ref<GestureKind>(), announcement = ref('')
 const lanes = new Map<string, HTMLElement>()
 const daysOfWeek = ['日', '一', '二', '三', '四', '五', '六']
 const calendar = computed(() => buildCalendar(props.project, props.holidayYears))
-const columnWidth = computed(() => Math.max(36, Math.min(160, Number.isFinite(props.dayWidth) ? props.dayWidth : 64)))
+const columnWidth = computed(() => clampDayWidth(zoomWidth.value ?? props.dayWidth))
 const calendarWidth = computed(() => Math.max(columnWidth.value, calendar.value.days.length * columnWidth.value))
 const contentWidth = computed(() => LABEL_WIDTH + calendarWidth.value)
 const firstVisible = computed(() => Math.max(0, Math.floor(scrollLeft.value / columnWidth.value) - 2))
@@ -53,7 +56,7 @@ type GestureKind = 'move' | 'start' | 'end' | 'height'
 type PointerGesture = {
  kind: GestureKind; pointerId: number; element: HTMLElement; original: ScheduleEvent; base: ScheduleProject
  sourceKey: string; targetKey: string; startX: number; startY: number; x: number; y: number
- startScrollLeft: number; startHeight: number; moved: boolean; width: number
+ startScrollLeft: number; startHeight: number; grabRatio: number; moved: boolean; width: number
 }
 type TrackGesture = { pointerId: number; element: HTMLElement; key: string; name: string; base: ScheduleProject; startY: number; startHeight: number; moved: boolean }
 let trackGesture: TrackGesture | undefined
@@ -69,16 +72,46 @@ function rowTestKey(row: TimelineRow): string {
 function rowHeight(key: string): number { return trackPreview.value?.key === key ? trackPreview.value.height : getTrackHeight(props.project, key) }
 function fullHeight(key: string): number { return rowHeight(key) - PADDING * 2 }
 function eventStyle(item: DisplayEvent, color: string, key: string) {
- return { left: `${item.start * columnWidth.value + 3}px`, width: `${Math.max(10, item.count * columnWidth.value - 6)}px`, height: `${fullHeight(key) * item.event.height}px`, '--event-color': color }
+ const vertical = getEventVerticalLayout(rowHeight(key), item.event)
+ return { top: `${vertical.top}px`, left: `${item.start * columnWidth.value + 3}px`, width: `${Math.max(10, item.count * columnWidth.value - 6)}px`, height: `${vertical.height}px`, '--event-color': color }
 }
 function eventTitle(event: ScheduleEvent): string {
  const name = event.roleId ? roleById.value.get(event.roleId)?.name ?? '' : '整体计划'
- return `${event.title}\n${name} · ${event.startDate} 至 ${event.endDate}\n${event.height === 1 ? '整行高度' : '半行高度'}${event.notes ? `\n${event.notes}` : ''}`
+ return `${event.title}\n${name} · ${event.startDate} 至 ${event.endDate}\n${event.height === 1 ? '全天' : event.slot === 1 ? '下午 · 半高' : '上午 · 半高'}${event.notes ? `\n${event.notes}` : ''}`
 }
 function sameEvent(a: ScheduleEvent, b: ScheduleEvent): boolean {
  return a.roleId === b.roleId && a.startDate === b.startDate && a.endDate === b.endDate && a.height === b.height && a.slot === b.slot
 }
 function canEdit(): boolean { return props.active && !props.disabled }
+/** clientX is in viewport coordinates; omitted means the visible date area's centre. */
+function zoomTo(width: number, clientX?: number): boolean {
+ const scroll = viewport.value
+ if (!scroll || !canEdit() || gesture || trackGesture) return false
+ const current = columnWidth.value, next = clampDayWidth(width)
+ if (current === next) return false
+ const available = Math.max(0, scroll.clientWidth - LABEL_WIDTH)
+ const anchor = clientX === undefined ? available / 2 : clientX - scroll.getBoundingClientRect().left - LABEL_WIDTH
+ const desired = zoomAnchorScroll(current, next, zoomScroll ?? scroll.scrollLeft, anchor, available, calendar.value.days.length)
+ const token = ++zoomGeneration
+ // Multiple trackpad events can arrive before Vue renders the parent's width.
+ // Carry both width and logical scroll forward so every event uses its predecessor.
+ zoomWidth.value = next; zoomScroll = desired
+ emit('zoom', next)
+ void nextTick(() => {
+  if (token !== zoomGeneration || !viewport.value) return
+  if (canEdit()) { viewport.value.scrollLeft = desired; scrollLeft.value = viewport.value.scrollLeft }
+  zoomWidth.value = undefined; zoomScroll = undefined
+ })
+ return true
+}
+function wheel(event: WheelEvent) {
+ if (!event.ctrlKey) return
+ // Suppress browser page zoom even while an edit/dialog temporarily blocks the
+ // timeline. Plain wheel gestures keep the browser's native scrolling behavior.
+ event.preventDefault(); event.stopPropagation()
+ if (!canEdit() || gesture || trackGesture) return
+ zoomTo(wheelDayWidth(columnWidth.value, event.deltaY, event.deltaMode, viewport.value?.clientHeight ?? 800), event.clientX)
+}
 function onScroll() {
  scrollLeft.value = viewport.value?.scrollLeft ?? 0
  if (gesture?.moved) updatePreview()
@@ -99,17 +132,30 @@ function targetRow(drag: PointerGesture): TimelineRow | undefined {
  }
  return undefined
 }
+function targetSlot(drag: PointerGesture): 0 | 1 {
+ if (drag.original.height === 1) return 0
+ const lane = lanes.get(drag.targetKey)
+ if (!lane) return drag.original.slot
+ // Preserve where the user grabbed the block, scaled to the destination row.
+ // Purely horizontal movement therefore keeps even a bottom-edge grab in its
+ // original period, while cross-row moves select by the block's new centre.
+ const halfHeight = fullHeight(drag.targetKey) / 2
+ const centre = drag.y - lane.getBoundingClientRect().top + (.5 - drag.grabRatio) * halfHeight
+ return centre < rowHeight(drag.targetKey) / 2 ? 0 : 1
+}
 function placeGhost() {
  const drag = gesture, event = preview.value, wrapper = root.value
  if (!drag || !event || !wrapper) return
  const span = projectedSpan(event, calendar.value.days), lane = lanes.get(drag.targetKey)
  if (!span || !lane) return
  const bounds = wrapper.getBoundingClientRect(), rect = lane.getBoundingClientRect()
+ const vertical = getEventVerticalLayout(rowHeight(drag.targetKey), event)
+ const top = drag.kind === 'height' && drag.original.height === .5 && drag.original.slot === 1 && previewPixels.value !== undefined ? PADDING + fullHeight(drag.targetKey) - previewPixels.value : vertical.top
  ghostStyle.value = {
   left: `${rect.left - bounds.left + span.start * columnWidth.value + 3}px`,
-  top: `${rect.top - bounds.top + PADDING}px`,
+  top: `${rect.top - bounds.top + top}px`,
   width: `${Math.max(10, span.count * columnWidth.value - 6)}px`,
-  height: `${previewPixels.value ?? fullHeight(drag.targetKey) * event.height}px`,
+  height: `${previewPixels.value ?? vertical.height}px`,
   '--event-color': previewColor.value,
  }
 }
@@ -125,12 +171,13 @@ function updatePreview() {
    const target = targetRow(drag)
    if (target) drag.targetKey = target.key
    const roleId = props.mode === 'global' ? drag.original.roleId : (rows.value.find(row => row.key === drag.targetKey)?.roleId ?? null)
-   preview.value = moveScheduledEvent(previewProject, drag.original, delta, roleId, 0, calendar.value.days)
+   preview.value = moveScheduledEvent(previewProject, drag.original, delta, roleId, targetSlot(drag), calendar.value.days)
   } else if (drag.kind === 'height') {
    const maximum = fullHeight(drag.sourceKey)
    const height = Math.max(maximum / 2, Math.min(maximum, drag.startHeight + drag.y - drag.startY))
    previewPixels.value = height
-   preview.value = { ...drag.original, height: height < maximum * .75 ? .5 : 1, slot: 0 }
+   const half = height < maximum * .75
+   preview.value = { ...drag.original, height: half ? .5 : 1, slot: half ? drag.original.slot : 0 }
   } else preview.value = resizeScheduledEvent(previewProject, drag.original, drag.kind, delta, calendar.value.days)
   placeGhost()
  } catch (cause) { announcement.value = cause instanceof Error ? cause.message : String(cause) }
@@ -159,7 +206,8 @@ function startGesture(event: PointerEvent, item: ScheduleEvent, rowKey: string, 
  const element = (event.currentTarget as HTMLElement).closest<HTMLElement>('[data-event-id]')
  if (!element) return
  emit('select', item.id); element.focus({ preventScroll: true })
- gesture = { kind, pointerId: event.pointerId, element, original: { ...item }, base: props.project, sourceKey: rowKey, targetKey: rowKey, startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY, startScrollLeft: viewport.value?.scrollLeft ?? 0, startHeight: fullHeight(rowKey) * item.height, moved: false, width: columnWidth.value }
+ const bounds = element.getBoundingClientRect(), grabRatio = Math.max(0, Math.min(1, (event.clientY - bounds.top) / Math.max(1, bounds.height)))
+ gesture = { kind, pointerId: event.pointerId, element, original: { ...item }, base: props.project, sourceKey: rowKey, targetKey: rowKey, startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY, startScrollLeft: viewport.value?.scrollLeft ?? 0, startHeight: fullHeight(rowKey) * item.height, grabRatio, moved: false, width: columnWidth.value }
  dragKind.value = kind; announcement.value = ''
  try { element.setPointerCapture(event.pointerId) } catch { /* Window listeners cover devices without pointer capture. */ }
  element.addEventListener('lostpointercapture', cancelPointer)
@@ -204,8 +252,8 @@ function finishPointer(event: PointerEvent) {
  if (drag.moved) suppressClickUntil = performance.now() + 300
  releaseGesture()
  if (valid && changed && !sameEvent(changed, drag.original)) {
-  emit('change', { ...changed, slot: 0 })
-  announcement.value = `${changed.title}：${changed.startDate} 至 ${changed.endDate}，${changed.height === 1 ? '整行' : '半行'}高度。`
+  emit('change', { ...changed })
+  announcement.value = `${changed.title}：${changed.startDate} 至 ${changed.endDate}，${changed.height === 1 ? '全天' : changed.slot === 1 ? '下午' : '上午'}。`
   void nextTick(() => root.value?.querySelector<HTMLElement>(`[data-event-id="${changed.id}"]`)?.focus({ preventScroll: true }))
  }
 }
@@ -233,13 +281,19 @@ function eventKeyboard(event: KeyboardEvent, item: ScheduleEvent) {
   const horizontal = event.key === 'ArrowLeft' || event.key === 'ArrowRight'
   const delta = horizontal ? (event.key === 'ArrowLeft' ? -1 : 1) : 0
   let roleId = item.roleId
+  if (!horizontal && event.shiftKey) {
+   if (item.height !== .5) return
+   const candidate = moveScheduledEvent(props.project, item, 0, item.roleId, event.key === 'ArrowUp' ? 0 : 1, calendar.value.days)
+   if (!sameEvent(item, candidate)) emit('change', candidate)
+   return
+  }
   if (!horizontal) {
    if (props.mode === 'global') return
    const index = rows.value.findIndex(row => row.roleId === item.roleId), next = rows.value[index + (event.key === 'ArrowUp' ? -1 : 1)]
    if (!next) return
    roleId = next.roleId
   }
-  const candidate = event.shiftKey && horizontal ? resizeScheduledEvent(props.project, item, 'end', delta, calendar.value.days) : moveScheduledEvent(props.project, item, delta, roleId, 0, calendar.value.days)
+  const candidate = event.shiftKey && horizontal ? resizeScheduledEvent(props.project, item, 'end', delta, calendar.value.days) : moveScheduledEvent(props.project, item, delta, roleId, item.slot, calendar.value.days)
   if (!sameEvent(item, candidate)) emit('change', candidate)
  } catch (cause) { emit('error', cause instanceof Error ? cause.message : String(cause)) }
 }
@@ -325,6 +379,7 @@ watch(() => [props.disabled, props.active, props.mode, props.dayWidth, props.pro
 watch(() => props.selectedId, focusSelected)
 onMounted(() => {
  if (viewport.value) {
+  viewport.value.addEventListener('wheel', wheel, { passive: false, capture: true })
   observer = new ResizeObserver(() => {
    viewportWidth.value = viewport.value?.clientWidth ?? 900
    viewportHeight.value = viewport.value?.clientHeight ?? 0
@@ -335,8 +390,8 @@ onMounted(() => {
   observer.observe(viewport.value); viewportWidth.value = viewport.value.clientWidth; viewportHeight.value = viewport.value.clientHeight
  }
 })
-onBeforeUnmount(() => { cancelGesture(); observer?.disconnect(); lanes.clear() })
-defineExpose({ cancelGesture })
+onBeforeUnmount(() => { cancelGesture(); zoomGeneration++; viewport.value?.removeEventListener('wheel', wheel, { capture: true }); observer?.disconnect(); lanes.clear() })
+defineExpose({ cancelGesture, zoomTo })
 </script>
 
 <template>
@@ -353,9 +408,10 @@ defineExpose({ cancelGesture })
     <div v-for="row in rows" :key="row.key" class="schedule-track" :class="{ 'schedule-overall-track': row.key === 'overall', 'schedule-overall-pinned': row.key === 'overall' && overallSticky, 'track-resizing': trackPreview?.key === row.key }" :style="{ '--schedule-track-height': `${rowHeight(row.key)}px` }" :data-track-height="rowHeight(row.key)" :data-sticky="row.key === 'overall' && overallSticky" :data-testid="`schedule-track-${rowTestKey(row)}`" :data-role-id="row.roleId ?? 'overall'" :data-track-key="row.key">
      <div class="schedule-track-label" :data-testid="`schedule-label-${rowTestKey(row)}`" :style="{ '--role-color': row.color }"><span class="schedule-role-dot" /><div><strong :title="row.name">{{ row.name }}</strong><span :title="row.subtitle">{{ row.subtitle }}</span><small v-if="mode === 'people' || row.key === 'overall'">{{ row.total }} 个事件<span v-if="row.total > row.events.length"> · {{ row.total - row.events.length }} 个已隐藏</span></small></div><div class="schedule-track-ruler" aria-hidden="true"><span v-for="tick in (trackPreview?.key === row.key ? rowHeight(row.key) / TRACK_STEP - 1 : 0)" :key="tick" :style="{ top: `${tick * TRACK_STEP}px` }">{{ tick }}</span></div><span class="schedule-track-height-label" aria-hidden="true">{{ rowHeight(row.key) / TRACK_STEP }} × {{ TRACK_STEP }} px</span></div>
      <div :ref="element => setLane(row.key, element)" class="schedule-track-lane" :style="{ width: `${calendarWidth}px` }" :data-testid="`schedule-lane-${rowTestKey(row)}`" :data-role-id="row.roleId ?? 'overall'" @dblclick="createEvent($event, row)">
+      <span class="schedule-lane-midline" aria-hidden="true"/><span class="schedule-period-hint period-morning" aria-hidden="true">上午</span><span class="schedule-period-hint period-afternoon" aria-hidden="true">下午</span>
       <span v-if="!row.total && calendar.days.length" class="schedule-lane-hint">双击日期空白处添加{{ row.key === 'overall' ? '整体计划' : '事件' }}</span>
       <span v-else-if="row.total && !row.events.length" class="schedule-lane-hint">事件日期已隐藏，可在事件列表中编辑</span>
-      <button v-for="item in row.events" :key="item.event.id" type="button" class="schedule-event" :class="{ selected: selectedId === item.event.id, 'event-half': item.event.height === .5, 'event-drag-source': preview?.id === item.event.id }" :style="eventStyle(item, row.color, row.key)" :data-testid="`schedule-event-${item.event.id}`" :data-event-id="item.event.id" :data-role-id="item.event.roleId ?? 'overall'" :data-height="item.event.height" :data-start-date="item.event.startDate" :data-end-date="item.event.endDate" :aria-label="eventTitle(item.event)" :aria-pressed="selectedId === item.event.id" :title="eventTitle(item.event)" :disabled="disabled || !active" @pointerdown="startGesture($event, item.event, row.key, 'move')" @click="selectEvent($event, item.event.id)" @dblclick="editEvent($event, item.event.id)" @keydown="eventKeyboard($event, item.event)">
+      <button v-for="item in row.events" :key="item.event.id" type="button" class="schedule-event" :class="{ selected: selectedId === item.event.id, 'event-half': item.event.height === .5, 'event-drag-source': preview?.id === item.event.id }" :style="eventStyle(item, row.color, row.key)" :data-testid="`schedule-event-${item.event.id}`" :data-event-id="item.event.id" :data-role-id="item.event.roleId ?? 'overall'" :data-height="item.event.height" :data-slot="item.event.slot" :data-start-date="item.event.startDate" :data-end-date="item.event.endDate" :aria-label="eventTitle(item.event)" :aria-pressed="selectedId === item.event.id" :title="eventTitle(item.event)" :disabled="disabled || !active" @pointerdown="startGesture($event, item.event, row.key, 'move')" @click="selectEvent($event, item.event.id)" @dblclick="editEvent($event, item.event.id)" @keydown="eventKeyboard($event, item.event)">
        <span class="schedule-resize-handle resize-start" data-testid="resize-start" data-resize="start" title="拖动调整开始日期" @pointerdown.stop="startGesture($event, item.event, row.key, 'start')" />
        <strong class="schedule-event-title">{{ item.event.title }}</strong>
        <span class="schedule-event-dates">{{ item.event.startDate.slice(5).replace('-', '/') }} — {{ item.event.endDate.slice(5).replace('-', '/') }}</span>
@@ -371,8 +427,8 @@ defineExpose({ cancelGesture })
     <div v-else-if="mode === 'global' && rows.length === 1" class="schedule-timeline-empty">人员事件会按开始日期汇总显示在这里。</div>
    </div>
   </div>
-  <div v-if="preview" class="schedule-preview-overlay" aria-hidden="true"><div class="schedule-event schedule-event-ghost" :class="{ 'event-half': preview.height === .5 }" :style="ghostStyle"><strong class="schedule-event-title">{{ preview.title }}</strong><span class="schedule-event-dates">{{ preview.startDate.slice(5).replace('-', '/') }} — {{ preview.endDate.slice(5).replace('-', '/') }}</span><span class="schedule-event-owner">{{ dragKind === 'height' ? `${preview.height * 100}% 高度` : previewOwner }}</span></div></div>
-  <div class="schedule-timeline-help"><span>双击添加或编辑 · 拖动移动 · 左右拉伸日期 · 事件底边调整比例 · 轨道底边按 28 px 吸附</span><span v-if="hiddenEvents">{{ hiddenEvents }} 个事件日期已隐藏</span><span v-else>方向键微调 · Esc 取消</span></div>
+  <div v-if="preview" class="schedule-preview-overlay" aria-hidden="true"><div class="schedule-event schedule-event-ghost" :class="{ 'event-half': preview.height === .5 }" :style="ghostStyle" :data-slot="preview.slot"><strong class="schedule-event-title">{{ preview.title }}</strong><span class="schedule-event-dates">{{ preview.startDate.slice(5).replace('-', '/') }} — {{ preview.endDate.slice(5).replace('-', '/') }}</span><span class="schedule-event-owner">{{ dragKind === 'height' ? `${preview.height * 100}% · ${preview.height === 1 ? '全天' : preview.slot === 1 ? '下午' : '上午'}` : `${previewOwner} · ${preview.height === 1 ? '全天' : preview.slot === 1 ? '下午' : '上午'}` }}</span></div></div>
+  <div class="schedule-timeline-help"><span>双击添加或编辑 · 拖动移动 · 左右拉伸日期 · 事件底边调整比例 · 轨道底边按 28 px 吸附</span><span v-if="hiddenEvents">{{ hiddenEvents }} 个事件日期已隐藏</span><span v-else>Shift+↑↓ 切换上下午 · Ctrl+滚轮缩放</span></div>
   <span class="schedule-sr-only" role="status" aria-live="polite">{{ announcement }}</span>
  </section>
 </template>
@@ -407,6 +463,9 @@ defineExpose({ cancelGesture })
 .schedule-role-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--role-color); }
 .schedule-track-lane { position: relative; flex: none; height: var(--schedule-track-height); border-bottom: 1px solid var(--ui-line); background-color: var(--ui-surface); background-image: linear-gradient(to right, transparent calc(100% - 1px), var(--ui-line) calc(100% - 1px)); background-size: var(--schedule-day-width) 100%; }
 .schedule-overall-track .schedule-track-lane { background-color: color-mix(in srgb, var(--ui-accent-soft) 35%, var(--ui-surface)); }
+.schedule-lane-midline { position: absolute; top: 50%; left: 0; right: 0; border-top: 1px dashed var(--ui-line); pointer-events: none; }
+.schedule-period-hint { position: absolute; left: 5px; font-size: 8px; color: var(--ui-subtle); opacity: .7; pointer-events: none; }
+.period-morning { top: 9px; }.period-afternoon { top: calc(50% + 3px); }
 .schedule-lane-hint { position: sticky; left: calc(var(--schedule-label-width) + 14px); display: inline-block; margin: calc(var(--schedule-track-height) / 2 - 10px) 14px 0; color: var(--ui-subtle); font-size: 10px; pointer-events: none; white-space: nowrap; }
 .schedule-event { position: absolute; top: 9px; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--event-color) 50%, var(--ui-line)); border-left: 3px solid var(--event-color); border-radius: 6px; background: color-mix(in srgb, var(--event-color) 13%, var(--ui-surface)); color: var(--ui-text); cursor: grab; user-select: none; touch-action: none; overflow: hidden; text-align: left; z-index: 2; }
 .schedule-event:hover { background: color-mix(in srgb, var(--event-color) 19%, var(--ui-surface)); border-color: var(--event-color); }

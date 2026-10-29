@@ -19,6 +19,11 @@ export function snapTrackHeight(value: number): number {
 export function getTrackHeight(project: ScheduleProject, key: string): number {
  return project.layout?.trackHeights[key] ?? SCHEDULE_TRACK_HEIGHT
 }
+/** Half-height events use the upper/lower half for morning/afternoon. */
+export function getEventVerticalLayout(trackHeight: number, event: Pick<ScheduleEvent, 'height' | 'slot'>): { top: number; height: number } {
+ const fullHeight = trackHeight - SCHEDULE_EVENT_PADDING * 2
+ return { top: SCHEDULE_EVENT_PADDING + (event.height === .5 && event.slot === 1 ? fullHeight / 2 : 0), height: fullHeight * event.height }
+}
 export function trackKeys(project: Pick<ScheduleProject, 'roles' | 'events'>): Set<string> {
  return new Set(['overall', ...project.roles.map(role => `person-${role.id}`), ...project.events.map(event => `event-${event.id}`)])
 }

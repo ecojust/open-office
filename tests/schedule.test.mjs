@@ -27,6 +27,21 @@ test('UTF-8 round trip retains inclusive dates, half height, notes and the fixed
  assert.equal(validateSchedule(enriched).unsafe, undefined); assert.equal(validateSchedule(enriched).roles[0].html, undefined)
 })
 
+test('morning and afternoon half-events round trip without changing legacy morning documents', () => {
+ for (const slot of [0, 1]) {
+  const value = project(); value.events = [event({ height: .5, slot, notes: slot ? '下午安排' : '上午安排' })]
+  assert.deepEqual(decodeSchedule(encodeSchedule(value)), value)
+  const session = sessionFor(value), receipt = session.export(); session.markSaved(receipt.bytes)
+  assert.equal(session.inspect().dirty, false); assert.equal(session.model.events[0].slot, slot)
+ }
+ const value = project(); value.events = [event({ height: 1, slot: 1 })]
+ assert.throws(() => validateSchedule(value), /时段无效/)
+ for (const slot of [-1, 2, .5, '1', null, undefined]) {
+  value.events = [event({ height: .5, slot })]
+  assert.throws(() => validateSchedule(value), /时段无效/)
+ }
+})
+
 test('civil date functions reject normalized invalid dates and fractional day changes', () => {
  for (const date of ['2026-02-29', '2025-04-31', '2026-00-01', '2026-01-00', '2026-13-01', '2026-1-01', '2026-01-01T00:00:00Z', '0099-01-01']) assert.throws(() => dayNumber(date))
  assert.equal(addDays('2024-02-28', 1), '2024-02-29'); assert.equal(addDays('2024-02-29', 1), '2024-03-01')
@@ -140,6 +155,46 @@ test('cross-role moves reject collisions without overwriting either event', () =
  assert.equal(JSON.stringify(value), before)
  const moved = moveScheduledEvent(value, value.events[0], 0, null, 1, days)
  assert.equal(moved.slot, 0); assert.equal(moved.roleId, null)
+})
+
+test('half-event moves retain explicit time period across roles, dates and left/right resizing', () => {
+ const value = project(), original = event({ height: .5, slot: 1 }); value.events = [original]
+ const days = buildCalendar(value).days
+ const across = moveScheduledEvent(value, original, 0, 'bob', original.slot, days)
+ assert.equal(across.slot, 1); assert.equal(across.roleId, 'bob'); assert.equal(across.startDate, original.startDate); assert.equal(across.endDate, original.endDate)
+ const moved = moveScheduledEvent(value, original, 1, 'alice', original.slot, days)
+ assert.equal(moved.slot, 1); assert.notEqual(moved.startDate, original.startDate)
+ const morning = moveScheduledEvent(value, original, 0, 'alice', 0, days)
+ assert.equal(morning.slot, 0); assert.equal(morning.startDate, original.startDate)
+ for (const edge of ['start', 'end']) assert.equal(resizeScheduledEvent(value, original, edge, 1, days).slot, 1)
+ for (const slot of [-1, 2, .5, '1', undefined]) {
+  assert.throws(() => moveScheduledEvent(value, original, 0, 'bob', slot, days), /目标时段无效/)
+  assert.throws(() => moveScheduledEvent(value, { ...original, height: 1, slot: 0 }, 0, 'bob', slot, days), /目标时段无效/)
+ }
+ assert.equal(original.slot, 1)
+})
+
+test('morning and afternoon remain mutually exclusive on the same track and date', () => {
+ const value = project(); value.events = [event({ height: .5, slot: 0 }), event({ id: 'afternoon', title: '下午任务', height: .5, slot: 1 })]
+ assert.throws(() => validateSchedule(value), /日期重叠/)
+ value.events[1].roleId = 'bob'; assert.doesNotThrow(() => validateSchedule(value))
+ const before = structuredClone(value), days = buildCalendar(value).days
+ assert.throws(() => moveScheduledEvent(value, value.events[1], 0, 'alice', 1, days), /日期重叠/)
+ assert.deepEqual(value, before)
+ value.events[0].roleId = null; value.events[1].roleId = null
+ assert.throws(() => validateSchedule(value), /整体计划/)
+})
+
+test('time period edits participate in history and exact save receipts', () => {
+ const value = project(); value.events = [event({ height: .5 })]
+ const session = sessionFor(value), morningReceipt = session.export()
+ session.change(copy => { copy.events[0].slot = 1 })
+ assert.equal(session.inspect().dirty, true); assert.equal(session.model.events[0].slot, 1)
+ assert.throws(() => session.markSaved(morningReceipt.bytes), /又有修改/)
+ session.undo(); assert.equal(session.model.events[0].slot, 0); assert.equal(session.inspect().dirty, false)
+ session.redo(); assert.equal(session.model.events[0].slot, 1)
+ const afternoonReceipt = session.export(); session.markSaved(afternoonReceipt.bytes)
+ assert.equal(session.inspect().dirty, false); assert.equal(decodeSchedule(afternoonReceipt.bytes).events[0].slot, 1)
 })
 
 test('decoder rejects malformed files, identifiers, dates, colors, references, slots and quantities', () => {

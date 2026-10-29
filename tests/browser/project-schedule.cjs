@@ -3,6 +3,7 @@
  * Focused unknown-year regression: OFFICE_SCHEDULE_FOCUS=unknown-year node tests/browser/project-schedule.cjs
  * Automatic holiday regression: OFFICE_SCHEDULE_FOCUS=holiday-refresh node tests/browser/project-schedule.cjs
  * Compact toolbar, track sizing and file/image export: OFFICE_SCHEDULE_FOCUS=layout-export node tests/browser/project-schedule.cjs
+ * Half-day slots and pointer-anchored wheel zoom: OFFICE_SCHEDULE_FOCUS=daypart-zoom node tests/browser/project-schedule.cjs
  * Synthetic project data only. No screen-capture, microphone or native I/O API.
  */
 const assert = require('node:assert/strict');
@@ -13,8 +14,8 @@ const { chromium } = require('playwright');
 const { PNG } = require('pngjs');
 const root = path.resolve(__dirname, '../..');
 const focus = process.env.OFFICE_SCHEDULE_FOCUS || '';
-const output = path.resolve(process.env.OFFICE_SCHEDULE_OUTPUT || path.join(root, ['unknown-year', 'holiday-refresh', 'layout-export'].includes(focus) ? `test-results/project-schedule-${focus}` : 'test-results/project-schedule'));
-const sources = ['src/App.vue', 'src/style.css', 'src/components/ScheduleEditor.vue', 'src/schedule/components/ScheduleTimeline.vue', 'src/schedule/model.ts', 'src/schedule/calendar.ts', 'src/schedule/holidays.ts', 'src/schedule/holiday-native.ts', 'src/schedule/session.ts', 'src/schedule/layout.ts', 'src/schedule/png-export.ts', 'src/shared/document.ts'];
+const output = path.resolve(process.env.OFFICE_SCHEDULE_OUTPUT || path.join(root, ['unknown-year', 'holiday-refresh', 'layout-export', 'daypart-zoom'].includes(focus) ? `test-results/project-schedule-${focus}` : 'test-results/project-schedule'));
+const sources = ['src/App.vue', 'src/style.css', 'src/components/ScheduleEditor.vue', 'src/schedule/components/ScheduleTimeline.vue', 'src/schedule/model.ts', 'src/schedule/calendar.ts', 'src/schedule/holidays.ts', 'src/schedule/holiday-native.ts', 'src/schedule/session.ts', 'src/schedule/layout.ts', 'src/schedule/zoom.ts', 'src/schedule/png-export.ts', 'src/shared/document.ts'];
 const hashes = () => Object.fromEntries(sources.map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex')]));
 const report = { ok: false, runtime: 'Real Vue schedule UI in system Chromium over local Vite HTTP; real browser downloads and file input; allowlisted public holiday responses are deterministic fixtures', checks: [], screenshots: [], gestures: [], errors: [], consoleErrors: [], externalRequests: [], holidayRequests: [], expectedNetworkErrors: [], limitations: ['Native file dialogs, desktop filesystem autosave and platform WebViews are not exercised.', 'Holiday fetches use the real browser fetch/client/cache path with fixture responses; live upstream availability is not asserted.', 'Pointer input is automated Chromium mouse input; physical touch and operating-system accessibility tools are not exercised.', 'Browser page screenshots require visual review.'] };
 let server, browser, page;
@@ -109,6 +110,7 @@ async function eventForm(value) {
   await eventDialog().getByTestId('schedule-event-start').fill(value.startDate);
   await eventDialog().getByTestId('schedule-event-end').fill(value.endDate);
   await eventDialog().getByTestId('schedule-event-height').selectOption(String(value.height || 1));
+  if (value.height === .5 && value.slot !== undefined) await eventDialog().getByTestId('schedule-event-slot').selectOption(String(value.slot));
   await eventDialog().getByTestId('schedule-event-notes').fill(value.notes || '');
 }
 async function createEvent(value) {
@@ -268,7 +270,7 @@ async function layoutExportChecks() {
     assert.equal(Math.round((await eventElement('alice_work').boundingBox()).height), 150);
     await gesture(eventElement('alice_work').getByTestId('resize-height'), 0, -85); assert.equal((await eventState('alice_work')).height, .5); assert.equal(Math.round((await eventElement('alice_work').boundingBox()).height), 75);
     const original = await eventState('alice_work'), item = await eventElement('alice_work').boundingBox(), lane = await editor().getByTestId('schedule-lane-bob').boundingBox(); assert.ok(item && lane);
-    const x = item.x + item.width / 2, y = item.y + item.height / 2, targetY = lane.y + lane.height / 2;
+    const x = item.x + item.width / 2, y = item.y + item.height / 2, targetY = lane.y + 9 + (lane.height - 18) / 4;
     await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x, targetY, { steps: 8 }); await frame();
     assert.equal(Math.round((await timeline().locator('.schedule-event-ghost').boundingBox()).height), 33, 'Ghost fits the half-height destination lane');
     await page.mouse.up(); await frame(); const moved = await eventState('alice_work'); assert.equal(moved.roleId, 'bob'); assert.equal(moved.startDate, original.startDate); assert.equal(moved.endDate, original.endDate); assert.equal(Math.round((await eventElement('alice_work').boundingBox()).height), 33);
@@ -340,6 +342,119 @@ async function layoutExportChecks() {
   });
 }
 
+
+async function dropToDaypart(id, targetRole, slot, cancel = false) {
+  await eventElement(id).scrollIntoViewIfNeeded(); await frame();
+  const item = await eventElement(id).boundingBox(), lane = await editor().getByTestId(`schedule-lane-${targetRole || 'overall'}`).boundingBox(); assert.ok(item && lane);
+  const start = { x: item.x + item.width / 2, y: item.y + item.height / 2 }, end = { x: start.x, y: lane.y + 9 + (lane.height - 18) * (slot ? .75 : .25) };
+  assert.equal(await eventElement(id).evaluate((element, point) => element.contains(document.elementFromPoint(point.x, point.y)), start), true);
+  report.gestures.push({ stage: report.stage, event: id, start, end, slot, cancel }); persist();
+  await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(end.x, end.y, { steps: 8 }); await frame();
+  if (cancel) await page.keyboard.press('Escape');
+  else { const ghost = timeline().locator('.schedule-event-ghost'); assert.equal(await ghost.getAttribute('data-slot'), String(slot)); }
+  await page.mouse.up(); await frame();
+}
+async function wheelAt(x, y, deltaY, ctrl = true, deltaX = 0) {
+  await page.mouse.move(x, y); if (ctrl) await page.keyboard.down('Control');
+  try { await page.mouse.wheel(deltaX, deltaY); } finally { if (ctrl) await page.keyboard.up('Control'); }
+  await frame();
+}
+async function zoomState() {
+  return { width: Number(await timeline().getAttribute('data-day-width')), ...(await scroll().evaluate(element => { const rect = element.getBoundingClientRect(); return { left: element.scrollLeft, top: element.scrollTop, x: rect.left, y: rect.top, viewWidth: element.clientWidth, viewHeight: element.clientHeight }; })) };
+}
+async function daypartZoomChecks() {
+  const fixture = { format: 'open-office-schedule', version: 1, id: 'daypart_zoom_project', title: '上午下午与时间轴缩放', startDate: '2026-09-21', endDate: '2026-11-30', calendar: { hideWeekends: false, hideHolidays: false, extraHolidays: [], excludedHolidays: [] }, roles: [{ id: 'alice', name: '林设计', role: '设计', color: '#cc0044' }, { id: 'bob', name: '陈开发', role: '开发', color: '#00aa88' }, ...Array.from({ length: 4 }, (_, i) => ({ id: `extra_${i}`, name: `其他成员 ${i + 1}`, role: '协作', color: '#2563eb' }))], events: [{ id: 'overview_pm', roleId: null, title: '下午整体会议', startDate: '2026-09-21', endDate: '2026-09-23', height: .5, slot: 1, notes: '' }, { id: 'alice_half', roleId: 'alice', title: '设计半天安排', startDate: '2026-09-23', endDate: '2026-09-25', height: .5, slot: 0, notes: '' }, { id: 'bob_later', roleId: 'bob', title: '后续开发安排', startDate: '2026-10-05', endDate: '2026-10-06', height: .5, slot: 1, notes: '' }], layout: { trackHeights: { 'person-alice': 168, 'person-bob': 84 } } };
+  let saved, originalKey, beforeZoom, zoomSnapshot, zoomIdentity;
+  const assertPosition = async (id, role, slot) => {
+    const item = await eventElement(id).boundingBox(), lane = await editor().getByTestId(`schedule-lane-${role || 'overall'}`).boundingBox(); assert.ok(item && lane);
+    const half = (lane.height - 18) / 2; assert.ok(Math.abs(item.y - lane.y - 9 - slot * half) < 1, `Slot ${slot} is aligned within the ${lane.height}px lane`); assert.ok(Math.abs(item.height - half) < 1); assert.equal(await eventElement(id).getAttribute('data-slot'), String(slot));
+  };
+  await check('imported-morning-and-afternoon-events-render-in-correct-halves', async () => {
+    await openFixture('daypart-zoom.ooschedule', fixture); await holidayIdle(); originalKey = (await active()).key;
+    await assertPosition('overview_pm', null, 1); await assertPosition('alice_half', 'alice', 0); await assertPosition('bob_later', 'bob', 1);
+    assert.match(await eventElement('overview_pm').getAttribute('title'), /下午/); assert.match(await eventElement('alice_half').getAttribute('title'), /上午/);
+    await saveDownload('半天排期验证.ooschedule', true); await capture('imported-dayparts');
+  });
+  await check('real-vertical-drag-switches-dayparts-with-undo-redo-and-cancel', async () => {
+    const before = await exportedModel(); await dropToDaypart('alice_half', 'alice', 1);
+    const after = await exportedModel(); assert.equal(after.events.find(event => event.id === 'alice_half').slot, 1); assert.equal(after.events.find(event => event.id === 'alice_half').startDate, '2026-09-23'); await assertPosition('alice_half', 'alice', 1);
+    await undo(); assert.deepEqual(await exportedModel(), before); await redo(); assert.deepEqual(await exportedModel(), after);
+    await dropToDaypart('alice_half', 'alice', 0, true); assert.deepEqual(await exportedModel(), after); await assertPosition('alice_half', 'alice', 1);
+    await dropToDaypart('alice_half', 'alice', 0); assert.equal((await eventState('alice_half')).slot, 0); await assertPosition('alice_half', 'alice', 0);
+  });
+  await check('cross-height-track-drag-selects-morning-or-afternoon', async () => {
+    const before = await eventState('alice_half'); await dropToDaypart('alice_half', 'bob', 1); let value = await eventState('alice_half'); assert.equal(value.roleId, 'bob'); assert.equal(value.slot, 1); assert.equal(value.startDate, before.startDate); assert.equal(value.endDate, before.endDate); await assertPosition('alice_half', 'bob', 1);
+    await dropToDaypart('alice_half', 'alice', 0); value = await eventState('alice_half'); assert.equal(value.roleId, 'alice'); assert.equal(value.slot, 0); await assertPosition('alice_half', 'alice', 0);
+    await dropToDaypart('alice_half', 'bob', 1); await assertPosition('alice_half', 'bob', 1); await capture('afternoon-in-short-track');
+  });
+  await check('horizontal-move-resize-and-global-view-preserve-afternoon-slot', async () => {
+    const width = Number(await timeline().getAttribute('data-day-width')); await gesture(eventElement('alice_half'), width, 0);
+    let event = await eventState('alice_half'); assert.equal(event.slot, 1); assert.equal(event.startDate, '2026-09-24'); assert.equal(event.endDate, '2026-09-26');
+    await gesture(eventElement('alice_half').getByTestId('resize-end'), width, 0); event = await eventState('alice_half'); assert.equal(event.slot, 1); assert.equal(event.endDate, '2026-09-27');
+    await gesture(eventElement('alice_half').getByTestId('resize-start'), -width, 0); event = await eventState('alice_half'); assert.equal(event.slot, 1); assert.equal(event.startDate, '2026-09-23');
+    await gesture(eventElement('alice_half').getByTestId('resize-start'), width, 0); assert.equal((await eventState('alice_half')).slot, 1);
+    const before = await exportedModel(); await editor().getByTestId('schedule-mode-global').click(); await frame(); assert.equal(await eventElement('alice_half').getAttribute('data-slot'), '1');
+    await gesture(eventElement('alice_half'), width, 0); assert.equal((await eventState('alice_half')).slot, 1); assert.equal((await eventState('alice_half')).roleId, 'bob'); await undo(); assert.deepEqual(await exportedModel(), before);
+    await editor().getByTestId('schedule-mode-people').click(); await frame();
+  });
+  await check('half-to-full-normalizes-slot-and-form-supports-afternoon', async () => {
+    await gesture(eventElement('alice_half').getByTestId('resize-height'), 0, 50); let event = await eventState('alice_half'); assert.equal(event.height, 1); assert.equal(event.slot, 0);
+    await editor().getByTestId('schedule-edit-event').click(); await eventDialog().waitFor(); await eventDialog().getByTestId('schedule-event-height').selectOption('0.5'); await eventDialog().getByTestId('schedule-event-slot').selectOption('1'); await eventDialog().getByTestId('schedule-event-confirm').click(); await eventDialog().waitFor({ state: 'hidden' }); await assertPosition('alice_half', 'bob', 1);
+    await editor().getByTestId('schedule-edit-event').click(); await eventDialog().waitFor(); await eventDialog().getByTestId('schedule-event-height').selectOption('1'); await eventDialog().getByTestId('schedule-event-confirm').click(); await eventDialog().waitFor({ state: 'hidden' }); event = await eventState('alice_half'); assert.equal(event.height, 1); assert.equal(event.slot, 0);
+    await undo(); await assertPosition('alice_half', 'bob', 1);
+  });
+  await check('morning-and-afternoon-still-cannot-share-person-and-day', async () => {
+    const before = await exportedModel(); await editor().getByTestId('schedule-add-event').click();
+    await eventForm({ title: '冲突的上午安排', roleId: 'bob', startDate: '2026-09-24', endDate: '2026-09-24', height: .5, slot: 0 }); await eventDialog().getByTestId('schedule-event-confirm').click(); await frame();
+    assert.equal(await eventDialog().isVisible(), true); assert.match(await eventDialog().innerText(), /重叠|冲突|占用/); await cancelDialog(eventDialog()); assert.deepEqual(await exportedModel(), before);
+  });
+  await check('afternoon-survives-save-json-round-trip-and-png-lower-half', async () => {
+    saved = await saveDownload('半天排期验证.ooschedule'); assert.equal(saved.model.events.find(event => event.id === 'alice_half').slot, 1);
+    const json = await toolbarExport('json', 'afternoon-project.json'); assert.deepEqual(JSON.parse(json.bytes), saved.model);
+    const pngResult = await toolbarExport('png', 'afternoon-people.png'), png = PNG.sync.read(pngResult.bytes);
+    const x = (24 + 192 + 3 * 64 + 4) * 2, rowTop = 160 + 112 + 168;
+    assert.deepEqual(pixel(png, x, (rowTop + 9 + 33 + 12) * 2), [0, 170, 136, 255], 'Afternoon event paints the lower half of its 84px personnel track');
+    assert.deepEqual(pixel(png, x + 20, (rowTop + 9 + 12) * 2), [255, 255, 255, 255], 'The upper morning half stays empty');
+    await editor().getByTestId('schedule-mode-global').click(); await frame(); const global = PNG.sync.read((await toolbarExport('png', 'afternoon-global.png')).bytes);
+    assert.deepEqual(pixel(global, x, (160 + 112 + 9 + 47 + 12) * 2), [0, 170, 136, 255], 'Global export also puts afternoon below the midpoint');
+    await editor().getByTestId('schedule-mode-people').click(); await toolbarImport('afternoon-import.json', saved.model); await ready(); assert.deepEqual(await exportedModel(), saved.model); await assertPosition('alice_half', 'bob', 1);
+    await saveDownload('半天缩放验证.ooschedule', true); beforeZoom = await exportedModel(); zoomSnapshot = await scheduleState(); zoomIdentity = await active(); await capture('afternoon-roundtrip');
+  });
+  await check('control-wheel-zooms-continuously-around-cursor-date-without-editing', async () => {
+    await scroll().evaluate(element => { element.scrollLeft = 640; }); await frame();
+    let prior = await zoomState(); const x = prior.x + 192 + 420, y = prior.y + 90, initialViewport = await page.evaluate(() => ({ width: innerWidth, ratio: devicePixelRatio, scale: visualViewport?.scale }));
+    for (const delta of [-120, -60, 90, 45]) {
+      const before = prior, anchorBefore = (before.left + x - before.x - 192) / before.width;
+      await wheelAt(x, y, delta); await poll(async () => (await zoomState()).width !== before.width, 'Ctrl+wheel changes timeline width'); prior = await zoomState();
+      assert.equal(Math.sign(prior.width - before.width), -Math.sign(delta)); const anchorAfter = (prior.left + x - prior.x - 192) / prior.width; assert.ok(Math.abs(anchorAfter - anchorBefore) < .04, 'The date fraction below the mouse remains anchored');
+      assert.equal(prior.top, before.top, 'Zoom does not vertically scroll the timeline');
+    }
+    assert.deepEqual(await exportedModel(), beforeZoom); assert.deepEqual(await scheduleState(), zoomSnapshot); assert.deepEqual(await active(), zoomIdentity); assert.deepEqual(await page.evaluate(() => ({ width: innerWidth, ratio: devicePixelRatio, scale: visualViewport?.scale })), initialViewport, 'Ctrl+wheel does not zoom the browser page');
+    await viewMenu(); assert.match(await editor().getByRole('combobox', { name: '日期列宽' }).locator('option:checked').innerText(), /%/); await viewMenu(false); await capture('mouse-anchored-wheel-zoom');
+  });
+  await check('wheel-zoom-clamps-at-bounds-and-normal-wheel-still-scrolls', async () => {
+    let view = await zoomState(); const x = view.x + 192 + 420, y = view.y + 100;
+    await wheelAt(x, y, -1200); await wheelAt(x, y, -1200); assert.equal((await zoomState()).width, 160);
+    const max = await zoomState(); await wheelAt(x, y, -1200); assert.deepEqual(await zoomState(), max);
+    await wheelAt(x, y, 1200); await wheelAt(x, y, 1200); assert.equal((await zoomState()).width, 36); const min = await zoomState(); await wheelAt(x, y, 1200); assert.deepEqual(await zoomState(), min);
+    await scroll().evaluate(element => { element.scrollLeft = 0; element.scrollTop = 0; }); await frame(); view = await zoomState();
+    await wheelAt(x, y + 210, 180, false); await poll(async () => (await zoomState()).top > view.top, 'Plain wheel scrolls rows'); assert.equal((await zoomState()).width, 36);
+    const beforeHorizontal = await zoomState(); await wheelAt(x, y + 210, 0, false, 220); await poll(async () => (await zoomState()).left > beforeHorizontal.left, 'Plain horizontal wheel scrolls dates'); assert.equal((await zoomState()).width, 36);
+    assert.deepEqual(await exportedModel(), beforeZoom); assert.deepEqual(await scheduleState(), zoomSnapshot); assert.deepEqual(await active(), zoomIdentity);
+  });
+  await check('zoom-is-disabled-during-dialog-or-gesture-and-isolated-by-tab', async () => {
+    await scroll().evaluate(element => { element.scrollLeft = 0; element.scrollTop = 0; }); await frame();
+    let view = await zoomState(); await editor().getByTestId('schedule-settings').click(); await wheelAt(view.x + 210, view.y + 100, -120); assert.equal((await zoomState()).width, view.width); await cancelDialog(projectDialog());
+    const item = await eventElement('alice_half').boundingBox(); assert.ok(item); const x = item.x + item.width / 2, y = item.y + item.height / 2;
+    await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 8, y, { steps: 3 }); await frame(); view = await zoomState();
+    await wheelAt(x + 8, y, -120); assert.equal((await zoomState()).width, view.width); await page.keyboard.press('Escape'); await page.mouse.up(); await frame(); assert.deepEqual(await exportedModel(), beforeZoom);
+    const firstZoomedKey = (await active()).key, firstWidth = (await zoomState()).width; await newSchedule('缩放隔离验证'); const secondKey = (await active()).key; assert.notEqual(secondKey, firstZoomedKey); assert.equal((await zoomState()).width, 64);
+    const second = await zoomState(); await wheelAt(second.x + 192 + 200, second.y + 100, -120); assert.ok((await zoomState()).width > 64);
+    await page.locator('.document-tab').filter({ has: page.locator('.tab-name', { hasText: '半天缩放验证.ooschedule' }) }).locator('.tab-name').click(); await ready(); assert.equal((await active()).key, firstZoomedKey); assert.equal((await zoomState()).width, firstWidth); assert.deepEqual(await exportedModel(), beforeZoom); assert.deepEqual(await scheduleState(), zoomSnapshot);
+    await page.locator('.document-tab').first().locator('.tab-name').click(); await ready(); assert.equal((await active()).key, originalKey); assert.equal((await zoomState()).width, 64); assert.deepEqual(await exportedModel(), saved.model);
+  });
+}
+
 (async () => {
   try {
     report.startedAt = new Date().toISOString(); report.sourcesBefore = hashes();
@@ -358,6 +473,7 @@ async function layoutExportChecks() {
     await page.goto(origin, { timeout: 60000 });
     if (focus === 'holiday-refresh') { await holidayRefreshChecks(); completeReport(); return; }
     if (focus === 'layout-export') { await layoutExportChecks(); completeReport(); return; }
+    if (focus === 'daypart-zoom') { await daypartZoomChecks(); completeReport(); return; }
     if (focus === 'unknown-year') {
       await check('unknown-year-notice-respects-both-weekend-display-states', async () => {
         const value = { format: 'open-office-schedule', version: 1, id: 'unknown_year_toggle', title: '未知年份周末显示验证', startDate: '2035-06-04', endDate: '2035-06-29', calendar: { hideWeekends: true, hideHolidays: true, extraHolidays: ['2035-06-12'], excludedHolidays: [] }, roles: [], events: [{ id: 'unknown_year_event', roleId: null, title: '跨周工作安排', startDate: '2035-06-08', endDate: '2035-06-14', height: 1, slot: 0, notes: '合成测试数据' }] };

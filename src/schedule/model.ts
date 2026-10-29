@@ -3,6 +3,7 @@ import { SCHEDULE_TRACK_MAX_HEIGHT, SCHEDULE_TRACK_MIN_HEIGHT, SCHEDULE_TRACK_ST
 
 export type ScheduleCalendarSettings = { hideWeekends: boolean; hideHolidays: boolean; extraHolidays: string[]; excludedHolidays: string[] }
 export type ScheduleRole = { id: string; name: string; role: string; color: string }
+/** Half-height events use slot 0 for morning and 1 for afternoon; full height always uses 0. */
 export type ScheduleEvent = { id: string; roleId: string | null; title: string; startDate: string; endDate: string; height: 1 | 0.5; slot: 0 | 1; notes: string }
 /** Dates include both endpoints. null roleId denotes the permanent overall-plan track. */
 export type ScheduleProject = { format: 'open-office-schedule'; version: 1; id: string; title: string; startDate: string; endDate: string; calendar: ScheduleCalendarSettings; roles: ScheduleRole[]; events: ScheduleEvent[]; layout?: { trackHeights: Record<string, number> } }
@@ -51,7 +52,7 @@ export function validateSchedule(value: unknown): ScheduleProject {
   if (event.roleId !== null && (typeof event.roleId !== 'string' || !roleIds.has(event.roleId))) throw Error('事件引用的角色不存在。')
   if (eventStart > eventEnd || eventStart < startDate || eventEnd > endDate) throw Error('事件起止日期无效或超出项目范围。')
   if (event.height !== 1 && event.height !== 0.5) throw Error('事件高度只支持整行或半行。')
-  if (event.slot !== 0) throw Error('事件槽位无效；每条角色轨道只允许一层事件。')
+  if ((event.slot !== 0 && event.slot !== 1) || (event.height === 1 && event.slot !== 0)) throw Error('事件时段无效；整行事件使用全天，半高事件只能选择上午或下午。')
   return { id: eventId, roleId: event.roleId as string | null, title: text(event.title, 200, '事件名称', true), startDate: eventStart, endDate: eventEnd, height: event.height, slot: event.slot, notes: text(event.notes, 20000, '事件备注') }
  })
  if (root.layout !== undefined) {
