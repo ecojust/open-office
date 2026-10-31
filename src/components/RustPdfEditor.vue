@@ -10,7 +10,7 @@ import { normalizePdfAuthor, pdfAuthorPreference } from '../pdf/author'
 import { useDialogFocus } from '../shared/dialog-focus'
 import Icon from './Icon.vue'
 
-const props = withDefaults(defineProps<{ document: NativeDocument; prepared?: PreparedRustPdfDocument; active?: boolean; disabled?: boolean; theme?: Appearance }>(), { active: true, disabled: false, theme: 'system' })
+const props = withDefaults(defineProps<{ document: NativeDocument; prepared?: PreparedRustPdfDocument; active?: boolean; disabled?: boolean; theme?: Appearance; focusMode?: boolean }>(), { active: true, disabled: false, theme: 'system', focusMode: false })
 const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: OfficePdfFileAction] }>()
 const viewport = ref<HTMLElement>(), snapshot = shallowRef<OfficePdfSnapshot>()
 const loading = ref(true), problem = ref('')
@@ -216,7 +216,7 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
 
 <template>
   <section class="rust-pdf-editor" data-testid="rust-pdf-editor" data-engine="office-pdf-wasm" :data-ready="!!snapshot && !loading" :data-session-id="snapshot?.sessionId" :data-revision="snapshot?.revision" :data-pages="snapshot?.pageCount" :data-dirty="snapshot?.dirty" :aria-busy="loading">
-    <div class="pdf-author-bar">
+    <div v-show="!focusMode" class="pdf-author-bar">
       <button class="pdf-author-button" type="button" :disabled="loading || disabled || !active" aria-label="设置图章署名" @click="editAuthor"><Icon name="pdf" :size="16" /><span>图章署名</span><strong :title="author || '未设置'">{{ author || '未设置' }}</strong><Icon name="chevron-down" :size="14" /></button>
       <span class="pdf-author-hint">用于新图章和批注</span>
     </div>

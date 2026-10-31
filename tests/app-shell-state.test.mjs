@@ -29,6 +29,7 @@ const names = 'tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,sav
   + ',autosaveEnabled,autosave,autosaveWaiting,saveStateLabel,saveStateTitle,backgroundSaving,editorInputBlocked,noteEntries,noteHandles,setNoteHandle,activeNote'
   + ',printDisabled,status,scheduleEntries,scheduleHandles,setScheduleHandle,activeSchedule'
   + ',mcpConfig,mcpSettingsOpen,mcpSettingsBusy,mcpSettingsError,mcpState,mcpWorking,mcpMutating,mcpService,toggleMcp,saveMcpSettings,openMcpSettings,workflowEntries,workflowHandles,setWorkflowHandle,composing'
+  + ',focusMode,setFocusMode,focusEnterButton,focusExitButton,editorContent,templateDraft,templatePanelOpen'
 
 
 // Every shell still receives a fresh VM context and fresh Vue state. Reuse only
@@ -320,6 +321,150 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     unmount() { for (const callback of beforeUnmount) callback(); scope.stop() },
   }
 }
+
+test('fullscreen layout preserves all eight live editor sessions, dirty state and running MCP service', async () => {
+  for (const kind of ['word','sheet','presentation','pdf','note','canvas','diagram','schedule']) {
+    const h = shell(), tab = h.tab(`fullscreen-${kind}`, { kind, dirty: true })
+    try {
+      h.active(tab); h.state.home.value = false
+      await settleShell()
+      const entries = [h.state.rustWordEntries,h.state.rustSheetEntries,h.state.rustPresentationEntries,h.state.rustPdfEntries,h.state.noteEntries,h.state.workflowEntries,h.state.scheduleEntries]
+      const handles = [h.state.rustWordHandles,h.state.rustSheetHandles,h.state.rustPresentationHandles,h.state.rustPdfHandles,h.state.noteHandles,h.state.workflowHandles,h.state.scheduleHandles]
+      const mounted = entries.map(value => value.value), attached = handles.map(value => [...value.entries()])
+      for (const handle of attached.flat().map(([,value]) => value)) {
+        for (const method of ['prepareDeactivate','exportFile','discardChanges','markSaved','undo','redo']) {
+          handle[method] = () => assert.fail(`A layout toggle must not call ${kind}.${method}`)
+        }
+      }
+      await h.state.toggleMcp()
+      assert.equal(h.state.mcpState.value.phase, 'running')
+      const before = JSON.stringify(h.state.tabs.value), mcp = h.state.mcpState.value, transportCalls = h.mcpCalls.length
+      for (const dirty of [true, false]) {
+        tab.dirty = dirty
+        const documentBefore = JSON.stringify(tab)
+        h.state.setFocusMode(true); await settleShell()
+        assert.equal(h.state.focusMode.value, true, kind)
+        h.state.setFocusMode(false); await settleShell()
+        assert.equal(h.state.focusMode.value, false, kind)
+        assert.equal(JSON.stringify(tab), documentBefore, `${kind} keeps the same saved/unsaved document`)
+        for (let i = 0; i < entries.length; i++) assert.equal(entries[i].value, mounted[i], `${kind} editors remain mounted`)
+        for (let i = 0; i < handles.length; i++) {
+          assert.equal(handles[i].size, attached[i].length)
+          for (const [id, handle] of attached[i]) assert.equal(handles[i].get(id), handle)
+        }
+        assert.equal(h.state.mcpState.value, mcp, `${kind} MCP session retains its identity`)
+        assert.equal(h.mcpCalls.length, transportCalls, `${kind} neither stops nor restarts MCP`)
+      }
+      tab.dirty = true
+      assert.equal(JSON.stringify(h.state.tabs.value), before)
+      assert.equal(h.calls.length, 0, 'No file, editor lifecycle or save calls are needed for layout')
+    } finally { h.unmount() }
+  }
+})
+
+test('fullscreen is reset when changing documents or returning to the workbench', async () => {
+  const h = shell(), first = h.tab('focused', { kind: 'schedule' }), second = h.tab('other', { kind: 'note' })
+  try {
+    h.active(first); h.state.home.value = false; await settleShell()
+    h.state.setFocusMode(true); await settleShell(); assert.equal(h.state.focusMode.value, true)
+    h.active(second); await settleShell(); assert.equal(h.state.focusMode.value, false)
+    h.state.setFocusMode(true); await settleShell(); assert.equal(h.state.focusMode.value, true)
+    h.state.home.value = true; await settleShell(); assert.equal(h.state.focusMode.value, false)
+    h.state.home.value = false; await settleShell(); assert.equal(h.state.focusMode.value, false, 'Reopening does not restore a stale fullscreen layout')
+  } finally { h.unmount() }
+})
+
+test('fullscreen entry waits for a ready document and preserves global and local modal ownership', async () => {
+  for (const blocked of ['home','not-ready','busy','saveAsDraft','templateDraft','closeTarget','help','mcpSettingsOpen','mcpWorking','local-dialog']) {
+    const h = shell(), tab = h.tab('blocked-fullscreen', { kind: 'schedule' })
+    let modalFocus = 0
+    try {
+      h.active(tab); h.state.home.value = false; await settleShell()
+      if (blocked === 'home') h.state.home.value = true
+      else if (blocked === 'not-ready') tab.ready = false
+      else if (blocked === 'busy') h.state.busy.value = '正在保存'
+      else if (blocked === 'saveAsDraft') h.state.saveAsDraft.value = { key: tab.key, kind: 'schedule', format: 'ooschedule', name: 'Plan', error: '' }
+      else if (blocked === 'templateDraft') h.state.templateDraft.value = { kind: 'save', key: tab.key, name: 'Template', error: '' }
+      else if (blocked === 'closeTarget') h.state.closeTarget.value = tab
+      else if (blocked === 'local-dialog') {
+        const control = { tabIndex: 0, matches: () => false, closest: () => null, getClientRects: () => [{}], focus: () => { modalFocus++ } }
+        h.state.editorContent.value = { querySelectorAll: () => [{ getClientRects: () => [{}], querySelectorAll: () => [control], focus: () => assert.fail('Focus the dialog control instead of its unfocusable form') }] }
+      }
+      else h.state[blocked].value = true
+      h.state.setFocusMode(true); await settleShell()
+      assert.equal(h.state.focusMode.value, false, blocked)
+      assert.equal(modalFocus, blocked === 'local-dialog' ? 1 : 0)
+    } finally { h.unmount() }
+  }
+})
+
+test('fullscreen Escape yields to editor handling, IME composition and visible dialogs before exiting', async () => {
+  const h = shell(), tab = h.tab('escape-fullscreen', { kind: 'schedule' })
+  const escape = (overrides = {}) => ({ key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true }, ...overrides })
+  try {
+    h.active(tab); h.state.home.value = false; await settleShell()
+    h.state.setFocusMode(true); await settleShell()
+    for (const props of [{ defaultPrevented: true }, { isComposing: true }]) {
+      const event = escape(props); h.state.keydown(event)
+      assert.equal(h.state.focusMode.value, true)
+      assert.equal(event.defaultPrevented, !!props.defaultPrevented)
+    }
+    h.state.help.value = true
+    let event = escape(); h.state.keydown(event)
+    assert.equal(h.state.focusMode.value, true); assert.equal(event.defaultPrevented, false)
+    h.state.help.value = false
+    let visible = true, modalFocus = 0
+    const control = { tabIndex: 0, matches: () => false, closest: () => null, getClientRects: () => [{}], focus: () => { modalFocus++ } }
+    h.state.editorContent.value = { querySelectorAll: () => [{ getClientRects: () => visible ? [{}] : [], querySelectorAll: () => [control] }] }
+    event = escape(); h.state.keydown(event)
+    assert.equal(h.state.focusMode.value, true); assert.equal(event.defaultPrevented, false)
+    h.state.setFocusMode(false)
+    assert.equal(h.state.focusMode.value, true); assert.equal(modalFocus, 1, 'Clicking exit also retains an active editor dialog')
+    visible = false
+    event = escape(); h.state.keydown(event); event.preventDefault(); await h.fireTimeout(0)
+    assert.equal(h.state.focusMode.value, true, 'A later window gesture handler gets the chance to consume Escape')
+    event = escape(); h.state.keydown(event); visible = true; await h.fireTimeout(0)
+    assert.equal(h.state.focusMode.value, true, 'An editor dialog opened during dispatch retains ownership')
+    visible = false
+    event = escape(); h.state.keydown(event); h.state.help.value = true; await h.fireTimeout(0)
+    assert.equal(h.state.focusMode.value, true, 'A global dialog opened during dispatch also retains ownership')
+    h.state.help.value = false
+    event = escape(); h.state.keydown(event)
+    const next = h.tab('escape-next', { kind: 'note' })
+    h.active(next); await settleShell(); h.state.setFocusMode(true); await settleShell(); await h.fireTimeout(0)
+    assert.equal(h.state.focusMode.value, true, 'An Escape queued for another document cannot exit the new view')
+    event = escape(); h.state.keydown(event); await h.fireTimeout(0)
+    assert.equal(event.defaultPrevented, false, 'The shell does not claim Escape before editor handlers run')
+    assert.equal(h.state.focusMode.value, false, 'A hidden background dialog does not block an unused Escape')
+  } finally { h.unmount() }
+})
+
+test('fullscreen focuses the visible exit/entry controls, resizes editors and cancels obsolete focus callbacks', async () => {
+  const h = shell(), tab = h.tab('focus-fullscreen', { kind: 'presentation' }), focused = [], dispatched = []
+  h.state.focusEnterButton.value = { focus: () => focused.push('enter') }
+  h.state.focusExitButton.value = { focus: () => focused.push('exit') }
+  h.browser.window.dispatchEvent = event => { dispatched.push(event.type) }
+  try {
+    h.active(tab); h.state.home.value = false; await settleShell()
+    h.state.templatePanelOpen.value = true; await settleShell()
+    dispatched.length = 0
+    h.state.setFocusMode(true); await settleShell()
+    assert.equal(h.state.templatePanelOpen.value, false, 'A template sidebar does not consume the expanded editing area')
+    assert.deepEqual(focused, ['exit']); assert.ok(dispatched.includes('resize'))
+    dispatched.length = 0
+    h.state.setFocusMode(false); await settleShell()
+    assert.deepEqual(focused, ['exit','enter']); assert.ok(dispatched.includes('resize'))
+    focused.length = 0
+    h.state.setFocusMode(true); h.state.setFocusMode(false); await settleShell()
+    assert.deepEqual(focused, ['enter'], 'A superseded enter callback must not focus a hidden exit button')
+    focused.length = 0
+    h.state.setFocusMode(true); h.state.home.value = true; await settleShell()
+    assert.deepEqual(focused, [], 'Navigation cannot focus controls in a hidden editor')
+    h.state.home.value = false; await settleShell()
+    h.state.setFocusMode(true); h.unmount(); await settleShell()
+    assert.deepEqual(focused, [], 'Disposal invalidates queued focus work')
+  } finally { h.unmount() }
+})
 
 test('autosave directOnly refuses browser downloads, missing file capabilities and protected or import-only files before export', async () => {
   for (const scenario of ['browser','missing-file','protected-import','template','conversion']) {

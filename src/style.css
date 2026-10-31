@@ -98,6 +98,13 @@ a { color: var(--ui-accent); }
   grid-template-rows: 52px minmax(0, 1fr); overflow: hidden;
 }
 .app-shell.editing { --sidebar-width: 64px; }
+.app-shell.focus-mode { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.app-shell.focus-mode .editor-workspace { grid-column: 1; grid-row: 1; }
+.focus-mode-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex: none; min-height: 30px; padding: 4px 8px; border-radius: 4px; color: var(--ui-muted); font-size: 12px; white-space: nowrap; }
+.focus-mode-button:hover:not(:disabled) { background: var(--ui-accent-soft); color: var(--ui-accent); }
+.editor-focus-bar { display: flex; align-items: center; gap: 8px; flex: none; height: 32px; min-width: 0; padding: 0 6px 0 12px; border-bottom: 1px solid var(--ui-line); background: var(--ui-surface); }
+.focus-document-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--ui-muted); }
+.editor-focus-bar .focus-mode-button { min-height: 26px; padding-top: 2px; padding-bottom: 2px; }
 .titlebar {
   grid-column: 2; grid-row: 1; min-width: 0;
   height: 52px; flex: none; display: flex; align-items: center; gap: 16px;
