@@ -118,6 +118,8 @@ pub fn inspect(app: &SlideApp, ctx: &egui::Context) -> Value {
             "frameMs": app.perf.frame_ms, "renderMs": app.perf.render_ms, "fps": app.perf.fps,
             "canvasRenders": app.textures.canvas_renders,
             "canvasCachedPages": app.textures.canvas_count(), "canvasCachedBytes": app.textures.canvas_bytes(),
+            "canvasCachedVariants": app.textures.canvas_variant_count(),
+            "canvasResizePending": app.textures.canvas_resize_pending(),
             "thumbnailCachedPages": app.textures.thumb_count(),
         },
     })

@@ -188,7 +188,20 @@ pub fn show(app: &mut SlideApp, ui: &mut Ui) {
             let idx = d.selection.slide;
             let doc = d.doc.clone();
             let frame = anim.as_ref().map(|(tl, t)| (tl, *t));
-            app.textures.slide(ui.ctx(), &doc, idx, px, visible, true, crate::media::gif_key(&gifs), app.ui.grayscale, &times, typing_into, frame)
+            app.textures.slide(
+                ui.ctx(),
+                &doc,
+                idx,
+                px,
+                visible,
+                true,
+                crate::media::gif_key(&gifs),
+                app.ui.grayscale,
+                &times,
+                typing_into,
+                frame,
+                true,
+            )
         }
         Some((Target::Master { master }, d)) => master_tex(ui.ctx(), &d.doc, master, None, px, visible, typing_into),
         Some((Target::Layout { master, layout }, d)) => master_tex(ui.ctx(), &d.doc, master, Some(layout), px, visible, typing_into),

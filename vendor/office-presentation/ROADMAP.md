@@ -2,7 +2,7 @@
 
 **Stage: alpha** · next: beta, ~20 points and ~120–210 h away
 
-> **Last reviewed:** 2026-10-15 · **Last updated:** 2026-10-15 · **Change:** minor (Open Office embedded Simplified Chinese interface implementation; WASM/browser validation recorded; breadth, readiness, language scores and stage unchanged) · **Target:** Microsoft PowerPoint for Mac 16.113 (Microsoft 365)
+> **Last reviewed:** 2026-10-31 · **Last updated:** 2026-10-31 · **Change:** minor (Open Office fitted-canvas resize caching and bounded static previews; parity scores and stage unchanged) · **Target:** Microsoft PowerPoint for Mac 16.113 (Microsoft 365)
 
 OfficePresentation aims at full PowerPoint parity, and to be better: faster, open (a documented zip+JSON
 format plus PPTX), scriptable by agents (CLI, JSON control channel, MCP), and available everywhere
@@ -140,6 +140,7 @@ app's JSON control channel (`presentation --control PORT`).
 
 | Date | What landed |
 |---|---|
+| 2026-10-31 | Open Office canvas: retain two exact static sizes per page within four textures / 64 MiB, avoiding repeated full-page CPU rasterization when toggling the workspace. Static complete-slide resize bursts preview the existing image for at most 100 ms after the last size change, then render at exact device resolution; text edits, animation and exposed pasteboard content bypass that preview. CPU rasterization remains; no parity score change |
 | 2026-10-15 | Local Open Office integration: embedded Simplified Chinese display catalogs for editor controls, menus, dialogs, panes, built-in galleries and presentation controls. Standalone remains English; WASM/browser navigation, editing/export and renderer regressions pass; native verification and coverage measurement remain open; no parity score change |
 | 2026-10-15 | PDF export and rendering: `anchorCtr` centres the drawn text block — right-aligned text no longer ran past the box edge (#736) |
 | 2026-10-14 | connected MCP rejects unrelated, malformed, incomplete and oversized replies without replay; buffered unsolicited bytes force a fresh connection before sending (#718) |
@@ -236,6 +237,7 @@ app's JSON control channel (`presentation --control PORT`).
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-31 | minor | Documented bounded exact-size canvas reuse and final-resolution redraw after static resize bursts; broader hardware-performance gap remains open |
 | 2026-10-15 | minor | Documented the local Open Office embedded Simplified Chinese interface; standalone remains English, WASM/browser validation recorded; native verification and coverage measurement remain open, all parity scores unchanged |
 | 2026-10-14 | trivial | remote MCP checks reply IDs, envelopes and bounded newline framing (#718) |
 | 2026-10-14 | minor | Gray list markers on empty paragraphs while editing; caret keeps the list indent before typing |

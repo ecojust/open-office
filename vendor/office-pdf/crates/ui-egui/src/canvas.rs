@@ -292,6 +292,13 @@ pub struct RasterMemory {
     pub thumbnail_bytes: usize,
     pub page_count: usize,
     pub page_bytes: usize,
+    /// Whole-page textures kept at the preceding zoom/viewport size, included in page totals.
+    pub previous_scale_count: usize,
+    pub slow_page_count: usize,
+    /// Cumulative accepted whole-page uploads; cache promotions do not increment it.
+    pub page_uploads: u64,
+    /// Visible requested rasters that are not exact yet, including debounce-held work.
+    pub visible_rasters_pending: usize,
     pub tile_count: usize,
     pub tile_bytes: usize,
     pub thumbnail_demand: usize,
@@ -346,6 +353,11 @@ pub struct DocView {
     errors: HashMap<usize, String>,
     /// When each still-missing page was first shown, to flag unusually slow renders.
     waiting_since: HashMap<usize, f64>,
+    /// One preceding size per page makes fit-width/fullscreen round trips cache hits. These
+    /// handles share the main page count/byte allowance and are evicted before current pages.
+    previous_page_scales: HashMap<usize, PageTex>,
+    page_uploads: u64,
+    visible_rasters_pending: usize,
     thumbs: HashMap<usize, PageTex>,
     /// This frame's consumers, with visible cells ahead of prefetch.
     thumb_demand: HashMap<usize, bool>,
@@ -574,8 +586,12 @@ impl DocView {
         RasterMemory {
             thumbnail_count: self.thumbs.len(),
             thumbnail_bytes: self.thumbs.values().fold(0usize, |n, p| n.saturating_add(texture_bytes(&p.tex))),
-            page_count: self.pages.len(),
-            page_bytes: self.pages.values().fold(0usize, |n, p| n.saturating_add(texture_bytes(&p.tex))),
+            page_count: self.pages.len().saturating_add(self.previous_page_scales.len()),
+            page_bytes: self.pages.values().chain(self.previous_page_scales.values()).fold(0usize, |n, p| n.saturating_add(texture_bytes(&p.tex))),
+            previous_scale_count: self.previous_page_scales.len(),
+            slow_page_count: self.slow_pages.len(),
+            page_uploads: self.page_uploads,
+            visible_rasters_pending: self.visible_rasters_pending,
             tile_count: self.tiles.len(),
             tile_bytes: self.tiles.values().fold(0usize, |n, tex| n.saturating_add(texture_bytes(tex))),
             thumbnail_demand: self.thumb_demand.len(),
@@ -638,6 +654,9 @@ impl DocView {
             flash: None,
             compare_marks: Vec::new(),
             pages: HashMap::new(),
+            previous_page_scales: HashMap::new(),
+            page_uploads: 0,
+            visible_rasters_pending: 0,
             errors: HashMap::new(),
             waiting_since: HashMap::new(),
             thumbs: HashMap::new(),
@@ -864,6 +883,7 @@ impl DocView {
         for p in self.pages.values_mut() {
             p.tag = STALE_TAG;
         }
+        self.previous_page_scales.clear();
         self.stale_thumbs.extend(self.thumbs.keys().copied());
         for slot in self.print_pages.values_mut() {
             slot.0 = STALE_TAG;
@@ -889,6 +909,7 @@ impl DocView {
     /// Only `page` changed (a comment was added, edited or removed): re-render that page and
     /// re-read its text, keep everything else. Out-of-date tiles stay on screen until replacements arrive.
     pub fn page_changed(&mut self, page: usize) {
+        self.previous_page_scales.remove(&page);
         if let Some(p) = self.pages.get_mut(&page) {
             p.tag = STALE_TAG;
         }
@@ -1446,6 +1467,7 @@ impl DocView {
         self.thumb_demand.clear();
         self.frame_queue.clear();
         self.frame_visible.clear();
+        self.visible_rasters_pending = 0;
     }
 
     pub(crate) fn need_thumbnail(&mut self, page: usize, visible: bool) {
@@ -1467,6 +1489,7 @@ impl DocView {
     pub(crate) fn suspend_rendering(&mut self, pool: &RenderPool) {
         self.begin_render_frame();
         self.pages.clear();
+        self.previous_page_scales.clear();
         self.tiles.clear();
         self.thumbs.clear();
         self.grid_pages.clear();
@@ -1556,6 +1579,7 @@ impl DocView {
                     queue.push(*req);
                 }
             } else {
+                self.restore_page_scale(req.page, req.tag, false);
                 let bytes = rgba_bytes(device_pixels(p.width, req.scale) as usize, device_pixels(p.height, req.scale) as usize);
                 if (!visible && (page_bytes.saturating_add(bytes) > PAGE_BYTES || pages.len() >= MAX_CACHED_PAGES)) || !pages.insert(req.page) {
                     continue;
@@ -1580,6 +1604,7 @@ impl DocView {
             }
         }
         self.pages.retain(|p, _| pages.contains(p));
+        self.trim_previous_page_scales(0, 0);
         // Tiles of an earlier zoom (not a demanded scale) stay while the canvas keeps them, a
         // bounded few under a page whose current tiles are still missing (OLD_TILES). Tiles of a
         // page on screen stay too even when this frame does not demand them (#2196): the viewport
@@ -1722,7 +1747,11 @@ impl DocView {
         }
         // Remember heavy pages: only these get the zoom/pan settle holds, so fast pages
         // never pay added latency. Stale entries die with the tiles on edits.
-        if r.millis >= SLOW_MILLIS {
+        // Browser renders run on the input thread: two missed 60 Hz frames already
+        // justify coalescing the next zoom gesture. Native workers retain their
+        // existing threshold because their rendering does not block UI input.
+        let slow_millis = if cfg!(target_arch = "wasm32") { 32 } else { SLOW_MILLIS };
+        if r.millis >= slow_millis {
             self.slow_pages.insert(r.request.page);
         }
         let page = r.request.page;
@@ -1758,6 +1787,7 @@ impl DocView {
         } else {
             let tex = ctx.load_texture(format!("page-{:?}-{page}", self.id), img, TextureOptions::LINEAR);
             self.pages.insert(page, PageTex { tag: r.request.tag, tex });
+            self.page_uploads = self.page_uploads.saturating_add(1);
             self.signature_drag.page_received(page);
             self.move_background.page_received(page);
             self.comments.page_rendered(page);
@@ -1787,6 +1817,17 @@ impl DocView {
             visible || bytes <= TILE_BYTES.saturating_sub(retained)
         } else {
             let thumb = req.tag & THUMB_TAG != 0;
+            if !thumb {
+                if let Some(old) = self.pages.remove(&req.page)
+                    && old.tag != STALE_TAG
+                    && old.tag != req.tag
+                {
+                    self.previous_page_scales.insert(req.page, old);
+                }
+                // Reserve the incoming surface before upload, rather than briefly adding
+                // a second page allowance during resize. Current pages take precedence.
+                self.trim_previous_page_scales(bytes, 1);
+            }
             let (cache, limit) = if thumb { (&mut self.thumbs, THUMB_BYTES) } else { (&mut self.pages, PAGE_BYTES) };
             cache.remove(&req.page);
             let mut retained = cache.values().fold(0usize, |n, p| n.saturating_add(texture_bytes(&p.tex)));
@@ -1800,6 +1841,39 @@ impl DocView {
                 }
             }
             visible || bytes <= limit.saturating_sub(retained)
+        }
+    }
+
+    /// Promote an already uploaded exact-size texture without rasterizing or uploading it
+    /// again. Swap the current size back into the spare slot for the next round trip.
+    /// A tiled view may keep a sharper current raster instead of a smaller backdrop.
+    fn restore_page_scale(&mut self, page: usize, tag: u64, keep_sharper: bool) {
+        if keep_sharper && self.pages.get(&page).is_some_and(|p| p.tag != STALE_TAG && tag_scale(p.tag) >= tag_scale(tag)) {
+            return;
+        }
+        if self.pages.get(&page).is_some_and(|p| p.tag == tag) || self.previous_page_scales.get(&page).is_none_or(|p| p.tag != tag) {
+            return;
+        }
+        let Some(previous) = self.previous_page_scales.remove(&page) else { return };
+        if let Some(current) = self.pages.insert(page, previous)
+            && current.tag != STALE_TAG
+            && current.tag != tag
+        {
+            self.previous_page_scales.insert(page, current);
+        }
+    }
+
+    /// Spare sizes never enlarge the existing whole-page budget. Drop farther pages first,
+    /// with a deterministic tie break; visible/current surfaces are never removed here.
+    fn trim_previous_page_scales(&mut self, reserved_bytes: usize, reserved_count: usize) {
+        let mut bytes =
+            self.pages.values().chain(self.previous_page_scales.values()).fold(reserved_bytes, |n, p| n.saturating_add(texture_bytes(&p.tex)));
+        while bytes > PAGE_BYTES || self.pages.len().saturating_add(self.previous_page_scales.len()).saturating_add(reserved_count) > MAX_CACHED_PAGES
+        {
+            let Some(page) = self.previous_page_scales.keys().copied().max_by_key(|p| (p.abs_diff(self.current), *p)) else { break };
+            if let Some(old) = self.previous_page_scales.remove(&page) {
+                bytes = bytes.saturating_sub(texture_bytes(&old.tex));
+            }
         }
     }
 
@@ -1923,6 +1997,16 @@ fn annotation_hover_text(a: &office_pdf_render::Annotation) -> Option<String> {
 /// The request tag for a raster at `scale`: equal tags mean the same scale (to 1/65536).
 fn scale_tag(scale: f32) -> u64 {
     (f64::from(scale) * 65536.0).round() as u64
+}
+
+/// egui consumes delayed repaint requests when an intervening immediate frame runs.
+/// Re-arm from every held frame, including when only offscreen prefetch is waiting,
+/// so the exact-size render resumes after the deadline without another input event.
+fn repaint_after_raster_hold(ctx: &egui::Context, deadline: f64) {
+    let remaining = deadline - ctx.input(|input| input.time);
+    if let Ok(delay) = std::time::Duration::try_from_secs_f64(remaining.max(0.0)) {
+        ctx.request_repaint_after(delay);
+    }
 }
 
 /// The scale of a raster tagged by [`scale_tag`].
@@ -2696,6 +2780,7 @@ pub fn document_area(app: &mut OfficePdfApp, index: usize, ui: &mut egui::Ui) {
                 } else {
                     (scale, tag)
                 };
+                view.restore_page_scale(i, want_tag, tiled);
                 // Under tiles, a whole-page raster sharper than the backdrop (from before the page
                 // grew past the tiling size) is a better backdrop: keep demanding it as it is.
                 match view.pages.get(&i).filter(|p| tiled && p.tag != STALE_TAG && tag_scale(p.tag) >= want_scale) {
@@ -3534,12 +3619,28 @@ pub fn document_area(app: &mut OfficePdfApp, index: usize, ui: &mut egui::Ui) {
             preview: tile.is_none() && (wanted_scale != scale || wanted_tag != tag),
         })
         .collect();
+    view.visible_rasters_pending = queue
+        .iter()
+        .filter(|request| {
+            if !on_screen.contains(&request.page) || view.errors.contains_key(&request.page) {
+                return false;
+            }
+            match request.tile {
+                Some(tile) => {
+                    let key = (request.page, request.tag, tile.x, tile.y);
+                    !view.tiles.contains_key(&key) || view.stale_tiles.contains(&key)
+                }
+                None => view.pages.get(&request.page).is_none_or(|p| p.tag != request.tag),
+            }
+        })
+        .count();
     // While the zoom or pan is settling, hold back sharp re-renders of pages that already
     // show something (a stale whole-page raster or older tiles, drawn stretched): each new
     // scale would cancel the running full-page interpret and restart it from scratch, and
     // each pan frame would queue a storm of full-page tile interprets.
     // Pages with nothing on screen yet still queue, so panning to a fresh page draws it.
     if sharp_held || pan_held {
+        repaint_after_raster_hold(ui.ctx(), view.sharp_hold_until.max(view.pan_hold_until));
         let main_tag = tag;
         queue.retain(|req| {
             // Fast pages render straight through: the hold only protects heavy pages
@@ -5443,6 +5544,142 @@ trailer << /Root 1 0 R >>
         v.frame_visible = [0].into();
         v.frame_queue = vec![req(0)];
         assert!(v.prepare_render_queue(&info, 1.0).is_empty());
+    }
+
+    #[test]
+    fn page_size_roundtrips_reuse_uploaded_texture() {
+        let ctx = egui::Context::default();
+        let info = thumbnail_info(1);
+        let mut view = DocView::new(DocId(1), &info, ViewDefaults::default());
+        let regular = RenderRequest { page: 0, scale: 1.0, tag: scale_tag(1.0), ..Default::default() };
+        let fullscreen = RenderRequest { page: 0, scale: 1.25, tag: scale_tag(1.25), ..Default::default() };
+        let mut original = None;
+        for request in [regular, fullscreen] {
+            view.begin_render_frame();
+            view.frame_visible = [0].into();
+            view.frame_queue = vec![request];
+            view.last_queue = view.prepare_render_queue(&info, 1.0);
+            assert_eq!(view.last_queue, vec![request]);
+            assert!(view.receive_result(&ctx, solid_result(request, 100, 130)) > 0);
+            original.get_or_insert(view.page_raster(0).unwrap());
+        }
+        let full_texture = view.page_raster(0).unwrap();
+        assert_ne!(Some(full_texture), original);
+        for (request, texture) in [(regular, original.unwrap()), (fullscreen, full_texture), (regular, original.unwrap())] {
+            view.begin_render_frame();
+            view.frame_visible = [0].into();
+            view.frame_queue = vec![request];
+            assert!(view.prepare_render_queue(&info, 1.0).is_empty(), "a previously rendered viewport size must not rasterize again");
+            assert_eq!(view.page_raster(0), Some(texture), "reuse the uploaded texture, not another pixel conversion/upload");
+        }
+        assert_eq!(view.raster_memory().page_uploads, 2, "round trips need no additional uploads");
+    }
+
+    #[test]
+    fn page_size_cache_invalidates_for_edits_document_changes_and_suspend() {
+        let ctx = egui::Context::default();
+        let info = thumbnail_info(1);
+        let mut view = DocView::new(DocId(1), &info, ViewDefaults::default());
+        let regular = RenderRequest { scale: 1.0, tag: scale_tag(1.0), ..Default::default() };
+        let fullscreen = RenderRequest { scale: 1.25, tag: scale_tag(1.25), ..Default::default() };
+        let warm = |view: &mut DocView| {
+            for request in [regular, fullscreen] {
+                view.frame_visible = [0].into();
+                view.last_queue = vec![request];
+                assert!(view.receive_result(&ctx, solid_result(request, 100, 130)) > 0);
+            }
+            assert_eq!(view.raster_memory().page_count, 2);
+        };
+        warm(&mut view);
+        view.page_changed(0);
+        view.frame_queue = vec![regular];
+        assert_eq!(view.prepare_render_queue(&info, 1.0), vec![regular], "comments and page edits invalidate every stored size");
+        assert_eq!(view.pages.get(&0).unwrap().tag, STALE_TAG, "only a stale backdrop may remain until the edited render arrives");
+        warm(&mut view);
+        view.invalidate_content();
+        view.frame_queue = vec![regular];
+        assert_eq!(view.prepare_render_queue(&info, 1.0), vec![regular], "undo, redo and reorder cannot resurrect old pixels");
+        warm(&mut view);
+        let pool = RenderPool::new_inline(Arc::new(Vec::new()), Default::default());
+        view.suspend_rendering(&pool);
+        assert_eq!(view.raster_memory().page_count, 0, "inactive documents release all viewport sizes");
+        assert_eq!(view.raster_memory().page_bytes, 0);
+    }
+
+    #[test]
+    fn page_size_cache_keeps_a_sharper_tiled_backdrop() {
+        let ctx = egui::Context::default();
+        let info = thumbnail_info(1);
+        let mut view = DocView::new(DocId(1), &info, ViewDefaults::default());
+        let backdrop = RenderRequest { scale: 1.0, tag: scale_tag(1.0), ..Default::default() };
+        let sharper = RenderRequest { scale: 1.25, tag: scale_tag(1.25), ..Default::default() };
+        let mut backdrop_texture = None;
+        for request in [backdrop, sharper] {
+            view.last_queue = vec![request];
+            assert!(view.receive_result(&ctx, solid_result(request, 100, 130)) > 0);
+            backdrop_texture.get_or_insert(view.page_raster(0).unwrap());
+        }
+        let sharper_texture = view.page_raster(0).unwrap();
+        view.restore_page_scale(0, backdrop.tag, true);
+        assert_eq!(view.page_raster(0), Some(sharper_texture), "zooming into tiles must not downgrade a valid, sharper backdrop");
+        view.restore_page_scale(0, backdrop.tag, false);
+        assert_eq!(view.page_raster(0), backdrop_texture, "a normal whole-page view still uses its exact-size cached raster");
+        assert_eq!(view.raster_memory().page_uploads, 2);
+    }
+
+    #[test]
+    fn raster_hold_rearms_after_intermediate_frames_without_more_input() {
+        let ctx = egui::Context::default();
+        let deadline = 0.35;
+        for time in [0.0, 0.03, 0.07] {
+            let mut output = ctx.run_ui(egui::RawInput { time: Some(time), predicted_dt: 0.0, ..Default::default() }, |ui| {
+                repaint_after_raster_hold(ui.ctx(), deadline);
+                if time == 0.0 {
+                    // Layout/resize commonly asks for an immediate frame after the hold
+                    // was scheduled. Subsequent passes have no new mouse/key events.
+                    ui.ctx().request_repaint();
+                }
+            });
+            // This scheduling-only harness has no renderer to apply texture deltas.
+            output.textures_delta.clear();
+            if time == 0.07 {
+                let delay = output.viewport_output[&egui::ViewportId::ROOT].repaint_delay;
+                assert!(delay > std::time::Duration::ZERO && delay.as_secs_f64() <= deadline - time + 0.001);
+            }
+        }
+        let mut settled = ctx.run_ui(egui::RawInput { time: Some(0.36), predicted_dt: 0.0, ..Default::default() }, |_| {});
+        settled.textures_delta.clear();
+        assert_eq!(
+            settled.viewport_output[&egui::ViewportId::ROOT].repaint_delay,
+            std::time::Duration::MAX,
+            "the hold must not keep repainting after its deadline"
+        );
+    }
+
+    #[test]
+    fn page_size_cache_shares_the_existing_count_and_byte_budget() {
+        let ctx = egui::Context::default();
+        let info = thumbnail_info(MAX_CACHED_PAGES);
+        let mut view = DocView::new(DocId(1), &info, ViewDefaults::default());
+        for page in 0..MAX_CACHED_PAGES {
+            for scale in [1.0, 1.25, 1.5] {
+                let request = RenderRequest { page, scale, tag: scale_tag(scale), ..Default::default() };
+                view.last_queue = vec![request];
+                assert!(view.receive_result(&ctx, solid_result(request, 10, 10)) > 0);
+                assert!(view.raster_memory().page_count <= MAX_CACHED_PAGES, "previous sizes cannot double the count allowance");
+                assert!(view.raster_memory().page_bytes <= PAGE_BYTES);
+            }
+        }
+        let mut view = DocView::new(DocId(2), &info, ViewDefaults::default());
+        for scale in [1.0, 1.25] {
+            let request = RenderRequest { scale, tag: scale_tag(scale), ..Default::default() };
+            view.last_queue = vec![request];
+            assert!(view.receive_result(&ctx, solid_result(request, 10, 10)) > 0);
+        }
+        assert_eq!(view.raster_memory().page_count, 2);
+        view.trim_previous_page_scales(PAGE_BYTES - 400, 1);
+        assert_eq!(view.raster_memory().page_count, 1, "the incoming raster reserves its bytes before upload");
+        assert_eq!(view.raster_memory().page_bytes, 400);
     }
 
     #[test]
