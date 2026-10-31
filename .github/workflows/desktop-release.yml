@@ -189,6 +189,7 @@ jobs:
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-annot --lib stamp -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-automation --test embedded_editing
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p open-office-pdf-host --lib
+          cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib canvas::tests -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib comment_drafts:: -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib embedding:: -- --test-threads=1
           cargo test --locked --manifest-path vendor/office-pdf/Cargo.toml -p office-pdf-ui-egui --lib embedded_toolbar:: -- --test-threads=1

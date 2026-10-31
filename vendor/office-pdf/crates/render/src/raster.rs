@@ -31,22 +31,17 @@ use hayro::{RenderCache, RenderSettings, render_into, render_size};
 
 use crate::{Pixels, ReadingColors};
 
-/// Monotonic-ish timer that is safe on wasm32 (where `std::time::Instant` panics).
+/// Monotonic render timing on native and web. A zero placeholder on wasm disabled
+/// the view's slow-page zoom/pan debounce, repeatedly blocking input on every scale.
 #[derive(Clone, Copy)]
-struct Stopwatch(#[cfg(not(target_arch = "wasm32"))] std::time::Instant);
+struct Stopwatch(web_time::Instant);
 
 impl Stopwatch {
     fn start() -> Self {
-        #[cfg(not(target_arch = "wasm32"))]
-        return Self(std::time::Instant::now());
-        #[cfg(target_arch = "wasm32")]
-        return Self();
+        Self(web_time::Instant::now())
     }
     fn millis(self) -> u32 {
-        #[cfg(not(target_arch = "wasm32"))]
-        return self.0.elapsed().as_millis() as u32;
-        #[cfg(target_arch = "wasm32")]
-        return 0;
+        self.0.elapsed().as_millis().min(u128::from(u32::MAX)) as u32
     }
 }
 

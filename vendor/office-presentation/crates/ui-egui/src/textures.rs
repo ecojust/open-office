@@ -28,16 +28,19 @@ struct Key {
 }
 
 impl Key {
-    fn same_picture(&self, other: &Self) -> bool {
+    fn same_content(&self, other: &Self) -> bool {
         self.index == other.index
             && self.slide == other.slide
             && self.master == other.master
-            && self.size == other.size
             && self.edit == other.edit
             && self.extra == other.extra
             && self.grayscale == other.grayscale
             && self.animation == other.animation
             && self.editing_text == other.editing_text
+    }
+
+    fn same_picture(&self, other: &Self) -> bool {
+        self.same_content(other) && self.size == other.size
     }
 }
 
@@ -59,18 +62,28 @@ struct CanvasEntry {
     bytes: u64,
 }
 
-const CANVAS_PAGE_LIMIT: usize = 4;
+const CANVAS_TEXTURE_LIMIT: usize = 4;
 const CANVAS_BYTE_LIMIT: u64 = 64 * 1024 * 1024;
+const CANVAS_SIZE_LIMIT: usize = 2;
+const RESIZE_SETTLE_SECONDS: f64 = 0.1;
+
+struct PendingResize {
+    key: Key,
+    changed_at: f64,
+}
 
 #[derive(Default)]
 pub struct Textures {
-    /// Least recently used first. At most four pages / 64 MiB of RGBA pixels; an active texture
+    /// Least recently used first. At most four textures / 64 MiB of RGBA pixels; an active texture
     /// larger than that budget is retained alone to preserve device-pixel clarity. In that case
     /// the existing GPU maximum texture dimensions are the bound, and no other page is retained.
+    /// A static page may retain two exact sizes, so toggling a fitted editor between its normal
+    /// and expanded workspace does not repeatedly rasterize the same content at the same sizes.
     canvas: Vec<CanvasEntry>,
     /// Keep the immutable document alive: its address cannot be reused under a cached picture.
     /// A content, media, theme, ordering or page-size edit changes this Arc and drops old pages.
     canvas_document: Option<Arc<Presentation>>,
+    resize: Option<PendingResize>,
     font_faces: usize,
     /// Canvas renders so far (tests, performance checks).
     pub canvas_renders: u64,
@@ -283,6 +296,7 @@ impl Textures {
         gif_times: &[(ShapeId, f64)],
         editing_text: Option<ShapeId>,
         anim: Option<(&office_presentation_anim::Timeline, f64)>,
+        settle_resize: bool,
     ) -> Option<(TextureHandle, Region)> {
         self.sync_fonts();
         let mut reusable = None;
@@ -291,6 +305,7 @@ impl Textures {
             reusable = self.canvas.pop().map(|e| e.entry.tex);
             self.canvas.clear();
             self.canvas_document = Some(p.clone());
+            self.resize = None;
         }
         let slide = p.slides.get(index)?.clone();
         let master = master_of(p, &slide);
@@ -325,12 +340,58 @@ impl Textures {
             let e = self.canvas.remove(at);
             let result = (e.entry.tex.clone(), e.entry.region);
             self.canvas.push(e);
+            self.resize = None;
             self.last_render_ms = 0.0;
             return Some(result);
         }
-        // Keep only one variant of a page: zooming, GIF playback and text editing must not
-        // accumulate a full-size texture per frame or displace all the other visited pages.
-        if let Some(at) = self.canvas.iter().position(|e| e.entry.key.index == index) {
+        // Resize/trackpad bursts should not CPU-rasterize every intermediate fitted size.
+        // Reuse only a static, complete slide with identical content. Pasteboard regions,
+        // text editing and animated frames always render exactly, so this cannot omit an
+        // off-slide object or lag a text/animation change. Once size stops changing, request
+        // a final frame at the exact device resolution even if the pointer has stopped.
+        if settle_resize && key.extra == 0 && key.animation == 0 && editing_text.is_none() && want == Region::slide(size.0, size.1) {
+            // Drawing bounds travel through pixel/point transforms; tolerate only floating
+            // point roundoff, never visible overflow from text or effects.
+            let page = Rect::new(0.0, 0.0, p.slide_size.width, p.slide_size.height).inflate(1e-6, 1e-6);
+            let previous = self.canvas.iter().rev().find(|e| {
+                e.entry.key.same_content(&key)
+                    && e.entry.key.size != size
+                    && e.entry.region == Region::slide(e.entry.key.size.0, e.entry.key.size.1)
+                    && page.union(e.estimate).union(e.drawn) == page
+            });
+            if let Some(previous) = previous {
+                let now = ctx.input(|input| input.time);
+                if self.resize.as_ref().is_none_or(|pending| pending.key != key) {
+                    self.resize = Some(PendingResize { key: key.clone(), changed_at: now });
+                }
+                let elapsed = self.resize.as_ref().map(|pending| now - pending.changed_at).unwrap_or(RESIZE_SETTLE_SECONDS);
+                if elapsed.is_finite() && (0.0..RESIZE_SETTLE_SECONDS).contains(&elapsed) {
+                    ctx.request_repaint_after(std::time::Duration::from_secs_f64(RESIZE_SETTLE_SECONDS - elapsed));
+                    self.last_render_ms = 0.0;
+                    return Some((previous.entry.tex.clone(), want));
+                }
+            }
+        }
+        self.resize = None;
+        // Content or interaction changes invalidate every size variant of this page. Retain
+        // one allocation for reuse, but never show old animation/text-editing pixels.
+        let mut at = 0;
+        while at < self.canvas.len() {
+            let Some(old) = self.canvas.get(at).map(|entry| &entry.entry.key) else { break };
+            if old.index == index && !old.same_content(&key) {
+                reusable = Some(self.canvas.remove(at).entry.tex);
+            } else {
+                at += 1;
+            }
+        }
+        // Static pages keep only two sizes within the existing global budget. Scrolling a
+        // pasteboard replaces its region at that size; GIF/animation frames retain just one.
+        // Continuous zoom therefore cannot consume an unbounded texture per wheel event.
+        let variants = self.canvas.iter().filter(|e| e.entry.key.index == index).count();
+        let keep_sizes = key.extra == 0 && key.animation == 0;
+        if let Some(at) =
+            self.canvas.iter().position(|e| e.entry.key.index == index && (e.entry.key.size == size || !keep_sizes || variants >= CANVAS_SIZE_LIMIT))
+        {
             reusable = Some(self.canvas.remove(at).entry.tex);
         }
         let t0 = crate::now_ms();
@@ -368,7 +429,8 @@ impl Textures {
         }
         self.last_render_ms = crate::now_ms() - t0;
         let bytes = u64::from(img.width).saturating_mul(u64::from(img.height)).saturating_mul(4);
-        while !self.canvas.is_empty() && (self.canvas.len() >= CANVAS_PAGE_LIMIT || self.canvas_bytes().saturating_add(bytes) > CANVAS_BYTE_LIMIT) {
+        while !self.canvas.is_empty() && (self.canvas.len() >= CANVAS_TEXTURE_LIMIT || self.canvas_bytes().saturating_add(bytes) > CANVAS_BYTE_LIMIT)
+        {
             let old = self.canvas.remove(0);
             if reusable.is_none() {
                 reusable = Some(old.entry.tex);
@@ -392,7 +454,19 @@ impl Textures {
     }
 
     pub fn canvas_count(&self) -> usize {
+        self.canvas
+            .iter()
+            .enumerate()
+            .filter(|(at, e)| !self.canvas.iter().take(*at).any(|before| before.entry.key.index == e.entry.key.index))
+            .count()
+    }
+
+    pub fn canvas_variant_count(&self) -> usize {
         self.canvas.len()
+    }
+
+    pub fn canvas_resize_pending(&self) -> bool {
+        self.resize.is_some()
     }
 
     pub fn canvas_bytes(&self) -> u64 {
@@ -416,6 +490,7 @@ impl Textures {
     pub fn invalidate(&mut self) {
         self.canvas.clear();
         self.canvas_document = None;
+        self.resize = None;
         self.thumbs.clear();
         self.smartart.clear();
     }
@@ -516,7 +591,63 @@ mod canvas_cache_tests {
     }
 
     fn draw(cache: &mut Textures, ctx: &egui::Context, doc: &Arc<Presentation>, index: usize) -> TextureHandle {
-        cache.slide(ctx, doc, index, (160, 90), Region::slide(160, 90), true, 0, false, &[], None, None).unwrap().0
+        cache.slide(ctx, doc, index, (160, 90), Region::slide(160, 90), true, 0, false, &[], None, None, false).unwrap().0
+    }
+
+    fn resized(cache: &mut Textures, ctx: &egui::Context, doc: &Arc<Presentation>, size: (u32, u32), time: f64) -> TextureHandle {
+        ctx.begin_pass(egui::RawInput { time: Some(time), ..Default::default() });
+        let texture = cache.slide(ctx, doc, 0, size, Region::slide(size.0, size.1), true, 0, false, &[], None, None, true).unwrap().0;
+        ctx.end_pass().textures_delta.clear();
+        texture
+    }
+
+    #[test]
+    fn a_resize_burst_renders_its_final_resolution_after_input_stops() {
+        let ctx = egui::Context::default();
+        let doc = deck();
+        let mut cache = Textures::default();
+        let original = resized(&mut cache, &ctx, &doc, (160, 90), 0.0);
+        let renders = cache.canvas_renders;
+        for (i, width) in [192, 224, 256, 288, 320].into_iter().enumerate() {
+            let preview = resized(&mut cache, &ctx, &doc, (width, width * 9 / 16), 0.02 * (i + 1) as f64);
+            assert_eq!(preview.id(), original.id());
+            assert!(cache.canvas_resize_pending());
+            assert_eq!(cache.canvas_renders, renders, "intermediate sizes only reposition the unchanged complete slide");
+        }
+        let exact = resized(&mut cache, &ctx, &doc, (320, 180), 0.25);
+        assert_eq!(exact.size(), [320, 180]);
+        assert!(!cache.canvas_resize_pending());
+        assert_eq!(cache.canvas_renders, renders + 1, "one final exact raster after the settle deadline");
+        let renders = cache.canvas_renders;
+        assert_eq!(resized(&mut cache, &ctx, &doc, (160, 90), 0.3).id(), original.id());
+        assert_eq!(resized(&mut cache, &ctx, &doc, (320, 180), 0.35).id(), exact.id());
+        assert_eq!(cache.canvas_renders, renders, "repeated workspace sizes need neither preview nor raster work");
+    }
+
+    #[test]
+    fn resize_preview_never_defers_new_content_or_an_exposed_pasteboard() {
+        let ctx = egui::Context::default();
+        let mut session = office_presentation_engine::Session::with_new();
+        let doc = session.active().unwrap().doc.clone();
+        let mut cache = Textures::default();
+        let _ = resized(&mut cache, &ctx, &doc, (160, 90), 0.0);
+        let _ = resized(&mut cache, &ctx, &doc, (320, 180), 0.02);
+        assert!(cache.canvas_resize_pending());
+        session.execute("shape.insert", &serde_json::json!({"preset": "rect", "rect": [-40, -40, 100, 80]})).unwrap();
+        let changed = session.active().unwrap().doc.clone();
+        let before = cache.canvas_renders;
+        let _ = resized(&mut cache, &ctx, &changed, (320, 180), 0.04);
+        assert!(!cache.canvas_resize_pending(), "a content edit must not wait on an older resize timer");
+        assert!(cache.canvas_renders > before);
+        let before = cache.canvas_renders;
+        let size = (400, 225);
+        ctx.begin_pass(egui::RawInput { time: Some(0.06), ..Default::default() });
+        let (_, region) =
+            cache.slide(&ctx, &changed, 0, size, Region { x: -100, y: -100, w: 600, h: 425 }, true, 0, false, &[], None, None, true).unwrap();
+        ctx.end_pass().textures_delta.clear();
+        assert!(!cache.canvas_resize_pending());
+        assert!(cache.canvas_renders > before, "newly visible off-slide content needs an exact raster immediately");
+        assert!(region.x < 0 || region.y < 0);
     }
 
     #[test]
@@ -525,7 +656,7 @@ mod canvas_cache_tests {
         let doc = deck();
         let mut cache = Textures::default();
         let first = draw(&mut cache, &ctx, &doc, 0);
-        draw(&mut cache, &ctx, &doc, 1);
+        let _ = draw(&mut cache, &ctx, &doc, 1);
         let renders = cache.canvas_renders;
         let again = draw(&mut cache, &ctx, &doc, 0);
         assert_eq!(first.id(), again.id());
@@ -534,23 +665,70 @@ mod canvas_cache_tests {
     }
 
     #[test]
+    fn toggling_fitted_workspace_sizes_reuses_exact_resolution_textures() {
+        let ctx = egui::Context::default();
+        let doc = deck();
+        let mut cache = Textures::default();
+        let regular = draw(&mut cache, &ctx, &doc, 0);
+        let expanded = cache.slide(&ctx, &doc, 0, (320, 180), Region::slide(320, 180), true, 0, false, &[], None, None, false).unwrap().0;
+        let renders = cache.canvas_renders;
+        for _ in 0..3 {
+            assert_eq!(draw(&mut cache, &ctx, &doc, 0).id(), regular.id());
+            let again = cache.slide(&ctx, &doc, 0, (320, 180), Region::slide(320, 180), true, 0, false, &[], None, None, false).unwrap().0;
+            assert_eq!(again.id(), expanded.id());
+            assert_eq!(again.size(), [320, 180], "cached workspace toggles preserve device-pixel resolution");
+        }
+        assert_eq!(cache.canvas_renders, renders, "warm workspace toggles must not rerasterize either size");
+        assert_eq!(cache.canvas_count(), 1);
+        assert_eq!(cache.canvas_variant_count(), 2);
+    }
+
+    #[test]
+    fn continuous_zoom_and_animated_states_do_not_accumulate_page_variants() {
+        let ctx = egui::Context::default();
+        let doc = deck();
+        let mut cache = Textures::default();
+        let _ = draw(&mut cache, &ctx, &doc, 1);
+        for width in [160, 200, 240, 280, 320] {
+            let height = width * 9 / 16;
+            let _ = cache.slide(&ctx, &doc, 0, (width, height), Region::slide(width, height), true, 0, false, &[], None, None, false).unwrap();
+            assert!(cache.canvas_variant_count() <= CANVAS_SIZE_LIMIT + 1);
+            assert!(cache.canvas_bytes() <= CANVAS_BYTE_LIMIT);
+        }
+        let renders = cache.canvas_renders;
+        let _ = draw(&mut cache, &ctx, &doc, 1);
+        assert_eq!(cache.canvas_renders, renders, "zooming one page must preserve the other recently used page");
+        for frame in 1..5 {
+            let _ = cache.slide(&ctx, &doc, 0, (160, 90), Region::slide(160, 90), true, frame, false, &[], None, None, false).unwrap();
+            assert_eq!(cache.canvas_count(), 2);
+            assert_eq!(cache.canvas_variant_count(), 2, "an animated page retains one frame, not both stale size variants");
+        }
+        let mut changed = doc.clone();
+        Arc::make_mut(&mut changed).first_slide_number = 10;
+        let renders = cache.canvas_renders;
+        let _ = draw(&mut cache, &ctx, &changed, 0);
+        assert!(cache.canvas_renders > renders);
+        assert_eq!(cache.canvas_variant_count(), 1, "document edits invalidate every prior size");
+    }
+
+    #[test]
     fn least_recent_pages_are_evicted_without_discarding_recent_hits() {
         let ctx = egui::Context::default();
         let doc = deck();
         let mut cache = Textures::default();
         for index in 0..4 {
-            draw(&mut cache, &ctx, &doc, index);
+            let _ = draw(&mut cache, &ctx, &doc, index);
         }
-        draw(&mut cache, &ctx, &doc, 0);
-        draw(&mut cache, &ctx, &doc, 4);
-        assert_eq!(cache.canvas_count(), CANVAS_PAGE_LIMIT);
+        let _ = draw(&mut cache, &ctx, &doc, 0);
+        let _ = draw(&mut cache, &ctx, &doc, 4);
+        assert_eq!(cache.canvas_count(), CANVAS_TEXTURE_LIMIT);
         assert!(cache.canvas_bytes() <= CANVAS_BYTE_LIMIT);
         let renders = cache.canvas_renders;
-        draw(&mut cache, &ctx, &doc, 0);
+        let _ = draw(&mut cache, &ctx, &doc, 0);
         assert_eq!(cache.canvas_renders, renders);
-        draw(&mut cache, &ctx, &doc, 1);
+        let _ = draw(&mut cache, &ctx, &doc, 1);
         assert!(cache.canvas_renders > renders, "the least recent page must render again");
-        assert_eq!(cache.canvas_count(), CANVAS_PAGE_LIMIT);
+        assert_eq!(cache.canvas_count(), CANVAS_TEXTURE_LIMIT);
     }
 
     #[test]
@@ -558,26 +736,26 @@ mod canvas_cache_tests {
         let ctx = egui::Context::default();
         let doc = deck();
         let mut cache = Textures::default();
-        draw(&mut cache, &ctx, &doc, 0);
-        draw(&mut cache, &ctx, &doc, 1);
+        let _ = draw(&mut cache, &ctx, &doc, 0);
+        let _ = draw(&mut cache, &ctx, &doc, 1);
         let mut changed = doc.clone();
         Arc::make_mut(&mut changed).first_slide_number = 10;
         assert!(Arc::ptr_eq(&doc.slides[0], &changed.slides[0]));
         let before = cache.canvas_renders;
-        draw(&mut cache, &ctx, &changed, 0);
+        let _ = draw(&mut cache, &ctx, &changed, 0);
         assert!(cache.canvas_renders > before, "global properties affect fields even when slide Arcs are unchanged");
         assert_eq!(cache.canvas_count(), 1);
 
         let before = cache.canvas_renders;
-        cache.slide(&ctx, &changed, 0, (160, 90), Region::slide(160, 90), true, 0, true, &[], None, None).unwrap();
+        let _ = cache.slide(&ctx, &changed, 0, (160, 90), Region::slide(160, 90), true, 0, true, &[], None, None, false).unwrap();
         assert!(cache.canvas_renders > before);
         assert_eq!(cache.canvas_count(), 1, "render variants must replace the same page's entry");
         let before = cache.canvas_renders;
-        cache.slide(&ctx, &changed, 0, (320, 180), Region::slide(320, 180), true, 0, true, &[], None, None).unwrap();
+        let _ = cache.slide(&ctx, &changed, 0, (320, 180), Region::slide(320, 180), true, 0, true, &[], None, None, false).unwrap();
         assert!(cache.canvas_renders > before, "a DPI or zoom change must render at the new resolution");
         let before = cache.canvas_renders;
         cache.invalidate();
-        draw(&mut cache, &ctx, &changed, 0);
+        let _ = draw(&mut cache, &ctx, &changed, 0);
         assert!(cache.canvas_renders > before);
     }
 
@@ -587,21 +765,21 @@ mod canvas_cache_tests {
         let mut session = office_presentation_engine::Session::with_new();
         let original = session.active().unwrap().doc.clone();
         let mut cache = Textures::default();
-        draw(&mut cache, &ctx, &original, 0);
+        let _ = draw(&mut cache, &ctx, &original, 0);
         session.execute("shape.insert", &serde_json::json!({"preset": "rect", "rect": [20, 20, 100, 80]})).unwrap();
         let changed = session.active().unwrap().doc.clone();
         let before = cache.canvas_renders;
-        draw(&mut cache, &ctx, &changed, 0);
+        let _ = draw(&mut cache, &ctx, &changed, 0);
         assert!(cache.canvas_renders > before);
         session.execute("edit.undo", &serde_json::json!({})).unwrap();
         let restored = session.active().unwrap().doc.clone();
         assert_eq!(*restored, *original);
         let before = cache.canvas_renders;
-        draw(&mut cache, &ctx, &restored, 0);
+        let _ = draw(&mut cache, &ctx, &restored, 0);
         assert!(cache.canvas_renders > before);
         let other_document = Arc::new(Presentation::default());
         let before = cache.canvas_renders;
-        draw(&mut cache, &ctx, &other_document, 0);
+        let _ = draw(&mut cache, &ctx, &other_document, 0);
         assert!(cache.canvas_renders > before, "a newly opened document cannot inherit a previous document's picture");
         assert_eq!(cache.canvas_count(), 1);
     }
