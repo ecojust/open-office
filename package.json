@@ -1,6 +1,6 @@
 {
   "name": "open-office",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -39,6 +39,7 @@
     "test:browser:ppt-templates-storage": "node tests/browser/presentation-template-storage.cjs",
     "test:browser:ppt-render-cache": "node tests/browser/presentation-render-cache.cjs",
     "test:browser:live-tabs": "node tests/browser/live-tab-switching.cjs",
+    "test:browser:focus": "node tests/browser/focus-mode.cjs",
     "engine:check": "node scripts/check-editor-boundaries.mjs",
     "engine:check:dist": "node scripts/check-editor-boundaries.mjs --dist",
     "pdf:check": "node scripts/build-office-pdf.mjs --check",

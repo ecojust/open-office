@@ -199,6 +199,43 @@ function closeNewMenu(restoreFocus = false) {
   newMenu.value?.removeAttribute('open')
   if (restoreFocus) newMenu.value?.querySelector('summary')?.focus()
 }
+// This is a workspace layout, separate from the editors' native fullscreen and
+// presentation modes. Keep every editor mounted so its live session survives.
+const focusMode = ref(false)
+const focusEnterButton = ref<HTMLButtonElement>(), focusExitButton = ref<HTMLButtonElement>()
+const editorContent = ref<HTMLElement>()
+function visibleEditorDialog() {
+  return [...(editorContent.value?.querySelectorAll<HTMLElement>('[role="dialog"], [aria-modal="true"]') ?? [])]
+    .find(dialog => dialog.getClientRects().length > 0)
+}
+function setFocusMode(enabled: boolean) {
+  if (globalActionsBlocked.value || (enabled && documentActionsDisabled.value)) return
+  // Local editor dialogs own focus until confirmed or cancelled.
+  const dialog = visibleEditorDialog()
+  if (dialog) {
+    const control = [...dialog.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href], [tabindex]')]
+      .find(node => node.tabIndex >= 0 && !node.matches(':disabled') && !node.closest('[inert]') && node.getClientRects().length > 0)
+    const target = control ?? dialog
+    target.focus({ preventScroll: true })
+    return
+  }
+  closeNewMenu()
+  if (enabled) templatePanelOpen.value = false
+  focusMode.value = enabled
+  void nextTick(() => {
+    if (appDisposed || home.value || focusMode.value !== enabled) return
+    const button = enabled ? focusExitButton.value : focusEnterButton.value
+    button?.focus({ preventScroll: true })
+  })
+}
+watch([activeKey, home], () => { focusMode.value = false })
+watch(focusMode, () => {
+  void nextTick(() => {
+    if (appDisposed) return
+    window.dispatchEvent(new Event('resize'))
+    revealActiveTab()
+  })
+})
 function dismissNewMenu(event: PointerEvent) {
   if (newMenu.value && !event.composedPath().includes(newMenu.value)) closeNewMenu()
 }
@@ -848,6 +885,15 @@ function rustEditorFileAction(action:string) {
 }
 function keydown(event:KeyboardEvent) {
   if(event.defaultPrevented)return
+  if(event.key==='Escape'&&focusMode.value&&!event.isComposing&&!globalActionsBlocked.value&&!visibleEditorDialog()) {
+    const key = activeKey.value
+    // Gesture/engine handlers can register on window after this listener. Let
+    // them cancel their own operation before interpreting an unused Escape.
+    setTimeout(() => {
+      if (!appDisposed && !event.defaultPrevented && !event.isComposing && activeKey.value === key && focusMode.value && !globalActionsBlocked.value && !visibleEditorDialog()) setFocusMode(false)
+    }, 0)
+    return
+  }
   const key=event.key.toLowerCase()
   const fileShortcut=((event.ctrlKey||event.metaKey)&&!event.altKey&&['n','o','s','p'].includes(key))||(activeRustEditor.value&&event.key==='F12')
   const presentationShortcut=event.key==='F5'&&activeRustPresentation.value&&!home.value
@@ -1361,10 +1407,10 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 </script>
 
 <template>
-  <div class="app-shell" :class="{'editing':!home}">
+  <div class="app-shell" :class="{'editing':!home,'focus-mode':focusMode}">
     <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.xlsx,.csv,.tsv,.pptx,.potx,.ppsx,.pdf,.oonote,.ooschedule,.owflow,.mmd,.mermaid,.drawio,.xml,.excalidraw,.json" @change="browserFile" />
     <input ref="scheduleImportInput" data-testid="schedule-import-input" class="visually-hidden" type="file" accept=".ooschedule,.json" @change="browserScheduleFile" />
-    <aside class="sidebar" aria-label="全局导航" :inert="globalActionsBlocked">
+    <aside v-show="!focusMode" class="sidebar" aria-label="全局导航" :inert="globalActionsBlocked">
       <button class="primary open-sidebar" @click="openFile" aria-label="打开文件" title="打开文件 · Ctrl / ⌘ O"><Icon name="folder"/><span>打开文件</span><kbd>⌘ / Ctrl O</kbd></button>
       <nav aria-label="工作区"><button :class="{selected:home}" :aria-current="home ? 'page' : undefined" aria-label="工作台" title="工作台" @click="home=true"><Icon name="home"/><span>工作台</span></button></nav>
       <div v-if="tabs.length" v-show="home" class="sidebar-documents"><div class="sidebar-documents-heading"><span class="eyebrow">正在编辑 · {{tabs.length}}</span><button data-testid="home-close-all" @click="closeAllTabs" title="关闭所有打开的文档">全部关闭</button></div><button v-for="tab in tabs" :key="tab.key" :title="tab.document.name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button></div>
@@ -1380,7 +1426,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         </div>
       </div>
     </aside>
-    <header class="titlebar" data-testid="global-toolbar" :inert="globalActionsBlocked">
+    <header v-show="!focusMode" class="titlebar" data-testid="global-toolbar" :inert="globalActionsBlocked">
       <nav class="global-file-toolbar" aria-label="全局文件操作">
         <details ref="newMenu" class="new-document-menu" @keydown.esc.stop.prevent="closeNewMenu(true)">
           <summary data-testid="shell-new" aria-label="新建文档" title="新建文档 · Ctrl / ⌘ N"><Icon name="plus" :size="18"/><span class="file-action-label">新建</span><Icon name="chevron-down" :size="12"/></summary>
@@ -1404,6 +1450,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       <span class="titlebar-context" :title="currentDocument?.document.name">{{currentDocument?.document.name || '工作台'}}</span>
       <div class="titlebar-right">
         <span class="save-state" data-testid="global-save-state" role="status" aria-live="polite" :title="saveStateTitle"><i v-if="currentDocument?.dirty" class="dirty-dot"/>{{saveStateLabel}}</span>
+        <button v-if="currentDocument" ref="focusEnterButton" class="focus-mode-button" data-testid="shell-focus-enter" :disabled="documentActionsDisabled" title="全屏编辑 · 隐藏导航与全局设置，扩大操作空间" @click="setFocusMode(true)"><Icon name="expand" :size="17"/><span>全屏编辑</span></button>
       </div>
     </header>
     <div v-show="home" class="workspace" :inert="globalActionsBlocked">
@@ -1429,7 +1476,12 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       </main>
     </div>
     <section v-show="!home" class="editor-workspace" :inert="editorInputBlocked">
-      <div class="tab-strip" :inert="globalActionsBlocked">
+      <div v-if="focusMode" class="editor-focus-bar" data-testid="editor-focus-bar" :inert="globalActionsBlocked">
+        <span class="focus-document-name" :title="currentDocument?.document.name">{{currentDocument?.document.name}}</span>
+        <span class="save-state" role="status" aria-live="polite" :title="saveStateTitle"><i v-if="currentDocument?.dirty" class="dirty-dot"/>{{saveStateLabel}}</span>
+        <button ref="focusExitButton" class="focus-mode-button" data-testid="shell-focus-exit" :disabled="globalActionsBlocked" title="退出全屏编辑，恢复导航与设置" @click="setFocusMode(false)"><Icon name="collapse" :size="16"/><span>退出全屏</span></button>
+      </div>
+      <div v-show="!focusMode" class="tab-strip" :inert="globalActionsBlocked">
         <button class="home-tab" @click="home=true" aria-label="工作台" title="工作台"><Icon name="home" :size="18"/></button>
         <div ref="tabBar" class="tab-bar">
           <div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" :title="tab.document.name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div>
@@ -1437,7 +1489,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <button class="new-tab" @click="home=true" aria-label="新建文档" title="新建文档"><Icon name="plus" :size="18"/></button>
         <button class="close-all-tabs" data-testid="tabs-close-all" :disabled="globalActionsBlocked||!tabs.length" @click="closeAllTabs" title="批量关闭所有文档"><Icon name="close" :size="15"/><span>全部关闭</span></button>
       </div>
-      <div v-if="currentDocument" class="document-mcp-bar" role="toolbar" :aria-label="kindNames[currentDocument.document.kind]+' MCP 服务'">
+      <div v-if="currentDocument" v-show="!focusMode" class="document-mcp-bar" role="toolbar" :aria-label="kindNames[currentDocument.document.kind]+' MCP 服务'">
         <span class="document-mcp-kind"><Icon :name="icons[currentDocument.document.kind]" :size="14"/>{{kindNames[currentDocument.document.kind]}}<small>当前文档</small></span>
         <span v-if="mcpState.phase==='running'" class="document-mcp-detail" role="status">{{mcpWorking?'正在处理…':'修改实时显示 · 切换文档后关闭'}}</span>
         <button v-if="mcpConfigReady" class="document-mcp-permission" data-testid="document-mcp-permission" :disabled="globalActionsBlocked" aria-label="MCP 读写权限设置" :title="mcpConfig.allowEdits?'已开放当前文档编辑，点击调整权限':'当前仅提供读取工具；点击设置中开启编辑权限'" @click="openMcpSettings">{{mcpConfig.allowEdits?'允许编辑':'只读'}}<Icon name="chevron-down" :size="12"/></button>
@@ -1448,18 +1500,18 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       </div>
       <div v-if="active?.importWarnings?.length" class="import-review-notice" role="note" data-testid="import-review-notice"><Icon name="info" :size="16"/><div><p v-for="warning in active.importWarnings" :key="warning">{{warning}}</p><strong>请核对文档内容与排版。</strong></div></div>
       <div class="editor-stage">
-      <div class="editor-content" :inert="editorInputBlocked">
+      <div ref="editorContent" class="editor-content" :inert="editorInputBlocked">
         <RustWordEditor :theme="appearance" v-for="entry in rustWordEntries" :key="entry.document.id" v-show="activeRustWord&&activeKey===entry.document.id" :ref="handle=>setRustWordHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustWord&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <RustSheetEditor :theme="appearance" v-for="entry in rustSheetEntries" :key="entry.document.id" v-show="activeRustSheet&&activeKey===entry.document.id" :ref="handle=>setRustSheetHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustSheet&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <RustPresentationEditor :theme="appearance" v-for="entry in rustPresentationEntries" :key="entry.document.id" v-show="activeRustPresentation&&activeKey===entry.document.id" :ref="handle=>setRustPresentationHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPresentation&&activeKey===entry.document.id" :disabled="editorInputBlocked" :templates-open="templatePanelOpen" @toggle-templates="activeKey===entry.document.id&&togglePresentationTemplates()" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
-        <RustPdfEditor :theme="appearance" v-for="entry in rustPdfEntries" :key="entry.document.id" v-show="activeRustPdf&&activeKey===entry.document.id" :ref="handle=>setRustPdfHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPdf&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
+        <RustPdfEditor :focus-mode="focusMode" :theme="appearance" v-for="entry in rustPdfEntries" :key="entry.document.id" v-show="activeRustPdf&&activeKey===entry.document.id" :ref="handle=>setRustPdfHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPdf&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <NotebookEditor :theme="appearance" v-for="entry in noteEntries" :key="entry.document.id" v-show="activeNote&&activeKey===entry.document.id" :ref="handle=>setNoteHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeNote&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
-        <ScheduleEditor :theme="effectiveAppearance" v-for="entry in scheduleEntries" :key="entry.document.id" v-show="activeSchedule&&activeKey===entry.document.id" :ref="handle=>setScheduleHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeSchedule&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)" @import="importSchedule(entry.document.id)" @export="exportScheduleCopy(entry.document.id,$event)"/>
+        <ScheduleEditor :focus-mode="focusMode" :theme="effectiveAppearance" v-for="entry in scheduleEntries" :key="entry.document.id" v-show="activeSchedule&&activeKey===entry.document.id" :ref="handle=>setScheduleHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeSchedule&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)" @import="importSchedule(entry.document.id)" @export="exportScheduleCopy(entry.document.id,$event)"/>
         <WorkflowEditor :theme="effectiveAppearance" v-for="entry in workflowEntries" :key="entry.document.id" v-show="activeWorkflow&&activeKey===entry.document.id" :ref="handle=>setWorkflowHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeWorkflow&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)" @create-canvas="activeKey===entry.document.id&&createCanvasCopy($event)" @export="exportWorkflowCopy(entry.document.id,$event)"/>
       </div>
       <PresentationTemplates v-if="!home&&activeRustPresentation&&templatePanelOpen" class="template-panel" :templates="presentationTemplates" :loading="templateListLoading" :error="templateListError" :disabled="documentActionsDisabled" @select="openPresentationTemplateDialog('apply',$event)" @save="openPresentationTemplateDialog('save')" @delete="openPresentationTemplateDialog('delete',$event)" @retry="refreshPresentationTemplates" @close="templatePanelOpen=false"/>
       </div>
-      <footer class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · {{activeRustWord?'文字编辑':activeRustSheet?'表格编辑':activeRustPresentation?'演示编辑':activeRustPdf?'PDF 编辑':activeNote?'笔记编辑':activeSchedule?'计划排期':active?.document.kind==='canvas'?'画布编辑':'代码图表'}}</span></footer>
+      <footer v-show="!focusMode" class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · {{activeRustWord?'文字编辑':activeRustSheet?'表格编辑':activeRustPresentation?'演示编辑':activeRustPdf?'PDF 编辑':activeNote?'笔记编辑':activeSchedule?'计划排期':active?.document.kind==='canvas'?'画布编辑':'代码图表'}}</span></footer>
     </section>
     <McpSettingsDialog v-if="mcpSettingsOpen" :config="mcpConfig" :running="mcpState.phase==='running'" :native-available="native.isTauri()" :saving="mcpSettingsBusy" :error="mcpSettingsError" @save="saveMcpSettings" @close="!mcpSettingsBusy&&(mcpSettingsOpen=false)"/>
     <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{error}}</span><button @click="error=''" aria-label="关闭错误提示"><Icon name="close" :size="16"/></button></div>

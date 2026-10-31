@@ -24,6 +24,12 @@
 
 ![事件视图](screenshots/project-schedule-global.png)
 
+## 全屏编辑
+
+点击工作区右上角的「全屏编辑」，可隐藏全局导航、文件工具、文档标签及 MCP 设置栏。排期同时收起项目名称、项目设置、人员管理、导入入口和底部快捷键说明，将空间留给时间轴；保留「人员 / 事件」、视图与缩放、撤销／重做、添加事件和导出。下方保留紧凑的事件操作栏，选中事件后可编辑或删除，人员工时胶囊也继续显示。
+
+点击右上角「退出全屏」恢复完整界面，再调整项目设置或人员。切换只改变布局，不重新打开排期，不改变事件、保存状态或撤销记录；JSON、PNG 导出仍包含完整项目数据与标题。
+
 ## 拖动、拉伸与冲突
 
 - 拖动事件主体调整日期；人员视图下可拖到其他人员轨道。松开后对齐整天。
@@ -132,5 +138,7 @@
 按年／按项目周号专项验收：`OFFICE_SCHEDULE_FOCUS=annual-weeks npm run test:browser:schedule`，覆盖模式切换与撤销、文件保存重开、跨年与项目起点、隐藏整周跳号、窄列表头及对应的 PNG 周标题。
 
 月度工时专项验收：`OFFICE_SCHEDULE_FOCUS=monthly-workload npm run test:browser:schedule`，覆盖胶囊填充及零月份隐藏、跨月与半天工时、单价校验及预算、撤销和保存重开、最小轨道及长月份滚动、PNG 像素，以及全局新建菜单的层级命中。
+
+全屏编辑验收：`npm run test:browser:focus`，逐个检查八种工具的编辑区域扩展、会话与撤销历史保留，以及全屏后的继续编辑。排期额外覆盖未选中事件直接拖动、移动／拉伸时 Esc 取消、弹窗焦点、人员／事件视图及深色窄窗口。报告和截图写入 `test-results/focus-mode/`；设置 `OFFICE_FOCUS_KINDS=schedule` 可只检查排期。测试使用真实 Vue 与本地 WASM，不代替安装版系统全屏验证。
 
 排期 MCP 专项验收：`OFFICE_MCP_KINDS=schedule npm run test:browser:mcp`，使用生产 Rust HTTP 服务与实际 Vue 界面，验证全部工具、权限与会话隔离、原子回滚、预算、假日慢刷新、JSON／PNG 导出及保存重开。需要 Rust 和 Chromium；测试仅替换 Tauri IPC 传输，不替换排期模型或服务实现。
