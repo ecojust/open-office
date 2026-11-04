@@ -19,7 +19,15 @@ Open Office 包含具有独立版权和许可的第三方软件。根目录 MIT 
 
 集成 Open Workflow 的 MIT 代码，固定提交 `110b86d81de3e74787ef1a34a25ecbfe50a9d2d7`，版权为 Copyright (c) 2026 桔子桑。[许可和集成说明](public/legal/workflow/OPEN-OFFICE-INTEGRATION.md)随应用分发，源码与本地修改在 `src/workflow`。
 
+## 日历便笺
+
+参考并适配 [CalendarNote](https://github.com/ecojust/CalendarNote)，固定提交 `2e8c3f072f304ed1c6624456ff1267c18fed151f`，版权为 Copyright (c) 2026 桔子桑。月历、事项、拖动复制与工作日统计以本地 TypeScript 模型和 Vue 界面接入 Open Office，保留 [MIT 许可原文](public/legal/calendarnote/LICENSE)及[来源和改动说明](public/legal/calendarnote/OPEN-OFFICE-INTEGRATION.md)。未分发来源应用的二维码、品牌图片或独立应用存储层。
+
+农历、节气与黄历计算使用 [lunar-typescript](https://github.com/6tail/lunar-typescript) `1.8.6`，版权为 Copyright (c) 2020 6tail，采用 [MIT 许可](public/legal/npm/lunar-typescript@1.8.6/LICENSE)。精确 npm 下载地址、完整性校验和许可摘要见[来源清单](public/legal/npm/lunar-typescript@1.8.6/source-manifest.json)。中国大陆法定假日继续使用 holiday-cn 数据，其 [MIT 许可](public/legal/holiday-cn-LICENSE.txt)随应用保留。
+
 ## 前端、依赖与素材
+
+计划排期和日历便笺的中国大陆节假日数据来自 [NateScarlet/holiday-cn](https://github.com/NateScarlet/holiday-cn)，MIT，Copyright (c) 2019 NateScarlet。内置兜底表按官方公告交叉核对；运行时可下载并缓存年度 JSON。[原始许可](public/legal/holiday-cn-LICENSE.txt)随应用分发。
 
 Vue 和 Tauri 的原始许可保留在 `public/legal/npm`、`public/legal/rust`。fflate 用于画布图形 XML 的压缩页面解码；pdf-lib 和外部 Python PDF 检查器只用于开发测试。npm、原生 Rust 及四个 WASM 宿主各有依赖索引，精确版本由锁文件确定；清单中的开发或可选项不代表它们都进入每个平台安装包。
 

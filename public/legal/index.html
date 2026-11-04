@@ -5,12 +5,14 @@
 <title>Open Office — 开源许可与对应源码</title>
 <style>body{max-width:880px;margin:40px auto;padding:0 20px;font:16px/1.8 system-ui,sans-serif;color:#23314b}a{color:#2455aa}li{margin:.4em 0}code{font-size:.92em}footer{margin-top:3em;color:#637087}</style>
 <h1>开源许可与对应源码</h1>
-<p>Open Office 使用 WordCraft、GridCraft、DeckCraft、PdfCraft、Vue、Tauri 等开源组件。各组件保留原作者的版权、许可和免责条款，本应用不是这些项目的官方发行版。</p>
+<p>Open Office 使用 WordCraft、GridCraft、DeckCraft、PdfCraft、CalendarNote、lunar-typescript、Vue、Tauri 等开源组件。各组件保留原作者的版权、许可和免责条款，本应用不是这些项目的官方发行版。</p>
 <p>四套本地 Rust 编辑器保留上游 MIT OR Apache-2.0 及依赖各自的许可。旧 PDF 后台已从当前产品移除。</p>
 <h2>主要许可原文</h2>
 <ul>
 <li>holiday-cn：中国大陆节假日数据 · <a href="holiday-cn-LICENSE.txt">MIT</a> · <a href="https://github.com/NateScarlet/holiday-cn">数据来源</a></li>
 <li>Open Workflow：<a href="workflow/LICENSE">MIT</a> · <a href="workflow/OPEN-OFFICE-INTEGRATION.md">画布与代码图表集成</a> · <a href="workflow/source-manifest.json">固定来源</a></li>
+<li>CalendarNote：<a href="calendarnote/LICENSE">MIT</a> · <a href="calendarnote/OPEN-OFFICE-INTEGRATION.md">日历便笺集成</a> · <a href="calendarnote/source-manifest.json">固定来源</a></li>
+<li>lunar-typescript 1.8.6：<a href="npm/lunar-typescript@1.8.6/LICENSE">MIT</a> · <a href="npm/lunar-typescript@1.8.6/source-manifest.json">农历与黄历计算依赖来源</a></li>
 <li>WordCraft：<a href="wordcraft/LICENSE-MIT">MIT</a> · <a href="wordcraft/LICENSE-APACHE">Apache-2.0</a> · <a href="wordcraft/NOTICE">NOTICE</a> · <a href="wordcraft/ATTRIBUTION.md">资产归属</a> · <a href="wordcraft/OPEN-OFFICE-INTEGRATION.md">本地集成与字体说明</a> · <a href="wordcraft/source-manifest.json">固定来源及 SHA-256</a></li>
 <li>GridCraft：<a href="gridcraft/LICENSE-MIT">MIT</a> · <a href="gridcraft/LICENSE-APACHE">Apache-2.0</a> · <a href="gridcraft/NOTICE">NOTICE</a> · <a href="gridcraft/ATTRIBUTION.md">资产归属</a> · <a href="gridcraft/OPEN-OFFICE-INTEGRATION.md">本地集成说明</a> · <a href="gridcraft/source-manifest.json">固定来源及 SHA-256</a></li>
 <li>DeckCraft：<a href="deckcraft/LICENSE-MIT">MIT</a> · <a href="deckcraft/LICENSE-APACHE">Apache-2.0</a> · <a href="deckcraft/NOTICE">NOTICE</a> · <a href="deckcraft/ATTRIBUTION.md">资产归属</a> · <a href="deckcraft/OPEN-OFFICE-INTEGRATION.md">本地集成与字体</a> · <a href="deckcraft/source-manifest.json">固定来源及 SHA-256</a></li>
@@ -28,7 +30,7 @@
 <h2>逐项清单和源码</h2>
 <ul>
 <li><a href="THIRD_PARTY_NOTICES.md">本应用第三方声明</a> · <a href="DISTRIBUTION_LICENSE.md">集成分发许可</a></li>
-<li><a href="npm-dependencies.json">npm 依赖及许可索引</a> · <a href="rust-dependencies.json">Rust 依赖及许可索引</a></li>
+<li><a href="npm-dependencies.json">npm 依赖及许可索引（既有审计快照）</a> · <a href="npm/lunar-typescript@1.8.6/source-manifest.json">新增 lunar-typescript 1.8.6 核验清单</a> · <a href="rust-dependencies.json">Rust 依赖及许可索引</a></li>
 <li><a href="wordcraft-dependencies.json">WordCraft WASM 实际依赖及许可索引</a>（normal / build 依赖）</li>
 <li><a href="gridcraft-dependencies.json">GridCraft WASM 实际依赖及许可索引</a>（normal / build 依赖）</li>
 <li><a href="deckcraft-dependencies.json">DeckCraft WASM 实际依赖及许可索引</a>（包含 Symphonia MPL-2.0 音频依赖）</li>

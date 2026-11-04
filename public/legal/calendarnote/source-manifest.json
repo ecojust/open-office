@@ -1,0 +1,17 @@
+{
+  "repository": "https://github.com/ecojust/CalendarNote",
+  "commit": "2e8c3f072f304ed1c6624456ff1267c18fed151f",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2026 桔子桑",
+  "sourceFiles": [
+    "src/App.vue",
+    "src/components/CalendarView.vue",
+    "src/components/NoteForm.vue",
+    "src/components/NoteCard.vue"
+  ],
+  "localDirectories": [
+    "src/calendar",
+    "src/components/CalendarEditor.vue"
+  ],
+  "licenseSha256": "1877e621fd1f3208fe8412093f6a608066ad260c0d060113af0c70cb85d26089"
+}

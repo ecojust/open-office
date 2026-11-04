@@ -9,6 +9,7 @@ import { presentationEditingTools } from './presentation-tools.ts'
 import { pdfEditingTools } from './pdf-tools.ts'
 import { noteEditingTools, canvasEditingTools, diagramEditingTools } from './notes-workflow-tools.ts'
 import { scheduleTools } from './schedule-tools.ts'
+import { calendarTools } from './calendar-tools.ts'
 import { SCHEDULE_PNG_MAX_PIXELS, SCHEDULE_PNG_MAX_SIDE } from '../schedule/png-export.ts'
 
 const MAX_RESULT_BYTES = 7 * 1024 * 1024
@@ -25,6 +26,7 @@ const common = [
  tool('document_redo', '重做当前文档最后一次撤销的编辑。', false),
 ]
 const catalogs: Record<Kind, McpToolDefinition[]> = {
+ calendar: [],
  schedule: [],
  word: [tool('word_read', '读取文字文稿的纯文本（最多 100000 字符）。', true), tool('word_insert_text', '在当前光标处插入纯文本；有选区时替换选区，可撤销。', false, { text }, ['text'])],
  sheet: [
@@ -38,6 +40,7 @@ const catalogs: Record<Kind, McpToolDefinition[]> = {
  diagram: [tool('diagram_read_source', '读取代码图表源码。', true), tool('diagram_set_source', '更新当前代码图表源码，立即更新预览，可撤销；不能访问文件或网络。', false, { source: { ...text, maxLength: 50000 } }, ['source'])],
 }
 const editingTools: Record<Kind, McpToolDefinition[]> = {
+ calendar: calendarTools,
  schedule: scheduleTools,
  word: wordEditingTools, sheet: sheetEditingTools, presentation: presentationEditingTools,
  pdf: pdfEditingTools, note: noteEditingTools, canvas: canvasEditingTools, diagram: diagramEditingTools,

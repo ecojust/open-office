@@ -10,6 +10,7 @@ import { pdfReport } from './helpers/pdf-smoke-report.mjs';
 import { presentationReport } from './helpers/office-presentation-smoke-report.mjs';
 import { workspaceReport } from './helpers/workspace-smoke-report.mjs';
 import { notebookReport } from './helpers/notebook-smoke-report.mjs';
+import { calendarReport } from './helpers/calendar-smoke-report.mjs';
 import { workflowReport } from './helpers/workflow-smoke-report.mjs';
 import { mcpReport } from './helpers/mcp-smoke-report.mjs';
 
@@ -18,7 +19,7 @@ function completeReport() {
     ok: true, crossOriginIsolated: true, sharedArrayBuffer: true,
     userAgent: 'Native WebView contract test',
     word: wordReport(), sheet: sheetReport(), presentation: presentationReport(),
-    pdf: pdfReport(), workspace: workspaceReport(), notebook: notebookReport(), workflow: workflowReport(), mcp: mcpReport(),
+    pdf: pdfReport(), workspace: workspaceReport(), notebook: notebookReport(), calendar: calendarReport(), workflow: workflowReport(), mcp: mcpReport(),
   };
 }
 
@@ -69,6 +70,7 @@ test('release evidence requires four Rust canvases, PDF text replacement, and na
     'pdfOriginalTextReplacementRoundTrip', 'pdfDefaultCanvas', 'pdfUndoRedo', 'pdfFailureAtomicity', 'pdfSessionCleanup', 'crossOriginIsolated',
     'workspaceLocalAutosave', 'workspaceSavedFileReadback', 'workspaceSessionCleanup',
     'notebookDomInput', 'notebookSavedFileReadback', 'notebookSessionCleanup',
+    'calendarDomInput', 'calendarSavedFileReadback', 'calendarSessionCleanup',
     'canvasDomInput', 'canvasSavedFileReadback', 'canvasSessionCleanup',
     'diagramDomInput', 'diagramSavedFileReadback', 'diagramSessionCleanup',
     'mcpNativeHttp', 'mcpNativeDocumentTools', 'mcpNativeDocxExport', 'mcpNativeSwitchStop', 'mcpNativeSessionCleanup', 'mcpNativeSevenEditorEditing', 'mcpNativeWordFormatHistory', 'mcpNativeSevenEditorExports',
@@ -80,6 +82,13 @@ test('successful four-engine and autosave evidence cannot substitute for native 
   for (const notebook of [undefined, null, {}, { ok: true, transport: 'browser' }]) {
     const report = completeReport(); report.notebook = notebook;
     assert.throws(() => validateFrontendReport(report), /Native notebook/);
+  }
+});
+
+test('other editors cannot substitute for native calendar acceptance', () => {
+  for (const calendar of [undefined, null, {}, { ok: true, transport: 'browser' }]) {
+    const report = completeReport(); report.calendar = calendar;
+    assert.throws(() => validateFrontendReport(report), /Native calendar/);
   }
 });
 

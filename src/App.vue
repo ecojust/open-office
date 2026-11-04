@@ -9,6 +9,8 @@ import { getMcpConfig, saveMcpConfig as storeNativeMcpConfig, mcpTransport } fro
 import { catalogForKind, executeDocumentTool } from './mcp/document-tools'
 import NotebookEditor from './components/NotebookEditor.vue'
 import ScheduleEditor from './components/ScheduleEditor.vue'
+import CalendarEditor from './components/CalendarEditor.vue'
+import { decodeCalendar } from './calendar/model'
 import { decodeSchedule } from './schedule/model'
 import WorkflowEditor from './components/WorkflowEditor.vue'
 import { importText as importWorkflowText, documentBytes as workflowBytes } from './workflow/core/files'
@@ -38,6 +40,7 @@ import { inspectOfficePdfSession, prepareRustPdfDocument, type PreparedRustPdfDo
 import type { OfficePdfSmokeEditor } from './pdf/rust/native-smoke'
 import type { EditingSmokeAdapter } from './sheet/rust/macos-editing-smoke'
 import type { NotebookNativeSmokeAdapter } from './notes/native-smoke'
+import type { CalendarNativeSmokeAdapter } from './calendar/native-smoke'
 import { bytesToBase64, base64ToBytes, extensionOf, kindOf, documentKindOf, withExtension, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFormats, saveFileName, type SaveExtension, type Kind, type Extension, type EditorHandle, type EditorExport } from './shared/document'
 
 interface Tab { key: string; document: NativeDocument; fileId?: string; requiresSaveAs?: boolean; importWarnings?:string[]; dirty: boolean; ready: boolean; loadError?: string; autoSavedAt?: number }
@@ -78,6 +81,7 @@ const activeRustSheet = computed(() => active.value?.document.kind === 'sheet')
 const activeRustPresentation = computed(() => active.value?.document.kind === 'presentation')
 const activeRustPdf = computed(() => active.value?.document.kind === 'pdf')
 const activeSchedule = computed(() => active.value?.document.kind === 'schedule')
+const activeCalendar = computed(() => active.value?.document.kind === 'calendar')
 const activeNote = computed(() => active.value?.document.kind === 'note')
 const isWorkflowKind = (kind: Kind) => kind === 'canvas' || kind === 'diagram'
 const activeWorkflow = computed(() => !!active.value && isWorkflowKind(active.value.document.kind))
@@ -169,8 +173,18 @@ function setScheduleHandle(id:string,handle:unknown) {
   if(handle)scheduleHandles.set(id,handle as EditorHandle)
   else scheduleHandles.delete(id)
 }
+const calendarEntries = shallowRef<{document:NativeDocument}[]>([])
+const calendarHandles = new Map<string,EditorHandle>()
+function setCalendarDocument(document?:NativeDocument) {
+  if(!document) {calendarEntries.value=[];calendarHandles.clear()}
+  else if(!calendarEntries.value.some(entry=>entry.document.id===document.id))calendarEntries.value=[...calendarEntries.value,{document}]
+}
+function setCalendarHandle(id:string,handle:unknown) {
+  if(handle)calendarHandles.set(id,handle as EditorHandle)
+  else calendarHandles.delete(id)
+}
 let appDisposed = false
-onBeforeUnmount(() => { appDisposed = true; setRustWordDocument(); setRustSheetDocument(); setRustPresentationDocument(); setRustPdfDocument(); setNoteDocument(); setWorkflowDocument(); setScheduleDocument() })
+onBeforeUnmount(() => { appDisposed = true; setRustWordDocument(); setRustSheetDocument(); setRustPresentationDocument(); setRustPdfDocument(); setNoteDocument(); setWorkflowDocument(); setScheduleDocument(); setCalendarDocument() })
 const recents = ref<RecentDocument[]>([]), busy = ref(''), error = ref(''), status = ref('所有文件，仅在你的设备上处理')
 const help = ref(false), search = ref(''), closeTarget = ref<Tab | 'window' | 'all' | null>(null)
 const mcpSettingsOpen = ref(false), mcpSettingsBusy = ref(false), mcpSettingsError = ref(''), mcpWorking = ref(false)
@@ -267,9 +281,9 @@ const fileInput = ref<HTMLInputElement>()
 const scheduleImportInput = ref<HTMLInputElement>()
 let unlisten: (() => void) | undefined
 let pendingWindowClose = false
-const editor = () => activeRustWord.value ? rustWordHandles.get(activeKey.value) : activeRustSheet.value ? rustSheetHandles.get(activeKey.value) : activeRustPresentation.value ? rustPresentationHandles.get(activeKey.value) : activeRustPdf.value ? rustPdfHandles.get(activeKey.value) : activeSchedule.value ? scheduleHandles.get(activeKey.value) : activeWorkflow.value ? workflowHandles.get(activeKey.value) : noteHandles.get(activeKey.value)
-const kindNames: Record<Kind,string> = { word:'文字文档', sheet:'电子表格', presentation:'演示文稿', pdf:'PDF 文档', note:'笔记本', canvas:'画布', diagram:'代码图表', schedule:'计划排期' }
-const icons: Record<Kind,string> = {word:'file',sheet:'sheet',presentation:'presentation',pdf:'pdf',note:'notebook',canvas:'canvas',diagram:'code-diagram',schedule:'schedule'}
+const editor = () => activeRustWord.value ? rustWordHandles.get(activeKey.value) : activeRustSheet.value ? rustSheetHandles.get(activeKey.value) : activeRustPresentation.value ? rustPresentationHandles.get(activeKey.value) : activeRustPdf.value ? rustPdfHandles.get(activeKey.value) : activeCalendar.value ? calendarHandles.get(activeKey.value) : activeSchedule.value ? scheduleHandles.get(activeKey.value) : activeWorkflow.value ? workflowHandles.get(activeKey.value) : noteHandles.get(activeKey.value)
+const kindNames: Record<Kind,string> = { word:'文字文档', sheet:'电子表格', presentation:'演示文稿', pdf:'PDF 文档', note:'笔记本', canvas:'画布', diagram:'代码图表', schedule:'计划排期', calendar:'日历便笺' }
+const icons: Record<Kind,string> = {word:'file',sheet:'sheet',presentation:'presentation',pdf:'pdf',note:'notebook',canvas:'canvas',diagram:'code-diagram',schedule:'schedule',calendar:'schedule'}
 const helpTools: { kind: Kind; name: string; description: string }[] = [
   { kind: 'word', name: '文字', description: '撰写文章、整理报告，完成图文排版。' },
   { kind: 'sheet', name: '表格', description: '记录数据、计算公式，制作分析图表。' },
@@ -278,6 +292,7 @@ const helpTools: { kind: Kind; name: string; description: string }[] = [
   { kind: 'note', name: '笔记本', description: '分区记录笔记，自由摆放文字与图片。' },
   { kind: 'canvas', name: '画布', description: '绘制图形、连线与手绘，梳理想法和流程。' },
   { kind: 'schedule', name: '计划排期', description: '安排项目日期、角色分工与事件，直观调整时间。' },
+  { kind: 'calendar', name: '日历便笺', description: '按月记录事项，查看农历节假日，复用历史事项与属性。' },
   { kind: 'diagram', name: '代码图表', description: '用简洁代码绘制时序图等图表，实时预览。' },
 ]
 const filteredRecents = computed(() => recents.value.filter(r => r.name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase())))
@@ -447,7 +462,7 @@ async function activate(tab:Tab) {
     await stash()
     activeKey.value=tab.key
     const kind=tab.document.kind
-    const entries=kind==='word'?rustWordEntries.value:kind==='sheet'?rustSheetEntries.value:kind==='presentation'?rustPresentationEntries.value:kind==='pdf'?rustPdfEntries.value:kind==='note'?noteEntries.value:kind==='schedule'?scheduleEntries.value:workflowEntries.value
+    const entries=kind==='word'?rustWordEntries.value:kind==='sheet'?rustSheetEntries.value:kind==='presentation'?rustPresentationEntries.value:kind==='pdf'?rustPdfEntries.value:kind==='note'?noteEntries.value:kind==='calendar'?calendarEntries.value:kind==='schedule'?scheduleEntries.value:workflowEntries.value
     const reusable=entries.some(entry=>entry.document.id===tab.key)
     if(!reusable){tab.ready=false;tab.loadError=undefined}
     if(kind==='word')setRustWordDocument(tab.document)
@@ -455,6 +470,7 @@ async function activate(tab:Tab) {
     else if(kind==='presentation')setRustPresentationDocument(tab.document)
     else if(kind==='pdf')setRustPdfDocument(tab.document)
     else if(kind==='note')setNoteDocument(tab.document)
+    else if(kind==='calendar')setCalendarDocument(tab.document)
     else if(kind==='schedule')setScheduleDocument(tab.document)
     else setWorkflowDocument(tab.document)
     await nextTick()
@@ -484,6 +500,7 @@ async function addDocument(doc:NativeDocument, fileId?:string) {
     else if(doc.kind==='sheet')sheetPrepared=await prepareRustSheetDocument({...doc,id:key})
     else if(doc.kind==='presentation')presentationPrepared=await prepareRustPresentationDocument({...doc,id:key})
     else if(doc.kind==='pdf')pdfPrepared=await prepareRustPdfDocument({...doc,id:key})
+    else if(doc.kind==='calendar'&&doc.base64)decodeCalendar(base64ToBytes(doc.base64))
     else if(doc.kind==='schedule'&&doc.base64)decodeSchedule(base64ToBytes(doc.base64))
     else if(doc.kind==='note'&&doc.base64)decodeNotebook(base64ToBytes(doc.base64))
     else if(isWorkflowKind(doc.kind)&&doc.base64) {
@@ -503,6 +520,7 @@ async function addDocument(doc:NativeDocument, fileId?:string) {
     else if(doc.kind==='presentation') {setRustPresentationDocument(tab.document,presentationPrepared);presentationPrepared=undefined}
     else if(doc.kind==='pdf') {setRustPdfDocument(tab.document,pdfPrepared);pdfPrepared=undefined}
     else if(doc.kind==='note')setNoteDocument(tab.document)
+    else if(doc.kind==='calendar')setCalendarDocument(tab.document)
     else if(doc.kind==='schedule')setScheduleDocument(tab.document)
     else setWorkflowDocument(tab.document)
     return storedTab
@@ -516,7 +534,7 @@ async function addDocument(doc:NativeDocument, fileId?:string) {
 }
 function newDocument(kind:Kind) {
   void task('正在新建文档',async()=>{
-    const extension:Extension=kind==='word'?'docx':kind==='sheet'?'xlsx':kind==='presentation'?'pptx':kind==='pdf'?'pdf':kind==='note'?'oonote':kind==='schedule'?'ooschedule':'owflow'
+    const extension:Extension=kind==='word'?'docx':kind==='sheet'?'xlsx':kind==='presentation'?'pptx':kind==='pdf'?'pdf':kind==='note'?'oonote':kind==='schedule'?'ooschedule':kind==='calendar'?'oocalendar':'owflow'
     const number=tabs.value.filter(t=>t.document.kind===kind).length+1
     await addDocument({id:'',kind,extension,name:`未命名${kindNames[kind]}${number}.${extension}`,base64:'',sha256:'',sizeBytes:0})
   })
@@ -641,7 +659,7 @@ async function saveActive(saveAs=false, format?:Extension, chosenName?:string, d
   const name=chosenName||(protectSource?exportName.replace(/\.[^.]+$/,` - 副本.${exported.extension}`):exportName)
   if(!native.isTauri()) {
     download(exported.base64,name)
-    if(!isCopy) { tab.document={...tab.document,base64:exported.base64,name,extension:exported.extension};tab.requiresSaveAs=false;tab.importWarnings=[];await handle.markSaved?.(exported.base64);tab.dirty=(isWorkflowKind(tab.document.kind)||tab.document.kind==='schedule')?!!(await handle.inspect?.())?.dirty:false }
+    if(!isCopy) { tab.document={...tab.document,base64:exported.base64,name,extension:exported.extension};tab.requiresSaveAs=false;tab.importWarnings=[];await handle.markSaved?.(exported.base64);tab.dirty=(isWorkflowKind(tab.document.kind)||tab.document.kind==='schedule'||tab.document.kind==='calendar')?!!(await handle.inspect?.())?.dirty:false }
     status.value='已生成下载文件';return true
   }
   const request:SaveDocumentRequest={documentId:isCopy||protectSource?undefined:tab.fileId,name,extension:exported.extension,base64:exported.base64,expectedSha256:isCopy||protectSource?undefined:tab.document.sha256,saveAs:saveAs||isCopy||protectSource||exported.saveAs||!tab.fileId}
@@ -656,7 +674,7 @@ async function saveActive(saveAs=false, format?:Extension, chosenName?:string, d
     tab.document={...result.document,id:tab.key,base64:exported.base64}
     tab.requiresSaveAs=false
     tab.importWarnings=[]
-    await handle.markSaved?.(exported.base64,directOnly?{background:true}:undefined);tab.dirty=(isWorkflowKind(tab.document.kind)||tab.document.kind==='schedule')?!!(await handle.inspect?.())?.dirty:false
+    await handle.markSaved?.(exported.base64,directOnly?{background:true}:undefined);tab.dirty=(isWorkflowKind(tab.document.kind)||tab.document.kind==='schedule'||tab.document.kind==='calendar')?!!(await handle.inspect?.())?.dirty:false
     if(!directOnly){tab.autoSavedAt=undefined;autosaveWaiting.value=undefined}
   }
   await refreshRecents();status.value=isCopy?`${exported.extension.toUpperCase()} 副本已保存`:'已保存到本机';return true
@@ -774,11 +792,12 @@ async function removeTab(tab:Tab, discardConfirmed=false) {
   noteEntries.value=noteEntries.value.filter(entry=>entry.document.id!==tab.key)
   workflowEntries.value=workflowEntries.value.filter(entry=>entry.document.id!==tab.key)
   scheduleEntries.value=scheduleEntries.value.filter(entry=>entry.document.id!==tab.key)
+  calendarEntries.value=calendarEntries.value.filter(entry=>entry.document.id!==tab.key)
   for(const entries of [rustWordEntries,rustSheetEntries,rustPresentationEntries,rustPdfEntries]) {
     for(const entry of entries.value)if(entry.document.id===tab.key)entry.prepared?.discard()
     entries.value=entries.value.filter(entry=>entry.document.id!==tab.key) as typeof entries.value
   }
-  rustWordHandles.delete(tab.key);rustSheetHandles.delete(tab.key);rustPresentationHandles.delete(tab.key);rustPdfHandles.delete(tab.key);noteHandles.delete(tab.key);workflowHandles.delete(tab.key);scheduleHandles.delete(tab.key)
+  rustWordHandles.delete(tab.key);rustSheetHandles.delete(tab.key);rustPresentationHandles.delete(tab.key);rustPdfHandles.delete(tab.key);noteHandles.delete(tab.key);workflowHandles.delete(tab.key);scheduleHandles.delete(tab.key);calendarHandles.delete(tab.key)
 }
 function closeTab(tab:Tab) {
   if(busy.value)return
@@ -814,7 +833,8 @@ async function removeTabs(selected:Tab[], discardConfirmed=false) {
   noteEntries.value=noteEntries.value.filter(entry=>!keys.has(entry.document.id))
   workflowEntries.value=workflowEntries.value.filter(entry=>!keys.has(entry.document.id))
   scheduleEntries.value=scheduleEntries.value.filter(entry=>!keys.has(entry.document.id))
-  for(const key of keys)for(const handles of [rustWordHandles,rustSheetHandles,rustPresentationHandles,rustPdfHandles,noteHandles,workflowHandles,scheduleHandles])handles.delete(key)
+  calendarEntries.value=calendarEntries.value.filter(entry=>!keys.has(entry.document.id))
+  for(const key of keys)for(const handles of [rustWordHandles,rustSheetHandles,rustPresentationHandles,rustPdfHandles,noteHandles,workflowHandles,scheduleHandles,calendarHandles])handles.delete(key)
   if(!tabs.value.length)home.value=true
   else if(!activeKey.value)await activate(tabs.value[0]!)
 }
@@ -938,7 +958,7 @@ function inputActivity(event: Event) {
 }
 function handleFor(tab: Tab) {
   return (tab.document.kind==='word'?rustWordHandles:tab.document.kind==='sheet'?rustSheetHandles:
-    tab.document.kind==='presentation'?rustPresentationHandles:tab.document.kind==='pdf'?rustPdfHandles:tab.document.kind==='note'?noteHandles:tab.document.kind==='schedule'?scheduleHandles:workflowHandles).get(tab.key)
+    tab.document.kind==='presentation'?rustPresentationHandles:tab.document.kind==='pdf'?rustPdfHandles:tab.document.kind==='note'?noteHandles:tab.document.kind==='schedule'?scheduleHandles:tab.document.kind==='calendar'?calendarHandles:workflowHandles).get(tab.key)
 }
 const autosaveEnabled=ref((()=>{try{return localStorage.getItem('open-office-autosave')==='true'}catch{return false}})())
 const autosaveWaiting=ref<{key:string;reason:string}>()
@@ -1311,6 +1331,48 @@ onMounted(async()=>{
           report.workflow=workflow
           if(!workflow.ok)throw Error(workflow.error||workflow.cleanupError||'Native workflow verification failed')
           smokeStage('workflow-native','complete')
+          smokeStage('calendar-native','starting mounted calendar input and native original-file save verification')
+          const {runCalendarNativeSmoke}=await import('./calendar/native-smoke')
+          const calendar=await runCalendarNativeSmoke({
+            open:async source=>{
+              const tab=await editorTransaction('正在验证本机日历便笺',()=>addDocument(source,source.id||undefined))
+              if(!tab||tab.document.kind!=='calendar')throw Error('Native calendar smoke tab missing')
+              await nextTick();await awaitReady(tab);await nextTick()
+              const editor=calendarHandles.get(tab.key) as Awaited<ReturnType<CalendarNativeSmokeAdapter['open']>>['editor']|undefined
+              const element=[...document.querySelectorAll<HTMLElement>('[data-testid="calendar-editor"]')].find(node=>node.dataset.documentId===tab.key)
+              if(!editor?.inspect||!editor.markSaved||!element)throw Error('Native calendar editor unavailable')
+              return {key:tab.key,element,editor}
+            },
+            bindTemporaryFile:async(key,file)=>{
+              const tab=tabs.value.find(item=>item.key===key)
+              if(!tab||tab.fileId||tab.document.kind!=='calendar'||file.kind!=='calendar'||file.extension!=='oocalendar')throw Error('Invalid temporary calendar capability')
+              tab.fileId=file.id;tab.document={...file,id:key};tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false
+              await nextTick()
+            },
+            state:key=>{
+              const tab=tabs.value.find(item=>item.key===key)
+              if(!tab)throw Error('Native calendar tab closed unexpectedly')
+              return {active:activeKey.value===key&&!home.value,ready:tab.ready,dirty:tab.dirty,busy:!!busy.value||autosave.running,fileId:tab.fileId,sha256:tab.document.sha256,
+                modal:!!saveAsDraft.value||!!templateDraft.value||!!closeTarget.value||help.value}
+            },
+            autosaveEnabled:()=>autosaveEnabled.value,
+            setAutosave:async enabled=>{autosaveEnabled.value=enabled;await nextTick();autosave.notify()},
+            observeNativeSaves:observer=>{
+              if(nativeSmokeSaveObserver)throw Error('Native save observer already installed')
+              nativeSmokeSaveObserver=observer
+              return ()=>{if(nativeSmokeSaveObserver===observer)nativeSmokeSaveObserver=undefined}
+            },
+            close:async key=>{
+              const tab=tabs.value.find(item=>item.key===key)
+              if(!tab)throw Error('Native calendar cleanup tab missing')
+              const element=[...document.querySelectorAll<HTMLElement>('[data-testid="calendar-editor"]')].find(node=>node.dataset.documentId===key)
+              await removeTab(tab,true);await nextTick()
+              if(tabs.value.some(item=>item.key===key)||calendarEntries.value.some(item=>item.document.id===key)||calendarHandles.has(key)||element?.isConnected)throw Error('Native calendar editor survived cleanup')
+            },
+          })
+          report.calendar=calendar
+          if(!calendar.ok)throw Error(calendar.error||calendar.cleanupError||'Native calendar verification failed')
+          smokeStage('calendar-native','complete')
           smokeStage('mcp-native','starting native HTTP document tool verification')
           const {runMcpNativeSmoke}=await import('./mcp/native-smoke')
           const savedMcpConfig=mcpConfig.value
@@ -1408,7 +1470,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
 
 <template>
   <div class="app-shell" :class="{'editing':!home,'focus-mode':focusMode}">
-    <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.xlsx,.csv,.tsv,.pptx,.potx,.ppsx,.pdf,.oonote,.ooschedule,.owflow,.mmd,.mermaid,.drawio,.xml,.excalidraw,.json" @change="browserFile" />
+    <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.xlsx,.csv,.tsv,.pptx,.potx,.ppsx,.pdf,.oonote,.ooschedule,.oocalendar,.owflow,.mmd,.mermaid,.drawio,.xml,.excalidraw,.json" @change="browserFile" />
     <input ref="scheduleImportInput" data-testid="schedule-import-input" class="visually-hidden" type="file" accept=".ooschedule,.json" @change="browserScheduleFile" />
     <aside v-show="!focusMode" class="sidebar" aria-label="全局导航" :inert="globalActionsBlocked">
       <button class="primary open-sidebar" @click="openFile" aria-label="打开文件" title="打开文件 · Ctrl / ⌘ O"><Icon name="folder"/><span>打开文件</span><kbd>⌘ / Ctrl O</kbd></button>
@@ -1431,7 +1493,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <details ref="newMenu" class="new-document-menu" @keydown.esc.stop.prevent="closeNewMenu(true)">
           <summary data-testid="shell-new" aria-label="新建文档" title="新建文档 · Ctrl / ⌘ N"><Icon name="plus" :size="18"/><span class="file-action-label">新建</span><Icon name="chevron-down" :size="12"/></summary>
           <div class="new-document-options" role="group" aria-label="选择新建文档类型">
-            <button v-for="kind in (['word','sheet','presentation','pdf','note','canvas','diagram','schedule'] as const)" :key="kind" :data-testid="'shell-new-'+kind" @click="globalNewDocument(kind)"><Icon :name="icons[kind]" :size="18"/><span>{{kindNames[kind]}}</span></button>
+            <button v-for="kind in (['word','sheet','presentation','pdf','note','canvas','diagram','schedule','calendar'] as const)" :key="kind" :data-testid="'shell-new-'+kind" @click="globalNewDocument(kind)"><Icon :name="icons[kind]" :size="18"/><span>{{kindNames[kind]}}</span></button>
           </div>
         </details>
         <div class="global-file-actions">
@@ -1465,6 +1527,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
           <button class="create-card canvas" data-testid="home-new-canvas" @click="newDocument('canvas')"><span class="document-art"><Icon name="canvas" :size="28"/></span><span class="card-bottom"><span><strong>画布</strong><small>流程连线、自由绘制与灵感整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
           <button class="create-card diagram" data-testid="home-new-diagram" @click="newDocument('diagram')"><span class="document-art"><Icon name="code-diagram" :size="28"/></span><span class="card-bottom"><span><strong>代码图表</strong><small>代码绘图、实时预览与图表模板</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
           <button class="create-card schedule" data-testid="home-new-schedule" @click="newDocument('schedule')"><span class="document-art"><Icon name="schedule" :size="28"/></span><span class="card-bottom"><span><strong>计划排期</strong><small>项目日历、角色分工与事件安排</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card calendar" data-testid="home-new-calendar" @click="newDocument('calendar')"><span class="document-art"><Icon name="schedule" :size="28"/></span><span class="card-bottom"><span><strong>日历便笺</strong><small>农历节假日、事项与历史复用</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
         </section>
         <section class="recent-section"><div class="section-heading"><h2>最近打开 <span>{{recents.length}}</span></h2><label class="search-box"><Icon name="search" :size="18"/><input v-model="search" placeholder="查找最近的文件" aria-label="查找最近的文件"/></label></div>
           <div ref="recentList" class="recent-list" role="region" aria-label="最近打开的文件" tabindex="0">
@@ -1472,7 +1535,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
             <template v-else><button v-for="item in filteredRecents" :key="item.id" class="recent-row" @click="openRecent(item)"><span class="file-icon" :class="item.kind"><Icon :name="icons[item.kind]"/></span><span class="recent-name">{{item.name}}<small>{{kindNames[item.kind]}} · {{item.extension.toUpperCase()}}</small></span><time>{{new Date(item.lastOpenedAt* (item.lastOpenedAt<1e12?1000:1)).toLocaleDateString('zh-CN')}}</time><Icon name="arrow" :size="18"/></button></template>
           </div>
         </section>
-        <footer class="home-footer"><span>文档 · 表格 · 演示 · PDF · 笔记本 · 画布 · 代码图表 · 计划排期</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
+        <footer class="home-footer"><span>文档 · 表格 · 演示 · PDF · 笔记本 · 画布 · 代码图表 · 计划排期 · 日历便笺</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
       </main>
     </div>
     <section v-show="!home" class="editor-workspace" :inert="editorInputBlocked">
@@ -1507,11 +1570,12 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <RustPdfEditor :focus-mode="focusMode" :theme="appearance" v-for="entry in rustPdfEntries" :key="entry.document.id" v-show="activeRustPdf&&activeKey===entry.document.id" :ref="handle=>setRustPdfHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPdf&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <NotebookEditor :theme="appearance" v-for="entry in noteEntries" :key="entry.document.id" v-show="activeNote&&activeKey===entry.document.id" :ref="handle=>setNoteHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeNote&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <ScheduleEditor :focus-mode="focusMode" :theme="effectiveAppearance" v-for="entry in scheduleEntries" :key="entry.document.id" v-show="activeSchedule&&activeKey===entry.document.id" :ref="handle=>setScheduleHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeSchedule&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)" @import="importSchedule(entry.document.id)" @export="exportScheduleCopy(entry.document.id,$event)"/>
+        <CalendarEditor :focus-mode="focusMode" :theme="effectiveAppearance" v-for="entry in calendarEntries" :key="entry.document.id" v-show="activeCalendar&&activeKey===entry.document.id" :ref="handle=>setCalendarHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeCalendar&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <WorkflowEditor :theme="effectiveAppearance" v-for="entry in workflowEntries" :key="entry.document.id" v-show="activeWorkflow&&activeKey===entry.document.id" :ref="handle=>setWorkflowHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeWorkflow&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)" @create-canvas="activeKey===entry.document.id&&createCanvasCopy($event)" @export="exportWorkflowCopy(entry.document.id,$event)"/>
       </div>
       <PresentationTemplates v-if="!home&&activeRustPresentation&&templatePanelOpen" class="template-panel" :templates="presentationTemplates" :loading="templateListLoading" :error="templateListError" :disabled="documentActionsDisabled" @select="openPresentationTemplateDialog('apply',$event)" @save="openPresentationTemplateDialog('save')" @delete="openPresentationTemplateDialog('delete',$event)" @retry="refreshPresentationTemplates" @close="templatePanelOpen=false"/>
       </div>
-      <footer v-show="!focusMode" class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · {{activeRustWord?'文字编辑':activeRustSheet?'表格编辑':activeRustPresentation?'演示编辑':activeRustPdf?'PDF 编辑':activeNote?'笔记编辑':activeSchedule?'计划排期':active?.document.kind==='canvas'?'画布编辑':'代码图表'}}</span></footer>
+      <footer v-show="!focusMode" class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · {{activeRustWord?'文字编辑':activeRustSheet?'表格编辑':activeRustPresentation?'演示编辑':activeRustPdf?'PDF 编辑':activeNote?'笔记编辑':activeSchedule?'计划排期':activeCalendar?'日历便笺':active?.document.kind==='canvas'?'画布编辑':'代码图表'}}</span></footer>
     </section>
     <McpSettingsDialog v-if="mcpSettingsOpen" :config="mcpConfig" :running="mcpState.phase==='running'" :native-available="native.isTauri()" :saving="mcpSettingsBusy" :error="mcpSettingsError" @save="saveMcpSettings" @close="!mcpSettingsBusy&&(mcpSettingsOpen=false)"/>
     <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{error}}</span><button @click="error=''" aria-label="关闭错误提示"><Icon name="close" :size="16"/></button></div>
@@ -1564,7 +1628,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       <section ref="helpDialog" class="modal help-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="help-heading">
         <button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button>
         <span class="eyebrow">OPEN OFFICE</span>
-        <h2 id="help-heading">八种工具，随需使用</h2>
+        <h2 id="help-heading">九种工具，随需使用</h2>
         <div class="help-grid">
           <article v-for="tool in helpTools" :key="tool.kind">
             <span class="help-tool-icon"><Icon :name="icons[tool.kind]" :size="21"/></span>

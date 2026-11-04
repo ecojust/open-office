@@ -97,7 +97,7 @@ function toolValue(probe: ToolProbe, tool: string, sessionId: string, port: numb
 
 const extensions = { word: 'docx', sheet: 'xlsx', presentation: 'pptx', pdf: 'pdf', note: 'oonote', canvas: 'owflow', diagram: 'owflow' } as const
 const markers = { word: MCP_NATIVE_TEXT, sheet: 'NATIVE_MCP_SHEET', presentation: 'NATIVE_MCP_PRESENTATION', pdf: 'NATIVE_MCP_PDF', note: 'NATIVE_MCP_NOTE', canvas: 'NATIVE_MCP_CANVAS', diagram: 'NATIVE_MCP_DIAGRAM' } as const
-type McpSmokeKind = Exclude<DocumentKind, 'schedule'>
+type McpSmokeKind = Exclude<DocumentKind, 'schedule' | 'calendar'>
 const blank = (kind: McpSmokeKind, name = `native-mcp-${kind}`): NativeDocument => ({ id: '', kind, extension: extensions[kind], name: `${name}.${extensions[kind]}`, base64: '', sha256: '', sizeBytes: 0 })
 const json = (value: unknown) => JSON.stringify(value)
 async function exportEvidence(editor: SmokeEditor) {

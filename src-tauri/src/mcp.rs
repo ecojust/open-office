@@ -435,6 +435,7 @@ fn validate_document(document: &McpDocument) -> Result<(), String> {
             "canvas",
             "diagram",
             "schedule",
+            "calendar",
         ]
         .contains(&document.kind.as_str())
     {
@@ -1005,6 +1006,21 @@ mod tests {
         let (status, body) = request(config, "POST", &value.to_string(), "", &config.token);
         assert_eq!(status, 200);
         body.unwrap()
+    }
+
+    #[test]
+    fn calendar_document_uses_the_existing_mcp_identity_contract() {
+        let mut document = McpDocument {
+            id: "calendar-1".into(),
+            title: "日历笔记".into(),
+            kind: "calendar".into(),
+        };
+        validate_document(&document).unwrap();
+        document.kind = "unknown".into();
+        assert!(validate_document(&document).is_err());
+        document.kind = "calendar".into();
+        document.id.clear();
+        assert!(validate_document(&document).is_err());
     }
 
     #[test]
