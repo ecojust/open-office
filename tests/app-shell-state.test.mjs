@@ -10,6 +10,7 @@ import { zipSync, strToU8 } from 'fflate'
 import { createId } from '../src/shared/id.ts'
 import * as workflowFiles from '../src/workflow/core/files.ts'
 import * as scheduleModel from '../src/schedule/model.ts'
+import * as calendarModel from '../src/calendar/model.ts'
 import * as scheduleLayout from '../src/schedule/layout.ts'
 import * as schedulePng from '../src/schedule/png-export.ts'
 
@@ -22,12 +23,12 @@ const utilities = await readFile(new URL('../src/shared/document.ts', import.met
 const dialogFocus = await readFile(new URL('../src/shared/dialog-focus.ts', import.meta.url), 'utf8')
 const appearanceSource = await readFile(new URL('../src/shared/appearance.ts', import.meta.url), 'utf8')
 const autosaveSource = await readFile(new URL('../src/shared/autosave.ts', import.meta.url), 'utf8')
-const mcpSources = Object.fromEntries(await Promise.all(['config', 'service', 'document-tools', 'tool-schema', 'word-tools', 'sheet-tools', 'presentation-tools', 'pdf-tools', 'notes-workflow-tools', 'schedule-tools'].map(async name =>
+const mcpSources = Object.fromEntries(await Promise.all(['config', 'service', 'document-tools', 'tool-schema', 'word-tools', 'sheet-tools', 'presentation-tools', 'pdf-tools', 'notes-workflow-tools', 'schedule-tools', 'calendar-tools'].map(async name =>
   [`./mcp/${name}`, await readFile(new URL(`../src/mcp/${name}.ts`, import.meta.url), 'utf8')]
 )))
 const names = 'tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,rustPdfEntries,rustPdfHandles,setRustPdfHandle,rustWordEntries,rustWordHandles,setRustWordHandle,rustSheetEntries,rustSheetHandles,setRustSheetHandle,rustPresentationEntries,rustPresentationHandles,setRustPresentationHandle,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,browserFile,saveActive,closeTab,closeAllTabs,closeWindow,resolveClose,removeTab,removeTabs,task,editorTransaction,nativeTransactionalEditor,appearance,currentDocument,globalActionsBlocked,documentActionsDisabled,globalFileAction,globalNewDocument,keydown,rustEditorFileAction,previewSlides'
   + ',autosaveEnabled,autosave,autosaveWaiting,saveStateLabel,saveStateTitle,backgroundSaving,editorInputBlocked,noteEntries,noteHandles,setNoteHandle,activeNote'
-  + ',printDisabled,status,scheduleEntries,scheduleHandles,setScheduleHandle,activeSchedule'
+  + ',printDisabled,status,scheduleEntries,scheduleHandles,setScheduleHandle,activeSchedule,calendarEntries,calendarHandles,setCalendarHandle,activeCalendar'
   + ',mcpConfig,mcpSettingsOpen,mcpSettingsBusy,mcpSettingsError,mcpState,mcpWorking,mcpMutating,mcpService,toggleMcp,saveMcpSettings,openMcpSettings,workflowEntries,workflowHandles,setWorkflowHandle,composing'
   + ',focusMode,setFocusMode,focusEnterButton,focusExitButton,editorContent,templateDraft,templatePanelOpen'
 
@@ -49,7 +50,7 @@ function compile(source, require, extra = {}) {
 }
 
 
-function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], deckPrepareError, deckPrepare, deckWarnings = [], presentationSmokeError, presentationSmokeReport, presentationSmokeRun, sheetSmokeError, sheetSmokeReport, sheetSmokeRun, pdfPrepareError, pdfPrepare, pdfWarnings = [], pdfSmokeError, pdfSmokeReport, notebookSmokeError, notebookSmokeReport, notebookSmokeRun, workflowSmokeError, workflowSmokeReport, workflowSmokeRun, workspaceSmokeError, workspaceSmokeReport, storedAppearance, storedAutosave, systemDark = false, storageUnavailable = false, browserUrl = 'http://127.0.0.1/', browserFetch, notebookDecodeError, mcpSmokeError, mcpSmokeReport, mcpSmokeRun} = {}) {
+function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], deckPrepareError, deckPrepare, deckWarnings = [], presentationSmokeError, presentationSmokeReport, presentationSmokeRun, sheetSmokeError, sheetSmokeReport, sheetSmokeRun, pdfPrepareError, pdfPrepare, pdfWarnings = [], pdfSmokeError, pdfSmokeReport, notebookSmokeError, notebookSmokeReport, notebookSmokeRun, workflowSmokeError, workflowSmokeReport, workflowSmokeRun, workspaceSmokeError, workspaceSmokeReport, calendarSmokeError, calendarSmokeReport, calendarSmokeRun, storedAppearance, storedAutosave, systemDark = false, storageUnavailable = false, browserUrl = 'http://127.0.0.1/', browserFetch, notebookDecodeError, mcpSmokeError, mcpSmokeReport, mcpSmokeRun} = {}) {
   const rustPreparations = [], sheetPreparations = [], deckPreparations = [], pdfPreparations = []
   const calls = [], mounted = [], beforeUnmount = [], observers = [], native = {
     isTauri: () => nativeEnabled,
@@ -161,6 +162,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
       if (dependency === '../shared/document') return helpers
       // Keep the real schedule schemas and shared constraints in this shell
       // harness; these modules do not require a rendered canvas at import time.
+      if (dependency === '../calendar/model.ts') return calendarModel
       if (dependency === '../schedule/model.ts') return scheduleModel
       if (dependency === '../schedule/layout.ts') return scheduleLayout
       if (dependency === '../schedule/png-export.ts') return schedulePng
@@ -192,6 +194,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     if (name === './smoke') return {smokeRequested:()=>smoke,smokeStage(){},smokeFeatures:()=>({}),smokeFailure:async(error,phase)=>{calls.push(['smoke-failure',phase,String(error)])},smokeAwait:async(_phase,action)=>action()}
     if (name === './shared/document') return helpers
     if (name === './workflow/core/files') return workflowFiles
+    if (name === './calendar/model') return calendarModel
     if (name === './schedule/model') return scheduleModel
     if (name === './shared/id') return { createId }
     if (name === './shared/dialog-focus') return focus
@@ -258,6 +261,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     if (name === './word/rust/office-word-native-smoke') return {async runOfficeWordNativeSmoke(adapter){calls.push(['office-word-native-smoke']);if(wordSmokeError)throw Error(wordSmokeError);if(wordSmokeRun)return wordSmokeRun(adapter);return wordSmokeReport??{schemaVersion:1,ok:true,engine:'office-word-wasm'}}}
     if (name === './sheet/rust/office-sheet-native-smoke') return {async runOfficeSheetNativeSmoke(adapter){calls.push(['office-sheet-native-smoke']);if(sheetSmokeError)throw Error(sheetSmokeError);if(sheetSmokeRun)return sheetSmokeRun(adapter);return sheetSmokeReport??{schemaVersion:1,ok:true,engine:'office-sheet-wasm',reopenedXlsxBase64:'native-sheet-reopened'}}}
     if (name === './notes/native-smoke') return {async runNotebookNativeSmoke(...args){assert.equal(args.length,1);const [adapter]=args;calls.push(['notebook-native-smoke']);for(const method of ['open','bindTemporaryFile','state','autosaveEnabled','setAutosave','observeNativeSaves','close'])assert.equal(typeof adapter[method],'function');if(notebookSmokeError)throw Error(notebookSmokeError);if(notebookSmokeRun)return notebookSmokeRun(adapter);return notebookSmokeReport??{schemaVersion:1,kind:'notebook-native',ok:true}}}
+    if (name === './calendar/native-smoke') return {async runCalendarNativeSmoke(...args){assert.equal(args.length,1);const [adapter]=args;calls.push(['calendar-native-smoke']);for(const method of ['open','bindTemporaryFile','state','autosaveEnabled','setAutosave','observeNativeSaves','close'])assert.equal(typeof adapter[method],'function');if(calendarSmokeError)throw Error(calendarSmokeError);if(calendarSmokeRun)return calendarSmokeRun(adapter);return calendarSmokeReport??{schemaVersion:1,kind:'calendar-native',ok:true}}}
     if (name === './workflow/native-smoke') return {async runWorkflowNativeSmoke(...args){assert.equal(args.length,1);const [adapter]=args;calls.push(['workflow-native-smoke']);for(const method of ['open','bindTemporaryFile','state','autosaveEnabled','setAutosave','observeNativeSaves','close'])assert.equal(typeof adapter[method],'function');if(workflowSmokeError)throw Error(workflowSmokeError);if(workflowSmokeRun)return workflowSmokeRun(adapter);return workflowSmokeReport??{schemaVersion:1,kind:'workflow-native',ok:true}}}
     if (name === './shared/workspace-native-smoke') return {async runWorkspaceNativeSmoke(...args){assert.equal(args.length,1);const [adapter]=args;calls.push(['workspace-native-smoke']);assert.equal(typeof adapter.observeNativeSaves,'function');if(workspaceSmokeError)throw Error(workspaceSmokeError);return workspaceSmokeReport??{schemaVersion:1,kind:'workspace-native',ok:true}}}
     if (name === '@tauri-apps/api/core') return { invoke: async (command,args) => { calls.push(['invoke',command,args]) } }
@@ -278,6 +282,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
   })
   function attachHandles() {
     for(const entry of state.scheduleEntries.value)if(!state.scheduleHandles.has(entry.document.id))state.setScheduleHandle(entry.document.id,Object.create(handle))
+    for(const entry of state.calendarEntries.value)if(!state.calendarHandles.has(entry.document.id))state.setCalendarHandle(entry.document.id,Object.create(handle))
     for(const entry of state.noteEntries.value)if(!state.noteHandles.has(entry.document.id))state.setNoteHandle(entry.document.id,Object.create(handle))
     for(const entry of state.rustPdfEntries.value)if(!state.rustPdfHandles.has(entry.document.id))state.setRustPdfHandle(entry.document.id,Object.create(handle))
     for(const entry of state.rustWordEntries.value)if(!state.rustWordHandles.has(entry.document.id))state.setRustWordHandle(entry.document.id,rustWordHandle)
@@ -285,16 +290,16 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     for(const entry of state.rustPresentationEntries.value)if(!state.rustPresentationHandles.has(entry.document.id))state.setRustPresentationHandle(entry.document.id,presentationHandle)
     for(const entry of state.workflowEntries.value)if(!state.workflowHandles.has(entry.document.id))state.setWorkflowHandle(entry.document.id,Object.create(handle))
   }
-  scope.run(()=>vue.watch([state.rustWordEntries,state.rustSheetEntries,state.rustPresentationEntries,state.rustPdfEntries,state.noteEntries,state.workflowEntries,state.scheduleEntries],attachHandles,{flush:'sync'}))
+  scope.run(()=>vue.watch([state.rustWordEntries,state.rustSheetEntries,state.rustPresentationEntries,state.rustPdfEntries,state.noteEntries,state.workflowEntries,state.scheduleEntries,state.calendarEntries],attachHandles,{flush:'sync'}))
   function tab(id, { ready = true, dirty = false, fileId = id, kind = 'word' } = {}) {
-    const extension = {word:'docx',sheet:'xlsx',presentation:'pptx',pdf:'pdf',note:'oonote',canvas:'owflow',diagram:'owflow',schedule:'ooschedule'}[kind]
+    const extension = {word:'docx',sheet:'xlsx',presentation:'pptx',pdf:'pdf',note:'oonote',canvas:'owflow',diagram:'owflow',schedule:'ooschedule',calendar:'oocalendar'}[kind]
     state.tabs.value.push({ key: id, ready, dirty, fileId, document: { id, kind, extension,
       name: `${id}.${extension}`, base64: 'T0xE', sha256: 'old-hash', sizeBytes: 3 } })
     return state.tabs.value.at(-1)
   }
   function active(tab) {
     state.activeKey.value = tab.key
-    const entries={word:state.rustWordEntries,sheet:state.rustSheetEntries,presentation:state.rustPresentationEntries,pdf:state.rustPdfEntries,note:state.noteEntries,canvas:state.workflowEntries,diagram:state.workflowEntries,schedule:state.scheduleEntries}[tab.document.kind]
+    const entries={word:state.rustWordEntries,sheet:state.rustSheetEntries,presentation:state.rustPresentationEntries,pdf:state.rustPdfEntries,note:state.noteEntries,canvas:state.workflowEntries,diagram:state.workflowEntries,schedule:state.scheduleEntries,calendar:state.calendarEntries}[tab.document.kind]
     if(entries&&!entries.value.some(entry=>entry.document.id===tab.key))entries.value=[...entries.value,{document:tab.document}]
   }
   async function idle() {
@@ -322,14 +327,14 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
   }
 }
 
-test('fullscreen layout preserves all eight live editor sessions, dirty state and running MCP service', async () => {
-  for (const kind of ['word','sheet','presentation','pdf','note','canvas','diagram','schedule']) {
+test('fullscreen layout preserves all nine live editor sessions, dirty state and running MCP service', async () => {
+  for (const kind of ['word','sheet','presentation','pdf','note','canvas','diagram','schedule','calendar']) {
     const h = shell(), tab = h.tab(`fullscreen-${kind}`, { kind, dirty: true })
     try {
       h.active(tab); h.state.home.value = false
       await settleShell()
-      const entries = [h.state.rustWordEntries,h.state.rustSheetEntries,h.state.rustPresentationEntries,h.state.rustPdfEntries,h.state.noteEntries,h.state.workflowEntries,h.state.scheduleEntries]
-      const handles = [h.state.rustWordHandles,h.state.rustSheetHandles,h.state.rustPresentationHandles,h.state.rustPdfHandles,h.state.noteHandles,h.state.workflowHandles,h.state.scheduleHandles]
+      const entries = [h.state.rustWordEntries,h.state.rustSheetEntries,h.state.rustPresentationEntries,h.state.rustPdfEntries,h.state.noteEntries,h.state.workflowEntries,h.state.scheduleEntries,h.state.calendarEntries]
+      const handles = [h.state.rustWordHandles,h.state.rustSheetHandles,h.state.rustPresentationHandles,h.state.rustPdfHandles,h.state.noteHandles,h.state.workflowHandles,h.state.scheduleHandles,h.state.calendarHandles]
       const mounted = entries.map(value => value.value), attached = handles.map(value => [...value.entries()])
       for (const handle of attached.flat().map(([,value]) => value)) {
         for (const method of ['prepareDeactivate','exportFile','discardChanges','markSaved','undo','redo']) {
@@ -1845,14 +1850,14 @@ test('F5 starts the active presentation once and native close stops it before th
   assert.ok(!h.calls.some(call=>call[0]==='close'));h.unmount()
 })
 
-test('full native smoke requires four Rust editors, notebook, workflows, MCP and actual workspace persistence gates',async()=>{
+test('full native smoke requires four Rust editors, notebook, workflows, calendar, MCP and actual workspace persistence gates',async()=>{
   const h=shell({smoke:true});h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'})
   await h.mount()
   const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
   assert.equal(report.ok,true);assert.equal(report.word.ok,true);assert.equal(report.sheet.ok,true);assert.equal(report.presentation.ok,true)
   assert.equal(report.pdf.reopened,true);assert.equal(report.pdf.removedOldText,true);assert.equal(report.pdf.newTextPresent,true);assert.equal(report.notebook.ok,true);assert.equal(report.workflow.ok,true);assert.equal(report.workspace.ok,true)
-  assert.equal(report.mcp.ok,true)
-  assert.deepEqual(h.calls.filter(call=>call[0].endsWith('-native-smoke')).map(call=>call[0]),['office-word-native-smoke','office-sheet-native-smoke','office-presentation-native-smoke','pdf-native-smoke','notebook-native-smoke','workflow-native-smoke','mcp-native-smoke','workspace-native-smoke'])
+  assert.equal(report.mcp.ok,true);assert.equal(report.calendar.ok,true)
+  assert.deepEqual(h.calls.filter(call=>call[0].endsWith('-native-smoke')).map(call=>call[0]),['office-word-native-smoke','office-sheet-native-smoke','office-presentation-native-smoke','pdf-native-smoke','notebook-native-smoke','workflow-native-smoke','calendar-native-smoke','mcp-native-smoke','workspace-native-smoke'])
   assert.equal(h.calls.filter(call=>call[0]==='notebook-native-smoke').length,1)
   assert.equal(h.calls.filter(call=>call[0]==='workflow-native-smoke').length,1)
   assert.equal(h.calls.filter(call=>call[0]==='workspace-native-smoke').length,1)
@@ -2226,7 +2231,7 @@ for (const replaceHandle of [false,true]) test(`switching rejects a ${replaceHan
   } finally {h.unmount()}
 })
 
-for (const kind of ['word', 'sheet', 'presentation', 'pdf', 'note', 'canvas', 'diagram', 'schedule']) test(`${kind} shell starts MCP only for its ready active document and advertises its own tools`, async () => {
+for (const kind of ['word', 'sheet', 'presentation', 'pdf', 'note', 'canvas', 'diagram', 'schedule', 'calendar']) test(`${kind} shell starts MCP only for its ready active document and advertises its own tools`, async () => {
   const h = shell(), tab = h.tab(`mcp-${kind}`, { kind })
   try {
     h.active(tab)
@@ -2625,4 +2630,131 @@ test('schedule autosave uses the selected file and retains changes made after th
     await settleShell();assert.equal(h.state.mcpState.value.phase,'stopped')
     assert.equal(h.state.scheduleHandles.size,0);assert.equal(h.state.scheduleEntries.value.length,0)
   } finally {h.unmount()}
+})
+
+test('calendar creation uses its own live tab and shared undo, redo, save, close and cleanup controls',async()=>{
+  const h=shell()
+  try {
+    h.state.globalNewDocument('calendar');await h.idle()
+    const tab=h.state.active.value,handle=h.state.calendarHandles.get(tab.key)
+    assert.equal(tab.document.kind,'calendar');assert.equal(tab.document.extension,'oocalendar')
+    assert.equal(h.state.activeCalendar.value,true);assert.equal(h.state.calendarEntries.value.length,1)
+    assert.equal(tab.dirty,true);assert.equal(tab.ready,false);assert.equal(tab.fileId,undefined)
+    h.state.readyFor(tab.key)
+    handle.undo=async()=>h.calls.push(['calendar-undo'])
+    handle.redo=async()=>h.calls.push(['calendar-redo'])
+    h.state.globalFileAction('undo');await h.idle()
+    h.state.globalFileAction('redo');await h.idle()
+    assert.equal(h.calls.filter(call=>call[0]==='calendar-undo').length,1)
+    assert.equal(h.calls.filter(call=>call[0]==='calendar-redo').length,1)
+    h.state.openSaveAs()
+    assert.deepEqual(Array.from(h.state.saveAsOptions.value,option=>option.extension),['oocalendar'])
+    h.state.cancelSaveAs()
+    const other=h.tab('other')
+    await h.state.activate(other);h.state.readyFor(other.key);await h.state.activate(tab)
+    assert.equal(h.state.calendarHandles.get(tab.key),handle,'Switching retains the same editor and history')
+    h.state.closeTab(tab)
+    assert.equal(h.state.closeTarget.value.key,tab.key,'Unsaved plans require a close decision')
+    h.state.closeTarget.value=null
+    assert.equal(await h.state.saveActive(),true)
+    const request=h.calls.find(call=>call[0]==='save')[1]
+    assert.equal(request.extension,'oocalendar');assert.equal(request.saveAs,true)
+    assert.equal(tab.document.kind,'calendar');assert.equal(tab.dirty,false)
+    await h.state.removeTab(tab)
+    assert.equal(h.state.calendarEntries.value.length,0);assert.equal(h.state.calendarHandles.size,0)
+  } finally {h.unmount()}
+})
+
+for(const route of ['native','recent','browser'])for(const extension of ['oocalendar','json'])test(`${route} ${extension} calendars open in the calendar editor and protect imported JSON`,async()=>{
+  const bytes=calendarModel.encodeCalendar(calendarModel.createCalendar('Launch plan'))
+  const source={id:'local-calendar',kind:'calendar',extension,name:`Launch.${extension}`,base64:Buffer.from(bytes).toString('base64'),sha256:'calendar-hash',sizeBytes:bytes.length}
+  const h=shell({nativeEnabled:route!=='browser'})
+  try {
+    if(route==='native'){h.native.openDocument=async()=>source;h.state.openFile();await h.idle()}
+    else if(route==='recent'){h.native.openRecent=async()=>source;h.state.openRecent({id:source.id});await h.idle()}
+    else await h.state.browserFile({target:{value:source.name,files:[{name:source.name,size:bytes.length,arrayBuffer:async()=>bytes.buffer}]}})
+    assert.equal(h.state.error.value,'')
+    const tab=h.state.active.value,handle=h.state.calendarHandles.get(tab.key)
+    assert.equal(tab.document.kind,'calendar');assert.equal(tab.requiresSaveAs,extension==='json')
+    assert.equal(h.state.calendarEntries.value[0].document.id,tab.key)
+    assert.equal(h.state.workflowEntries.value.length,0)
+    h.state.readyFor(tab.key);tab.dirty=true
+    handle.exportFile=async({format})=>{assert.equal(format,'oocalendar');return {base64:source.base64,extension:'oocalendar',dirty:true}}
+    h.state.openSaveAs();assert.equal(h.state.saveAsDraft.value.format,'oocalendar');assert.equal(h.state.saveAsCopy.value,false);h.state.cancelSaveAs()
+    assert.equal(await h.state.saveActive(),true)
+    if(route==='browser')assert.match(h.calls.find(call=>call[0]==='download')[1],/\.oocalendar$/)
+    else {
+      const request=h.calls.find(call=>call[0]==='save')[1]
+      assert.equal(request.documentId,extension==='json'?undefined:source.id)
+      assert.equal(request.expectedSha256,extension==='json'?undefined:source.sha256)
+      assert.equal(request.saveAs,extension==='json')
+      if(extension==='json')assert.deepEqual(Array.from(request.protectedDocumentIds),[source.id])
+    }
+    assert.equal(tab.document.extension,'oocalendar');assert.equal(tab.dirty,false)
+  } finally {h.unmount()}
+})
+
+test('invalid calendar details are rejected before settling or replacing the active draft',async()=>{
+  const h=shell(),original=h.tab('unsaved-word',{dirty:true});h.active(original)
+  h.rustWordHandle.prepareDeactivate=async()=>assert.fail('Invalid imports must not settle the active draft')
+  try {
+    const model=calendarModel.createCalendar('Invalid plan');model.notes=[{id:'invalid'}]
+    const bytes=new TextEncoder().encode(JSON.stringify(model))
+    for(const extension of ['oocalendar','json'])await assert.rejects(h.state.addDocument({id:'broken',kind:'calendar',extension,name:`Broken.${extension}`,base64:Buffer.from(bytes).toString('base64'),sha256:'',sizeBytes:bytes.length},'broken'))
+    assert.equal(h.state.activeKey.value,original.key);assert.equal(h.state.tabs.value.length,1)
+    assert.equal(h.state.calendarEntries.value.length,0);assert.equal(original.dirty,true)
+  } finally {h.unmount()}
+})
+
+test('calendar autosave uses the selected file and retains changes made after the exported revision',async()=>{
+  const h=shell({storedAutosave:'true'}),tab=h.tab('automatic-plan',{kind:'calendar',dirty:true,fileId:'selected-plan'});h.active(tab);h.state.home.value=false
+  const handle=h.state.calendarHandles.get(tab.key)
+  handle.inspect=async()=>({documentId:1,revision:2,dirty:true})
+  try {
+    await h.mount();await h.fireTimeout(10000);await h.idle()
+    const request=h.calls.find(call=>call[0]==='save')[1]
+    assert.equal(request.documentId,'selected-plan');assert.equal(request.extension,'oocalendar');assert.equal(request.saveAs,false)
+    assert.equal(tab.dirty,true,'Acknowledging the earlier snapshot leaves subsequent changes dirty')
+    await h.state.toggleMcp()
+    const start=h.mcpCalls.find(call=>call[0]==='start')
+    assert.equal(start[2].kind,'calendar');assert.equal(start[2].id,tab.key)
+    assert.ok(start[3].some(tool=>tool.name==='calendar_read'))
+    assert.ok(start[3].some(tool=>tool.name==='calendar_edit'))
+    assert.equal(h.state.mcpState.value.documentId,tab.key)
+    assert.equal(tab.dirty,true,'Starting MCP does not acknowledge or discard pending calendar edits')
+    await h.state.removeTabs([tab],true)
+    await settleShell();assert.equal(h.state.mcpState.value.phase,'stopped')
+    assert.equal(h.state.calendarHandles.size,0);assert.equal(h.state.calendarEntries.value.length,0)
+  } finally {h.unmount()}
+})
+
+test('full native smoke waits for calendar verification before shared workspace cleanup',async()=>{
+  let finishCalendar,started
+  const waiting=new Promise(resolve=>{finishCalendar=resolve}),entered=new Promise(resolve=>{started=resolve})
+  const h=shell({smoke:true,calendarSmokeRun:()=>{started();return waiting}});h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'})
+  const mounted=h.mount()
+  await entered
+  assert.equal(h.calls.some(call=>call[0]==='notebook-native-smoke'),true)
+  assert.equal(h.calls.some(call=>call[0]==='calendar-native-smoke'),true)
+  assert.equal(h.calls.some(call=>call[0]==='workspace-native-smoke'),false)
+  assert.equal(h.calls.some(call=>call[0]==='invoke'&&call[1]==='smoke_report'),false)
+  finishCalendar({ok:true,kind:'calendar-native'});await mounted
+  assert.equal(h.calls.filter(call=>call[0]==='workspace-native-smoke').length,1)
+  const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
+  assert.equal(report.ok,true);assert.equal(report.calendar.ok,true)
+  h.unmount()
+})
+
+for(const mode of ['report','throw','cleanup','missing'])test(`failed calendar ${mode} prevents native success and subsequent workspace verification`,async()=>{
+  const failure='Controlled calendar failure'
+  const options=mode==='throw'?{calendarSmokeError:failure}:mode==='cleanup'?{calendarSmokeReport:{ok:false,cleanupError:failure}}:
+    mode==='missing'?{calendarSmokeReport:{}}:{calendarSmokeReport:{ok:false,error:failure}}
+  const h=shell({smoke:true,...options});h.native.bootstrap=async()=>({smokeMode:true,smokeScope:'full'});await h.mount()
+  const report=h.calls.find(call=>call[0]==='invoke'&&call[1]==='smoke_report')[2].report
+  assert.equal(report.ok,false);assert.match(report.error,mode==='missing'?/Native calendar verification failed/:/Controlled calendar failure/)
+  for(const engine of ['word','sheet','presentation','pdf','notebook'])assert.equal(report[engine].ok,true)
+  assert.equal(h.calls.filter(call=>call[0]==='calendar-native-smoke').length,1)
+  assert.equal(h.calls.some(call=>call[0]==='workspace-native-smoke'),false)
+  assert.equal(Object.hasOwn(report,'workspace'),false)
+  h.unmount()
 })

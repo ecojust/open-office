@@ -26,6 +26,7 @@ const DOCUMENT_LIMIT: u64 = 100 * 1024 * 1024;
 const IMAGE_LIMIT: u64 = 20 * 1024 * 1024;
 const NOTEBOOK_LIMIT: usize = 16 * 1024 * 1024;
 const SCHEDULE_LIMIT: usize = 4 * 1024 * 1024;
+const CALENDAR_LIMIT: usize = 8 * 1024 * 1024;
 const ENCODED_LIMIT: usize = ((DOCUMENT_LIMIT as usize + 2) / 3) * 4;
 const HISTORY_LIMIT: u64 = 2 * 1024 * 1024;
 const MAX_RECENT: usize = 100;
@@ -40,6 +41,7 @@ const EXTENSIONS: &[&str] = &[
     "pdf",
     "oonote",
     "ooschedule",
+    "oocalendar",
     "owflow",
     "mmd",
     "mermaid",
@@ -72,6 +74,7 @@ pub enum DocExt {
     Pdf,
     Oonote,
     Ooschedule,
+    Oocalendar,
     Owflow,
     Mmd,
     Mermaid,
@@ -103,6 +106,7 @@ impl DocExt {
             Self::Pdf => "pdf",
             Self::Oonote => "oonote",
             Self::Ooschedule => "ooschedule",
+            Self::Oocalendar => "oocalendar",
             Self::Owflow => "owflow",
             Self::Mmd => "mmd",
             Self::Mermaid => "mermaid",
@@ -131,6 +135,7 @@ impl DocExt {
             "pdf" => Ok(Self::Pdf),
             "oonote" => Ok(Self::Oonote),
             "ooschedule" => Ok(Self::Ooschedule),
+            "oocalendar" => Ok(Self::Oocalendar),
             "owflow" => Ok(Self::Owflow),
             "mmd" => Ok(Self::Mmd),
             "mermaid" => Ok(Self::Mermaid),
@@ -139,7 +144,7 @@ impl DocExt {
             "excalidraw" => Ok(Self::Excalidraw),
             "json" => Ok(Self::Json),
             _ => Err(
-                "请选择受支持的办公文档、笔记本、计划排期、画布或代码图表文件；其他格式请先转换。"
+                "请选择受支持的办公文档、笔记本、计划排期、日历笔记、画布或代码图表文件；其他格式请先转换。"
                     .into(),
             ),
         }
@@ -155,6 +160,7 @@ impl DocExt {
             Self::Pdf => DocumentKind::Pdf,
             Self::Oonote => DocumentKind::Note,
             Self::Ooschedule => DocumentKind::Schedule,
+            Self::Oocalendar => DocumentKind::Calendar,
             Self::Mmd | Self::Mermaid => DocumentKind::Diagram,
             Self::Owflow
             | Self::Drawio
@@ -177,6 +183,7 @@ impl DocExt {
                 | Self::Pdf
                 | Self::Oonote
                 | Self::Ooschedule
+                | Self::Oocalendar
                 | Self::Owflow
                 | Self::Mmd
                 | Self::Drawio
@@ -189,13 +196,16 @@ impl DocExt {
         Ok(())
     }
 
-    /// JSON stays import-only except for a bounded schedule data copy. Keep the
+    /// JSON stays import-only except for bounded schedule/calendar data copies. Keep the
     /// exception content-aware so other supported JSON imports cannot acquire
     /// a general JSON save capability.
     fn ensure_exportable_content(self, bytes: &[u8]) -> Result<(), String> {
         if self == Self::Json
-            && bytes.len() <= SCHEDULE_LIMIT
-            && workflow_json(bytes).is_some_and(|value| valid_schedule_header(&value))
+            && bytes.len() <= CALENDAR_LIMIT
+            && workflow_json(bytes).is_some_and(|value| {
+                (bytes.len() <= SCHEDULE_LIMIT && valid_schedule_header(&value))
+                    || valid_calendar_header(&value)
+            })
         {
             return Ok(());
         }
@@ -212,6 +222,7 @@ pub enum DocumentKind {
     Pdf,
     Note,
     Schedule,
+    Calendar,
     Canvas,
     Diagram,
 }
@@ -481,6 +492,7 @@ impl DocumentStore {
                 | DocExt::Pptx
                 | DocExt::Pdf
                 | DocExt::Oonote
+                | DocExt::Oocalendar
                 | DocExt::Owflow
         ) {
             return Err("Native smoke requires an editable document format.".into());
@@ -589,7 +601,7 @@ impl DocumentStore {
         extension.ensure_exportable_content(&bytes)?;
         let hash = hash_bytes(&bytes);
         let kind = document_kind(&bytes, extension);
-        // Images and schedule JSON are export copies, not editable document
+        // Images and schedule/calendar JSON are export copies, not editable document
         // capabilities. Keep them out of recents and never replace an active
         // document's registered identity. JSON content was checked above.
         if matches!(extension, DocExt::Svg | DocExt::Png | DocExt::Json) {
@@ -1038,6 +1050,157 @@ fn valid_schedule_header(value: &serde_json::Value) -> bool {
             })
 }
 
+fn valid_calendar_date(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 10
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes
+            .iter()
+            .enumerate()
+            .any(|(index, byte)| !matches!(index, 4 | 7) && !byte.is_ascii_digit())
+    {
+        return false;
+    }
+    let year: u32 = value[..4].parse().unwrap_or(0);
+    let month: u32 = value[5..7].parse().unwrap_or(0);
+    let day: u32 = value[8..].parse().unwrap_or(0);
+    let days = match month {
+        4 | 6 | 9 | 11 => 30,
+        2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
+        2 => 28,
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        _ => return false,
+    };
+    (1900..=9999).contains(&year) && (1..=days).contains(&day)
+}
+
+fn valid_calendar_timestamp(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 24
+        && bytes.is_ascii()
+        && valid_calendar_date(&value[..10])
+        && bytes[10] == b'T'
+        && bytes[13] == b':'
+        && bytes[16] == b':'
+        && bytes[19] == b'.'
+        && bytes[23] == b'Z'
+        && [11..13, 14..16, 17..19, 20..23]
+            .iter()
+            .all(|range| bytes[range.clone()].iter().all(u8::is_ascii_digit))
+        && value[11..13].parse::<u32>().is_ok_and(|hour| hour < 24)
+        && value[14..16].parse::<u32>().is_ok_and(|minute| minute < 60)
+        && value[17..19].parse::<u32>().is_ok_and(|second| second < 60)
+}
+
+/// Screen bounded calendar fields before the editor's complete model parser.
+/// No native file capability is granted to malformed or future-version books.
+fn valid_calendar_header(value: &serde_json::Value) -> bool {
+    fn field<'a>(value: &'a serde_json::Value, key: &str) -> Option<&'a str> {
+        value.get(key).and_then(serde_json::Value::as_str)
+    }
+    fn trimmed_title(value: &str) -> &str {
+        // Match JavaScript String.trim rather than Rust's wider whitespace set.
+        value.trim_matches(|c| {
+            matches!(c, '\u{9}'..='\u{d}' | ' ' | '\u{a0}' | '\u{1680}'
+                | '\u{2000}'..='\u{200a}' | '\u{2028}' | '\u{2029}'
+                | '\u{202f}' | '\u{205f}' | '\u{3000}' | '\u{feff}')
+        })
+    }
+    fn valid_weights(notes: &[serde_json::Value]) -> bool {
+        let mut days = std::collections::HashMap::<&str, (usize, usize, f64)>::new();
+        for note in notes {
+            let weight = note.get("weight");
+            if field(note, "type") != Some("工作日") {
+                if weight.is_some() {
+                    return false;
+                }
+                continue;
+            }
+            // Dates and types have already passed the structural screening.
+            let day = days.entry(field(note, "date").unwrap_or("")).or_default();
+            day.0 += 1;
+            if let Some(weight) = weight {
+                let Some(weight) = weight
+                    .as_f64()
+                    .filter(|weight| (0.0..=1.0).contains(weight))
+                else {
+                    return false;
+                };
+                day.1 += 1;
+                day.2 += weight;
+            }
+        }
+        days.values().all(|(count, weighted, total)| {
+            *weighted == 0 || (count == weighted && (total - 1.0).abs() <= 1e-9)
+        })
+    }
+    let valid_id = |id: &str| {
+        !id.is_empty()
+            && id.len() <= 100
+            && id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    };
+    let valid_text = |text: &str, limit: usize| {
+        text.chars().count() <= limit
+            && !text
+                .chars()
+                .any(|c| (c < ' ' && !matches!(c, '\t' | '\r' | '\n')) || c == '\u{7f}')
+    };
+    let valid_title = |title: &str| !trimmed_title(title).is_empty() && valid_text(title, 200);
+    let valid_color = |color: &str| {
+        color.len() == 7
+            && color.starts_with('#')
+            && color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+    };
+    let valid_type = |kind: &str| matches!(kind, "工作日" | "非工作日");
+    let Some(id) = field(value, "id").filter(|id| valid_id(id)) else {
+        return false;
+    };
+    if value.get("format").and_then(|v| v.as_str()) != Some("open-office-calendar")
+        || value.get("version").and_then(|v| v.as_u64()) != Some(1)
+        || !field(value, "title").is_some_and(valid_title)
+        || !value.get("workdayHours").is_none_or(|hours| {
+            hours
+                .as_f64()
+                .is_some_and(|hours| (0.5..=24.0).contains(&hours) && (hours * 2.0).fract() == 0.0)
+        })
+        || !value
+            .get("allocationDisplay")
+            .is_none_or(|mode| matches!(mode.as_str(), Some("percent" | "hours")))
+    {
+        return false;
+    }
+    let (Some(notes), Some(history)) = (
+        value.get("notes").and_then(|v| v.as_array()),
+        value.get("history").and_then(|v| v.as_array()),
+    ) else {
+        return false;
+    };
+    if notes.len() > 10_000 || history.len() > 100 {
+        return false;
+    }
+    let mut ids = std::collections::HashSet::from([id]);
+    let mut titles = std::collections::HashSet::new();
+    notes.iter().all(|note| {
+        field(note, "id").is_some_and(|id| valid_id(id) && ids.insert(id))
+            && field(note, "title").is_some_and(valid_title)
+            && field(note, "content").is_some_and(|content| valid_text(content, 20_000))
+            && field(note, "date").is_some_and(valid_calendar_date)
+            && field(note, "color").is_some_and(valid_color)
+            && field(note, "type").is_some_and(valid_type)
+            && field(note, "created_at").is_some_and(valid_calendar_timestamp)
+    }) && valid_weights(notes)
+        && history.iter().all(|entry| {
+            field(entry, "title")
+                .is_some_and(|title| valid_title(title) && titles.insert(trimmed_title(title)))
+                && field(entry, "color").is_some_and(valid_color)
+                && field(entry, "type").is_some_and(valid_type)
+                && field(entry, "lastUsedAt").is_some_and(valid_calendar_timestamp)
+        })
+}
+
 fn document_kind(bytes: &[u8], extension: DocExt) -> DocumentKind {
     if matches!(extension, DocExt::Owflow | DocExt::Json) {
         if let Some(value) = workflow_json(bytes) {
@@ -1046,6 +1209,12 @@ fn document_kind(bytes: &[u8], extension: DocExt) -> DocumentKind {
                 && valid_schedule_header(&value)
             {
                 return DocumentKind::Schedule;
+            }
+            if extension == DocExt::Json
+                && bytes.len() <= CALENDAR_LIMIT
+                && valid_calendar_header(&value)
+            {
+                return DocumentKind::Calendar;
             }
             if valid_workflow_header(&value)
                 && value.get("kind").and_then(|v| v.as_str()) == Some("mermaid")
@@ -1176,11 +1345,16 @@ fn validate_document_signature(bytes: &[u8], extension: DocExt) -> Result<(), St
             bytes.len() <= SCHEDULE_LIMIT
                 && workflow_json(bytes).is_some_and(|value| valid_schedule_header(&value))
         }
+        DocExt::Oocalendar => {
+            bytes.len() <= CALENDAR_LIMIT
+                && workflow_json(bytes).is_some_and(|value| valid_calendar_header(&value))
+        }
         DocExt::Owflow => workflow_json(bytes).is_some_and(|value| valid_workflow_header(&value)),
         DocExt::Json => workflow_json(bytes).is_some_and(|value| {
             valid_workflow_header(&value)
                 || valid_board_header(&value)
                 || (bytes.len() <= SCHEDULE_LIMIT && valid_schedule_header(&value))
+                || (bytes.len() <= CALENDAR_LIMIT && valid_calendar_header(&value))
         }),
         DocExt::Excalidraw => workflow_json(bytes).is_some_and(|value| valid_board_header(&value)),
         DocExt::Mmd | DocExt::Mermaid => plain_text(bytes).is_some_and(valid_code_header),
@@ -1614,6 +1788,385 @@ mod tests {
             "roles": [{ "id": "role-1", "name": "小李", "role": "设计", "color": "#5b73e8" }],
             "events": [{ "id": "event-1", "roleId": "role-1", "title": "设计稿", "startDate": "2026-10-08", "endDate": "2026-10-12", "height": 0.5, "slot": 0, "notes": "评审后交付" }]
         })
+    }
+
+    fn calendar_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "format": "open-office-calendar", "version": 1,
+            "id": "calendar-1", "title": "工作日历",
+            "notes": [{ "id": "note-1", "title": "项目评审", "content": "核对进度\n准备材料",
+                "date": "2026-11-04", "color": "#5b73e8", "type": "工作日", "created_at": "2026-11-04T09:30:00.000Z" }],
+            "history": [{ "title": "项目评审", "color": "#5b73e8", "type": "工作日", "lastUsedAt": "2026-11-04T09:30:00.000Z" }]
+        })
+    }
+
+    #[test]
+    fn calendar_format_survives_save_reopen_and_recent_history() {
+        assert!(EXTENSIONS.contains(&"oocalendar"));
+        assert_eq!(
+            DocExt::from_path(Path::new("工作日历.OOCALENDAR")).unwrap(),
+            DocExt::Oocalendar
+        );
+        assert_eq!(DocExt::Oocalendar.kind(), DocumentKind::Calendar);
+        assert_eq!(
+            serde_json::to_value(DocExt::Oocalendar).unwrap(),
+            "oocalendar"
+        );
+        assert_eq!(
+            serde_json::to_value(DocumentKind::Calendar).unwrap(),
+            "calendar"
+        );
+        validate_file_name("工作日历.oocalendar", DocExt::Oocalendar).unwrap();
+        assert!(validate_file_name("工作日历.json", DocExt::Oocalendar).is_err());
+        DocExt::Oocalendar.ensure_exportable().unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let path = directory.path().join("工作日历.oocalendar");
+        let store = DocumentStore::new(data.clone()).unwrap();
+        let original = serde_json::to_vec(&calendar_fixture()).unwrap();
+        validate_document_signature(&original, DocExt::Oocalendar).unwrap();
+        let SaveResult::Saved { document } = store
+            .save_to_target(
+                TargetSnapshot::capture(path.clone()).unwrap(),
+                DocExt::Oocalendar,
+                original.clone(),
+            )
+            .unwrap()
+        else {
+            panic!("expected calendar save")
+        };
+        assert_eq!(document.kind, DocumentKind::Calendar);
+        let opened = store.register_open(path.clone()).unwrap();
+        assert_eq!(opened.id, document.id);
+        assert_eq!(STANDARD.decode(&opened.base64).unwrap(), original);
+        let mut calendar = calendar_fixture();
+        calendar["notes"][0]["date"] = "2026-11-05".into();
+        calendar["notes"][0]["weight"] = 1.0.into();
+        calendar["workdayHours"] = 7.5.into();
+        calendar["allocationDisplay"] = "hours".into();
+        let edited = serde_json::to_vec(&calendar).unwrap();
+        validate_document_signature(&edited, DocExt::Oocalendar).unwrap();
+        let SaveResult::Saved { document } = store
+            .save_existing(
+                &store.record(&opened.id).unwrap(),
+                DocExt::Oocalendar,
+                Some(&opened.sha256),
+                edited.clone(),
+            )
+            .unwrap()
+        else {
+            panic!("expected original calendar save")
+        };
+        assert_eq!(document.id, opened.id);
+        let reopened = store.register_open(path).unwrap();
+        assert_eq!(reopened.kind, DocumentKind::Calendar);
+        assert_eq!(reopened.sha256, document.sha256);
+        assert_eq!(STANDARD.decode(reopened.base64).unwrap(), edited);
+        let recent = DocumentStore::new(data)
+            .unwrap()
+            .record(&opened.id)
+            .unwrap();
+        assert_eq!(recent.kind, Some(DocumentKind::Calendar));
+        assert_eq!(recent.extension, DocExt::Oocalendar);
+    }
+
+    #[test]
+    fn calendar_optional_work_settings_accept_legacy_books_and_reject_invalid_types() {
+        let legacy = calendar_fixture();
+        assert!(valid_calendar_header(&legacy));
+        for hours in [0.5, 7.0, 7.5, 24.0] {
+            for mode in ["percent", "hours"] {
+                let mut calendar = legacy.clone();
+                calendar["workdayHours"] = hours.into();
+                calendar["allocationDisplay"] = mode.into();
+                let bytes = serde_json::to_vec(&calendar).unwrap();
+                validate_document_signature(&bytes, DocExt::Oocalendar).unwrap();
+                validate_document_signature(&bytes, DocExt::Json).unwrap();
+                DocExt::Json.ensure_exportable_content(&bytes).unwrap();
+            }
+        }
+        for (field, values) in [
+            (
+                "workdayHours",
+                vec![
+                    serde_json::Value::Null,
+                    true.into(),
+                    "7".into(),
+                    0.into(),
+                    (-1).into(),
+                    0.25.into(),
+                    7.1.into(),
+                    24.5.into(),
+                ],
+            ),
+            (
+                "allocationDisplay",
+                vec![
+                    serde_json::Value::Null,
+                    true.into(),
+                    1.into(),
+                    "days".into(),
+                    "".into(),
+                ],
+            ),
+        ] {
+            for invalid in values {
+                let mut calendar = legacy.clone();
+                calendar[field] = invalid;
+                let bytes = serde_json::to_vec(&calendar).unwrap();
+                assert!(
+                    validate_document_signature(&bytes, DocExt::Oocalendar).is_err(),
+                    "{field}: {}",
+                    calendar[field]
+                );
+                assert!(validate_document_signature(&bytes, DocExt::Json).is_err());
+                assert!(DocExt::Json.ensure_exportable_content(&bytes).is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn calendar_work_weights_are_complete_bounded_daily_allocations() {
+        let mut calendar = calendar_fixture();
+        let mut second = calendar["notes"][0].clone();
+        second["id"] = "note-2".into();
+        calendar["notes"].as_array_mut().unwrap().push(second);
+        // A legacy day with no explicit weights remains an equal-share day.
+        assert!(valid_calendar_header(&calendar));
+        for (first, second) in [(0.0, 1.0), (0.25, 0.75), (0.5, 0.5), (0.4, 0.6000000005)] {
+            calendar["notes"][0]["weight"] = first.into();
+            calendar["notes"][1]["weight"] = second.into();
+            let bytes = serde_json::to_vec(&calendar).unwrap();
+            validate_document_signature(&bytes, DocExt::Oocalendar).unwrap();
+            validate_document_signature(&bytes, DocExt::Json).unwrap();
+            DocExt::Json.ensure_exportable_content(&bytes).unwrap();
+        }
+        for invalid in [
+            serde_json::Value::Null,
+            true.into(),
+            "0.5".into(),
+            (-0.1).into(),
+            1.1.into(),
+        ] {
+            let mut invalid_calendar = calendar.clone();
+            invalid_calendar["notes"][0]["weight"] = invalid;
+            assert!(!valid_calendar_header(&invalid_calendar));
+        }
+        for (first, second) in [(0.0, 0.0), (0.4, 0.4), (0.6, 0.6), (0.4, 0.600000002)] {
+            let mut invalid_calendar = calendar.clone();
+            invalid_calendar["notes"][0]["weight"] = first.into();
+            invalid_calendar["notes"][1]["weight"] = second.into();
+            let bytes = serde_json::to_vec(&invalid_calendar).unwrap();
+            assert!(validate_document_signature(&bytes, DocExt::Oocalendar).is_err());
+            assert!(validate_document_signature(&bytes, DocExt::Json).is_err());
+            assert!(DocExt::Json.ensure_exportable_content(&bytes).is_err());
+        }
+        let mut mixed = calendar.clone();
+        mixed["notes"][1].as_object_mut().unwrap().remove("weight");
+        assert!(
+            !valid_calendar_header(&mixed),
+            "explicit and automatic weights cannot share a workday"
+        );
+        calendar["notes"][0]["weight"] = 1.0.into();
+        calendar["notes"][1]["weight"] = 1.0.into();
+        calendar["notes"][1]["date"] = "2026-11-05".into();
+        assert!(
+            valid_calendar_header(&calendar),
+            "each date has its own allocation capacity"
+        );
+        calendar["notes"][1]["type"] = "非工作日".into();
+        for weight in [serde_json::Value::Null, 0.into(), 1.into()] {
+            calendar["notes"][1]["weight"] = weight;
+            assert!(
+                !valid_calendar_header(&calendar),
+                "non-work notes cannot carry an allocation"
+            );
+        }
+        calendar["notes"][1]
+            .as_object_mut()
+            .unwrap()
+            .remove("weight");
+        assert!(valid_calendar_header(&calendar));
+    }
+
+    #[test]
+    fn calendar_json_import_saves_an_oocalendar_copy_without_overwriting_source() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let source = directory.path().join("导入日历.json");
+        let original = serde_json::to_vec(&calendar_fixture()).unwrap();
+        fs::write(&source, &original).unwrap();
+        let opened = store.register_open(source.clone()).unwrap();
+        assert_eq!(opened.kind, DocumentKind::Calendar);
+        assert_eq!(opened.extension, DocExt::Json);
+        assert!(DocExt::Json.ensure_exportable().is_err());
+        for extension in [DocExt::Json, DocExt::Oocalendar] {
+            assert!(store
+                .save_existing(
+                    &store.record(&opened.id).unwrap(),
+                    extension,
+                    Some(&opened.sha256),
+                    original.clone(),
+                )
+                .is_err());
+        }
+        let copy = directory.path().join("导入日历 - 副本.oocalendar");
+        let SaveResult::Saved { document } = store
+            .save_to_target(
+                TargetSnapshot::capture(copy.clone()).unwrap(),
+                DocExt::Oocalendar,
+                original.clone(),
+            )
+            .unwrap()
+        else {
+            panic!("expected editable calendar copy")
+        };
+        assert_eq!(document.extension, DocExt::Oocalendar);
+        assert_eq!(document.kind, DocumentKind::Calendar);
+        assert_ne!(document.id, opened.id);
+        assert_eq!(
+            store.register_open(copy.clone()).unwrap().kind,
+            DocumentKind::Calendar
+        );
+        assert_eq!(fs::read(source).unwrap(), original);
+        assert_eq!(fs::read(copy).unwrap(), original);
+    }
+
+    #[test]
+    fn calendar_json_export_does_not_rebind_the_book_or_recent_files() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let store = DocumentStore::new(data.clone()).unwrap();
+        let source = directory.path().join("日历.oocalendar");
+        let original = serde_json::to_vec(&calendar_fixture()).unwrap();
+        fs::write(&source, &original).unwrap();
+        let opened = store.register_open(source.clone()).unwrap();
+        let history = fs::read(data.join("recent-files.json")).unwrap();
+        let mut calendar = calendar_fixture();
+        calendar["notes"][0]["content"] = "调整后的安排".into();
+        calendar["notes"][0]["weight"] = 1.0.into();
+        calendar["workdayHours"] = 24.0.into();
+        calendar["allocationDisplay"] = "hours".into();
+        let exported = serde_json::to_vec(&calendar).unwrap();
+        let copy = directory.path().join("完整日历.json");
+        let SaveResult::Saved { document } = store
+            .save_to_target(
+                TargetSnapshot::capture(copy.clone()).unwrap(),
+                DocExt::Json,
+                exported.clone(),
+            )
+            .unwrap()
+        else {
+            panic!("expected calendar JSON export")
+        };
+        assert_eq!(document.kind, DocumentKind::Calendar);
+        assert_eq!(document.extension, DocExt::Json);
+        assert_ne!(document.id, opened.id);
+        assert!(store.record(&document.id).is_err());
+        assert_eq!(store.record(&opened.id).unwrap().sha256, opened.sha256);
+        assert_eq!(fs::read(data.join("recent-files.json")).unwrap(), history);
+        assert_eq!(fs::read(source).unwrap(), original);
+        assert_eq!(fs::read(&copy).unwrap(), exported);
+        assert_eq!(
+            store.register_open(copy).unwrap().kind,
+            DocumentKind::Calendar
+        );
+    }
+
+    #[test]
+    fn calendar_envelope_rejects_malformed_dates_fields_and_duplicate_ids() {
+        for (pointer, replacement) in [
+            ("/version", 2.into()),
+            ("/id", "invalid id".into()),
+            ("/title", " ".into()),
+            ("/title", "日".repeat(201).into()),
+            ("/notes/0/id", "calendar-1".into()),
+            ("/notes/0/title", serde_json::Value::Null),
+            ("/notes/0/content", "文".repeat(20_001).into()),
+            ("/notes/0/content", "invalid\u{0}content".into()),
+            ("/notes/0/color", "#123".into()),
+            ("/notes/0/type", "假日".into()),
+            ("/notes/0/created_at", "2026-11-04T24:00:00.000Z".into()),
+            ("/history/0/lastUsedAt", "2026-02-29T00:00:00.000Z".into()),
+            ("/history/0/type", serde_json::Value::Null),
+        ] {
+            let mut malformed = calendar_fixture();
+            *malformed.pointer_mut(pointer).unwrap() = replacement;
+            let bytes = serde_json::to_vec(&malformed).unwrap();
+            for extension in [DocExt::Oocalendar, DocExt::Json] {
+                assert!(
+                    validate_document_signature(&bytes, extension).is_err(),
+                    "{pointer}: {extension:?}"
+                );
+            }
+            assert!(DocExt::Json.ensure_exportable_content(&bytes).is_err());
+        }
+        for date in [
+            "1899-12-31",
+            "10000-01-01",
+            "1900-02-29",
+            "2026-02-29",
+            "2026-04-31",
+            "2026-00-01",
+            "2026-01-00",
+            "2026-1-01",
+            "日历-11-04",
+        ] {
+            let mut malformed = calendar_fixture();
+            malformed["notes"][0]["date"] = date.into();
+            assert!(!valid_calendar_header(&malformed), "{date}");
+        }
+        for date in ["1900-01-01", "2000-02-29", "2028-02-29", "9999-12-31"] {
+            let mut valid = calendar_fixture();
+            valid["notes"][0]["date"] = date.into();
+            valid["title"] = "📅".repeat(200).into();
+            assert!(valid_calendar_header(&valid), "{date}");
+        }
+        let mut duplicate = calendar_fixture();
+        let note = duplicate["notes"][0].clone();
+        duplicate["notes"].as_array_mut().unwrap().push(note);
+        assert!(!valid_calendar_header(&duplicate));
+        let mut duplicate = calendar_fixture();
+        let mut entry = duplicate["history"][0].clone();
+        entry["title"] = " 项目评审 ".into();
+        duplicate["history"].as_array_mut().unwrap().push(entry);
+        assert!(!valid_calendar_header(&duplicate));
+    }
+
+    #[test]
+    fn calendar_limits_and_damaged_files_cannot_acquire_native_capabilities() {
+        let mut too_many_notes = calendar_fixture();
+        too_many_notes["notes"] = vec![too_many_notes["notes"][0].clone(); 10_001].into();
+        let mut too_much_history = calendar_fixture();
+        too_much_history["history"] = vec![too_much_history["history"][0].clone(); 101].into();
+        let mut oversized = serde_json::to_vec(&calendar_fixture()).unwrap();
+        oversized.resize(CALENDAR_LIMIT + 1, b' ');
+        let directory = tempfile::tempdir().unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let path = directory.path().join("损坏日历.oocalendar");
+        for bytes in [
+            b"{broken".to_vec(),
+            b"{}".to_vec(),
+            serde_json::to_vec(&too_many_notes).unwrap(),
+            serde_json::to_vec(&too_much_history).unwrap(),
+            oversized,
+        ] {
+            fs::write(&path, &bytes).unwrap();
+            assert!(store.register_open(path.clone()).is_err());
+            assert!(store.records().unwrap().is_empty());
+            assert!(validate_document_signature(&bytes, DocExt::Json).is_err());
+            assert!(DocExt::Json.ensure_exportable_content(&bytes).is_err());
+        }
+        let bytes = serde_json::to_vec(&calendar_fixture()).unwrap();
+        let smoke = store
+            .create_smoke_document(
+                directory.path(),
+                DocExt::Oocalendar,
+                &STANDARD.encode(bytes),
+            )
+            .unwrap();
+        assert_eq!(smoke.kind, DocumentKind::Calendar);
+        assert_eq!(smoke.name, "native-workspace.oocalendar");
     }
 
     #[test]

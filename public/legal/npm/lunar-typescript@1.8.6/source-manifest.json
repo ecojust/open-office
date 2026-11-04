@@ -1,0 +1,17 @@
+{
+  "name": "lunar-typescript",
+  "version": "1.8.6",
+  "repository": "https://github.com/6tail/lunar-typescript",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2020 6tail",
+  "resolved": "https://registry.npmjs.org/lunar-typescript/-/lunar-typescript-1.8.6.tgz",
+  "integrity": "sha512-5Eo4T/cnuXfrgO4k5LCpOGHIUOuz5hCF/IfNv0T29WY2shR36Hiz+ecN9WjnUuxUKhql9gbOkPaQoqLFKtPRNA==",
+  "developmentOnly": false,
+  "optional": false,
+  "installedForThisAudit": true,
+  "licenseFiles": [
+    "LICENSE"
+  ],
+  "licenseSha256": "097ec7989106eb9a27b6eff71dbaf1cd6bb04a9b35b6c94b54fff0829a041a8c",
+  "auditScope": "Supplemental verification for lunar-typescript 1.8.6 only; does not replace or re-audit npm-dependencies.json."
+}

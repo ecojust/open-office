@@ -14,10 +14,12 @@ import { inspectInstalledPdf, validateNativePdfEvidence, validatePdfNativeReport
 import { inspectInstalledOfficePresentation, validateNativeOfficePresentationEvidence, validateOfficePresentationNativeReport } from './office-presentation-native-smoke.mjs';
 import { validateNativeWorkspaceReport } from './workspace-native-smoke.mjs';
 import { validateNativeNotebookReport } from './notebook-native-smoke.mjs';
+import { validateNativeCalendarReport } from './calendar-native-smoke.mjs';
 import { validateNativeWorkflowReport } from './workflow-native-smoke.mjs';
 import { validateNativeMcpReport } from './mcp-native-smoke.mjs';
 export { validateNativeWorkspaceReport } from './workspace-native-smoke.mjs';
 export { validateNativeNotebookReport } from './notebook-native-smoke.mjs';
+export { validateNativeCalendarReport } from './calendar-native-smoke.mjs';
 export { validateNativeWorkflowReport } from './workflow-native-smoke.mjs';
 export { validateNativeMcpReport } from './mcp-native-smoke.mjs';
 
@@ -118,7 +120,7 @@ export function emitFailureDiagnostics(report, env, reportPath) {
   }
 }
 
-/** Require four mounted Rust editors, notebook, canvas, diagram and native scheduled autosave. */
+/** Require four mounted Rust editors, notebook, calendar, canvas, diagram and native scheduled autosave. */
 export function validateFrontendReport(report) {
   requireCheck(report && typeof report === 'object' && !Array.isArray(report), 'Missing native frontend report');
   requireCheck(report.ok === true, 'The native GUI reported a failed smoke test');
@@ -136,6 +138,7 @@ export function validateFrontendReport(report) {
   validatePdfNativeReport(report.pdf);
   const workspaceChecks = validateNativeWorkspaceReport(report.workspace);
   const notebookChecks = validateNativeNotebookReport(report.notebook, report.workspace);
+  const calendarChecks = validateNativeCalendarReport(report.calendar, report.workspace);
   const workflowChecks = validateNativeWorkflowReport(report.workflow, report.workspace);
   const mcpChecks = validateNativeMcpReport(report.mcp);
 
@@ -151,6 +154,7 @@ export function validateFrontendReport(report) {
     pdfUndoRedo: true, pdfFailureAtomicity: true, pdfSessionCleanup: true,
     ...workspaceChecks,
     ...notebookChecks,
+    ...calendarChecks,
     ...workflowChecks,
     ...mcpChecks,
   };
