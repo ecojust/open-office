@@ -42,7 +42,7 @@ function rewriteSaved(report, mutate) {
 }
 test('recomputed hashes cannot disguise unexpected calendar content or history copied with body', () => {
   for (const mutate of [
-    m => { m.version = 2; }, m => { delete m.workdayHours; }, m => { m.workdayHours = 8; }, m => { m.allocationDisplay = 'hours'; },
+    m => { m.version = 2; }, m => { delete m.workdayHours; }, m => { delete m.weekMode; }, m => { m.weekMode = 'work'; }, m => { m.workdayHours = 8; }, m => { m.allocationDisplay = 'hours'; },
     m => { delete m.notes[0].weight; }, m => { m.notes[0].weight = '0.7'; }, m => { m.notes[0].weight = 0.5; m.notes[1].weight = 0.5; },
     m => { m.notes[1].weight = 0.2; }, m => { m.notes[1].type = '非工作日'; }, m => { m.id = 'different-book'; }, m => { m.title = 'changed'; },
     m => { m.notes = []; }, m => { m.notes.push({ ...m.notes[0], id: 'extra' }); }, m => { m.notes[0].content = 'wrong'; },

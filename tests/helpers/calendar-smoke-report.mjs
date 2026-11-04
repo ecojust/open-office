@@ -4,7 +4,7 @@ import { CALENDAR_NATIVE_CHECKS, CALENDAR_NATIVE_LIMITATIONS, CALENDAR_PAGE_TITL
 const bytes = model => { const data = Buffer.from(JSON.stringify(model)); return { base64: data.toString('base64'), sha256: createHash('sha256').update(data).digest('hex'), size: data.length }; };
 // Validator fixture only. This is never evidence from an installed/native process.
 export function calendarReport() {
-  const model = { format: 'open-office-calendar', version: 1, id: 'calendar', title: 'native-calendar', workdayHours: 7, allocationDisplay: 'percent', notes: [], history: [] };
+  const model = { format: 'open-office-calendar', version: 1, id: 'calendar', title: 'native-calendar', workdayHours: 7, allocationDisplay: 'percent', weekMode: 'week', notes: [], history: [] };
   const initial = bytes(model), timestamp = '2026-11-04T10:00:00.000Z';
   model.notes.push({ id: 'note', title: CALENDAR_PAGE_TITLE, content: CALENDAR_PAGE_TEXT, date: CALENDAR_NOTE_DATE, color: CALENDAR_NOTE_COLOR, type: CALENDAR_NOTE_TYPE, created_at: timestamp, weight: 0.7 });
   model.history.push({ title: CALENDAR_PAGE_TITLE, color: CALENDAR_NOTE_COLOR, type: CALENDAR_NOTE_TYPE, lastUsedAt: timestamp });

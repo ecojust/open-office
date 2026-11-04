@@ -1169,6 +1169,9 @@ fn valid_calendar_header(value: &serde_json::Value) -> bool {
         || !value
             .get("allocationDisplay")
             .is_none_or(|mode| matches!(mode.as_str(), Some("percent" | "hours")))
+        || !value
+            .get("weekMode")
+            .is_none_or(|mode| matches!(mode.as_str(), Some("week" | "work")))
     {
         return false;
     }
@@ -1844,6 +1847,7 @@ mod tests {
         calendar["notes"][0]["weight"] = 1.0.into();
         calendar["workdayHours"] = 7.5.into();
         calendar["allocationDisplay"] = "hours".into();
+        calendar["weekMode"] = "work".into();
         let edited = serde_json::to_vec(&calendar).unwrap();
         validate_document_signature(&edited, DocExt::Oocalendar).unwrap();
         let SaveResult::Saved { document } = store
@@ -1885,6 +1889,14 @@ mod tests {
                 DocExt::Json.ensure_exportable_content(&bytes).unwrap();
             }
         }
+        for mode in ["week", "work"] {
+            let mut calendar = legacy.clone();
+            calendar["weekMode"] = mode.into();
+            let bytes = serde_json::to_vec(&calendar).unwrap();
+            validate_document_signature(&bytes, DocExt::Oocalendar).unwrap();
+            validate_document_signature(&bytes, DocExt::Json).unwrap();
+            DocExt::Json.ensure_exportable_content(&bytes).unwrap();
+        }
         for (field, values) in [
             (
                 "workdayHours",
@@ -1906,6 +1918,17 @@ mod tests {
                     true.into(),
                     1.into(),
                     "days".into(),
+                    "".into(),
+                ],
+            ),
+            (
+                "weekMode",
+                vec![
+                    serde_json::Value::Null,
+                    true.into(),
+                    1.into(),
+                    "Week".into(),
+                    "month".into(),
                     "".into(),
                 ],
             ),
@@ -2047,6 +2070,7 @@ mod tests {
         calendar["notes"][0]["weight"] = 1.0.into();
         calendar["workdayHours"] = 24.0.into();
         calendar["allocationDisplay"] = "hours".into();
+        calendar["weekMode"] = "week".into();
         let exported = serde_json::to_vec(&calendar).unwrap();
         let copy = directory.path().join("完整日历.json");
         let SaveResult::Saved { document } = store

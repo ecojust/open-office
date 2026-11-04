@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createCalendar, validateCalendar, encodeCalendar, decodeCalendar, calendarId, rememberHistory, historySuggestions, CALENDAR_MAX_BYTES, CALENDAR_MAX_NOTES, CALENDAR_MAX_HISTORY } from '../src/calendar/model.ts'
-import { dateNumber, validateMonth, monthDays, shiftMonth, todayDate, monthSummary } from '../src/calendar/calendar.ts'
+import { dateNumber, validateMonth, monthDays, visibleMonthDays, isVisibleCalendarDate, normalizeVisibleDate, moveCalendarDate, shiftMonth, todayDate, monthSummary } from '../src/calendar/calendar.ts'
 import { dayAllocations, setDayAllocation, resizeAllocationBoundary } from '../src/calendar/allocation.ts'
 
 function note(overrides = {}) { return { id: calendarId(), title: '项目会议', content: '现场记录\n下一步😀', date: '2026-11-04', color: '#4376d4', created_at: '2026-11-04T09:30:00.000Z', type: '工作日', ...overrides } }
@@ -10,16 +10,65 @@ function book() { const value = createCalendar('团队日历😀'); value.notes.
 function close(actual, expected) { assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} differs from ${expected}`) }
 
 test('legacy version-one files default to seven hours and equal shares without rewriting note weights', () => {
- const old = book(); delete old.workdayHours; delete old.allocationDisplay
+ const old = book(); delete old.workdayHours; delete old.allocationDisplay; delete old.weekMode
  old.notes.push(note({ title: '研发' }), note({ title: '沟通' }), note({ title: '年假', type: '非工作日' }))
  const restored = decodeCalendar(new TextEncoder().encode(JSON.stringify(old)))
- assert.equal(restored.version, 1); assert.equal(restored.workdayHours, 7); assert.equal(restored.allocationDisplay, 'percent')
+ assert.equal(restored.version, 1); assert.equal(restored.workdayHours, 7); assert.equal(restored.allocationDisplay, 'percent'); assert.equal(restored.weekMode, 'week')
  assert.ok(restored.notes.every(item => !Object.hasOwn(item, 'weight')))
  const values = dayAllocations(restored, '2026-11-04')
  assert.equal(values.length, 3)
  for (const value of values) { close(value.weight, 1 / 3); close(value.hours, 7 / 3) }
  close(values.reduce((sum, value) => sum + value.hours, 0), 7)
  assert.deepEqual(decodeCalendar(encodeCalendar(restored)), restored)
+})
+
+test('Week and Work share six calendar rows and only filter weekends, including compensatory workdays', () => {
+ const week = visibleMonthDays('2026-11', 'week', '2026-11-04'), work = visibleMonthDays('2026-11', 'work', '2026-11-04')
+ assert.deepEqual(week, monthDays('2026-11', '2026-11-04')); assert.equal(week.length, 42); assert.equal(work.length, 30)
+ assert.deepEqual(work, week.filter(day => day.weekday < 5))
+ for (let row = 0; row < 6; row++) assert.deepEqual(work.slice(row * 5, row * 5 + 5).map(day => day.weekday), [0, 1, 2, 3, 4])
+ assert.equal(work[0].date, '2026-10-26'); assert.equal(work.at(-1).date, '2026-12-04')
+ assert.equal(isVisibleCalendarDate('2026-10-01', 'work'), true, 'weekday legal holidays remain visible')
+ assert.equal(isVisibleCalendarDate('2026-10-10', 'work'), false, 'Saturday compensatory workdays are still hidden')
+ assert.equal(isVisibleCalendarDate('2026-10-10', 'week'), true)
+ assert.equal(visibleMonthDays('9999-12', 'work', '9999-12-31').length, 30)
+ assert.ok(visibleMonthDays('9999-12', 'work', '9999-12-31').some(day => day.date === null))
+ for (const mode of [null, '', 'Work', 'days', 0, {}]) {
+  const value = book(); value.weekMode = mode
+  assert.throws(() => validateCalendar(value), /Week/)
+  assert.throws(() => visibleMonthDays('2026-11', mode), /Week/)
+ }
+ const value = book(); value.weekMode = 'work'; assert.equal(decodeCalendar(encodeCalendar(value)).weekMode, 'work')
+})
+
+test('hidden weekend selections normalize within the displayed grid without losing month-edge focus', () => {
+ assert.equal(normalizeVisibleDate('2026-11-01', 'work', '2026-11'), '2026-11-02')
+ assert.equal(normalizeVisibleDate('2026-11-07', 'work', '2026-11'), '2026-11-09')
+ assert.equal(normalizeVisibleDate('2026-11-08', 'work', '2026-11'), '2026-11-09')
+ assert.equal(normalizeVisibleDate('2026-12-06', 'work', '2026-11'), '2026-12-04', 'last spillover weekend cannot move selection beyond the grid')
+ assert.equal(normalizeVisibleDate('2026-11-07', 'week', '2026-11'), '2026-11-07')
+ assert.equal(normalizeVisibleDate('2026-01-09', 'work', '2026-11'), '2026-11-02')
+ assert.equal(normalizeVisibleDate('1900-01-01', 'work'), '1900-01-01')
+ assert.equal(normalizeVisibleDate('9999-12-31', 'work'), '9999-12-31')
+ for (const date of ['2026-11-01', '2026-11-07', '2026-12-06']) {
+  const normalized = normalizeVisibleDate(date, 'work', '2026-11')
+  assert.ok(visibleMonthDays('2026-11', 'work').some(day => day.date === normalized))
+ }
+})
+
+test('Work arrow navigation skips weekends horizontally and preserves weekdays vertically at year boundaries', () => {
+ assert.equal(moveCalendarDate('2026-11-06', 'ArrowRight', 'work'), '2026-11-09')
+ assert.equal(moveCalendarDate('2026-11-09', 'ArrowLeft', 'work'), '2026-11-06')
+ assert.equal(moveCalendarDate('2026-11-09', 'ArrowUp', 'work'), '2026-11-02')
+ assert.equal(moveCalendarDate('2026-11-09', 'ArrowDown', 'work'), '2026-11-16')
+ assert.equal(moveCalendarDate('2026-10-30', 'ArrowRight', 'work'), '2026-11-02')
+ assert.equal(moveCalendarDate('2027-01-01', 'ArrowLeft', 'work'), '2026-12-31')
+ assert.equal(moveCalendarDate('2026-11-06', 'ArrowRight', 'week'), '2026-11-07')
+ assert.equal(moveCalendarDate('1900-01-01', 'ArrowLeft', 'work'), '1900-01-01')
+ assert.equal(moveCalendarDate('1900-01-01', 'ArrowUp', 'work'), '1900-01-01')
+ assert.equal(moveCalendarDate('9999-12-31', 'ArrowRight', 'work'), '9999-12-31')
+ assert.equal(moveCalendarDate('9999-12-31', 'ArrowDown', 'work'), '9999-12-31')
+ assert.throws(() => moveCalendarDate('2026-11-09', 'Home', 'work'), /方向/)
 })
 
 test('allocation validation rejects invalid settings, partial weights and non-conserving totals', () => {
@@ -170,9 +219,9 @@ test('month navigation and civil dates reject normalization, overflow and fracti
 })
 
 test('month grids and day arithmetic are timezone independent while today follows the user timezone', () => {
- const script = `import {monthDays,shiftMonth,dateNumber,todayDate} from './src/calendar/calendar.ts'; console.log(JSON.stringify({grid:monthDays('2026-03','2026-03-08'),next:shiftMonth('2026-12',1),days:dateNumber('2026-11-02')-dateNumber('2026-10-31'),today:todayDate(new Date('2026-03-08T00:30:00Z'))}))`
+ const script = `import {monthDays,visibleMonthDays,moveCalendarDate,normalizeVisibleDate,shiftMonth,dateNumber,todayDate} from './src/calendar/calendar.ts'; console.log(JSON.stringify({grid:monthDays('2026-03','2026-03-08'),work:visibleMonthDays('2026-03','work','2026-03-08'),move:moveCalendarDate('2026-03-06','ArrowRight','work'),selection:normalizeVisibleDate('2026-03-08','work'),next:shiftMonth('2026-12',1),days:dateNumber('2026-11-02')-dateNumber('2026-10-31'),today:todayDate(new Date('2026-03-08T00:30:00Z'))}))`
  const results = ['UTC', 'America/New_York', 'Europe/Berlin', 'Asia/Shanghai'].map(TZ => JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: new URL('..', import.meta.url), env: { ...process.env, TZ }, encoding: 'utf8' })))
- for (const result of results) { assert.deepEqual(result.grid, results[0].grid); assert.equal(result.next, '2027-01'); assert.equal(result.days, 2) }
+ for (const result of results) { assert.deepEqual(result.grid, results[0].grid); assert.deepEqual(result.work, results[0].work); assert.equal(result.move, '2026-03-09'); assert.equal(result.selection, '2026-03-09'); assert.equal(result.next, '2027-01'); assert.equal(result.days, 2) }
  assert.equal(results[0].today, '2026-03-08'); assert.equal(results[1].today, '2026-03-07'); assert.equal(results[3].today, '2026-03-08')
 })
 

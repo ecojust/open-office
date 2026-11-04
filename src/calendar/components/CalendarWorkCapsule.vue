@@ -20,7 +20,7 @@ const activeBoundary = ref('')
 type Gesture = { pointer: number; element: HTMLElement; leftNoteId: string; startX: number; startWeight: number; weightPerPixel: number; position: number; display: 'percent'|'hours'; book: CalendarBook; moved: boolean }
 let gesture: Gesture | undefined
 function bookFor(notes = props.notes): CalendarBook {
- return { format: 'open-office-calendar', version: 1, id: 'calendar-allocation-preview', title: '工时预览', notes, history: [], workdayHours: props.workdayHours, allocationDisplay: props.display }
+ return { format: 'open-office-calendar', version: 1, id: 'calendar-allocation-preview', title: '工时预览', notes, history: [], workdayHours: props.workdayHours, allocationDisplay: props.display, weekMode: 'week' }
 }
 const allocations = computed(() => preview.value ?? dayAllocations(bookFor(), props.date))
 const noteById = computed(() => new Map(props.notes.map(note => [note.id, note])))

@@ -71,7 +71,7 @@ export function validateNativeCalendarReport(report, workspace) {
   check(typeof persistence.targetId === 'string' && persistence.targetId.length > 0 && persistence.targetId.length <= 256, 'file identity missing');
   const initial = calendarBytes(persistence.initialBase64, persistence.initialSha256, persistence.initialSizeBytes, 'initial');
   const saved = calendarBytes(persistence.readbackBase64, persistence.finalSha256, persistence.finalSizeBytes, 'saved');
-  assert.deepEqual(initial, { format: 'open-office-calendar', version: 1, id: initial.id, title: 'native-calendar', workdayHours: 7, allocationDisplay: 'percent', notes: [], history: [] }, 'Native calendar: initial content differs');
+  assert.deepEqual(initial, { format: 'open-office-calendar', version: 1, id: initial.id, title: 'native-calendar', workdayHours: 7, allocationDisplay: 'percent', weekMode: 'week', notes: [], history: [] }, 'Native calendar: initial content differs');
   check(saved.notes.length === 2 && saved.history.length === 2, 'saved note or history count differs');
   const [note, second] = saved.notes, [secondHistory, firstHistory] = saved.history;
   const ids = [saved.id, note.id, second.id];
