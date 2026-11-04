@@ -1,6 +1,6 @@
 import { calendarTools } from '../mcp/calendar-tools.ts'
 import { tool, validateToolArguments } from '../mcp/tool-schema.ts'
-import { dateNumber, monthSummary, validateMonth } from './calendar.ts'
+import { dateNumber, isVisibleCalendarDate, monthSummary, normalizeVisibleDate, validateMonth } from './calendar.ts'
 import { dayAllocations, rebalanceDayAllocations, resizeAllocationBoundary, setDayAllocation } from './allocation.ts'
 import { calendarId, historySuggestions, preserveHistory, rememberHistory, validateCalendar, type CalendarBook, type CalendarNote, type CalendarNoteType } from './model.ts'
 import type { CalendarSession } from './session.ts'
@@ -8,7 +8,7 @@ import type { CalendarSession } from './session.ts'
 type NotePatch = Partial<Pick<CalendarNote, 'title' | 'content' | 'date' | 'color' | 'type'>>
 export type CalendarEditOperation =
  | { op: 'book.title'; title: string }
- | { op: 'book.settings'; patch: Partial<Pick<CalendarBook, 'workdayHours' | 'allocationDisplay'>> }
+ | { op: 'book.settings'; patch: Partial<Pick<CalendarBook, 'workdayHours' | 'allocationDisplay' | 'weekMode'>> }
  | { op: 'note.add'; note: Pick<CalendarNote, 'title' | 'date'> & NotePatch & { id?: string } }
  | { op: 'note.update'; noteId: string; patch: NotePatch }
  | { op: 'note.delete'; noteId: string }
@@ -119,7 +119,7 @@ export function readCalendar(book: CalendarBook, raw: CalendarReadOptions = {}) 
   return values.map((item, index) => [item.noteId, { ...item, rightNoteId: values[index + 1]?.noteId ?? null }] as const)
  }))
  return {
-  book: { format: book.format, version: book.version, id: book.id, title: book.title, workdayHours: book.workdayHours, allocationDisplay: book.allocationDisplay },
+  book: { format: book.format, version: book.version, id: book.id, title: book.title, workdayHours: book.workdayHours, allocationDisplay: book.allocationDisplay, weekMode: book.weekMode },
   notes: page.map(item => {
    const allocation = allocations.get(item.id)
    return { ...item, share: allocation?.weight ?? 0, days: allocation?.weight ?? 0, hours: allocation?.hours ?? 0,
@@ -147,6 +147,8 @@ export function validateCalendarView(book: CalendarBook, current: CalendarView, 
   if (patch.month !== undefined && patch.month !== patch.selectedDate.slice(0, 7)) throw Error('选中日期必须属于指定月份。')
   next.month = patch.selectedDate.slice(0, 7)
  } else if (patch.month !== undefined && !next.selectedDate.startsWith(`${patch.month}-`)) next.selectedDate = `${patch.month}-01`
+ if ((patch.selectedDate !== undefined || typeof patch.selectedNoteId === 'string') && !isVisibleCalendarDate(next.selectedDate, book.weekMode)) throw Error('Work 模式隐藏周末；请先通过日历本设置切换到 Week，再选择该日期或事项。')
+ next.selectedDate = normalizeVisibleDate(next.selectedDate, book.weekMode, next.month)
  if (next.selectedNoteId !== null && !book.notes.some(item => item.id === next.selectedNoteId && item.date === next.selectedDate)) next.selectedNoteId = null
  return next
 }

@@ -1,4 +1,4 @@
-import type { CalendarBook } from './model.ts'
+import type { CalendarBook, CalendarWeekMode } from './model.ts'
 import { dayAllocations } from './allocation.ts'
 
 const DAY = 86_400_000
@@ -41,6 +41,57 @@ export function monthDays(month: string, today = todayDate()): CalendarDay[] {
   const date = year >= 1900 && year <= 9999 ? instant.toISOString().slice(0, 10) : null
   return { date, day: date === null ? 0 : instant.getUTCDate(), weekday: index % 7 as CalendarDay['weekday'], inMonth: date?.startsWith(`${month}-`) ?? false, isToday: date === today }
  })
+}
+function validateWeekMode(mode: CalendarWeekMode): void {
+ if (mode !== 'week' && mode !== 'work') throw Error('周视图请选择 Week 或 Work。')
+}
+/** Work filters weekends from the same six calendar rows, including weekend
+ * compensatory workdays. This never changes notes or monthly allocation totals. */
+export function visibleMonthDays(month: string, weekMode: CalendarWeekMode, today = todayDate()): CalendarDay[] {
+ validateWeekMode(weekMode)
+ const days = monthDays(month, today)
+ return weekMode === 'work' ? days.filter(day => day.weekday < 5) : days
+}
+export function isVisibleCalendarDate(date: string, weekMode: CalendarWeekMode): boolean {
+ validateWeekMode(weekMode)
+ const weekday = new Date(dateNumber(date) * DAY).getUTCDay()
+ return weekMode === 'week' || (weekday !== 0 && weekday !== 6)
+}
+function supportedDate(serial: number): string | null {
+ const instant = new Date(serial * DAY), year = instant.getUTCFullYear()
+ return year >= 1900 && year <= 9999 ? instant.toISOString().slice(0, 10) : null
+}
+/** Keep selection in the visible month grid without editing an event's date.
+ * A hidden weekend prefers the following Monday; at the last visible row it
+ * falls back to Friday. An unrelated date selects the first visible month day. */
+export function normalizeVisibleDate(date: string, weekMode: CalendarWeekMode, month = date.slice(0, 7)): string {
+ const serial = dateNumber(date), days = visibleMonthDays(month, weekMode, date)
+ const visible = new Set(days.flatMap(day => day.date ? [day.date] : []))
+ if (visible.has(date)) return date
+ if (weekMode === 'work' && !isVisibleCalendarDate(date, weekMode)) {
+  const weekday = new Date(serial * DAY).getUTCDay()
+  const monday = supportedDate(serial + (weekday === 6 ? 2 : 1)), friday = supportedDate(serial - (weekday === 6 ? 1 : 2))
+  if (monday && visible.has(monday)) return monday
+  if (friday && visible.has(friday)) return friday
+ }
+ return days.find(day => day.inMonth && day.date)?.date ?? days.find(day => day.date)?.date ?? date
+}
+export type CalendarNavigationKey = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown'
+/** Horizontal movement counts visible weekdays, while vertical movement keeps
+ * the weekday exactly one week apart. Out-of-range movement is a no-op. */
+export function moveCalendarDate(date: string, key: CalendarNavigationKey, weekMode: CalendarWeekMode): string {
+ validateWeekMode(weekMode)
+ const offsets = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }
+ if (!Object.hasOwn(offsets, key)) throw Error('日期导航方向无效。')
+ const offset = offsets[key]
+ const start = isVisibleCalendarDate(date, weekMode) ? date : normalizeVisibleDate(date, weekMode)
+ let serial = dateNumber(start) + offset
+ let next = supportedDate(serial)
+ while (next && !isVisibleCalendarDate(next, weekMode)) {
+  serial += Math.sign(offset)
+  next = supportedDate(serial)
+ }
+ return next ?? start
 }
 /** A date containing work notes contributes one day using its saved allocation.
  * Non-work notes and other months do not enter the denominator. */

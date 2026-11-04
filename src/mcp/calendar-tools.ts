@@ -11,6 +11,7 @@ const patch = (properties: Record<string, McpSchema>): McpSchema => ({ ...object
 const operation = (op: string, fields: Record<string, McpSchema>, required: string[] = []): McpSchema => object({ op: enumeration(op), ...fields }, ['op', ...required])
 const noteType = enumeration('工作日', '非工作日')
 const allocationDisplay = enumeration('percent', 'hours')
+const weekMode = enumeration('week', 'work')
 const workdayHours: McpSchema = { type: 'number', minimum: .5, maximum: 24, description: '每日工作小时数，默认7，只允许0.5小时整数倍。' }
 const weight: McpSchema = { type: 'number', minimum: 0, maximum: 1 }
 const noteFields = {
@@ -20,7 +21,7 @@ const noteFields = {
 }
 const operations = [
  operation('book.title', { title: text(CALENDAR_MAX_TITLE, true) }, ['title']),
- operation('book.settings', { patch: patch({ workdayHours, allocationDisplay }) }, ['patch']),
+ operation('book.settings', { patch: patch({ workdayHours, allocationDisplay, weekMode }) }, ['patch']),
  operation('note.add', { note: object({ id, ...noteFields }, ['title', 'date']) }, ['note']),
  operation('note.update', { noteId: id, patch: patch(noteFields) }, ['noteId', 'patch']),
  operation('note.delete', { noteId: id }, ['noteId']),
@@ -32,15 +33,15 @@ const operations = [
 ]
 
 export const calendarTools = [
- tool('calendar_read', '查询当前日历本事项，按日期、创建时间、ID升序。month、含端点的from/to取交集；query搜索名称和正文，type筛选工作日/非工作日。默认limit=200、上限500，返回分页及总数。book含每日工作小时数workdayHours和显示方式allocationDisplay。每项额外返回实际share(0..1)、days和hours，非工作事项均为0，份额计算包含该日全部工作事项、不受筛选分页影响。allocation为该事项胶囊位置{start,end,rightNoteId}，start/end为0..1全日累计比例，右邻按原文档事项顺序（不是查询排序），末段rightNoteId:null、非工作allocation:null。默认包含跨月历史事项（只含名称、颜色、属性、使用时间）；指定month时默认包含整月实际分配天数/小时/百分比统计，不受搜索分页影响。includeHistory/includeSummary可关闭附加结果。', true, {
+ tool('calendar_read', '查询当前日历本事项，按日期、创建时间、ID升序。month、含端点的from/to取交集；query搜索名称和正文，type筛选工作日/非工作日。默认limit=200、上限500，返回分页及总数。book含每日工作小时数workdayHours、显示方式allocationDisplay和周模式weekMode；Work隐藏周末不改变查询或统计数据。每项额外返回实际share(0..1)、days和hours，非工作事项均为0，份额计算包含该日全部工作事项、不受筛选分页影响。allocation为该事项胶囊位置{start,end,rightNoteId}，start/end为0..1全日累计比例，右邻按原文档事项顺序（不是查询排序），末段rightNoteId:null、非工作allocation:null。默认包含跨月历史事项（只含名称、颜色、属性、使用时间）；指定month时默认包含整月实际分配天数/小时/百分比统计，不受搜索分页影响。includeHistory/includeSummary可关闭附加结果。', true, {
   month, from: date, to: date, query: text(CALENDAR_MAX_CONTENT), type: noteType,
   offset: { type: 'integer', minimum: 0, maximum: CALENDAR_MAX_NOTES }, limit: { type: 'integer', minimum: 1, maximum: 500 },
   includeHistory: { type: 'boolean' }, includeSummary: { type: 'boolean' },
  }),
- tool('calendar_edit', '原子修改日历本：book.title改名；book.settings.patch设置workdayHours(0.5..24且为0.5倍数，默认7)、allocationDisplay(percent/hours)，会保存并可撤销；note.add/update/delete/move/copy增改删移动复制；notes.clear_month清空月。工作成员新增/删除/跨日移动/属性变化后相关日期重均分，纯名称/正文/颜色及每日小时设置保留比例。day.allocate完整列出该日每个工作事项noteId/weight一次，weight为0..1且总和1；day.adjust指定date、leftNoteId及全日累计边界position，display默认本设置，percent吸附10个百分点、hours吸附0.5小时后限制在相邻两段范围，仅调整左侧事项及紧邻右侧事项、二者总量保持。最多100项，失败全部回滚，成功一次撤销。新增默认空正文/#4376d4/工作日，ID可自定、时间自动生成；update不能修改ID、创建时间或weight。copy保留原正文并可patch；add/update/copy仅记录历史名称/颜色/属性，删除保留历史。返回created事项ID。', false, {
+ tool('calendar_edit', '原子修改日历本：book.title改名；book.settings.patch设置workdayHours(0.5..24且为0.5倍数，默认7)、allocationDisplay(percent/hours)、weekMode(week完整周/work隐藏周末，默认week)，仅作用于当前日历本全部日期，会保存并可撤销；note.add/update/delete/move/copy增改删移动复制；notes.clear_month清空月。工作成员新增/删除/跨日移动/属性变化后相关日期重均分，纯名称/正文/颜色及每日小时设置保留比例。day.allocate完整列出该日每个工作事项noteId/weight一次，weight为0..1且总和1；day.adjust指定date、leftNoteId及全日累计边界position，display默认本设置，percent吸附10个百分点、hours吸附0.5小时后限制在相邻两段范围，仅调整左侧事项及紧邻右侧事项、二者总量保持。最多100项，失败全部回滚，成功一次撤销。新增默认空正文/#4376d4/工作日，ID可自定、时间自动生成；update不能修改ID、创建时间或weight。copy保留原正文并可patch；add/update/copy仅记录历史名称/颜色/属性，删除保留历史。返回created事项ID。', false, {
   operations: { type: 'array', items: { anyOf: operations }, minItems: 1, maxItems: 100 },
  }, ['operations']),
- tool('calendar_set_view', '切换月份、选中日期/事项、搜索文字；selectedNoteId:null清除事项选择。选中事项自动切换到其日期与月份，选中日期自动切换月份；同时给出的日期/月/事项必须一致。仅切换月份时会清除不在该月的选择。只改变界面，不修改文件或撤销历史。', true, {
+ tool('calendar_set_view', '切换月份、选中日期/事项、搜索文字；selectedNoteId:null清除事项选择。选中事项自动切换到其日期与月份，选中日期自动切换月份；同时给出的日期/月/事项必须一致。Work模式中显式选择周末日期或事项会报错，请先通过book.settings切到Week；不会暗改周模式或替换显式日期。仅切换月份时清除不在该月的选择，并将隐含选中日期归一到该月可见日期。只改变界面，不修改文件或撤销历史。', true, {
   month, selectedDate: date, selectedNoteId: { anyOf: [id, { type: 'null' }] }, search: text(CALENDAR_MAX_CONTENT),
  }),
  tool('calendar_export', '返回当前日历本完整JSON：format、mimeType和book（含全部事项及历史）。不写文件、不改动已保存状态；MCP结果超过7MiB请通过界面保存日历本。', true, { format: enumeration('json') }, ['format']),

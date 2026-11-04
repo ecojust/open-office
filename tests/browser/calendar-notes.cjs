@@ -9,10 +9,10 @@ const crypto = require('node:crypto');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
 const focus = process.env.OFFICE_CALENDAR_FOCUS || '';
-const output = path.resolve(process.env.OFFICE_CALENDAR_OUTPUT || path.join(root, focus === 'allocation-boundaries' ? 'test-results/calendar-notes-allocation-boundaries' : 'test-results/calendar-notes'));
-const sources = ['src/App.vue', 'src/components/CalendarEditor.vue', 'src/calendar/model.ts', 'src/calendar/allocation.ts', 'src/calendar/components/CalendarWorkCapsule.vue', 'src/calendar/session.ts', 'src/calendar/calendar.ts', 'src/calendar/almanac.ts', 'src/calendar/mcp.ts', 'src/shared/document.ts', 'src/style.css'];
+const output = path.resolve(process.env.OFFICE_CALENDAR_OUTPUT || path.join(root, ['allocation-boundaries', 'week-settings'].includes(focus) ? `test-results/calendar-notes-${focus}` : 'test-results/calendar-notes'));
+const sources = ['src/App.vue', 'src/components/CalendarEditor.vue', 'src/calendar/model.ts', 'src/calendar/allocation.ts', 'src/calendar/components/CalendarWorkCapsule.vue', 'src/calendar/session.ts', 'src/calendar/calendar.ts', 'src/calendar/almanac.ts', 'src/calendar/mcp.ts', 'src/shared/document.ts', 'src/shared/printing.ts', 'src/style.css'];
 const hashes = () => Object.fromEntries(sources.filter(file => fs.existsSync(path.join(root, file))).map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex')]));
-const report = { ok: false, runtime: 'Real Vue UI in Chromium with deterministic public holiday fixtures; actual browser downloads and file imports', checks: [], screenshots: [], pointerGestures: [], errors: [], consoleErrors: [], externalRequests: [], holidayRequests: [], limitations: ['Native dialogs, native filesystem autosave and installed platform WebViews are not exercised.', 'Public holiday network responses are deterministic fixtures, not live availability evidence.', 'Mouse, keyboard and drag input are automated browser events; physical input is not exercised.'] };
+const report = { ok: false, runtime: 'Real Vue UI in Chromium with deterministic public holiday fixtures; actual browser downloads and file imports', checks: [], screenshots: [], printEvidence: [], pointerGestures: [], errors: [], consoleErrors: [], externalRequests: [], holidayRequests: [], limitations: ['Native dialogs, native filesystem autosave and installed platform WebViews are not exercised.', 'Public holiday network responses are deterministic fixtures, not live availability evidence.', 'Mouse, keyboard and drag input are automated browser events; physical input is not exercised.', 'Printing captures the generated browser print DOM; system print dialogs and printer output are not exercised.'] };
 fs.mkdirSync(output, { recursive: true });
 let server, browser, page;
 const persist = () => fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
@@ -30,6 +30,14 @@ async function state() { return page.evaluate(async () => { const a = document.q
 async function exported() { return page.evaluate(async () => { const a = document.querySelector('#app').__vue_app__._instance.setupState; const result = await a.handleFor(a.active).exportFile({ format: 'oocalendar' }); return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(result.base64), c => c.charCodeAt(0)))); }); }
 async function month(value) { await editor().getByTestId('calendar-month').fill(value); await editor().getByTestId('calendar-month').dispatchEvent('change'); await frame(); }
 async function custom(date) { await day(date).click({ button: 'right' }); await page.getByTestId('calendar-context-custom').click(); await page.getByTestId('calendar-note-dialog').waitFor(); }
+async function settings(values, commit = true) {
+  await editor().getByTestId('calendar-settings').click(); await page.getByTestId('calendar-settings-dialog').waitFor();
+  if (values.title !== undefined) await page.getByTestId('calendar-book-title').fill(values.title);
+  if (values.workdayHours !== undefined) await page.getByTestId('calendar-workday-hours').fill(String(values.workdayHours));
+  if (values.weekMode !== undefined) await page.getByTestId('calendar-week-mode').selectOption(values.weekMode);
+  if (values.allocationDisplay !== undefined) await page.getByTestId('calendar-allocation-display').selectOption(values.allocationDisplay);
+  await page.getByTestId(commit ? 'calendar-settings-confirm' : 'calendar-note-cancel').click(); await frame();
+}
 async function add(date, title, content = '', color = '#3b82f6', type = '工作日') { await custom(date); await page.getByTestId('calendar-note-title').fill(title); await page.getByTestId('calendar-note-content').fill(content); await page.getByTestId('calendar-note-color').fill(color); await page.getByTestId('calendar-note-type').selectOption(type); await page.getByTestId('calendar-note-confirm').click(); await frame(); const result = (await exported()).notes.find(n => n.date === date && n.title === title); assert.ok(result); return result; }
 async function undo() { await page.getByTestId('global-toolbar').getByRole('button', { name: '撤销', exact: true }).click(); await frame(); }
 async function redo() { await page.getByTestId('global-toolbar').getByRole('button', { name: '重做', exact: true }).click(); await frame(); }
@@ -72,9 +80,63 @@ async function allocationBoundaryChecks() {
     await allocations('2026-11-06', { 'boundary-a': .38, 'boundary-b': .2, 'boundary-c': .42 });
     await divider.press('Home'); await allocations('2026-11-06', { 'boundary-a': .38, 'boundary-b': 0, 'boundary-c': .62 }); await capture('calendar-unsnapped-home'); await undo(); assert.deepEqual(await exported(), original);
     await divider.press('End'); await allocations('2026-11-06', { 'boundary-a': .38, 'boundary-b': .62, 'boundary-c': 0 }); await capture('calendar-unsnapped-end'); await undo(); assert.deepEqual(await exported(), original);
-    await editor().getByTestId('calendar-allocation-display').selectOption('hours'); await frame(); const hours = await exported();
+    await settings({ allocationDisplay: 'hours' }); const hours = await exported();
     await divider.press('Home'); await allocations('2026-11-06', { 'boundary-a': .38, 'boundary-b': 0, 'boundary-c': .62 }); await undo(); assert.deepEqual(await exported(), hours);
     await divider.press('End'); await allocations('2026-11-06', { 'boundary-a': .38, 'boundary-b': .62, 'boundary-c': 0 }); await undo(); assert.deepEqual(await exported(), hours);
+  });
+}
+async function printedCalendar(label, columns, articleCount) {
+  await page.evaluate(() => {
+    window.calendarOriginalPrint = window.print; window.calendarPrinted = undefined;
+    window.print = () => { const root = document.querySelector('#office-print-root'); window.calendarPrinted = { headers: [...root.querySelectorAll('table th')].map(e => e.textContent), rows: [...root.querySelectorAll('table tr')].slice(1).map(row => [...row.querySelectorAll('td')].map(cell => cell.querySelector('strong')?.textContent || '')), summary: root.querySelector('.work-summary')?.textContent, articles: [...root.querySelectorAll('article')].map(e => e.textContent), html: root.outerHTML }; };
+  });
+  try {
+    await page.getByTestId('shell-print').click(); await poll(() => page.evaluate(() => !!window.calendarPrinted), 'calendar print content');
+    const printed = await page.evaluate(() => window.calendarPrinted); assert.equal(printed.headers.length, columns); assert.equal(printed.rows.length, 6); assert.ok(printed.rows.every(row => row.length === columns)); assert.equal(printed.articles.length, articleCount); assert.ok(printed.summary.includes('周六工作') && printed.summary.includes('周日工作'));
+    if (columns === 5) for (const date of printed.rows.flat().filter(Boolean)) assert.ok(![0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay()), `Work print hides weekend ${date}`);
+    fs.writeFileSync(path.join(output, `${label}.html`), printed.html); const { html, ...evidence } = printed; report.printEvidence.push({ label, ...evidence });
+    await page.emulateMedia({ media: 'print' }); await capture(label);
+  } finally { await page.emulateMedia({ media: 'screen' }); await page.evaluate(() => { window.print = window.calendarOriginalPrint; delete window.calendarOriginalPrint; window.dispatchEvent(new Event('afterprint')); }); await frame(); }
+  assert.equal(await page.locator('#office-print-root').count(), 0);
+}
+async function weekSettingsChecks() {
+  // Earlier independent scenarios have already saved and verified their fixtures.
+  // Use normal shell close/discard so this group stays below the eight-tab limit.
+  if (await page.locator('.document-tab').count()) {
+    await page.getByTestId('tabs-close-all').click(); await poll(async () => !(await page.locator('.document-tab').count()) || (await page.getByTestId('close-discard').isVisible()), 'close previous fixture tabs');
+    if (await page.getByTestId('close-discard').isVisible()) await page.getByTestId('close-discard').click();
+    await poll(async () => !(await page.locator('.document-tab').count()), 'previous fixture tabs closed'); await frame();
+  }
+  const fixture = { format: 'open-office-calendar', version: 1, id: 'week-settings-calendar', title: '周视图验收', workdayHours: 7, allocationDisplay: 'percent', weekMode: 'week', history: [], notes: [
+    ['friday', '2026-11-06', '周五工作', '#3b82f6', '工作日'], ['saturday', '2026-11-07', '周六工作', '#16a34a', '工作日'], ['sunday', '2026-11-08', '周日工作', '#8b5cf6', '工作日'], ['monday', '2026-11-09', '周一工作', '#f59e0b', '工作日'], ['weekend-off', '2026-11-08', '周末备注', '#ef4444', '非工作日'],
+  ].map(([id, date, title, color, type]) => ({ id, date, title, color, type, content: '', created_at: '2026-11-01T10:00:00.000Z', ...(type === '工作日' ? { weight: 1 } : {}) })) };
+  await check('unified-settings-commit-and-cancel-are-atomic-and-work-keeps-weekend-data', async () => {
+    await page.getByTestId('document-open-input').setInputFiles({ name: '周视图验收.oocalendar', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) }); await ready(); await month('2026-11'); await day('2026-11-07').click();
+    assert.equal(await editor().getByRole('gridcell').count(), 42); assert.equal(await editor().getByRole('columnheader').count(), 7);
+    for (const id of ['calendar-workday-hours', 'calendar-week-mode', 'calendar-allocation-display']) assert.equal(await page.getByTestId(id).count(), 0, `${id} is only shown in settings`);
+    const before = await exported(), original = await state(); await editor().getByTestId('calendar-settings').click();
+    await page.getByTestId('calendar-book-title').fill('统一设置提交'); await page.getByTestId('calendar-workday-hours').fill('8'); await page.getByTestId('calendar-week-mode').selectOption('work'); await page.getByTestId('calendar-allocation-display').selectOption('hours');
+    assert.deepEqual((await state()).book, before); assert.equal((await state()).revision, original.revision); assert.equal(await editor().getByRole('gridcell').count(), 42); await capture('calendar-unified-settings'); await page.getByTestId('calendar-note-cancel').click(); await frame(); assert.deepEqual(await exported(), before); assert.equal((await state()).revision, original.revision);
+    await settings({ title: '统一设置提交', workdayHours: 8, weekMode: 'work', allocationDisplay: 'hours' });
+    const work = await exported(); assert.deepEqual(work, { ...before, title: '统一设置提交', workdayHours: 8, weekMode: 'work', allocationDisplay: 'hours' }); assert.equal((await state()).revision, original.revision + 1); assert.equal((await state()).view.selectedDate, '2026-11-09'); assert.equal(await day('2026-11-09').evaluate(e => e === document.activeElement), true, 'Settings confirm focuses the normalized visible date');
+    assert.equal(await editor().getByRole('gridcell').count(), 30); assert.equal(await editor().getByRole('columnheader').count(), 5); assert.equal(await editor().locator('.calendar-grid').evaluate(e => getComputedStyle(e).gridTemplateColumns.split(' ').length), 5);
+    assert.equal(await day('2026-11-07').count(), 0); assert.equal(await day('2026-11-08').count(), 0); assert.equal(await editor().locator('[role="gridcell"][tabindex="0"]').count(), 1);
+    const summary = editor().getByTestId('calendar-summary'); for (const name of ['周五工作', '周六工作', '周日工作', '周一工作']) assert.match(await summary.locator('.calendar-summary-tag').filter({ hasText: name }).innerText(), /8h/);
+    assert.doesNotMatch(await editor().getByTestId('calendar-day-allocation-2026-11-06').innerText(), /全天|8h/);
+    await undo(); assert.deepEqual(await exported(), before); assert.equal(await editor().getByRole('gridcell').count(), 42); await redo(); assert.deepEqual(await exported(), work); assert.equal(await editor().getByRole('gridcell').count(), 30); await capture('calendar-work-view');
+  });
+  await check('work-keyboard-skips-weekends-with-visible-focus-and-month-normalization', async () => {
+    const book = await exported(); await day('2026-11-06').focus(); await page.keyboard.press('ArrowRight'); await frame(); assert.equal((await state()).view.selectedDate, '2026-11-09'); assert.equal(await day('2026-11-09').evaluate(e => e === document.activeElement), true);
+    await page.keyboard.press('ArrowLeft'); await frame(); assert.equal((await state()).view.selectedDate, '2026-11-06'); assert.equal(await day('2026-11-06').evaluate(e => e === document.activeElement), true);
+    await page.keyboard.press('ArrowDown'); await frame(); assert.equal((await state()).view.selectedDate, '2026-11-13'); assert.equal(await day('2026-11-13').evaluate(e => e === document.activeElement), true); await page.keyboard.press('ArrowUp'); await frame(); assert.equal((await state()).view.selectedDate, '2026-11-06');
+    await month('2027-05'); assert.equal((await state()).view.selectedDate, '2027-05-03'); assert.equal(await editor().getByRole('gridcell').count(), 30); assert.equal(await editor().locator('[role="gridcell"][tabindex="0"]').count(), 1);
+    await day('2027-05-03').focus(); await page.keyboard.press('ArrowLeft'); await frame(); assert.equal((await state()).view.selectedDate, '2027-04-30'); assert.equal(await day('2027-04-30').evaluate(e => e === document.activeElement), true); assert.deepEqual(await exported(), book);
+    await month('2026-11'); const download = await saveDownload('Work视图保留周末.oocalendar', true); assert.deepEqual(download.model, book); const session = (await state()).documentId; await page.getByTestId('document-open-input').setInputFiles(download.target); await ready(); assert.notEqual((await state()).documentId, session); await month('2026-11'); assert.deepEqual(await exported(), book); assert.equal(await editor().getByRole('gridcell').count(), 30);
+  });
+  await check('real-print-dom-follows-week-columns-and-discloses-full-month-work-summary', async () => {
+    const work = await exported(); await printedCalendar('calendar-print-work-five-columns', 5, 2); assert.deepEqual(await exported(), work);
+    await settings({ weekMode: 'week' }); assert.equal(await editor().getByRole('gridcell').count(), 42); assert.equal(await editor().getByRole('columnheader').count(), 7); assert.ok(await note('saturday').isVisible()); assert.ok(await note('sunday').isVisible());
+    await printedCalendar('calendar-print-week-seven-columns', 7, 5); assert.deepEqual((await exported()).notes, fixture.notes); assert.deepEqual((await exported()).history, fixture.history);
   });
 }
 function completeReport() { report.sourcesAfter = hashes(); assert.deepEqual(report.sourcesAfter, report.sourcesBefore, 'Source changed during browser acceptance'); assert.deepEqual(report.errors, []); assert.deepEqual(report.consoleErrors, []); assert.deepEqual(report.externalRequests, []); report.ok = true; }
@@ -95,6 +157,7 @@ function completeReport() { report.sourcesAfter = hashes(); assert.deepEqual(rep
     page = await context.newPage(); page.setDefaultTimeout(15000); page.on('pageerror', error => report.errors.push(error.message)); page.on('console', message => { if (message.type() === 'error') report.consoleErrors.push(message.text()); });
     await page.goto(origin, { timeout: 60000 });
     if (focus === 'allocation-boundaries') { await allocationBoundaryChecks(); completeReport(); return; }
+    if (focus === 'week-settings') { await weekSettingsChecks(); completeReport(); return; }
     let first, second, saved, firstKey;
     await check('new-calendar-has-42-cells-and-date-click-only-selects', async () => {
       await page.getByTestId('shell-new').click(); await page.getByTestId('shell-new-calendar').click(); await ready(); firstKey = (await active()).key;
@@ -151,7 +214,7 @@ function completeReport() { report.sourcesAfter = hashes(); assert.deepEqual(rep
     let workA, workB, workC, workD;
     await check('one-work-capsule-equal-shares-and-real-pointer-percent-resize', async () => {
       await page.getByTestId('shell-new').click(); await page.getByTestId('shell-new-calendar').click(); await ready(); await month('2026-11');
-      const blank = await exported(); assert.equal(blank.workdayHours, 7); assert.equal(blank.allocationDisplay, 'percent');
+      const blank = await exported(); assert.equal(blank.workdayHours, 7); assert.equal(blank.allocationDisplay, 'percent'); assert.equal(blank.weekMode, 'week');
       workA = await add('2026-11-04', '需求设计', '第一份工作', '#3b82f6'); await allocations('2026-11-04', { [workA.id]: 1 });
       workB = await add('2026-11-04', '开发实现', '第二份工作', '#16a34a'); await allocations('2026-11-04', { [workA.id]: .5, [workB.id]: .5 });
       const off = await add('2026-11-04', '请假备注', '不分配工作量', '#ef4444', '非工作日'); assert.equal(Object.hasOwn(off, 'weight'), false); await allocations('2026-11-04', { [workA.id]: .5, [workB.id]: .5 }); assert.equal(await capsule('2026-11-04').getByTestId(`calendar-note-${off.id}`).count(), 0);
@@ -161,20 +224,20 @@ function completeReport() { report.sourcesAfter = hashes(); assert.deepEqual(rep
       await capture('calendar-work-percent');
     });
     await check('hours-mode-snaps-half-hour-and-non-default-allocation-survives-reopen', async () => {
-      await editor().getByTestId('calendar-allocation-display').selectOption('hours'); await frame(); assert.equal((await exported()).allocationDisplay, 'hours'); await allocations('2026-11-04', { [workA.id]: .7, [workB.id]: .3 });
+      await settings({ allocationDisplay: 'hours' }); assert.equal((await exported()).allocationDisplay, 'hours'); await allocations('2026-11-04', { [workA.id]: .7, [workB.id]: .3 });
       await resize('2026-11-04', workA.id, workB.id, 4.1 / 7); await allocations('2026-11-04', { [workA.id]: 4 / 7, [workB.id]: 3 / 7 });
       await editor().getByTestId('calendar-settings').click(); assert.equal(await page.getByTestId('calendar-workday-hours').inputValue(), '7'); await page.getByTestId('calendar-workday-hours').fill('8'); await page.getByTestId('calendar-settings-confirm').click(); await frame(); assert.equal((await exported()).workdayHours, 8); await allocations('2026-11-04', { [workA.id]: 4 / 7, [workB.id]: 3 / 7 }); await undo(); assert.equal((await exported()).workdayHours, 7);
       const before = await exported(), session = (await state()).documentId; const download = await saveDownload('工时分配验收.oocalendar', true); assert.deepEqual(download.model, before); assert.ok(Math.abs(download.model.notes.find(n => n.id === workA.id).weight - 4 / 7) < 1e-9);
       await page.getByTestId('document-open-input').setInputFiles(download.target); await ready(); assert.notEqual((await state()).documentId, session); assert.deepEqual(await exported(), before); await month('2026-11'); await allocations('2026-11-04', { [workA.id]: 4 / 7, [workB.id]: 3 / 7 }); await capture('calendar-work-hours');
       const key = (await active()).key, tabs = await page.locator('.document-tab').count(), original = await state();
-      const variants = [book => { book.workdayHours = 0; }, book => { book.allocationDisplay = 'unknown'; }, book => { book.notes.find(n => n.id === workA.id).weight = .1; }, book => { delete book.notes.find(n => n.id === workA.id).weight; }, book => { book.notes.find(n => n.type === '非工作日').weight = .5; }];
+      const variants = [book => { book.workdayHours = 0; }, book => { book.allocationDisplay = 'unknown'; }, book => { book.weekMode = 'unknown'; }, book => { book.notes.find(n => n.id === workA.id).weight = .1; }, book => { delete book.notes.find(n => n.id === workA.id).weight; }, book => { book.notes.find(n => n.type === '非工作日').weight = .5; }];
       for (const [index, mutate] of variants.entries()) { const bad = structuredClone(before); mutate(bad); await page.getByTestId('document-open-input').setInputFiles({ name: `invalid-allocation-${index}.oocalendar`, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(bad)) }); await page.locator('.error-banner').waitFor(); await ready(); assert.equal((await active()).key, key); assert.equal(await page.locator('.document-tab').count(), tabs); assert.deepEqual(await exported(), before); assert.deepEqual(await state(), original); await closeError(); }
     });
     await check('work-membership-move-copy-type-and-delete-conserve-and-redivide-affected-days', async () => {
       workC = await add('2026-11-04', '联调测试', '', '#8b5cf6'); await allocations('2026-11-04', { [workA.id]: 1 / 3, [workB.id]: 1 / 3, [workC.id]: 1 / 3 });
       workD = await add('2026-11-05', '发布准备', '', '#f59e0b'); await allocations('2026-11-05', { [workD.id]: 1 });
       await note(workB.id).dragTo(day('2026-11-05')); await frame(); await allocations('2026-11-04', { [workA.id]: .5, [workC.id]: .5 }); await allocations('2026-11-05', { [workB.id]: .5, [workD.id]: .5 });
-      await editor().getByTestId('calendar-allocation-display').selectOption('percent'); await frame(); await resize('2026-11-04', workA.id, workC.id, .69); await allocations('2026-11-04', { [workA.id]: .7, [workC.id]: .3 });
+      await settings({ allocationDisplay: 'percent' }); await resize('2026-11-04', workA.id, workC.id, .69); await allocations('2026-11-04', { [workA.id]: .7, [workC.id]: .3 });
       const beforeCopy = await exported(); await page.keyboard.down('Control'); try { await note(workA.id).dragTo(day('2026-11-05')); } finally { await page.keyboard.up('Control'); } await frame();
       const copied = (await exported()).notes.find(n => n.date === '2026-11-05' && n.title === workA.title); assert.ok(copied); assert.notEqual(copied.id, workA.id); await allocations('2026-11-04', { [workA.id]: .7, [workC.id]: .3 }); await allocations('2026-11-05', { [workB.id]: 1 / 3, [workD.id]: 1 / 3, [copied.id]: 1 / 3 }); await undo(); assert.deepEqual(await exported(), beforeCopy); await redo();
       await remove(workB.id); await allocations('2026-11-05', { [workD.id]: .5, [copied.id]: .5 }); await undo(); await allocations('2026-11-05', { [workB.id]: 1 / 3, [workD.id]: 1 / 3, [copied.id]: 1 / 3 });
@@ -182,6 +245,7 @@ function completeReport() { report.sourcesAfter = hashes(); assert.deepEqual(rep
       const before = await exported(), download = await saveDownload('跨日分配验收.oocalendar', true); assert.deepEqual(download.model, before); await page.getByTestId('document-open-input').setInputFiles(download.target); await ready(); await month('2026-11'); assert.deepEqual(await exported(), before); await allocations('2026-11-04', { [workA.id]: .7, [workC.id]: .3 });
     });
     await allocationBoundaryChecks();
+    await weekSettingsChecks();
     await check('imported-notes-without-history-keep-reusable-types-after-delete-and-clear', async () => {
       const fixture = { format: 'open-office-calendar', version: 1, id: 'imported-calendar', title: '团队工作日历', history: [], notes: [
         ['planning', '2026-11-04', '项目计划', '#3b82f6', '工作日'], ['review', '2026-11-04', '产品评审', '#16a34a', '工作日'], ['travel', '2026-11-04', '客户拜访', '#f59e0b', '工作日'],
@@ -191,7 +255,7 @@ function completeReport() { report.sourcesAfter = hashes(); assert.deepEqual(rep
       await editor().getByTestId('calendar-day-allocation-2026-11-04').click(); await page.getByTestId('calendar-day-dialog').waitFor(); assert.equal(await page.locator('.calendar-day-list > button').count(), 3); await page.locator('.calendar-day-list > button').filter({ hasText: '客户拜访' }).click(); assert.equal(await page.getByTestId('calendar-note-title').inputValue(), '客户拜访'); await page.getByTestId('calendar-note-cancel').click();
       await remove('planning'); assert.ok((await exported()).history.find(h => h.title === '项目计划'));
       await editor().getByTestId('calendar-clear-month').click(); await page.getByTestId('calendar-delete-confirm').click(); await frame(); const cleared = await exported(); assert.deepEqual(cleared.notes.map(n => n.id), ['next-month']); for (const n of fixture.notes.filter(n => n.date.startsWith('2026-11'))) assert.ok(cleared.history.find(h => h.title === n.title && h.color === n.color && h.type === n.type));
-      const historical = await saveDownload('历史保留验收.oocalendar', true); assert.deepEqual(historical.model, cleared); await undo(); await undo(); assert.deepEqual(await exported(), { ...fixture, workdayHours: 7, allocationDisplay: 'percent' });
+      const historical = await saveDownload('历史保留验收.oocalendar', true); assert.deepEqual(historical.model, cleared); await undo(); await undo(); assert.deepEqual(await exported(), { ...fixture, workdayHours: 7, allocationDisplay: 'percent', weekMode: 'week' });
     });
     await check('focus-mode-preserves-session-and-allows-exit', async () => {
       const before = await state(); await page.getByTestId('shell-focus-enter').click(); await frame(); await page.getByTestId('shell-focus-exit').waitFor(); assert.ok(await editor().isVisible()); assert.deepEqual(await state(), before); await capture('calendar-focus-light'); await page.getByTestId('shell-focus-exit').click(); await frame(); assert.deepEqual(await state(), before);

@@ -226,6 +226,62 @@ test('workday settings persist as content and readers report actual whole-day sh
  await h.run('document_redo'); assert.equal(h.session.model.workdayHours, 8)
 })
 
+test('Week/Work persists per book while hidden weekends remain readable and counted in monthly work', async () => {
+ const h = harness([
+  item('weekday', '2026-11-06', { title: '周五工作' }),
+  item('saturday', '2026-11-07', { title: '周六工作' }),
+  item('sunday', '2026-11-08', { title: '周日休息', type: '非工作日' }),
+ ])
+ // Mirror the editor's synchronous accept callback, using the same validated
+ // visibility rule; the dispatcher must return the normalized post-edit view.
+ const accepted = h.host.changed
+ h.host.changed = () => {
+  accepted()
+  h.host.setView(validateCalendarView(h.session.model, h.host.view(), { search: h.host.view().search }))
+ }
+ assert.equal((await h.run('calendar_read')).book.weekMode, 'week')
+ await h.run('calendar_set_view', { selectedNoteId: 'saturday' })
+ const beforeNotes = structuredClone(h.session.model.notes), beforeHistory = structuredClone(h.session.model.history)
+ const changed = await h.edit([{ op: 'book.settings', patch: { weekMode: 'work', workdayHours: 8, allocationDisplay: 'hours' } }])
+ assert.equal(changed.revision, 1); assert.equal(changed.dirty, true); assert.equal(h.changes(), 1)
+ assert.equal(changed.view.selectedDate, '2026-11-09'); assert.equal(changed.view.selectedNoteId, null)
+ assert.deepEqual(h.session.model.notes, beforeNotes); assert.deepEqual(h.session.model.history, beforeHistory)
+ const read = await h.run('calendar_read', { month: '2026-11' })
+ assert.equal(read.book.weekMode, 'work'); assert.equal(read.total, 3)
+ assert.equal(read.notes.find(note => note.id === 'saturday').hours, 8)
+ assert.equal(read.summary.reduce((sum, row) => sum + row.hours, 0), 16)
+ assert.equal(read.summary.find(row => row.title === '周六工作').days, 1)
+ const exported = await h.run('calendar_export', { format: 'json' })
+ assert.equal(new CalendarSession(encodeCalendar(exported.book)).model.weekMode, 'work')
+ assert.equal(harness().session.model.weekMode, 'week', 'settings apply only to this book')
+ await h.run('document_undo'); assert.equal(h.session.model.weekMode, 'week'); assert.equal(h.session.inspect().dirty, false)
+ await h.run('document_redo'); assert.equal(h.session.model.weekMode, 'work')
+})
+
+test('Work rejects explicit hidden selectors without changing mode, but normalizes implicit month selection', async () => {
+ const h = harness([item('weekend', '2026-11-07')])
+ await h.edit([{ op: 'book.settings', patch: { weekMode: 'work' } }])
+ const before = h.session.inspect(), originalView = h.host.view()
+ for (const selection of [
+  { selectedDate: '2026-11-07' }, { selectedDate: '2026-11-08', month: '2026-11' },
+  { selectedNoteId: 'weekend' }, { selectedNoteId: 'weekend', selectedDate: '2026-11-07' },
+ ]) {
+  await assert.rejects(h.run('calendar_set_view', selection), /Week/)
+  assert.deepEqual(h.host.view(), originalView); assert.deepEqual(h.session.inspect(), before); assert.equal(h.session.model.weekMode, 'work')
+ }
+ const month = await h.run('calendar_set_view', { month: '2027-05' })
+ assert.equal(month.view.selectedDate, '2027-05-03'); assert.equal(month.view.month, '2027-05')
+ assert.deepEqual(h.session.inspect(), before)
+ await assert.rejects(h.run('calendar_set_view', { weekMode: 'week' }))
+ await assert.rejects(h.edit([{ op: 'book.settings', patch: { weekMode: 'weekend' } }]))
+ await h.edit([{ op: 'note.add', note: { id: 'hidden', title: '隐藏但保留', date: '2027-05-01' } }])
+ const hidden = await h.run('calendar_read', { month: '2027-05' })
+ assert.equal(hidden.total, 1); assert.equal(hidden.summary[0].days, 1)
+ await h.edit([{ op: 'book.settings', patch: { weekMode: 'week' } }])
+ const selected = await h.run('calendar_set_view', { selectedNoteId: 'hidden' })
+ assert.equal(selected.view.selectedDate, '2027-05-01'); assert.equal(selected.view.selectedNoteId, 'hidden')
+})
+
 test('explicit day allocation and adjacent divider edits conserve the day and use percentage/hour snapping', async () => {
  const h = harness([item('a'), item('b'), item('c')])
  await h.edit([{ op: 'day.allocate', date: '2026-11-04', allocations: [{ noteId: 'c', weight: .4 }, { noteId: 'a', weight: .2 }, { noteId: 'b', weight: .4 }] }])

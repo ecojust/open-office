@@ -3,10 +3,29 @@ import assert from 'node:assert/strict'
 import { CalendarSession } from '../src/calendar/session.ts'
 import { calendarId, createCalendar, decodeCalendar, encodeCalendar, rememberHistory, historySuggestions, preserveHistory } from '../src/calendar/model.ts'
 import { dayAllocations, resizeAllocationBoundary, setDayAllocation, rebalanceDayAllocations } from '../src/calendar/allocation.ts'
+import { monthSummary } from '../src/calendar/calendar.ts'
 
 function note(overrides = {}) { return { id: calendarId(), title: '会议', content: '', date: '2026-11-04', color: '#4376d4', created_at: '2026-11-04T09:30:00.000Z', type: '工作日', ...overrides } }
 function add(session, value) { session.change(copy => { copy.notes.push(value); rememberHistory(copy, value, value.created_at) }) }
 function close(actual, expected) { assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} differs from ${expected}`) }
+
+test('Work is a saved undoable view setting that preserves weekend events, historical types and monthly totals', () => {
+ const value = createCalendar()
+ value.notes = [note({ title: '周五研发', date: '2026-11-06', weight: 0.7 }), note({ title: '周五会议', date: '2026-11-06', weight: 0.3 }), note({ title: '周末工作', date: '2026-11-07', weight: 1 })]
+ for (const item of value.notes) rememberHistory(value, item, item.created_at)
+ const session = new CalendarSession(encodeCalendar(value)), totals = monthSummary(session.model, '2026-11')
+ session.change(copy => { copy.weekMode = 'work' })
+ assert.equal(session.model.weekMode, 'work'); assert.equal(session.inspect().dirty, true)
+ assert.deepEqual(session.model.notes, value.notes); assert.deepEqual(session.model.history, value.history)
+ assert.deepEqual(monthSummary(session.model, '2026-11'), totals)
+ close(totals.reduce((sum, item) => sum + item.hours, 0), 14)
+ session.undo(); assert.equal(session.model.weekMode, 'week'); assert.equal(session.inspect().dirty, false)
+ session.redo(); assert.equal(session.model.weekMode, 'work'); assert.deepEqual(session.model.notes, value.notes)
+ const saved = session.export(); session.markSaved(saved.bytes)
+ assert.deepEqual(new CalendarSession(saved.bytes).model, session.model)
+ assert.throws(() => session.change(copy => { copy.weekMode = 'weekday' }), /Week/)
+ assert.equal(session.inspect().dirty, false)
+})
 
 test('work event membership automatically rebalances while descriptive and duration edits retain shares', () => {
  const session = new CalendarSession(), first = note(), second = note({ title: '研发' }), third = note({ title: '设计' })

@@ -31,7 +31,7 @@ Open Office 桌面版可作为本机 MCP 服务，供支持 Streamable HTTP 的 
 | 画布（`canvas`） | `canvas_read`、`canvas_read_elements`、`canvas_list_templates` | `canvas_edit`：全部图形、连线、笔迹和图片的内容样式、位置尺寸、锁定、组合、层级、对齐布局及模板；`canvas_select_elements` 选择或定位元素 |
 | 代码图表（`diagram`） | `diagram_read`、`diagram_read_source`、`diagram_list_templates` | `diagram_update`：源码、标题、风格及模板；保留 `diagram_set_source` |
 | 计划排期（`schedule`） | `schedule_read`、`schedule_read_calendar`、`schedule_read_workload` | `schedule_edit`：项目、单价、人员、事件、日历、周号、轨道高度；`schedule_import` 导入完整排期，`schedule_export` 导出 JSON／PNG；`schedule_set_view` 切换视图、缩放、选择事件，`schedule_refresh_holidays` 更新假日 |
-| 日历便笺（`calendar`） | `calendar_read`、`calendar_export` | `calendar_edit`：日历本改名、每天工时与显示方式、增删改事项、移动、复制、清除指定月、每日工时分配；`calendar_set_view` 切换月份、日期／事项选择与搜索 |
+| 日历便笺（`calendar`） | `calendar_read`、`calendar_export` | `calendar_edit`：日历本改名、每天工时、Week／Work 与显示单位、增删改事项、移动、复制、清除指定月、每日工时分配；`calendar_set_view` 切换月份、日期／事项选择与搜索 |
 
 原有新增文字、单元格、幻灯片、PDF 文字框、笔记页面和画布图形的快捷工具继续可用。
 
@@ -49,7 +49,9 @@ Open Office 桌面版可作为本机 MCP 服务，供支持 Streamable HTTP 的 
 
 ### 日历便笺接口
 
-打开或新建 `.oocalendar` 日历本后，启用该文档的 MCP。`calendar_read` 支持 `month`、含端点的 `from`／`to`、搜索名称和正文的 `query`、`type:"工作日"`／`"非工作日"`；月份与日期范围取交集。每页默认 200 条、最多 500 条，通过 `offset` 分页，结果包含 `total`、`hasMore` 和 `nextOffset`。`book` 包含 `workdayHours` 与 `allocationDisplay`；每项还返回实际 `share`（0～1）、`days`、`hours`，非工作事项均为 0。份额计算包含该日全部工作事项，不受筛选和分页影响。默认返回跨月历史事项；指定 `month` 时默认附带整月实际分配天数、小时数与占比，可用 `includeHistory:false`、`includeSummary:false` 省略。
+打开或新建 `.oocalendar` 日历本后，启用该文档的 MCP。`calendar_read` 支持 `month`、含端点的 `from`／`to`、搜索名称和正文的 `query`、`type:"工作日"`／`"非工作日"`；月份与日期范围取交集。每页默认 200 条、最多 500 条，通过 `offset` 分页，结果包含 `total`、`hasMore` 和 `nextOffset`。`book` 包含 `workdayHours`、`allocationDisplay` 与 `weekMode`；每项还返回实际 `share`（0～1）、`days`、`hours`，非工作事项均为 0。份额计算包含该日全部工作事项，不受筛选和分页影响。默认返回跨月历史事项；指定 `month` 时默认附带整月实际分配天数、小时数与占比，可用 `includeHistory:false`、`includeSummary:false` 省略。
+
+`weekMode` 为 `week`（周一至周日）或 `work`（周一至周五），缺省为 `week`。它仅决定月历显示列数，`calendar_read`、历史、导出和整月统计仍包含隐藏的周末事项；Work 不额外排除法定假日，周末调休也仍隐藏。
 
 工作事项另带 `allocation:{start,end,rightNoteId}`：`start`／`end` 是从整日起点算起的 0～1 累计份额，`rightNoteId` 是胶囊中紧邻右侧的事项，末段为 `null`；非工作事项的 `allocation` 为 `null`。胶囊顺序沿用文档中的稳定顺序，可能与查询结果排序不同，调整边界前可据此确认邻项。
 
@@ -65,19 +67,21 @@ Open Office 桌面版可作为本机 MCP 服务，供支持 Streamable HTTP 的 
 
 | 操作 | 字段与行为 |
 | --- | --- |
-| `book.settings` | `patch.workdayHours` 设置每天工时，默认 7、范围 0.5～24、必须为 0.5 的整数倍；`patch.allocationDisplay` 为 `percent` 或 `hours`。设置会保存、可撤销；改变每天工时保留已分配比例 |
+| `book.settings` | `patch.workdayHours` 设置每天工时，默认 7、范围 0.5～24、必须为 0.5 的整数倍；`patch.allocationDisplay` 为 `percent` 或 `hours`；`patch.weekMode` 为 `week` 或 `work`。这些设置应用于当前日历本所有日期，随文件保存、可撤销；改变每天工时保留已分配比例，切换 Week／Work 保留所有事项及统计 |
 | `day.allocate` | `date` 指定日期，`allocations:[{noteId,weight}]` 完整列出该日每个工作事项一次；`weight` 为 0～1，总和必须为 1，可以包含 0，不包含非工作事项 |
 | `day.adjust` | `date`、`leftNoteId` 和 `position` 指定分隔线；`position` 是从整天起点算起的累计百分数或小时数，`display` 可指定 `percent`／`hours`，省略时使用日历本设置。分别按 10 个百分点／0.5 小时吸附，只调整左侧事项及紧邻的右侧事项，二者合计不变 |
 
-例如将默认每天工时设为 7 小时，并按小时显示：
+例如将每天工时设为 7 小时、按小时显示，并将月历切为周一至周五：
 
 ```json
-{"name":"calendar_edit","arguments":{"operations":[{"op":"book.settings","patch":{"workdayHours":7,"allocationDisplay":"hours"}}]}}
+{"name":"calendar_edit","arguments":{"operations":[{"op":"book.settings","patch":{"workdayHours":7,"allocationDisplay":"hours","weekMode":"work"}}]}}
 ```
 
 工作事项新增、删除、跨日移动、复制或改变工作属性后，受影响日期重新平均分配；只改名称、正文、颜色保留比例。一批中的操作按顺序处理：先新增再 `day.allocate` 保留最后的显式分配，先分配再新增则再次均分。要指定精确分配，使用 `day.allocate`，不要向 `note.update.patch` 传 `weight`。月统计中 `days` 为实际份额之和，`hours = days × workdayHours`；非工作事项不占工时。
 
 `calendar_set_view` 接受 `month`、`selectedDate`、`selectedNoteId`、`search`；选择事项会定位其日期和月份，`selectedNoteId:null` 清除事项选择。它只改变视图，不产生文件修改或撤销记录，只读权限下也可使用。`calendar_export({format:"json"})` 返回完整 `book`，包含全部月份及历史，不写入文件或标记已保存；超过 7 MiB 时通过界面保存。保存与自动保存沿用现有文件操作。格式、统计口径与历史事项使用方式见[日历便笺说明](calendar-notes.md)。
+
+Week／Work 是日历本的持久设置，需要通过具有编辑权限的 `book.settings` 修改，不是 `calendar_set_view` 参数。在 Work 中显式选择周末日期或周末事项会返回提示，需先切回 Week；不会自动修改持久显示范围。只切换月份时，选中日期会归一到该月可见日期。
 
 ### 计划排期接口
 
