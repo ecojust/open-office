@@ -46,6 +46,7 @@
   --ui-danger-soft: #fcf0ef;
   --ui-radius: 6px;
   --ui-control-height: 32px;
+  --ui-control-height-form: 36px;
   color-scheme: light;
   font-family: var(--ui-font);
   font-size: var(--ui-font-size);
@@ -83,6 +84,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 button svg { flex-shrink: 0; }
 .ui-icon { display: inline-block; flex: none; vertical-align: middle; }
 input, select, textarea { min-width: 0; accent-color: var(--ui-accent); }
+select { height: var(--ui-control-height); padding: 0 8px; }
 h1, h2, h3, p { margin-top: 0; }
 a { color: var(--ui-accent); }
 :where(button, input, select, textarea, a, [tabindex]):focus-visible {

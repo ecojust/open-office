@@ -711,7 +711,7 @@ onBeforeUnmount(() => { if (laserFrame !== undefined) cancelAnimationFrame(laser
 .property-row input[type=color] { width:32px; height:27px; padding:2px; border:1px solid var(--ui-line); border-radius:var(--ui-radius); background:var(--ui-surface); cursor:pointer; }
 .property-row input[type=number] { width:55px; }
 .property-unit { color:var(--ui-muted); }
-.property-row input[type=number],.property-row select { height:29px; padding:3px 6px; border:1px solid var(--ui-line); border-radius:var(--ui-radius); background:var(--ui-surface-muted); font-size:11px; }
+.property-row input[type=number],.property-row select { height:var(--ui-control-height); padding:0 6px; border:1px solid var(--ui-line); border-radius:var(--ui-radius); background:var(--ui-surface-muted); font-size:11px; }
 .property-row select { max-width:105px; }
 .check-row { display:flex; align-items:center; gap:8px; font-size:11px; margin:13px 0; color:var(--ui-muted); }
 .check-row input { accent-color:var(--ui-accent); }

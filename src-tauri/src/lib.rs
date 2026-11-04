@@ -296,6 +296,9 @@ pub fn run() {
                     .title("Open Office")
                     .inner_size(1360.0, 900.0)
                     .min_inner_size(900.0, 640.0)
+                    // Calendar items use HTML5 drag/drop. Tauri's native file-drop
+                    // handler replaces WebView2's handler and blocks these events.
+                    .disable_drag_drop_handler()
                     .on_navigation(move |url| {
                         server::AssetServer::allows_navigation(&navigation, url)
                     })
