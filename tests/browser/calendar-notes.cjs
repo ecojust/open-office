@@ -9,10 +9,10 @@ const crypto = require('node:crypto');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
 const focus = process.env.OFFICE_CALENDAR_FOCUS || '';
-const output = path.resolve(process.env.OFFICE_CALENDAR_OUTPUT || path.join(root, ['allocation-boundaries', 'week-settings'].includes(focus) ? `test-results/calendar-notes-${focus}` : 'test-results/calendar-notes'));
+const output = path.resolve(process.env.OFFICE_CALENDAR_OUTPUT || path.join(root, ['allocation-boundaries', 'week-settings', 'drag-summary'].includes(focus) ? `test-results/calendar-notes-${focus}` : 'test-results/calendar-notes'));
 const sources = ['src/App.vue', 'src/components/CalendarEditor.vue', 'src/calendar/model.ts', 'src/calendar/allocation.ts', 'src/calendar/components/CalendarWorkCapsule.vue', 'src/calendar/session.ts', 'src/calendar/calendar.ts', 'src/calendar/almanac.ts', 'src/calendar/mcp.ts', 'src/shared/document.ts', 'src/shared/printing.ts', 'src/style.css'];
 const hashes = () => Object.fromEntries(sources.filter(file => fs.existsSync(path.join(root, file))).map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex')]));
-const report = { ok: false, runtime: 'Real Vue UI in Chromium with deterministic public holiday fixtures; actual browser downloads and file imports', checks: [], screenshots: [], printEvidence: [], pointerGestures: [], errors: [], consoleErrors: [], externalRequests: [], holidayRequests: [], limitations: ['Native dialogs, native filesystem autosave and installed platform WebViews are not exercised.', 'Public holiday network responses are deterministic fixtures, not live availability evidence.', 'Mouse, keyboard and drag input are automated browser events; physical input is not exercised.', 'Printing captures the generated browser print DOM; system print dialogs and printer output are not exercised.'] };
+const report = { ok: false, runtime: 'Real Vue UI in Chromium with deterministic public holiday fixtures; actual browser downloads and file imports', checks: [], screenshots: [], printEvidence: [], pointerGestures: [], dragGestures: [], errors: [], consoleErrors: [], externalRequests: [], holidayRequests: [], limitations: ['Native dialogs, native filesystem autosave and installed platform WebViews are not exercised.', 'Public holiday network responses are deterministic fixtures, not live availability evidence.', 'Mouse, keyboard and drag input are automated browser events; physical input is not exercised.', 'Native operating-system drag cursors and drag images are not captured by Chromium screenshots; drop acceptance and source-icon visibility are checked in the DOM.', 'Printing captures the generated browser print DOM; system print dialogs and printer output are not exercised.'] };
 fs.mkdirSync(output, { recursive: true });
 let server, browser, page;
 const persist = () => fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
@@ -61,13 +61,128 @@ async function allocations(date, expected) {
   if (work.length) { near(percent, 100, 'day conserves 100%'); near(hours, book.workdayHours, 'day conserves total hours'); }
   return book;
 }
-async function resize(date, leftId, rightId, ratio) {
-  const container = capsule(date), handle = container.getByTestId(`calendar-work-divider-${leftId}-${rightId}`);
+async function resize(date, leftId, rightId, ratio, scope = editor()) {
+  const container = scope.getByTestId(`calendar-work-capsule-${date}`), handle = container.getByTestId(`calendar-work-divider-${leftId}-${rightId}`);
   await handle.scrollIntoViewIfNeeded(); const box = await container.boundingBox(), grip = await handle.boundingBox(); assert.ok(box && grip);
   await handle.evaluate(element => { window.calendarPointerEvents = []; for (const type of ['pointerdown', 'pointermove', 'pointerup']) element.addEventListener(type, event => window.calendarPointerEvents.push({ type: event.type, trusted: event.isTrusted })); });
   const start = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 }, end = { x: box.x + box.width * ratio, y: start.y };
   await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(end.x, end.y, { steps: 8 }); await page.mouse.up(); await frame();
   const events = await page.evaluate(() => window.calendarPointerEvents); assert.ok(events.some(e => e.type === 'pointerdown' && e.trusted)); assert.ok(events.some(e => e.type === 'pointermove' && e.trusted)); assert.ok(events.some(e => e.type === 'pointerup' && e.trusted)); report.pointerGestures.push({ date, leftId, rightId, ratio, start, end, events });
+}
+async function mouseDrag(source, target, { modifier, copy = false, release = true, label = 'calendar-note-drag', during } = {}) {
+  await source.scrollIntoViewIfNeeded(); await target.scrollIntoViewIfNeeded();
+  const from = await source.boundingBox(), to = await target.boundingBox(); assert.ok(from && to);
+  const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 }, end = { x: to.x + to.width / 2, y: to.y + to.height / 2 };
+  await page.evaluate(() => { window.calendarDragEvents = []; });
+  if (modifier) await page.keyboard.down(modifier);
+  try {
+    await page.mouse.move(start.x, start.y); await page.mouse.down();
+    await page.mouse.move(start.x + 8, start.y + 3, { steps: 3 });
+    await page.mouse.move(end.x, end.y, { steps: 10 }); await page.mouse.move(end.x + 1, end.y, { steps: 2 }); await frame();
+    const hints = editor().locator('.calendar-drop-hint');
+    assert.ok((await hints.allTextContents()).some(value => value.includes(copy ? '复制' : '移动')), `${label}: dragging shows the intended ${copy ? 'copy' : 'move'} action`);
+    if (during) await during();
+    if (!release) await page.keyboard.press('Escape');
+    await page.mouse.up(); await frame();
+  } finally { if (modifier) await page.keyboard.up(modifier); }
+  const events = await page.evaluate(() => window.calendarDragEvents);
+  const nativeDrag = events.filter(event => event.type === 'dragstart');
+  if (nativeDrag.length) {
+    assert.ok(nativeDrag.every(event => event.trusted), `${label}: native drag starts from real mouse input`);
+    assert.ok(events.some(event => event.type === 'dragover' && event.prevented && event.dropEffect === (copy ? 'copy' : 'move')), `${label}: valid native drop target accepts the intended action`);
+    if (release) assert.ok(events.some(event => event.type === 'drop' && event.trusted), `${label}: a real native drop reaches the target`);
+  } else {
+    assert.ok(events.some(event => event.type === 'pointerdown' && event.trusted), `${label}: pointer drag starts from real mouse input`);
+    assert.ok(events.some(event => event.type === 'pointermove' && event.trusted), `${label}: pointer drag has real movement`);
+  }
+  report.dragGestures.push({ label, modifier: modifier || null, copy, cancelled: !release, start, end, events }); persist();
+}
+async function dragSummaryChecks() {
+  const fixture = { format: 'open-office-calendar', version: 1, id: 'drag-summary-calendar', title: '胶囊拖拽及汇总单位验收', workdayHours: 7, allocationDisplay: 'percent', weekMode: 'week', history: [], notes: [
+    ['drag-a', '2026-11-04', '需求设计', .7, '#3b82f6'], ['drag-b', '2026-11-04', '开发实现', .3, '#16a34a'], ['drag-c', '2026-11-05', '发布准备', 1, '#8b5cf6'],
+  ].map(([id, date, title, weight, color]) => ({ id, date, title, weight, color, type: '工作日', content: `${title}的正文`, created_at: '2026-11-01T10:00:00.000Z' })) };
+  await page.getByTestId('document-open-input').setInputFiles({ name: '胶囊拖拽验收.oocalendar', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) }); await ready(); await month('2026-11');
+  await page.evaluate(() => {
+    window.calendarDragEvents = [];
+    if (window.calendarDragTraceInstalled) return;
+    window.calendarDragTraceInstalled = true;
+    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'dragstart', 'dragover', 'drop', 'dragend']) document.addEventListener(type, event => {
+      if (!event.target.closest?.('[data-testid="calendar-editor"]')) return;
+      if (window.calendarDragEvents.length >= 200) return;
+      window.calendarDragEvents.push({ type, trusted: event.isTrusted, prevented: event.defaultPrevented, dropEffect: event.dataTransfer?.dropEffect, effectAllowed: event.dataTransfer?.effectAllowed, ctrlKey: event.ctrlKey, metaKey: event.metaKey, target: event.target.getAttribute?.('data-testid') || event.target.tagName });
+    }, type !== 'dragover');
+  });
+  const text = id => title(id).locator('span').first();
+  await check('capsule-title-mouse-drag-moves-over-another-capsule-and-allows-undo', async () => {
+    const before = await exported();
+    await mouseDrag(text('drag-a'), text('drag-c'), { label: 'title-to-existing-capsule-move', during: async () => { assert.deepEqual((await state()).book, before); await capture('calendar-capsule-move-preview'); } });
+    assert.equal((await exported()).notes.find(n => n.id === 'drag-a').date, '2026-11-05');
+    await allocations('2026-11-04', { 'drag-b': 1 }); await allocations('2026-11-05', { 'drag-a': .5, 'drag-c': .5 });
+    assert.equal(await page.getByTestId('calendar-note-dialog').count(), 0); assert.equal(await page.getByTestId('calendar-delete-dialog').count(), 0);
+    await undo(); assert.deepEqual(await exported(), before);
+  });
+  await check('capsule-title-control-and-meta-copy-to-empty-and-occupied-days', async () => {
+    for (const [modifier, date, target] of [['Control', '2026-11-10', () => day('2026-11-10')], ['Meta', '2026-11-05', () => text('drag-c')]]) {
+      const before = await exported(); await mouseDrag(text('drag-a'), target(), { modifier, copy: true, label: `title-${modifier.toLowerCase()}-copy` });
+      const book = await exported(), copies = book.notes.filter(n => n.id !== 'drag-a' && n.title === '需求设计'); assert.equal(copies.length, 1);
+      assert.equal(copies[0].date, date); assert.equal(copies[0].content, fixture.notes[0].content); assert.equal(copies[0].color, fixture.notes[0].color); assert.equal(book.notes.find(n => n.id === 'drag-a').date, '2026-11-04');
+      await allocations('2026-11-04', { 'drag-a': .7, 'drag-b': .3 });
+      await allocations(date, date === '2026-11-05' ? { 'drag-c': .5, [copies[0].id]: .5 } : { [copies[0].id]: 1 });
+      await undo(); assert.deepEqual(await exported(), before);
+    }
+  });
+  await check('same-day-drag-keeps-allocation-and-control-drag-copies-with-one-undo', async () => {
+    const before = await exported(), revision = (await state()).revision;
+    await mouseDrag(text('drag-a'), text('drag-b'), { label: 'same-day-move' }); assert.deepEqual(await exported(), before); assert.equal((await state()).revision, revision);
+    await mouseDrag(text('drag-a'), text('drag-b'), { modifier: 'Control', copy: true, label: 'same-day-copy' });
+    const book = await exported(), copy = book.notes.find(n => !before.notes.some(original => original.id === n.id)); assert.ok(copy); assert.equal(copy.date, '2026-11-04');
+    await allocations('2026-11-04', { 'drag-a': 1 / 3, 'drag-b': 1 / 3, [copy.id]: 1 / 3 });
+    assert.equal((await state()).revision, revision + 1); await undo(); assert.deepEqual(await exported(), before);
+  });
+  await check('capsule-escape-cancels-drag-and-divider-resize-never-moves-notes', async () => {
+    const before = await exported(); await mouseDrag(text('drag-a'), text('drag-c'), { release: false, label: 'escape-cancels-title-drag' }); assert.deepEqual(await exported(), before); assert.equal(await editor().locator('.calendar-drop-hint').count(), 0);
+    const dates = before.notes.map(n => [n.id, n.date]); await resize('2026-11-04', 'drag-a', 'drag-b', .59); await allocations('2026-11-04', { 'drag-a': .6, 'drag-b': .4 });
+    assert.deepEqual((await exported()).notes.map(n => [n.id, n.date]), dates); assert.equal(await editor().locator('.calendar-drop-hint').count(), 0); await undo(); assert.deepEqual(await exported(), before);
+  });
+  await check('dragging-hides-source-delete-icon-and-can-drop-over-day-adjust-control', async () => {
+    const before = await exported();
+    await mouseDrag(text('drag-a'), editor().getByTestId('calendar-day-allocation-2026-11-05'), { label: 'drop-over-day-adjust-control', during: async () => {
+      const button = editor().getByTestId('calendar-note-delete-drag-a');
+      if (await button.count()) assert.equal(await button.evaluate(element => { const style = getComputedStyle(element); return style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0; }), true, 'The source delete cross is hidden during the drag');
+      await capture('calendar-drag-over-day-adjust-control');
+    } });
+    assert.equal((await exported()).notes.find(n => n.id === 'drag-a').date, '2026-11-05'); assert.equal(await page.getByTestId('calendar-day-dialog').count(), 0); assert.equal(await page.getByTestId('calendar-delete-dialog').count(), 0);
+    await undo(); assert.deepEqual(await exported(), before);
+  });
+  await check('expanded-day-allocation-resizes-without-an-invalid-event-drag-affordance', async () => {
+    const before = await exported(); await editor().getByTestId('calendar-day-allocation-2026-11-04').click(); const dialog = page.getByTestId('calendar-day-dialog'); await dialog.waitFor();
+    const source = dialog.getByTestId('calendar-note-title-drag-a').locator('span').first(), target = dialog.getByTestId('calendar-note-title-drag-b').locator('span').first();
+    assert.notEqual(await source.evaluate(element => getComputedStyle(element.closest('button')).cursor), 'grab', 'The expanded allocation title does not advertise an unavailable date move');
+    await dialog.evaluate(element => { window.calendarExpandedDragStarts = 0; element.addEventListener('dragstart', () => window.calendarExpandedDragStarts++, { capture: true }); });
+    const from = await source.boundingBox(), to = await target.boundingBox(); assert.ok(from && to);
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2); await page.mouse.down(); await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 10 }); await page.mouse.up(); await frame();
+    assert.equal(await page.evaluate(() => window.calendarExpandedDragStarts), 0); assert.deepEqual((await state()).book, before);
+    await resize('2026-11-04', 'drag-a', 'drag-b', .59, dialog); await dialog.getByTestId('calendar-note-cancel').click(); await frame();
+    await allocations('2026-11-04', { 'drag-a': .6, 'drag-b': .4 }); assert.deepEqual((await exported()).notes.map(n => [n.id, n.date]), before.notes.map(n => [n.id, n.date])); await undo(); assert.deepEqual(await exported(), before);
+  });
+  await check('month-summary-and-print-follow-settings-hours-or-days', async () => {
+    async function assertSummary(mode, amount, unit) {
+      const tags = editor().getByTestId('calendar-summary').locator('.calendar-summary-tag'), row = tags.filter({ hasText: '需求设计' });
+      const shown = await row.innerText(); assert.ok(shown.includes(`${amount}${unit}`) || shown.includes(`${amount} ${unit}`), `${mode} summary shows ${amount} ${unit}: ${shown}`);
+      const all = await tags.allTextContents(); for (const value of all) assert.equal(mode === 'hours' ? /\d\s*天/.test(value) : /\d\s*(?:h|小时)/.test(value), false, `${mode} summary does not mix quantity units: ${value}`);
+      const hint = await row.getAttribute('title'); assert.ok(hint); assert.equal(mode === 'hours' ? /\d\s*天/.test(hint) : /\d\s*(?:h|小时)/.test(hint), false, `${mode} summary tooltip follows the selected unit: ${hint}`);
+      await page.evaluate(() => { window.calendarOriginalPrint = window.print; window.calendarPrinted = undefined; window.print = () => { const root = document.querySelector('#office-print-root'); window.calendarPrinted = { summary: root.querySelector('.work-summary')?.textContent, html: root.outerHTML }; }; });
+      try {
+        await page.getByTestId('shell-print').click(); await poll(() => page.evaluate(() => !!window.calendarPrinted), 'summary print generated');
+        const printed = await page.evaluate(() => window.calendarPrinted); const offsets = fixture.notes.map(note => printed.summary.indexOf(note.title)); assert.ok(offsets.every(index => index >= 0), 'All work categories appear in the printed summary'); const entries = printed.summary.slice(Math.min(...offsets));
+        assert.ok(entries.includes(`${amount} ${unit}`) || entries.includes(`${amount}${unit}`), `${mode} print summary uses selected unit: ${entries}`);
+        assert.equal(mode === 'hours' ? /\d\s*天/.test(entries) : /\d\s*(?:h|小时)/.test(entries), false, `${mode} print entries do not mix quantity units: ${entries}`);
+        fs.writeFileSync(path.join(output, `calendar-summary-${mode}.html`), printed.html); report.printEvidence.push({ label: `summary-${mode}`, summary: printed.summary });
+      } finally { await page.evaluate(() => { window.print = window.calendarOriginalPrint; delete window.calendarOriginalPrint; window.dispatchEvent(new Event('afterprint')); }); await frame(); }
+    }
+    await assertSummary('percent', .7, '天'); await settings({ allocationDisplay: 'hours' }); await assertSummary('hours', 4.9, '小时');
+    await settings({ workdayHours: 8 }); await assertSummary('hours', 5.6, '小时'); await settings({ allocationDisplay: 'percent' }); await assertSummary('percent', .7, '天'); await capture('calendar-summary-selected-unit');
+  });
 }
 async function closeError() { const error = page.locator('.error-banner'); if (await error.count()) await error.getByRole('button').click(); await frame(); }
 async function allocationBoundaryChecks() {
@@ -121,7 +236,7 @@ async function weekSettingsChecks() {
     const work = await exported(); assert.deepEqual(work, { ...before, title: '统一设置提交', workdayHours: 8, weekMode: 'work', allocationDisplay: 'hours' }); assert.equal((await state()).revision, original.revision + 1); assert.equal((await state()).view.selectedDate, '2026-11-09'); assert.equal(await day('2026-11-09').evaluate(e => e === document.activeElement), true, 'Settings confirm focuses the normalized visible date');
     assert.equal(await editor().getByRole('gridcell').count(), 30); assert.equal(await editor().getByRole('columnheader').count(), 5); assert.equal(await editor().locator('.calendar-grid').evaluate(e => getComputedStyle(e).gridTemplateColumns.split(' ').length), 5);
     assert.equal(await day('2026-11-07').count(), 0); assert.equal(await day('2026-11-08').count(), 0); assert.equal(await editor().locator('[role="gridcell"][tabindex="0"]').count(), 1);
-    const summary = editor().getByTestId('calendar-summary'); for (const name of ['周五工作', '周六工作', '周日工作', '周一工作']) assert.match(await summary.locator('.calendar-summary-tag').filter({ hasText: name }).innerText(), /8h/);
+    const summary = editor().getByTestId('calendar-summary'); for (const name of ['周五工作', '周六工作', '周日工作', '周一工作']) assert.match(await summary.locator('.calendar-summary-tag').filter({ hasText: name }).innerText(), /8\s*小时/);
     assert.doesNotMatch(await editor().getByTestId('calendar-day-allocation-2026-11-06').innerText(), /全天|8h/);
     await undo(); assert.deepEqual(await exported(), before); assert.equal(await editor().getByRole('gridcell').count(), 42); await redo(); assert.deepEqual(await exported(), work); assert.equal(await editor().getByRole('gridcell').count(), 30); await capture('calendar-work-view');
   });
@@ -158,6 +273,7 @@ function completeReport() { report.sourcesAfter = hashes(); assert.deepEqual(rep
     await page.goto(origin, { timeout: 60000 });
     if (focus === 'allocation-boundaries') { await allocationBoundaryChecks(); completeReport(); return; }
     if (focus === 'week-settings') { await weekSettingsChecks(); completeReport(); return; }
+    if (focus === 'drag-summary') { await dragSummaryChecks(); completeReport(); return; }
     let first, second, saved, firstKey;
     await check('new-calendar-has-42-cells-and-date-click-only-selects', async () => {
       await page.getByTestId('shell-new').click(); await page.getByTestId('shell-new-calendar').click(); await ready(); firstKey = (await active()).key;
@@ -245,6 +361,7 @@ function completeReport() { report.sourcesAfter = hashes(); assert.deepEqual(rep
       const before = await exported(), download = await saveDownload('跨日分配验收.oocalendar', true); assert.deepEqual(download.model, before); await page.getByTestId('document-open-input').setInputFiles(download.target); await ready(); await month('2026-11'); assert.deepEqual(await exported(), before); await allocations('2026-11-04', { [workA.id]: .7, [workC.id]: .3 });
     });
     await allocationBoundaryChecks();
+    await dragSummaryChecks();
     await weekSettingsChecks();
     await check('imported-notes-without-history-keep-reusable-types-after-delete-and-clear', async () => {
       const fixture = { format: 'open-office-calendar', version: 1, id: 'imported-calendar', title: '团队工作日历', history: [], notes: [
