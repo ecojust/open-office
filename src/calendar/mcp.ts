@@ -1,18 +1,22 @@
 import { calendarTools } from '../mcp/calendar-tools.ts'
 import { tool, validateToolArguments } from '../mcp/tool-schema.ts'
 import { dateNumber, monthSummary, validateMonth } from './calendar.ts'
+import { dayAllocations, rebalanceDayAllocations, resizeAllocationBoundary, setDayAllocation } from './allocation.ts'
 import { calendarId, historySuggestions, preserveHistory, rememberHistory, validateCalendar, type CalendarBook, type CalendarNote, type CalendarNoteType } from './model.ts'
 import type { CalendarSession } from './session.ts'
 
 type NotePatch = Partial<Pick<CalendarNote, 'title' | 'content' | 'date' | 'color' | 'type'>>
 export type CalendarEditOperation =
  | { op: 'book.title'; title: string }
+ | { op: 'book.settings'; patch: Partial<Pick<CalendarBook, 'workdayHours' | 'allocationDisplay'>> }
  | { op: 'note.add'; note: Pick<CalendarNote, 'title' | 'date'> & NotePatch & { id?: string } }
  | { op: 'note.update'; noteId: string; patch: NotePatch }
  | { op: 'note.delete'; noteId: string }
  | { op: 'note.move'; noteId: string; date: string }
  | { op: 'note.copy'; noteId: string; id?: string; patch?: NotePatch }
  | { op: 'notes.clear_month'; month: string }
+ | { op: 'day.allocate'; date: string; allocations: { noteId: string; weight: number }[] }
+ | { op: 'day.adjust'; date: string; leftNoteId: string; position: number; display?: CalendarBook['allocationDisplay'] }
 export type CalendarView = { month: string; selectedDate: string; selectedNoteId: string | null; search: string }
 export type CalendarMcpHost = { session: CalendarSession; view: () => CalendarView; setView: (view: CalendarView) => void; changed: () => void }
 export type CalendarReadOptions = { month?: string; from?: string; to?: string; query?: string; type?: CalendarNoteType; offset?: number; limit?: number; includeHistory?: boolean; includeSummary?: boolean }
@@ -31,6 +35,12 @@ function note(book: CalendarBook, id: string): CalendarNote {
  if (!found) throw Error(`事项不存在：${id}`)
  return found
 }
+function rebalanceMembershipChange(book: CalendarBook, before?: Pick<CalendarNote, 'date' | 'type'>, after?: Pick<CalendarNote, 'date' | 'type'>): void {
+ const dates = new Set<string>()
+ if (before?.type === '工作日' && (after?.type !== '工作日' || before.date !== after.date)) dates.add(before.date)
+ if (after?.type === '工作日' && (before?.type !== '工作日' || before.date !== after.date)) dates.add(after.date)
+ for (const date of dates) rebalanceDayAllocations(book, date)
+}
 
 /** Apply only to a detached CalendarSession.change draft. The session validates
  * the whole result before committing, so edits and history share one undo step. */
@@ -40,25 +50,39 @@ export function editCalendar(book: CalendarBook, operations: readonly CalendarEd
  for (const operation of checked) {
   switch (operation.op) {
    case 'book.title': book.title = operation.title; break
+   case 'book.settings': {
+    if (operation.patch.workdayHours !== undefined && !Number.isInteger(operation.patch.workdayHours * 2)) throw Error('每日工作小时数必须为 0.5 小时的整数倍。')
+    Object.assign(book, operation.patch); break
+   }
    case 'note.add': {
     const value: CalendarNote = { id: calendarId(), content: '', color: '#4376d4', type: '工作日', created_at: now, ...operation.note }
     dateNumber(value.date)
-    book.notes.push(value); rememberHistory(book, value, now); created.push({ type: 'note', id: value.id }); break
+    book.notes.push(value); rebalanceMembershipChange(book, undefined, value)
+    rememberHistory(book, value, now); created.push({ type: 'note', id: value.id }); break
    }
    case 'note.update': {
-    const target = note(book, operation.noteId)
+    const target = note(book, operation.noteId), before = { date: target.date, type: target.type }
     if (operation.patch.date !== undefined) dateNumber(operation.patch.date)
-    Object.assign(target, operation.patch); rememberHistory(book, target, now); break
+    Object.assign(target, operation.patch)
+    if (target.type !== '工作日') delete target.weight
+    rebalanceMembershipChange(book, before, target); rememberHistory(book, target, now); break
    }
    case 'note.delete': {
-    note(book, operation.noteId); preserveHistory(book)
-    book.notes = book.notes.filter(item => item.id !== operation.noteId); break
+    const before = note(book, operation.noteId); preserveHistory(book)
+    book.notes = book.notes.filter(item => item.id !== operation.noteId)
+    rebalanceMembershipChange(book, before); break
    }
-   case 'note.move': dateNumber(operation.date); note(book, operation.noteId).date = operation.date; break
+   case 'note.move': {
+    dateNumber(operation.date)
+    const target = note(book, operation.noteId), before = { date: target.date, type: target.type }
+    target.date = operation.date; rebalanceMembershipChange(book, before, target); break
+   }
    case 'note.copy': {
     const value = { ...note(book, operation.noteId), ...operation.patch, id: operation.id ?? calendarId(), created_at: now }
     dateNumber(value.date)
-    book.notes.push(value); rememberHistory(book, value, now); created.push({ type: 'note', id: value.id }); break
+    if (value.type !== '工作日') delete value.weight
+    book.notes.push(value); rebalanceMembershipChange(book, undefined, value)
+    rememberHistory(book, value, now); created.push({ type: 'note', id: value.id }); break
    }
    case 'notes.clear_month': {
     validateMonth(operation.month)
@@ -68,6 +92,8 @@ export function editCalendar(book: CalendarBook, operations: readonly CalendarEd
     }
     break
    }
+   case 'day.allocate': setDayAllocation(book, operation.date, operation.allocations); break
+   case 'day.adjust': resizeAllocationBoundary(book, operation.date, operation.leftNoteId, operation.position, operation.display); break
   }
  }
  return { created }
@@ -87,9 +113,20 @@ export function readCalendar(book: CalendarBook, raw: CalendarReadOptions = {}) 
   (options.type === undefined || item.type === options.type) && (!query || item.title.toLowerCase().includes(query) || item.content.toLowerCase().includes(query)),
  ).sort((a, b) => compare(a.date, b.date) || compare(a.created_at, b.created_at) || compare(a.id, b.id))
  const hasMore = offset + limit < matches.length
+ const page = matches.slice(offset, offset + limit)
+ const allocations = new Map([...new Set(page.map(item => item.date))].flatMap(date => {
+  const values = dayAllocations(book, date)
+  return values.map((item, index) => [item.noteId, { ...item, rightNoteId: values[index + 1]?.noteId ?? null }] as const)
+ }))
  return {
-  book: { format: book.format, version: book.version, id: book.id, title: book.title },
-  notes: matches.slice(offset, offset + limit).map(item => ({ ...item })), total: matches.length, offset, limit, hasMore, nextOffset: hasMore ? offset + limit : null,
+  book: { format: book.format, version: book.version, id: book.id, title: book.title, workdayHours: book.workdayHours, allocationDisplay: book.allocationDisplay },
+  notes: page.map(item => {
+   const allocation = allocations.get(item.id)
+   return { ...item, share: allocation?.weight ?? 0, days: allocation?.weight ?? 0, hours: allocation?.hours ?? 0,
+    allocation: allocation ? { start: allocation.start, end: allocation.end, rightNoteId: allocation.rightNoteId } : null,
+   }
+  }),
+  total: matches.length, offset, limit, hasMore, nextOffset: hasMore ? offset + limit : null,
   ...(options.includeHistory === false ? {} : { history: historySuggestions(book) }),
   ...(options.month === undefined || options.includeSummary === false ? {} : { summary: monthSummary(book, options.month) }),
  }

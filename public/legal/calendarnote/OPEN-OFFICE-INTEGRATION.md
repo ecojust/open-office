@@ -6,6 +6,8 @@
 
 主要调整：日期单击只选中，通过明确的日期详情入口打开黄历；新建自定义事项可以搜索并复用跨月历史的名称、颜色与是否需要上班，正文保留当前输入；所有月份及历史事项随 `.oocalendar` 文档保存。修改经过可撤销的文档会话，删除和清除当月需要确认。未引入来源应用的独立窗口外壳、壁纸、二维码、品牌图片、FullCalendar、Element Plus 或 SQLite 存储层。
 
+在来源项目按同日工作事项平均计天的基础上，Open Office 增加同日工时胶囊：默认每天 7 小时，可调整相邻事项的比例、切换百分比或小时显示，月度统计按实际分配计算。相关设置和分配保存在日历本文档中。
+
 农历、节气与黄历由 `lunar-typescript@1.8.6` 提供，Copyright (c) 2020 6tail，MIT 许可；原文和精确 npm 来源见 [`../npm/lunar-typescript@1.8.6/`](../npm/lunar-typescript@1.8.6/source-manifest.json)。中国大陆法定假日复用 Open Office 的 holiday-cn 年度数据及缓存，其许可见 [`../holiday-cn-LICENSE.txt`](../holiday-cn-LICENSE.txt)。
 
 `.oocalendar` 使用 `open-office-calendar` 格式标记与版本 1，是 Open Office 的文档格式，不声称与原应用 SQLite 数据库直接互通。上游版权、原始许可与免责条款不因集成改名而改变。

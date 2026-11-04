@@ -1,4 +1,5 @@
 import { createCalendar, decodeCalendar, validateCalendar, type CalendarBook } from './model.ts'
+import { editWithAllocationTracking } from './allocation.ts'
 
 let nextDocument = 0
 export type CalendarSnapshot = { documentId: number; revision: number; dirty: boolean; canUndo: boolean; canRedo: boolean }
@@ -29,7 +30,7 @@ export class CalendarSession {
  inspect(): CalendarSnapshot { return { documentId: this.documentId, revision: this.revision, dirty: this.content !== this.baseline, canUndo: this.cursor > 0, canRedo: this.cursor < this.history.length - 1 } }
  change(edit: (copy: CalendarBook) => void): boolean {
   const copy = structuredClone(this.value), revision = this.revision
-  edit(copy)
+  editWithAllocationTracking(this.value, copy, () => edit(copy))
   if (revision !== this.revision) throw Error('编辑期间日历本已有其他修改，请重试。')
   const value = validateCalendar(copy), content = JSON.stringify(value)
   if (content === this.content) return false

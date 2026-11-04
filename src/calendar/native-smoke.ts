@@ -5,6 +5,7 @@ import type { NativeDocument, SaveDocumentRequest, SaveResult } from '../types'
 
 export const CALENDAR_NATIVE_CHECKS = [
   'mounted-calendar-dom-input',
+  'mounted-calendar-allocation-keyboard-adjustment',
   'global-save-writes-approved-calendar-file',
   'native-file-readback-reopens-in-new-calendar-session',
   'calendar-tabs-and-editors-closed',
@@ -19,6 +20,9 @@ const NOTE_DATE = '2026-11-04'
 const NOTE_COLOR = '#3b82f6'
 const NOTE_TYPE = '工作日'
 const PAGE_TEXT = 'NATIVE_CALENDAR_EDIT 本地保存与重开'
+const SECOND_TITLE = '原生协作 Native allocation'
+const SECOND_TEXT = 'NATIVE_CALENDAR_ALLOCATION 两项工时分配'
+const SECOND_COLOR = '#16a34a'
 type Snapshot = { documentId: number; revision: number; dirty: boolean }
 type CalendarEditor = EditorHandle & { inspect(): Promise<Snapshot>; markSaved(base64: string): Promise<void> }
 type SaveReceipt = {
@@ -38,8 +42,9 @@ export interface CalendarNativeSmokeReport {
   schemaVersion: 1; kind: 'calendar-native'; transport: 'native-webview-ipc'; ok: boolean
   native: { tauri: true; origin: string }; checks: string[]; limitations: string[]
   editing?: { title: string; text: string; date: string; color: string; type: string; bodyInputEvents: number; titleInputEvents: number; before: Snapshot; after: Snapshot }
+  allocation?: { title: string; text: string; color: string; titleInputEvents: number; bodyInputEvents: number; keyEvents: number; beforePercent: number[]; afterPercent: number[] }
   persistence?: { targetId: string; initialBase64: string; initialSha256: string; initialSizeBytes: number; readbackBase64: string; finalSha256: string; finalSizeBytes: number; saves: SaveReceipt[]; dialogObserved: boolean; saved: Snapshot }
-  reopened?: { keyChanged: boolean; fileId: string; sha256: string; snapshot: Snapshot; exportedBase64: string; title: string; text: string; date: string }
+  reopened?: { keyChanged: boolean; fileId: string; sha256: string; snapshot: Snapshot; exportedBase64: string; title: string; text: string; date: string; allocationPercent: number[] }
   cleanup?: { closedDocuments: number }
   failedRunTemporaryFilesRemoved?: boolean
   error?: string; cleanupError?: string
@@ -86,31 +91,55 @@ export async function runCalendarNativeSmoke(adapter: CalendarNativeSmokeAdapter
     const day = mounted.element.querySelector<HTMLElement>(`[data-testid="calendar-day-${NOTE_DATE}"]`)!
     day.click()
     assert(!document.querySelector('[data-testid="calendar-almanac-dialog"]'), 'date click opened almanac')
-    day.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: day.getBoundingClientRect().left + 12, clientY: day.getBoundingClientRect().top + 12 }))
-    await waitFor(() => !!document.querySelector('[data-testid="calendar-context-custom"]'), 'custom note context menu')
-    document.querySelector<HTMLButtonElement>('[data-testid="calendar-context-custom"]')!.click()
-    await waitFor(() => !!document.querySelector('[data-testid="calendar-note-dialog"]'), 'custom note form')
-    const title = document.querySelector<HTMLInputElement>('[data-testid="calendar-note-title"]')
-    const body = document.querySelector<HTMLTextAreaElement>('[data-testid="calendar-note-content"]')
-    const color = document.querySelector<HTMLInputElement>('[data-testid="calendar-note-color"]')
-    const type = document.querySelector<HTMLSelectElement>('[data-testid="calendar-note-type"]')
-    assert(title && body && color && type, 'custom note fields missing')
-    let titleInputEvents = 0, bodyInputEvents = 0
-    const titleInput = () => titleInputEvents++, bodyInput = () => bodyInputEvents++
-    title.addEventListener('input', titleInput); body.addEventListener('input', bodyInput)
+    async function createDomNote(noteTitle: string, noteText: string, noteColor: string) {
+      day.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: day.getBoundingClientRect().left + 12, clientY: day.getBoundingClientRect().top + 12 }))
+      await waitFor(() => !!document.querySelector('[data-testid="calendar-context-custom"]'), 'custom note context menu')
+      document.querySelector<HTMLButtonElement>('[data-testid="calendar-context-custom"]')!.click()
+      await waitFor(() => !!document.querySelector('[data-testid="calendar-note-dialog"]'), 'custom note form')
+      const title = document.querySelector<HTMLInputElement>('[data-testid="calendar-note-title"]')
+      const body = document.querySelector<HTMLTextAreaElement>('[data-testid="calendar-note-content"]')
+      const color = document.querySelector<HTMLInputElement>('[data-testid="calendar-note-color"]')
+      const type = document.querySelector<HTMLSelectElement>('[data-testid="calendar-note-type"]')
+      assert(title && body && color && type, 'custom note fields missing')
+      let titleInputEvents = 0, bodyInputEvents = 0
+      const titleInput = () => titleInputEvents++, bodyInput = () => bodyInputEvents++
+      title.addEventListener('input', titleInput); body.addEventListener('input', bodyInput)
+      try {
+        for (const [field, value] of [[title, noteTitle], [body, noteText], [color, noteColor], [type, NOTE_TYPE]] as const) {
+          field.focus(); field.value = value
+          field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true }))
+        }
+        await waitFor(() => document.querySelector<HTMLButtonElement>('[data-testid="calendar-note-confirm"]')?.disabled === false, 'valid custom note form')
+        document.querySelector<HTMLButtonElement>('[data-testid="calendar-note-confirm"]')!.click()
+        await waitFor(async () => !document.querySelector('[data-testid="calendar-note-dialog"]') && (await mounted.editor.inspect()).dirty && adapter.state(mounted.key).dirty, 'calendar DOM input')
+      } finally { title.removeEventListener('input', titleInput); body.removeEventListener('input', bodyInput) }
+      return { titleInputEvents, bodyInputEvents }
+    }
+    const firstInput = await createDomNote(PAGE_TITLE, PAGE_TEXT, NOTE_COLOR)
+    const secondInput = await createDomNote(SECOND_TITLE, SECOND_TEXT, SECOND_COLOR)
+    const capsule = mounted.element.querySelector<HTMLElement>(`[data-testid="calendar-work-capsule-${NOTE_DATE}"]`)
+    assert(capsule, 'mounted work allocation capsule missing')
+    const percent = (element: HTMLElement) => [...element.querySelectorAll<HTMLElement>('[data-note-id]')].map(note => Number(note.dataset.allocationPercent))
+    await waitFor(() => percent(capsule).length === 2, 'two work allocations rendered')
+    const beforePercent = percent(capsule), divider = capsule.querySelector<HTMLElement>('[role="slider"]')
+    assert(divider && beforePercent.every(value => Math.abs(value - 50) < 1e-6), 'second work note did not split the day equally')
+    let keyEvents = 0
+    const countKey = () => keyEvents++
+    divider.addEventListener('keydown', countKey)
     try {
-      for (const [field, value] of [[title, PAGE_TITLE], [body, PAGE_TEXT], [color, NOTE_COLOR], [type, NOTE_TYPE]] as const) {
-        field.focus(); field.value = value
-        field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true }))
+      divider.focus()
+      for (const expected of [60, 70]) {
+        divider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+        await waitFor(() => Math.abs(percent(capsule)[0]! - expected) < 1e-6, 'keyboard allocation adjustment')
       }
-      await waitFor(() => document.querySelector<HTMLButtonElement>('[data-testid="calendar-note-confirm"]')?.disabled === false, 'valid custom note form')
-      document.querySelector<HTMLButtonElement>('[data-testid="calendar-note-confirm"]')!.click()
-      await waitFor(async () => !document.querySelector('[data-testid="calendar-note-dialog"]') && (await mounted.editor.inspect()).dirty && adapter.state(mounted.key).dirty, 'calendar DOM input')
-    } finally { title.removeEventListener('input', titleInput); body.removeEventListener('input', bodyInput) }
+    } finally { divider.removeEventListener('keydown', countKey) }
+    const afterPercent = percent(capsule)
+    assert(keyEvents === 2 && afterPercent.length === 2 && Math.abs(afterPercent[1]! - 30) < 1e-6, 'keyboard allocation did not conserve 100 percent')
+    report.allocation = { title: SECOND_TITLE, text: SECOND_TEXT, color: SECOND_COLOR, ...secondInput, keyEvents, beforePercent, afterPercent }
     const after = await mounted.editor.inspect()
-    assert(bodyInputEvents > 0 && titleInputEvents > 0 && after.documentId === before.documentId && after.revision > before.revision, 'DOM input did not reach calendar model')
-    report.editing = { title: PAGE_TITLE, text: PAGE_TEXT, date: NOTE_DATE, color: NOTE_COLOR, type: NOTE_TYPE, bodyInputEvents, titleInputEvents, before, after }
-    report.checks.push(CALENDAR_NATIVE_CHECKS[0])
+    assert(firstInput.bodyInputEvents > 0 && firstInput.titleInputEvents > 0 && after.documentId === before.documentId && after.revision > before.revision, 'DOM input did not reach calendar model')
+    report.editing = { title: PAGE_TITLE, text: PAGE_TEXT, date: NOTE_DATE, color: NOTE_COLOR, type: NOTE_TYPE, ...firstInput, before, after }
+    report.checks.push(CALENDAR_NATIVE_CHECKS[0], CALENDAR_NATIVE_CHECKS[1])
     const saves: SaveReceipt[] = []
     unobserve = adapter.observeNativeSaves((request, result) => saves.push({ documentId: request.documentId, extension: request.extension,
       expectedSha256: request.expectedSha256, saveAs: request.saveAs === true, status: result.status,
@@ -133,7 +162,7 @@ export async function runCalendarNativeSmoke(adapter: CalendarNativeSmokeAdapter
     assert(!dialogObserved && !savedSnapshot.dirty && savedSnapshot.documentId === after.documentId && savedSnapshot.revision === after.revision, 'calendar save acknowledgement or dialog state differs')
     report.persistence = { targetId: temporary.id, initialBase64: baseline.base64, initialSha256: initial.sha256, initialSizeBytes: initial.sizeBytes,
       readbackBase64: saved.base64, finalSha256: final.sha256, finalSizeBytes: final.sizeBytes, saves, dialogObserved, saved: savedSnapshot }
-    report.checks.push(CALENDAR_NATIVE_CHECKS[1])
+    report.checks.push(CALENDAR_NATIVE_CHECKS[2])
     await bounded(adapter.close(mounted.key), 'close original calendar'); keys.pop(); closedDocuments++
     assert(!mounted.element.isConnected, 'closed calendar editor survived')
     const reopened = await bounded(adapter.open(saved), 'reopen calendar from disk'); keys.push(reopened.key)
@@ -151,18 +180,22 @@ export async function runCalendarNativeSmoke(adapter: CalendarNativeSmokeAdapter
     const reopenedDate = document.querySelector<HTMLInputElement>('[data-testid="calendar-note-date"]')?.value
     document.querySelector<HTMLButtonElement>('[data-testid="calendar-note-cancel"]')!.click()
     await waitFor(() => !document.querySelector('[data-testid="calendar-note-dialog"]'), 'close reopened details')
+    const reopenedCapsule = reopened.element.querySelector<HTMLElement>(`[data-testid="calendar-work-capsule-${NOTE_DATE}"]`)
+    assert(reopenedCapsule, 'reopened work capsule missing')
+    const allocationPercent = percent(reopenedCapsule)
+    assert(allocationPercent.length === 2 && Math.abs(allocationPercent[0]! - 70) < 1e-6 && Math.abs(allocationPercent[1]! - 30) < 1e-6, 'reopened UI lost non-default work allocations')
     const reopenedState = adapter.state(reopened.key)
     assert(reopened.key !== mounted.key && snapshot.documentId !== after.documentId && !snapshot.dirty && snapshot.revision === 0 && reopenedState.active && !reopenedState.dirty && reopenedState.fileId === saved.id && reopenedState.sha256 === final.sha256, 'reopen reused a session or lost native file identity')
     assert(exported.base64 === saved.base64 && reopenedTitle === PAGE_TITLE && reopenedText === PAGE_TEXT && reopenedDate === NOTE_DATE, 'calendar reopen lost saved content')
-    report.reopened = { keyChanged: true, fileId: saved.id, sha256: final.sha256, snapshot, exportedBase64: exported.base64, title: reopenedTitle, text: reopenedText, date: reopenedDate }
-    report.checks.push(CALENDAR_NATIVE_CHECKS[2])
+    report.reopened = { keyChanged: true, fileId: saved.id, sha256: final.sha256, snapshot, exportedBase64: exported.base64, title: reopenedTitle, text: reopenedText, date: reopenedDate, allocationPercent }
+    report.checks.push(CALENDAR_NATIVE_CHECKS[3])
   } catch (cause) { report.error = cause instanceof Error ? cause.message : String(cause) }
   finally {
     unobserve?.()
     try {
       for (const key of keys.reverse()) { await bounded(adapter.close(key), 'close calendar'); closedDocuments++ }
       report.cleanup = { closedDocuments }
-      if (closedDocuments === 2) report.checks.push(CALENDAR_NATIVE_CHECKS[3])
+      if (closedDocuments === 2) report.checks.push(CALENDAR_NATIVE_CHECKS[4])
     } catch (cause) { report.cleanupError = cause instanceof Error ? cause.message : String(cause) }
     // A failed calendar check aborts before the workspace check can remove the
     // shared fixture directory. Clean it here only on that failure path.

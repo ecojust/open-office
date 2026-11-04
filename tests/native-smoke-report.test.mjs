@@ -70,7 +70,7 @@ test('release evidence requires four Rust canvases, PDF text replacement, and na
     'pdfOriginalTextReplacementRoundTrip', 'pdfDefaultCanvas', 'pdfUndoRedo', 'pdfFailureAtomicity', 'pdfSessionCleanup', 'crossOriginIsolated',
     'workspaceLocalAutosave', 'workspaceSavedFileReadback', 'workspaceSessionCleanup',
     'notebookDomInput', 'notebookSavedFileReadback', 'notebookSessionCleanup',
-    'calendarDomInput', 'calendarSavedFileReadback', 'calendarSessionCleanup',
+    'calendarDomInput', 'calendarAllocationReadback', 'calendarSavedFileReadback', 'calendarSessionCleanup',
     'canvasDomInput', 'canvasSavedFileReadback', 'canvasSessionCleanup',
     'diagramDomInput', 'diagramSavedFileReadback', 'diagramSessionCleanup',
     'mcpNativeHttp', 'mcpNativeDocumentTools', 'mcpNativeDocxExport', 'mcpNativeSwitchStop', 'mcpNativeSessionCleanup', 'mcpNativeSevenEditorEditing', 'mcpNativeWordFormatHistory', 'mcpNativeSevenEditorExports',

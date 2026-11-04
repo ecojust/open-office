@@ -1,9 +1,11 @@
 import { dateNumber } from './calendar.ts'
+import { validateWorkdayAllocations } from './allocation.ts'
 
 export type CalendarNoteType = '工作日' | '非工作日'
-export type CalendarNote = { id: string; title: string; content: string; date: string; color: string; created_at: string; type: CalendarNoteType }
+export type CalendarAllocationDisplay = 'percent' | 'hours'
+export type CalendarNote = { id: string; title: string; content: string; date: string; color: string; created_at: string; type: CalendarNoteType; weight?: number }
 export type CalendarHistoryItem = { title: string; color: string; type: CalendarNoteType; lastUsedAt: string }
-export type CalendarBook = { format: 'open-office-calendar'; version: 1; id: string; title: string; notes: CalendarNote[]; history: CalendarHistoryItem[] }
+export type CalendarBook = { format: 'open-office-calendar'; version: 1; id: string; title: string; workdayHours: number; allocationDisplay: CalendarAllocationDisplay; notes: CalendarNote[]; history: CalendarHistoryItem[] }
 export const CALENDAR_MAX_BYTES = 8 * 1024 * 1024
 export const CALENDAR_MAX_NOTES = 10000
 export const CALENDAR_MAX_HISTORY = 100
@@ -54,13 +56,19 @@ export function validateCalendar(value: unknown): CalendarBook {
   if (typeof raw !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(raw) || ids.has(raw)) throw Error('日历本或事项标识无效、重复。')
   ids.add(raw); return raw
  }
- const result: CalendarBook = { format: 'open-office-calendar', version: 1, id: id(root.id), title: text(root.title, CALENDAR_MAX_TITLE, '日历本名称', true), notes: [], history: [] }
+ const workdayHours = root.workdayHours === undefined ? 7 : root.workdayHours
+ if (typeof workdayHours !== 'number' || !Number.isFinite(workdayHours) || workdayHours < 0.5 || workdayHours > 24 || !Number.isInteger(workdayHours * 2)) throw Error('每天工时应为 0.5—24 小时，按 0.5 小时递增。')
+ const allocationDisplay = root.allocationDisplay === undefined ? 'percent' : root.allocationDisplay
+ if (allocationDisplay !== 'percent' && allocationDisplay !== 'hours') throw Error('工时显示请选择百分比或小时。')
+ const result: CalendarBook = { format: 'open-office-calendar', version: 1, id: id(root.id), title: text(root.title, CALENDAR_MAX_TITLE, '日历本名称', true), workdayHours, allocationDisplay, notes: [], history: [] }
  result.notes = list(root.notes, CALENDAR_MAX_NOTES, '事项').map(raw => {
   const note = object(raw)
   if (typeof note.date !== 'string') throw Error('事项日期必须为 YYYY-MM-DD。')
   dateNumber(note.date)
-  return { id: id(note.id), title: text(note.title, CALENDAR_MAX_TITLE, '事项名称', true), content: text(note.content, CALENDAR_MAX_CONTENT, '事项内容'), date: note.date, color: color(note.color), created_at: timestamp(note.created_at), type: noteType(note.type) }
+  if (Object.hasOwn(note, 'weight') && (typeof note.weight !== 'number' || !Number.isFinite(note.weight) || note.weight < 0 || note.weight > 1)) throw Error('工作事项份额应为 0—1。')
+  return { id: id(note.id), title: text(note.title, CALENDAR_MAX_TITLE, '事项名称', true), content: text(note.content, CALENDAR_MAX_CONTENT, '事项内容'), date: note.date, color: color(note.color), created_at: timestamp(note.created_at), type: noteType(note.type), ...(Object.hasOwn(note, 'weight') ? { weight: note.weight as number } : {}) }
  })
+ validateWorkdayAllocations(result)
  const titles = new Set<string>()
  result.history = list(root.history, CALENDAR_MAX_HISTORY, '历史事项').map(raw => {
   const item = historyItem(raw)

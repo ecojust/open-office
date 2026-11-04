@@ -8,7 +8,7 @@
 
 计划排期使用 `src/schedule/` 中的本地 TypeScript 模型、日期投影和独立文档会话，由 `ScheduleEditor.vue` 与 `ScheduleTimeline.vue` 提供编辑，以 `.ooschedule` 保存。它复用现有 Vue 工作台，没有新增运行时依赖或 WASM 引擎；见[使用说明](project-scheduling.md)和[日期、格式说明](schedule-calendar.md)。
 
-日历便笺参考 CalendarNote，以 `src/calendar/` 的 TypeScript 模型和独立会话、`CalendarEditor.vue` 的 Vue 界面接入工作台，使用 `.oocalendar` 保存。农历、节气和黄历由固定版本 `lunar-typescript@1.8.6` 本地计算，法定假日复用排期的年度数据与缓存；没有引入 FullCalendar、Element Plus、SQLite 或新的 WASM 引擎。它复用文件操作、保存回执、撤销重做、全屏编辑和 MCP，见[使用说明与格式](calendar-notes.md)及[来源与许可](../public/legal/calendarnote/OPEN-OFFICE-INTEGRATION.md)。
+日历便笺参考 CalendarNote，以 `src/calendar/` 的 TypeScript 模型和独立会话、`CalendarEditor.vue` 的 Vue 界面接入工作台，使用 `.oocalendar` 保存。`allocation.ts` 与 `CalendarWorkCapsule.vue` 提供同日工时分配，按比例持久化、根据日工时换算小时，保留旧版本 1 文件的默认值兼容。农历、节气和黄历由固定版本 `lunar-typescript@1.8.6` 本地计算，法定假日复用排期的年度数据与缓存；没有引入 FullCalendar、Element Plus、SQLite 或新的 WASM 引擎。它复用文件操作、保存回执、撤销重做、全屏编辑和 MCP，见[使用说明与格式](calendar-notes.md)及[来源与许可](../public/legal/calendarnote/OPEN-OFFICE-INTEGRATION.md)。
 
 ## 本地环境
 

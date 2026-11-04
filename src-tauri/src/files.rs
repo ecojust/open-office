@@ -1107,6 +1107,34 @@ fn valid_calendar_header(value: &serde_json::Value) -> bool {
                 | '\u{202f}' | '\u{205f}' | '\u{3000}' | '\u{feff}')
         })
     }
+    fn valid_weights(notes: &[serde_json::Value]) -> bool {
+        let mut days = std::collections::HashMap::<&str, (usize, usize, f64)>::new();
+        for note in notes {
+            let weight = note.get("weight");
+            if field(note, "type") != Some("工作日") {
+                if weight.is_some() {
+                    return false;
+                }
+                continue;
+            }
+            // Dates and types have already passed the structural screening.
+            let day = days.entry(field(note, "date").unwrap_or("")).or_default();
+            day.0 += 1;
+            if let Some(weight) = weight {
+                let Some(weight) = weight
+                    .as_f64()
+                    .filter(|weight| (0.0..=1.0).contains(weight))
+                else {
+                    return false;
+                };
+                day.1 += 1;
+                day.2 += weight;
+            }
+        }
+        days.values().all(|(count, weighted, total)| {
+            *weighted == 0 || (count == weighted && (total - 1.0).abs() <= 1e-9)
+        })
+    }
     let valid_id = |id: &str| {
         !id.is_empty()
             && id.len() <= 100
@@ -1133,6 +1161,14 @@ fn valid_calendar_header(value: &serde_json::Value) -> bool {
     if value.get("format").and_then(|v| v.as_str()) != Some("open-office-calendar")
         || value.get("version").and_then(|v| v.as_u64()) != Some(1)
         || !field(value, "title").is_some_and(valid_title)
+        || !value.get("workdayHours").is_none_or(|hours| {
+            hours
+                .as_f64()
+                .is_some_and(|hours| (0.5..=24.0).contains(&hours) && (hours * 2.0).fract() == 0.0)
+        })
+        || !value
+            .get("allocationDisplay")
+            .is_none_or(|mode| matches!(mode.as_str(), Some("percent" | "hours")))
     {
         return false;
     }
@@ -1155,13 +1191,14 @@ fn valid_calendar_header(value: &serde_json::Value) -> bool {
             && field(note, "color").is_some_and(valid_color)
             && field(note, "type").is_some_and(valid_type)
             && field(note, "created_at").is_some_and(valid_calendar_timestamp)
-    }) && history.iter().all(|entry| {
-        field(entry, "title")
-            .is_some_and(|title| valid_title(title) && titles.insert(trimmed_title(title)))
-            && field(entry, "color").is_some_and(valid_color)
-            && field(entry, "type").is_some_and(valid_type)
-            && field(entry, "lastUsedAt").is_some_and(valid_calendar_timestamp)
-    })
+    }) && valid_weights(notes)
+        && history.iter().all(|entry| {
+            field(entry, "title")
+                .is_some_and(|title| valid_title(title) && titles.insert(trimmed_title(title)))
+                && field(entry, "color").is_some_and(valid_color)
+                && field(entry, "type").is_some_and(valid_type)
+                && field(entry, "lastUsedAt").is_some_and(valid_calendar_timestamp)
+        })
 }
 
 fn document_kind(bytes: &[u8], extension: DocExt) -> DocumentKind {
@@ -1804,6 +1841,9 @@ mod tests {
         assert_eq!(STANDARD.decode(&opened.base64).unwrap(), original);
         let mut calendar = calendar_fixture();
         calendar["notes"][0]["date"] = "2026-11-05".into();
+        calendar["notes"][0]["weight"] = 1.0.into();
+        calendar["workdayHours"] = 7.5.into();
+        calendar["allocationDisplay"] = "hours".into();
         let edited = serde_json::to_vec(&calendar).unwrap();
         validate_document_signature(&edited, DocExt::Oocalendar).unwrap();
         let SaveResult::Saved { document } = store
@@ -1828,6 +1868,125 @@ mod tests {
             .unwrap();
         assert_eq!(recent.kind, Some(DocumentKind::Calendar));
         assert_eq!(recent.extension, DocExt::Oocalendar);
+    }
+
+    #[test]
+    fn calendar_optional_work_settings_accept_legacy_books_and_reject_invalid_types() {
+        let legacy = calendar_fixture();
+        assert!(valid_calendar_header(&legacy));
+        for hours in [0.5, 7.0, 7.5, 24.0] {
+            for mode in ["percent", "hours"] {
+                let mut calendar = legacy.clone();
+                calendar["workdayHours"] = hours.into();
+                calendar["allocationDisplay"] = mode.into();
+                let bytes = serde_json::to_vec(&calendar).unwrap();
+                validate_document_signature(&bytes, DocExt::Oocalendar).unwrap();
+                validate_document_signature(&bytes, DocExt::Json).unwrap();
+                DocExt::Json.ensure_exportable_content(&bytes).unwrap();
+            }
+        }
+        for (field, values) in [
+            (
+                "workdayHours",
+                vec![
+                    serde_json::Value::Null,
+                    true.into(),
+                    "7".into(),
+                    0.into(),
+                    (-1).into(),
+                    0.25.into(),
+                    7.1.into(),
+                    24.5.into(),
+                ],
+            ),
+            (
+                "allocationDisplay",
+                vec![
+                    serde_json::Value::Null,
+                    true.into(),
+                    1.into(),
+                    "days".into(),
+                    "".into(),
+                ],
+            ),
+        ] {
+            for invalid in values {
+                let mut calendar = legacy.clone();
+                calendar[field] = invalid;
+                let bytes = serde_json::to_vec(&calendar).unwrap();
+                assert!(
+                    validate_document_signature(&bytes, DocExt::Oocalendar).is_err(),
+                    "{field}: {}",
+                    calendar[field]
+                );
+                assert!(validate_document_signature(&bytes, DocExt::Json).is_err());
+                assert!(DocExt::Json.ensure_exportable_content(&bytes).is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn calendar_work_weights_are_complete_bounded_daily_allocations() {
+        let mut calendar = calendar_fixture();
+        let mut second = calendar["notes"][0].clone();
+        second["id"] = "note-2".into();
+        calendar["notes"].as_array_mut().unwrap().push(second);
+        // A legacy day with no explicit weights remains an equal-share day.
+        assert!(valid_calendar_header(&calendar));
+        for (first, second) in [(0.0, 1.0), (0.25, 0.75), (0.5, 0.5), (0.4, 0.6000000005)] {
+            calendar["notes"][0]["weight"] = first.into();
+            calendar["notes"][1]["weight"] = second.into();
+            let bytes = serde_json::to_vec(&calendar).unwrap();
+            validate_document_signature(&bytes, DocExt::Oocalendar).unwrap();
+            validate_document_signature(&bytes, DocExt::Json).unwrap();
+            DocExt::Json.ensure_exportable_content(&bytes).unwrap();
+        }
+        for invalid in [
+            serde_json::Value::Null,
+            true.into(),
+            "0.5".into(),
+            (-0.1).into(),
+            1.1.into(),
+        ] {
+            let mut invalid_calendar = calendar.clone();
+            invalid_calendar["notes"][0]["weight"] = invalid;
+            assert!(!valid_calendar_header(&invalid_calendar));
+        }
+        for (first, second) in [(0.0, 0.0), (0.4, 0.4), (0.6, 0.6), (0.4, 0.600000002)] {
+            let mut invalid_calendar = calendar.clone();
+            invalid_calendar["notes"][0]["weight"] = first.into();
+            invalid_calendar["notes"][1]["weight"] = second.into();
+            let bytes = serde_json::to_vec(&invalid_calendar).unwrap();
+            assert!(validate_document_signature(&bytes, DocExt::Oocalendar).is_err());
+            assert!(validate_document_signature(&bytes, DocExt::Json).is_err());
+            assert!(DocExt::Json.ensure_exportable_content(&bytes).is_err());
+        }
+        let mut mixed = calendar.clone();
+        mixed["notes"][1].as_object_mut().unwrap().remove("weight");
+        assert!(
+            !valid_calendar_header(&mixed),
+            "explicit and automatic weights cannot share a workday"
+        );
+        calendar["notes"][0]["weight"] = 1.0.into();
+        calendar["notes"][1]["weight"] = 1.0.into();
+        calendar["notes"][1]["date"] = "2026-11-05".into();
+        assert!(
+            valid_calendar_header(&calendar),
+            "each date has its own allocation capacity"
+        );
+        calendar["notes"][1]["type"] = "非工作日".into();
+        for weight in [serde_json::Value::Null, 0.into(), 1.into()] {
+            calendar["notes"][1]["weight"] = weight;
+            assert!(
+                !valid_calendar_header(&calendar),
+                "non-work notes cannot carry an allocation"
+            );
+        }
+        calendar["notes"][1]
+            .as_object_mut()
+            .unwrap()
+            .remove("weight");
+        assert!(valid_calendar_header(&calendar));
     }
 
     #[test]
@@ -1885,6 +2044,9 @@ mod tests {
         let history = fs::read(data.join("recent-files.json")).unwrap();
         let mut calendar = calendar_fixture();
         calendar["notes"][0]["content"] = "调整后的安排".into();
+        calendar["notes"][0]["weight"] = 1.0.into();
+        calendar["workdayHours"] = 24.0.into();
+        calendar["allocationDisplay"] = "hours".into();
         let exported = serde_json::to_vec(&calendar).unwrap();
         let copy = directory.path().join("完整日历.json");
         let SaveResult::Saved { document } = store

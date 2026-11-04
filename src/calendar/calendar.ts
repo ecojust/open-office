@@ -1,8 +1,9 @@
 import type { CalendarBook } from './model.ts'
+import { dayAllocations } from './allocation.ts'
 
 const DAY = 86_400_000
 export type CalendarDay = { date: string | null; day: number; weekday: 0 | 1 | 2 | 3 | 4 | 5 | 6; inMonth: boolean; isToday: boolean }
-export type CalendarMonthSummary = { title: string; color: string; days: number; percent: number }
+export type CalendarMonthSummary = { title: string; color: string; days: number; hours: number; percent: number }
 
 /** Civil date arithmetic uses UTC, never local midnight or a DST-sensitive duration. */
 export function dateNumber(value: string): number {
@@ -41,8 +42,8 @@ export function monthDays(month: string, today = todayDate()): CalendarDay[] {
   return { date, day: date === null ? 0 : instant.getUTCDate(), weekday: index % 7 as CalendarDay['weekday'], inMonth: date?.startsWith(`${month}-`) ?? false, isToday: date === today }
  })
 }
-/** Match CalendarNote: a date containing work notes contributes one day, shared
- * evenly by its work notes. Non-work notes and other months do not enter the denominator. */
+/** A date containing work notes contributes one day using its saved allocation.
+ * Non-work notes and other months do not enter the denominator. */
 export function monthSummary(book: CalendarBook, month: string): CalendarMonthSummary[] {
  validateMonth(month)
  const dates = new Map<string, typeof book.notes>()
@@ -53,9 +54,10 @@ export function monthSummary(book: CalendarBook, month: string): CalendarMonthSu
   else dates.set(note.date, [note])
  }
  const totals = new Map<string, { title: string; color: string; days: number; latest: string }>()
- for (const notes of dates.values()) {
-  const weight = 1 / notes.length
+ for (const [date, notes] of dates) {
+  const shares = new Map(dayAllocations(book, date).map(item => [item.noteId, item.weight]))
   for (const note of notes) {
+   const weight = shares.get(note.id)!
    const current = totals.get(note.title)
    if (current) {
     current.days += weight
@@ -64,5 +66,5 @@ export function monthSummary(book: CalendarBook, month: string): CalendarMonthSu
   }
  }
  return [...totals.values()].sort((a, b) => b.days - a.days || (a.title < b.title ? -1 : a.title > b.title ? 1 : 0))
-  .map(({ title, color, days }) => ({ title, color, days, percent: days / dates.size * 100 }))
+  .map(({ title, color, days }) => ({ title, color, days, hours: days * book.workdayHours, percent: days / dates.size * 100 }))
 }

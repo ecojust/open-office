@@ -2,9 +2,89 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { CalendarSession } from '../src/calendar/session.ts'
 import { calendarId, createCalendar, decodeCalendar, encodeCalendar, rememberHistory, historySuggestions, preserveHistory } from '../src/calendar/model.ts'
+import { dayAllocations, resizeAllocationBoundary, setDayAllocation, rebalanceDayAllocations } from '../src/calendar/allocation.ts'
 
 function note(overrides = {}) { return { id: calendarId(), title: '会议', content: '', date: '2026-11-04', color: '#4376d4', created_at: '2026-11-04T09:30:00.000Z', type: '工作日', ...overrides } }
 function add(session, value) { session.change(copy => { copy.notes.push(value); rememberHistory(copy, value, value.created_at) }) }
+function close(actual, expected) { assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} differs from ${expected}`) }
+
+test('work event membership automatically rebalances while descriptive and duration edits retain shares', () => {
+ const session = new CalendarSession(), first = note(), second = note({ title: '研发' }), third = note({ title: '设计' })
+ add(session, first); assert.equal(session.model.notes[0].weight, 1)
+ add(session, second); assert.deepEqual(session.model.notes.map(item => item.weight), [0.5, 0.5])
+ session.change(copy => resizeAllocationBoundary(copy, first.date, first.id, 70))
+ session.change(copy => { copy.notes[0].title = '改名'; copy.notes[0].content = '内容'; copy.notes[0].color = '#9b66c9'; copy.workdayHours = 8; copy.allocationDisplay = 'hours' })
+ close(session.model.notes[0].weight, 0.7); close(dayAllocations(session.model, first.date)[0].hours, 5.6)
+ add(session, third)
+ for (const value of session.model.notes) close(value.weight, 1 / 3)
+ session.change(copy => { copy.notes[1].type = '非工作日' })
+ assert.equal(Object.hasOwn(session.model.notes[1], 'weight'), false)
+ close(session.model.notes[0].weight, 0.5); close(session.model.notes[2].weight, 0.5)
+ session.change(copy => { copy.notes = copy.notes.filter(item => item.id !== third.id) })
+ assert.equal(session.model.notes[0].weight, 1)
+ session.change(copy => { copy.notes[1].type = '工作日' })
+ assert.deepEqual(session.model.notes.map(item => item.weight), [0.5, 0.5])
+})
+
+test('moving work events rebalances both dates and copying only rebalances the destination', () => {
+ const session = new CalendarSession(), a = note({ title: 'A' }), b = note({ title: 'B' }), c = note({ title: 'C', date: '2026-11-05' })
+ add(session, a); add(session, b); add(session, c)
+ session.change(copy => resizeAllocationBoundary(copy, a.date, a.id, 70))
+ const duplicateId = calendarId()
+ session.change(copy => { copy.notes.push({ ...copy.notes[0], id: duplicateId, date: c.date }) })
+ assert.deepEqual(dayAllocations(session.model, a.date).map(item => item.weight), [0.7, 0.30000000000000004])
+ assert.deepEqual(dayAllocations(session.model, c.date).map(item => item.weight), [0.5, 0.5])
+ session.change(copy => { copy.notes.find(item => item.id === a.id).date = c.date })
+ assert.equal(dayAllocations(session.model, a.date)[0].weight, 1)
+ for (const item of dayAllocations(session.model, c.date)) close(item.weight, 1 / 3)
+ session.undo(); close(dayAllocations(session.model, a.date)[0].weight, 0.7)
+})
+
+test('manual shares, display units and day hours survive undo, save receipts and reopening', () => {
+ const session = new CalendarSession(), a = note(), b = note({ title: '研发' })
+ add(session, a); add(session, b)
+ const before = session.export(); session.markSaved(before.bytes)
+ session.change(copy => { copy.workdayHours = 8; copy.allocationDisplay = 'hours'; resizeAllocationBoundary(copy, a.date, a.id, 5.1) })
+ close(dayAllocations(session.model, a.date)[0].hours, 5)
+ assert.throws(() => session.markSaved(before.bytes), /回执/)
+ const allocated = structuredClone(session.model)
+ session.undo(); assert.equal(session.model.workdayHours, 7); assert.equal(session.inspect().dirty, false)
+ session.redo(); assert.deepEqual(session.model, allocated)
+ const exported = session.export(); session.markSaved(exported.bytes)
+ assert.deepEqual(new CalendarSession(exported.bytes).model, allocated)
+ assert.throws(() => { session.model.notes[0].weight = 1 }, TypeError)
+})
+
+test('batched add then allocation keeps the final explicit shares and the reverse order rebalances', () => {
+ const session = new CalendarSession(), a = note(), b = note({ title: '研发' }), c = note({ title: '设计' })
+ add(session, a)
+ session.change(copy => {
+  copy.notes.push(b)
+  setDayAllocation(copy, a.date, [{ noteId: a.id, weight: 0.8 }, { noteId: b.id, weight: 0.2 }])
+ })
+ assert.deepEqual(dayAllocations(session.model, a.date).map(item => item.weight), [0.8, 0.2])
+ session.change(copy => {
+  setDayAllocation(copy, a.date, [{ noteId: a.id, weight: 0.6 }, { noteId: b.id, weight: 0.4 }])
+  copy.notes.push(c)
+ })
+ for (const item of dayAllocations(session.model, a.date)) close(item.weight, 1 / 3)
+ session.undo()
+ session.change(copy => { copy.notes.push(c); resizeAllocationBoundary(copy, a.date, a.id, 40) })
+ const actual = dayAllocations(session.model, a.date)
+ close(actual[0].weight, 0.4); close(actual[1].weight, 2 / 3 - 0.4); close(actual[2].weight, 1 / 3)
+})
+
+test('per-operation rebalancing preserves batch order when intermediate members are removed again', () => {
+ const session = new CalendarSession(), a = note(), b = note({ title: '研发' }), c = note({ title: '临时' })
+ add(session, a); add(session, b)
+ session.change(copy => resizeAllocationBoundary(copy, a.date, a.id, 80))
+ session.change(copy => {
+  setDayAllocation(copy, a.date, [{ noteId: a.id, weight: 0.7 }, { noteId: b.id, weight: 0.3 }])
+  copy.notes.push(c); rebalanceDayAllocations(copy, a.date)
+  copy.notes = copy.notes.filter(item => item.id !== c.id); rebalanceDayAllocations(copy, a.date)
+ })
+ assert.deepEqual(dayAllocations(session.model, a.date).map(item => item.weight), [0.5, 0.5])
+})
 
 test('deleting imported notes preserves empty-history suggestions atomically without replacing saved attributes', () => {
  const imported = createCalendar()

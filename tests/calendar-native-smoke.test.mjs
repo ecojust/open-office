@@ -8,7 +8,7 @@ import { workspaceReport } from './helpers/workspace-smoke-report.mjs';
 
 test('native calendar acceptance independently validates DOM changes, file bytes, history and clean new-session reopen', () => {
   assert.deepEqual(validateNativeCalendarReport(calendarReport(), workspaceReport()), {
-    calendarDomInput: true, calendarSavedFileReadback: true, calendarSessionCleanup: true,
+    calendarDomInput: true, calendarAllocationReadback: true, calendarSavedFileReadback: true, calendarSessionCleanup: true,
   });
 });
 
@@ -18,7 +18,7 @@ test('calendar gate rejects browser substitutes, missing edits, altered targets,
     r => { r.transport = 'browser'; }, r => { r.native.tauri = false; }, r => { r.native.origin = 'http://localhost:31415'; },
     r => { r.native.origin = 'http://127.0.0.1:31415/path'; }, r => { r.checks.reverse(); }, r => { r.limitations.pop(); },
     r => { r.error = 'failed'; }, r => { r.cleanupError = 'failed'; }, r => { r.editing.titleInputEvents = 0; }, r => { r.editing.bodyInputEvents = 0; },
-    r => { r.editing.after.revision = 0; }, r => { r.editing.after.documentId = 3; }, r => { r.editing.after.dirty = false; },
+    r => { r.editing.after.revision = 0; }, r => { r.allocation.keyEvents = 0; }, r => { r.allocation.afterPercent = [50, 50]; }, r => { delete r.allocation; }, r => { r.reopened.allocationPercent = [50, 50]; }, r => { r.editing.after.documentId = 3; }, r => { r.editing.after.dirty = false; },
     r => { r.editing.date = '2026-11-05'; }, r => { r.persistence.readbackBase64 = r.persistence.initialBase64; },
     r => { r.persistence.finalSizeBytes++; }, r => { r.persistence.finalSha256 = '0'.repeat(64); },
     r => { r.persistence.saves[0].documentId = 'other-file'; }, r => { r.persistence.saves[0].savedKind = 'note'; },
@@ -42,7 +42,9 @@ function rewriteSaved(report, mutate) {
 }
 test('recomputed hashes cannot disguise unexpected calendar content or history copied with body', () => {
   for (const mutate of [
-    m => { m.version = 2; }, m => { m.id = 'different-book'; }, m => { m.title = 'changed'; },
+    m => { m.version = 2; }, m => { delete m.workdayHours; }, m => { m.workdayHours = 8; }, m => { m.allocationDisplay = 'hours'; },
+    m => { delete m.notes[0].weight; }, m => { m.notes[0].weight = '0.7'; }, m => { m.notes[0].weight = 0.5; m.notes[1].weight = 0.5; },
+    m => { m.notes[1].weight = 0.2; }, m => { m.notes[1].type = '非工作日'; }, m => { m.id = 'different-book'; }, m => { m.title = 'changed'; },
     m => { m.notes = []; }, m => { m.notes.push({ ...m.notes[0], id: 'extra' }); }, m => { m.notes[0].content = 'wrong'; },
     m => { m.notes[0].date = '2026-02-30'; }, m => { m.notes[0].type = '非工作日'; }, m => { m.notes[0].color = '#ff0000'; },
     m => { m.notes[0].created_at = 'yesterday'; }, m => { m.notes[0].id = m.id; }, m => { m.notes[0].extra = true; },

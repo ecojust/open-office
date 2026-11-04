@@ -3,9 +3,72 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createCalendar, validateCalendar, encodeCalendar, decodeCalendar, calendarId, rememberHistory, historySuggestions, CALENDAR_MAX_BYTES, CALENDAR_MAX_NOTES, CALENDAR_MAX_HISTORY } from '../src/calendar/model.ts'
 import { dateNumber, validateMonth, monthDays, shiftMonth, todayDate, monthSummary } from '../src/calendar/calendar.ts'
+import { dayAllocations, setDayAllocation, resizeAllocationBoundary } from '../src/calendar/allocation.ts'
 
 function note(overrides = {}) { return { id: calendarId(), title: '项目会议', content: '现场记录\n下一步😀', date: '2026-11-04', color: '#4376d4', created_at: '2026-11-04T09:30:00.000Z', type: '工作日', ...overrides } }
 function book() { const value = createCalendar('团队日历😀'); value.notes.push(note()); rememberHistory(value, value.notes[0], '2026-11-04T09:30:00.000Z'); return value }
+function close(actual, expected) { assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} differs from ${expected}`) }
+
+test('legacy version-one files default to seven hours and equal shares without rewriting note weights', () => {
+ const old = book(); delete old.workdayHours; delete old.allocationDisplay
+ old.notes.push(note({ title: '研发' }), note({ title: '沟通' }), note({ title: '年假', type: '非工作日' }))
+ const restored = decodeCalendar(new TextEncoder().encode(JSON.stringify(old)))
+ assert.equal(restored.version, 1); assert.equal(restored.workdayHours, 7); assert.equal(restored.allocationDisplay, 'percent')
+ assert.ok(restored.notes.every(item => !Object.hasOwn(item, 'weight')))
+ const values = dayAllocations(restored, '2026-11-04')
+ assert.equal(values.length, 3)
+ for (const value of values) { close(value.weight, 1 / 3); close(value.hours, 7 / 3) }
+ close(values.reduce((sum, value) => sum + value.hours, 0), 7)
+ assert.deepEqual(decodeCalendar(encodeCalendar(restored)), restored)
+})
+
+test('allocation validation rejects invalid settings, partial weights and non-conserving totals', () => {
+ for (const mutate of [
+  value => { value.workdayHours = 0 }, value => { value.workdayHours = 24.5 }, value => { value.workdayHours = 7.1 }, value => { value.workdayHours = Infinity }, value => { value.workdayHours = null },
+  value => { value.allocationDisplay = 'days' }, value => { value.allocationDisplay = null },
+  value => { value.notes[0].weight = null }, value => { value.notes[0].weight = NaN }, value => { value.notes[0].weight = -0.1 }, value => { value.notes[0].weight = 1.1 },
+  value => { value.notes[0].weight = 0.5 },
+  value => { value.notes[0].weight = 1; value.notes.push(note()) },
+  value => { value.notes[0].weight = 1; value.notes[0].type = '非工作日' },
+ ]) { const value = book(); mutate(value); assert.throws(() => validateCalendar(value)) }
+ const value = book(); value.workdayHours = 0.5; value.allocationDisplay = 'hours'; value.notes[0].weight = 1
+ assert.equal(validateCalendar(value).workdayHours, 0.5)
+ value.workdayHours = 24; assert.equal(validateCalendar(value).workdayHours, 24)
+ value.notes.push(note({ weight: 0 })); assert.equal(validateCalendar(value).notes[1].weight, 0)
+})
+
+test('capsule boundaries snap globally and conserve the adjacent pair in percent and hours', () => {
+ const value = book(); value.notes.push(note({ title: '研发' }), note({ title: '设计' }))
+ const ids = value.notes.map(item => item.id)
+ resizeAllocationBoundary(value, '2026-11-04', ids[0], 47, 'percent')
+ let shares = dayAllocations(value, '2026-11-04')
+ close(shares[0].weight, 0.5); close(shares[1].weight, 1 / 6); close(shares[2].weight, 1 / 3)
+ const first = shares[0].weight
+ resizeAllocationBoundary(value, '2026-11-04', ids[1], 5.26, 'hours')
+ shares = dayAllocations(value, '2026-11-04')
+ close(shares[0].weight, first); close(shares[1].hours, 2); close(shares[2].hours, 1.5)
+ close(shares.reduce((sum, item) => sum + item.hours, 0), 7)
+ resizeAllocationBoundary(value, '2026-11-04', ids[0], -100, 'percent')
+ shares = dayAllocations(value, '2026-11-04'); assert.equal(shares[0].weight, 0); close(shares[2].hours, 1.5)
+ resizeAllocationBoundary(value, '2026-11-04', ids[0], 1000, 'hours')
+ shares = dayAllocations(value, '2026-11-04'); assert.equal(shares[1].weight, 0); close(shares[2].hours, 1.5)
+ validateCalendar(value)
+ const before = structuredClone(value)
+ assert.throws(() => resizeAllocationBoundary(value, '2026-11-04', ids[2], 20))
+ assert.throws(() => resizeAllocationBoundary(value, '2026-11-04', ids[0], NaN))
+ assert.throws(() => setDayAllocation(value, '2026-11-04', [{ noteId: ids[0], weight: 1 }]))
+ assert.throws(() => setDayAllocation(value, '2026-11-04', [{ noteId: ids[0], weight: 0.5 }, { noteId: ids[0], weight: 0.5 }, { noteId: ids[2], weight: 0 }]))
+ assert.deepEqual(value, before)
+})
+
+test('monthly day, hour and percentage summaries use actual weights and exclude non-work events', () => {
+ const value = book(); value.workdayHours = 8
+ value.notes = [note({ title: '研发', weight: 0.75 }), note({ title: '会议', weight: 0.25 }), note({ title: '研发', date: '2026-11-05', weight: 1 }), note({ title: '休假', type: '非工作日' })]
+ const rows = monthSummary(value, '2026-11')
+ assert.deepEqual(rows.map(({ title, days, hours, percent }) => ({ title, days, hours, percent })), [
+  { title: '研发', days: 1.75, hours: 14, percent: 87.5 }, { title: '会议', days: 0.25, hours: 2, percent: 12.5 },
+ ])
+})
 
 test('calendar UTF-8 round trip keeps notes and independent reusable history', () => {
  const value = book(), copy = structuredClone(value)
