@@ -193,6 +193,55 @@ fn configure_stream(stream: &TcpStream) -> std::io::Result<()> {
     stream.set_write_timeout(Some(Duration::from_secs(60)))
 }
 
+// Darwin may temporarily reject a socket write with ENOBUFS even though the
+// socket is blocking. Retry that one write, never the whole copy: successful
+// short writes must remain committed exactly once. The budget belongs to the
+// response and is not replenished by progress (at most 2s of requested backoff,
+// separate from the existing 60s blocking socket-write timeout).
+#[cfg(any(target_os = "macos", test))]
+struct AssetResponseWriter<'a, W> {
+    inner: &'a mut W,
+    retries_left: u16,
+    retry_delay: Duration,
+    retryable: fn(&std::io::Error) -> bool,
+}
+
+#[cfg(any(target_os = "macos", test))]
+fn is_macos_buffer_pressure(error: &std::io::Error) -> bool {
+    cfg!(target_os = "macos") && error.raw_os_error() == Some(55)
+}
+
+#[cfg(any(target_os = "macos", test))]
+impl<'a, W: Write> AssetResponseWriter<'a, W> {
+    fn new(inner: &'a mut W) -> Self {
+        Self {
+            inner,
+            retries_left: 100,
+            retry_delay: Duration::from_millis(20),
+            retryable: is_macos_buffer_pressure,
+        }
+    }
+}
+
+#[cfg(any(target_os = "macos", test))]
+impl<W: Write> Write for AssetResponseWriter<'_, W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        loop {
+            match self.inner.write(bytes) {
+                Err(error) if self.retries_left > 0 && (self.retryable)(&error) => {
+                    self.retries_left -= 1;
+                    thread::sleep(self.retry_delay);
+                }
+                result => return result,
+            }
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
 fn resolve_path(root: &Path, token: &str, target: &str) -> Result<PathBuf, ()> {
     let raw = target.split('?').next().ok_or(())?;
     let prefix = format!("/{token}/");
@@ -274,7 +323,7 @@ fn mime(path: &Path) -> &'static str {
 }
 
 fn headers(
-    stream: &mut TcpStream,
+    stream: &mut impl Write,
     status: u16,
     reason: &str,
     content_type: &str,
@@ -505,6 +554,12 @@ fn serve(stream: &mut TcpStream, assets: &Assets) -> std::io::Result<()> {
     } else {
         (200, "OK", 0, length, "Accept-Ranges: bytes".into())
     };
+    // Keep non-macOS copies on their original direct socket path. On macOS the
+    // header and body share one pressure budget; reads and routing are unchanged.
+    #[cfg(target_os = "macos")]
+    let mut output = AssetResponseWriter::new(stream);
+    #[cfg(target_os = "macos")]
+    let stream = &mut output;
     headers(stream, status, reason, mime(&path), count, Some(&extra))?;
     if !head {
         file.seek(SeekFrom::Start(start))?;
@@ -591,6 +646,218 @@ mod tests {
             assert!(byte_range(invalid, 10).is_err());
         }
         assert!(byte_range("bytes=0-", 0).is_err());
+    }
+
+    enum WriteStep {
+        Bytes(usize),
+        Error(std::io::Error),
+    }
+
+    #[derive(Default)]
+    struct ScriptedWriter {
+        steps: std::collections::VecDeque<WriteStep>,
+        bytes: Vec<u8>,
+        calls: usize,
+    }
+
+    impl Write for ScriptedWriter {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.calls += 1;
+            let count = match self.steps.pop_front() {
+                Some(WriteStep::Error(error)) => return Err(error),
+                Some(WriteStep::Bytes(count)) => count.min(bytes.len()),
+                None => bytes.len(),
+            };
+            self.bytes.extend_from_slice(&bytes[..count]);
+            Ok(count)
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn pressure_writer(
+        writer: &mut ScriptedWriter,
+        retries: u16,
+    ) -> AssetResponseWriter<'_, ScriptedWriter> {
+        AssetResponseWriter {
+            inner: writer,
+            retries_left: retries,
+            retry_delay: Duration::ZERO,
+            // Fault injection runs on Linux too; production only enables the
+            // Darwin-specific errno after checking the compiled target OS.
+            retryable: |error| error.raw_os_error() == Some(55),
+        }
+    }
+
+    #[test]
+    fn asset_pressure_policy_only_recognizes_darwin_enobufs() {
+        assert_eq!(
+            is_macos_buffer_pressure(&std::io::Error::from_raw_os_error(55)),
+            cfg!(target_os = "macos")
+        );
+        for code in [4, 32, 35, 54, 60, 105, 10055] {
+            assert!(!is_macos_buffer_pressure(
+                &std::io::Error::from_raw_os_error(code)
+            ));
+        }
+        assert!(!is_macos_buffer_pressure(&std::io::Error::other(
+            "not an OS buffer-pressure error"
+        )));
+        let mut sink = Vec::new();
+        let mut writer = AssetResponseWriter::new(&mut sink);
+        assert_eq!(writer.retries_left, 100);
+        assert_eq!(
+            writer.retry_delay * u32::from(writer.retries_left),
+            Duration::from_secs(2)
+        );
+        writer.write_all(b"ordinary response").unwrap();
+        assert_eq!(writer.retries_left, 100);
+        assert_eq!(sink, b"ordinary response");
+    }
+
+    #[test]
+    fn asset_pressure_recovery_preserves_short_writes_and_copy_bytes() {
+        use WriteStep::{Bytes, Error};
+        let bytes: Vec<u8> = (0..65_537).map(|index| (index % 251) as u8).collect();
+        let mut sink = ScriptedWriter {
+            steps: [
+                Bytes(7),
+                Error(std::io::Error::from_raw_os_error(55)),
+                Bytes(3),
+                Error(std::io::Error::from(std::io::ErrorKind::Interrupted)),
+                Bytes(11),
+                Error(std::io::Error::from_raw_os_error(55)),
+            ]
+            .into(),
+            ..Default::default()
+        };
+        let mut writer = pressure_writer(&mut sink, 2);
+        assert_eq!(
+            std::io::copy(&mut bytes.as_slice(), &mut writer).unwrap(),
+            bytes.len() as u64
+        );
+        assert_eq!(writer.retries_left, 0);
+        assert_eq!(
+            sink.bytes, bytes,
+            "partial writes must never lose or duplicate bytes"
+        );
+    }
+
+    #[test]
+    fn asset_pressure_budget_is_shared_across_progress_and_stops_persistent_errors() {
+        use WriteStep::{Bytes, Error};
+        let mut sink = ScriptedWriter {
+            steps: [
+                Bytes(2),
+                Error(std::io::Error::from_raw_os_error(55)),
+                Bytes(3),
+                Error(std::io::Error::from_raw_os_error(55)),
+                Bytes(4),
+                Error(std::io::Error::from_raw_os_error(55)),
+            ]
+            .into(),
+            ..Default::default()
+        };
+        let mut writer = pressure_writer(&mut sink, 2);
+        let error = std::io::copy(&mut b"0123456789abcdef".as_slice(), &mut writer).unwrap_err();
+        assert_eq!(error.raw_os_error(), Some(55));
+        assert_eq!(writer.retries_left, 0);
+        assert_eq!(sink.bytes, b"012345678");
+        assert_eq!(
+            sink.calls, 6,
+            "successful short writes must not replenish the response budget"
+        );
+
+        let mut sink = ScriptedWriter {
+            steps: (0..8)
+                .map(|_| Error(std::io::Error::from_raw_os_error(55)))
+                .collect(),
+            ..Default::default()
+        };
+        let error = pressure_writer(&mut sink, 3)
+            .write_all(b"data")
+            .unwrap_err();
+        assert_eq!(error.raw_os_error(), Some(55));
+        assert_eq!(
+            sink.calls, 4,
+            "one initial write plus exactly the allowed retries"
+        );
+        assert!(sink.bytes.is_empty());
+    }
+
+    #[test]
+    fn asset_pressure_writer_keeps_zero_writes_and_unrelated_errors_fatal() {
+        use WriteStep::{Bytes, Error};
+        for kind in [
+            std::io::ErrorKind::BrokenPipe,
+            std::io::ErrorKind::ConnectionReset,
+            std::io::ErrorKind::WouldBlock,
+            std::io::ErrorKind::TimedOut,
+        ] {
+            let mut sink = ScriptedWriter {
+                steps: [Bytes(3), Error(kind.into())].into(),
+                ..Default::default()
+            };
+            let mut writer = pressure_writer(&mut sink, 5);
+            assert_eq!(writer.write_all(b"abcdef").unwrap_err().kind(), kind);
+            assert_eq!(writer.retries_left, 5);
+            assert_eq!(sink.bytes, b"abc");
+            assert_eq!(sink.calls, 2);
+        }
+        let mut sink = ScriptedWriter {
+            steps: [Bytes(0)].into(),
+            ..Default::default()
+        };
+        let mut writer = pressure_writer(&mut sink, 5);
+        assert_eq!(
+            writer.write_all(b"data").unwrap_err().kind(),
+            std::io::ErrorKind::WriteZero
+        );
+        assert_eq!(writer.retries_left, 5);
+        assert_eq!(sink.calls, 1);
+    }
+
+    #[test]
+    fn asset_headers_and_body_use_one_pressure_budget_without_changing_http_bytes() {
+        use WriteStep::{Bytes, Error};
+        let mut expected = Vec::new();
+        headers(
+            &mut expected,
+            206,
+            "Partial Content",
+            "application/wasm",
+            4,
+            Some("Content-Range: bytes 2-5/10"),
+        )
+        .unwrap();
+        expected.extend_from_slice(b"2345");
+        let mut sink = ScriptedWriter {
+            steps: [Bytes(5), Error(std::io::Error::from_raw_os_error(55))].into(),
+            ..Default::default()
+        };
+        let mut writer = pressure_writer(&mut sink, 2);
+        headers(
+            &mut writer,
+            206,
+            "Partial Content",
+            "application/wasm",
+            4,
+            Some("Content-Range: bytes 2-5/10"),
+        )
+        .unwrap();
+        assert_eq!(writer.retries_left, 1);
+        writer.inner.steps.extend([
+            Bytes(1),
+            Error(std::io::Error::from_raw_os_error(55)),
+            Bytes(2),
+        ]);
+        assert_eq!(
+            std::io::copy(&mut b"2345".as_slice(), &mut writer).unwrap(),
+            4
+        );
+        assert_eq!(writer.retries_left, 0);
+        assert_eq!(sink.bytes, expected);
     }
 
     #[test]
