@@ -9,7 +9,7 @@ const crypto = require('node:crypto');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
 const focus = process.env.OFFICE_CALENDAR_FOCUS || '';
-const output = path.resolve(process.env.OFFICE_CALENDAR_OUTPUT || path.join(root, ['allocation-boundaries', 'week-settings', 'drag-summary'].includes(focus) ? `test-results/calendar-notes-${focus}` : 'test-results/calendar-notes'));
+const output = path.resolve(process.env.OFFICE_CALENDAR_OUTPUT || path.join(root, ['allocation-boundaries', 'week-settings', 'drag-summary', 'value-layout'].includes(focus) ? `test-results/calendar-notes-${focus}` : 'test-results/calendar-notes'));
 const sources = ['src/App.vue', 'src/components/CalendarEditor.vue', 'src/calendar/model.ts', 'src/calendar/allocation.ts', 'src/calendar/components/CalendarWorkCapsule.vue', 'src/calendar/session.ts', 'src/calendar/calendar.ts', 'src/calendar/almanac.ts', 'src/calendar/mcp.ts', 'src/shared/document.ts', 'src/shared/printing.ts', 'src/style.css'];
 const hashes = () => Object.fromEntries(sources.filter(file => fs.existsSync(path.join(root, file))).map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex')]));
 const report = { ok: false, runtime: 'Real Vue UI in Chromium with deterministic public holiday fixtures; actual browser downloads and file imports', checks: [], screenshots: [], printEvidence: [], pointerGestures: [], dragGestures: [], errors: [], consoleErrors: [], externalRequests: [], holidayRequests: [], limitations: ['Native dialogs, native filesystem autosave and installed platform WebViews are not exercised.', 'Public holiday network responses are deterministic fixtures, not live availability evidence.', 'Mouse, keyboard and drag input are automated browser events; physical input is not exercised.', 'Native operating-system drag cursors and drag images are not captured by Chromium screenshots; drop acceptance and source-icon visibility are checked in the DOM.', 'Printing captures the generated browser print DOM; system print dialogs and printer output are not exercised.'] };
@@ -184,6 +184,128 @@ async function dragSummaryChecks() {
     await settings({ workdayHours: 8 }); await assertSummary('hours', 5.6, '小时'); await settings({ allocationDisplay: 'percent' }); await assertSummary('percent', .7, '天'); await capture('calendar-summary-selected-unit');
   });
 }
+async function valueLayoutChecks() {
+  await page.setViewportSize({ width: 1360, height: 900 });
+  if (await page.getByTestId('shell-focus-exit').isVisible()) await page.getByTestId('shell-focus-exit').click();
+  await page.getByTestId('theme-light').click(); await frame();
+  if (await page.locator('.document-tab').count()) {
+    await page.getByTestId('tabs-close-all').click(); await poll(async () => !(await page.locator('.document-tab').count()) || (await page.getByTestId('close-discard').isVisible()), 'close prior fixtures');
+    if (await page.getByTestId('close-discard').isVisible()) await page.getByTestId('close-discard').click();
+    await poll(async () => !(await page.locator('.document-tab').count()), 'prior fixtures closed');
+  }
+  const fixture = { format: 'open-office-calendar', version: 1, id: 'value-layout-calendar', title: '数字直接编辑验收', workdayHours: 7, allocationDisplay: 'percent', weekMode: 'week', history: [], notes: [
+    ['value-a', '2026-11-04', '设计工作', .2, '#3b82f6'], ['value-b', '2026-11-04', '研发工作', .3, '#16a34a'], ['value-c', '2026-11-04', '测试工作', .5, '#8b5cf6'], ['value-single', '2026-11-09', '单项工作', 1, '#f59e0b'],
+  ].map(([id, date, title, weight, color]) => ({ id, date, title, weight, color, type: '工作日', content: '原事项正文保持不变', created_at: '2026-11-01T10:00:00.000Z' })) };
+  await page.getByTestId('document-open-input').setInputFiles({ name: '数字直接编辑.oocalendar', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) }); await ready(); await month('2026-11');
+  const value = (id, scope = editor()) => scope.getByTestId(`calendar-note-value-${id}`);
+  const dialog = () => page.getByTestId('calendar-allocation-dialog');
+  const input = () => dialog().getByTestId('calendar-allocation-value');
+  async function openValue(id = 'value-a', scope = editor(), keyboard = false) {
+    if (keyboard) await value(id, scope).press('Enter'); else await value(id, scope).dblclick();
+    await dialog().waitFor(); await frame(); assert.equal(await page.getByTestId('calendar-note-dialog').count(), 0, 'Double-clicking a quantity never opens the note editor');
+  }
+  async function commitValue(amount) { await input().fill(String(amount)); await dialog().getByTestId('calendar-allocation-confirm').click(); await frame(); }
+  async function cancelValue() { await dialog().getByTestId('calendar-note-cancel').click(); await frame(); }
+  await check('quantity-double-click-and-enter-open-draft-dialog-with-cancel-and-no-op', async () => {
+    const before = await exported(), original = await state();
+    await openValue(); assert.equal(Number(await input().inputValue()), 20); assert.equal(await input().evaluate(e => e === document.activeElement), true);
+    await input().fill('42.5'); assert.deepEqual((await state()).book, before); assert.equal((await state()).revision, original.revision); await capture('calendar-direct-value-dialog');
+    await cancelValue(); assert.deepEqual(await exported(), before); assert.equal((await state()).revision, original.revision);
+    await openValue('value-a', editor(), true); await dialog().getByTestId('calendar-allocation-confirm').click(); await frame(); assert.equal(await dialog().count(), 0); assert.deepEqual(await exported(), before); assert.equal((await state()).revision, original.revision);
+  });
+  await check('direct-percent-change-preserves-other-ratios-and-is-one-undo', async () => {
+    const before = await exported(), revision = (await state()).revision;
+    await openValue(); await commitValue(40); await allocations('2026-11-04', { 'value-a': .4, 'value-b': .225, 'value-c': .375 });
+    assert.equal((await state()).revision, revision + 1); assert.deepEqual((await exported()).notes.map(n => [n.id, n.date, n.title, n.content]), before.notes.map(n => [n.id, n.date, n.title, n.content]));
+    await undo(); assert.deepEqual(await exported(), before); await redo(); await allocations('2026-11-04', { 'value-a': .4, 'value-b': .225, 'value-c': .375 }); await undo();
+    await openValue(); await commitValue(37.5); await allocations('2026-11-04', { 'value-a': .375, 'value-b': .234375, 'value-c': .390625 }); await undo(); assert.deepEqual(await exported(), before);
+  });
+  await check('direct-value-validates-range-and-single-work-stays-full-day', async () => {
+    const before = await exported(), revision = (await state()).revision; await openValue();
+    for (const amount of ['', '-1', '101']) {
+      await input().fill(amount); await dialog().getByTestId('calendar-allocation-confirm').click(); await frame(); assert.ok(await dialog().isVisible()); assert.deepEqual((await state()).book, before); assert.equal((await state()).revision, revision);
+      assert.ok((await input().evaluate(e => !e.validity.valid)) || (await dialog().innerText()).includes('范围'), 'Invalid value is visibly rejected');
+    }
+    await cancelValue(); await openValue('value-single'); assert.equal(Number(await input().inputValue()), 100);
+    if (!(await input().isDisabled()) && !(await input().evaluate(e => e.readOnly))) {
+      await input().fill('50'); await dialog().getByTestId('calendar-allocation-confirm').click(); await frame(); assert.ok(await dialog().isVisible());
+    }
+    assert.deepEqual((await state()).book, before); assert.match(await dialog().innerText(), /全天|100%/); await cancelValue(); assert.deepEqual(await exported(), before);
+  });
+  await check('direct-value-handles-zero-full-and-previously-zero-peers', async () => {
+    const before = await exported(); await openValue(); await commitValue(100); await allocations('2026-11-04', { 'value-a': 1, 'value-b': 0, 'value-c': 0 });
+    await openValue(); await commitValue(60); await allocations('2026-11-04', { 'value-a': .6, 'value-b': .2, 'value-c': .2 });
+    await openValue(); await commitValue(0); await allocations('2026-11-04', { 'value-a': 0, 'value-b': .5, 'value-c': .5 });
+    await undo(); await undo(); await undo(); assert.deepEqual(await exported(), before);
+  });
+  await check('expanded-day-quantity-dialog-returns-to-day-and-can-be-undone', async () => {
+    const before = await exported(); await editor().getByTestId('calendar-day-allocation-2026-11-04').click(); const details = page.getByTestId('calendar-day-dialog'); await details.waitFor();
+    await openValue('value-b', details); await input().fill('46.5'); await cancelValue(); await details.waitFor(); assert.deepEqual((await state()).book, before);
+    await openValue('value-b', details); await commitValue(44); await details.waitFor(); assert.equal(await page.getByTestId('calendar-note-dialog').count(), 0);
+    await details.getByTestId('calendar-note-cancel').click(); await frame(); await allocations('2026-11-04', { 'value-a': .16, 'value-b': .44, 'value-c': .4 }); await undo(); assert.deepEqual(await exported(), before);
+  });
+  await check('direct-hours-accepts-precise-value-with-nondefault-day-and-survives-reopen', async () => {
+    await settings({ allocationDisplay: 'hours', workdayHours: 8 }); const before = await exported(); await openValue(); assert.equal(Number(await input().inputValue()), 1.6);
+    await commitValue(1.25); await allocations('2026-11-04', { 'value-a': .15625, 'value-b': .31640625, 'value-c': .52734375 });
+    const edited = await exported(); await undo(); assert.deepEqual(await exported(), before); await redo(); assert.deepEqual(await exported(), edited);
+    const download = await saveDownload('直接编辑工时.oocalendar', true), session = (await state()).documentId; assert.deepEqual(download.model, edited);
+    await page.getByTestId('document-open-input').setInputFiles(download.target); await ready(); await month('2026-11'); assert.notEqual((await state()).documentId, session); assert.deepEqual(await exported(), edited);
+    await allocations('2026-11-04', { 'value-a': .15625, 'value-b': .31640625, 'value-c': .52734375 }); await capture('calendar-direct-hours-saved');
+  });
+  const dense = { ...fixture, id: 'calendar-fit-density', title: '六行月历自适应布局验收', notes: [
+    ...Array.from({ length: 8 }, (_, index) => ({ id: `dense-work-${index}`, date: '2026-11-04', title: `工作事项${index + 1}及其完整名称`, color: ['#3b82f6', '#16a34a', '#8b5cf6'][index % 3], weight: 1 / 8, type: '工作日', content: `工作正文${index + 1}`, created_at: '2026-11-01T10:00:00.000Z' })),
+    ...Array.from({ length: 5 }, (_, index) => ({ id: `dense-off-${index}`, date: '2026-11-04', title: `非工作事项${index + 1}`, color: '#f59e0b', type: '非工作日', content: `非工作正文${index + 1}`, created_at: '2026-11-01T10:00:00.000Z' })),
+    { id: 'last-row-note', date: '2026-12-02', title: '最后一周仍可操作', color: '#3b82f6', type: '工作日', weight: 1, content: '', created_at: '2026-11-01T10:00:00.000Z' },
+  ] };
+  await page.getByTestId('document-open-input').setInputFiles({ name: '密集日历布局.oocalendar', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(dense)) }); await ready(); await month('2026-11');
+  async function assertFit(label, columns) {
+    const geometry = await editor().evaluate(element => {
+      const bounds = node => { const r = node.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight, scrollWidth: node.scrollWidth, clientWidth: node.clientWidth }; };
+      const viewport = element.querySelector('.calendar-scroll'), grid = element.querySelector('.calendar-grid');
+      return { outer: bounds(element), viewport: bounds(viewport), grid: bounds(grid), cells: [...grid.querySelectorAll('[role="gridcell"]')].map(bounds), root: { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight } };
+    });
+    report.layoutEvidence ||= []; report.layoutEvidence.push({ label, columns, ...geometry }); persist();
+    assert.equal(geometry.cells.length, columns * 6);
+    for (const [name, item] of [['viewport', geometry.viewport], ['grid', geometry.grid], ...geometry.cells.map((cell, index) => [`cell-${index}`, cell])]) {
+      assert.ok(item.height > 0 && item.width > 0, `${label}: ${name} has positive size`);
+      assert.ok(item.scrollHeight <= item.clientHeight + 1, `${label}: ${name} vertically fits (${item.scrollHeight}/${item.clientHeight})`);
+      assert.ok(item.scrollWidth <= item.clientWidth + 1, `${label}: ${name} horizontally fits (${item.scrollWidth}/${item.clientWidth})`);
+    }
+    assert.ok(geometry.grid.y >= geometry.viewport.y - 1 && geometry.grid.bottom <= geometry.viewport.bottom + 1, `${label}: all six rows fit in the actual viewport`);
+    assert.ok(geometry.cells.at(-1).bottom <= geometry.viewport.bottom + 1 && geometry.cells.at(-1).bottom <= geometry.root.height, `${label}: final week is on screen`);
+    const heights = geometry.cells.map(cell => cell.height); assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, `${label}: six rows share available height equally`);
+    assert.ok(geometry.root.scrollWidth <= geometry.root.width + 1 && geometry.root.scrollHeight <= geometry.root.height + 1, `${label}: document does not scroll`);
+    const entry = editor().getByTestId('calendar-day-allocation-2026-11-04'); const hit = await entry.evaluate(node => { const r = node.getBoundingClientRect(); return node.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }); assert.equal(hit, true, `${label}: dense-day details entry remains clickable`);
+    await entry.click(); const details = page.getByTestId('calendar-day-dialog'); await details.waitFor(); assert.equal(await details.locator('.calendar-day-list > button').count(), 13, `${label}: all dense-day notes remain accessible`);
+    for (const item of dense.notes.filter(n => n.date === '2026-11-04')) assert.equal(await details.locator(`.calendar-day-list > button[data-note-id="${item.id}"]`).count(), 1);
+    await details.getByTestId('calendar-note-cancel').click(); await frame();
+    const summary = editor().getByTestId('calendar-summary');
+    const summaryGeometry = await summary.locator('.calendar-summary-tags').evaluate(node => { const style = getComputedStyle(node); return { overflowX: style.overflowX, scrollWidth: node.scrollWidth, clientWidth: node.clientWidth }; });
+    assert.ok(summaryGeometry.scrollWidth <= summaryGeometry.clientWidth + 1 || !['auto', 'scroll'].includes(summaryGeometry.overflowX), `${label}: month summary has no horizontal scrollbar`);
+    await editor().getByTestId('calendar-summary-more').click(); const summaryDialog = page.getByTestId('calendar-summary-dialog'); await summaryDialog.waitFor();
+    const workTitles = dense.notes.filter(n => n.date.startsWith('2026-11') && n.type === '工作日').map(n => n.title);
+    assert.equal(await summaryDialog.locator('.calendar-summary-tag').count(), workTitles.length, `${label}: collapsed summary retains every monthly work category`);
+    for (const name of workTitles) assert.ok((await summaryDialog.innerText()).includes(name));
+    await summaryDialog.getByTestId('calendar-note-cancel').click(); await frame(); await day('2026-12-02').click(); assert.equal((await state()).view.selectedDate, '2026-12-02');
+  }
+  await check('six-calendar-rows-fit-week-and-work-with-dense-days-at-three-window-sizes', async () => {
+    for (const [width, height] of [[1360, 900], [1000, 700], [900, 640]]) {
+      await page.setViewportSize({ width, height }); await frame();
+      for (const weekMode of ['week', 'work']) {
+        await settings({ weekMode }); const before = await exported(); await assertFit(`${weekMode}-${width}x${height}`, weekMode === 'work' ? 5 : 7); assert.deepEqual(await exported(), before); await capture(`calendar-fit-${weekMode}-${width}x${height}`);
+      }
+    }
+  });
+  await check('fullscreen-resize-and-exit-keep-six-visible-rows-without-losing-notes', async () => {
+    for (const weekMode of ['week', 'work']) {
+      await settings({ weekMode }); const before = await exported(); await page.getByTestId('shell-focus-enter').click(); await frame(); await assertFit(`focus-${weekMode}-900x640`, weekMode === 'work' ? 5 : 7); await capture(`calendar-fit-focus-${weekMode}`);
+      await page.setViewportSize({ width: 1360, height: 900 }); await frame(); await assertFit(`focus-${weekMode}-1360x900`, weekMode === 'work' ? 5 : 7); await page.getByTestId('shell-focus-exit').click(); await frame(); assert.deepEqual(await exported(), before);
+      await page.setViewportSize({ width: 900, height: 640 }); await frame();
+    }
+    await page.setViewportSize({ width: 1360, height: 900 }); await frame();
+  });
+}
+
 async function closeError() { const error = page.locator('.error-banner'); if (await error.count()) await error.getByRole('button').click(); await frame(); }
 async function allocationBoundaryChecks() {
   await check('keyboard-home-end-reach-unsnapped-adjacent-pair-boundaries', async () => {
@@ -274,6 +396,7 @@ function completeReport() { report.sourcesAfter = hashes(); assert.deepEqual(rep
     if (focus === 'allocation-boundaries') { await allocationBoundaryChecks(); completeReport(); return; }
     if (focus === 'week-settings') { await weekSettingsChecks(); completeReport(); return; }
     if (focus === 'drag-summary') { await dragSummaryChecks(); completeReport(); return; }
+    if (focus === 'value-layout') { await valueLayoutChecks(); completeReport(); return; }
     let first, second, saved, firstKey;
     await check('new-calendar-has-42-cells-and-date-click-only-selects', async () => {
       await page.getByTestId('shell-new').click(); await page.getByTestId('shell-new-calendar').click(); await ready(); firstKey = (await active()).key;
@@ -380,6 +503,7 @@ function completeReport() { report.sourcesAfter = hashes(); assert.deepEqual(rep
     await check('dark-and-narrow-window-retain-42-cells-without-document-overflow', async () => {
       await capture('calendar-desktop-light'); await page.getByTestId('theme-dark').click(); await capture('calendar-desktop-dark'); await page.setViewportSize({ width: 800, height: 640 }); await frame(); assert.equal(await editor().getByRole('gridcell').count(), 42); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true); await capture('calendar-narrow-dark');
     });
+    await valueLayoutChecks();
     completeReport();
   } catch (error) { report.failure = { message: error.message, stack: error.stack }; if (page && !page.isClosed()) { try { await capture('failure'); report.failure.text = (await page.locator('body').innerText()).slice(-10000); } catch {} } process.exitCode = 1; }
   finally { await browser?.close(); await server?.close(); persist(); console.log(JSON.stringify({ ok: report.ok, stage: report.stage, checks: report.checks.length, report: path.join(output, 'report.json'), failure: report.failure?.message })); }

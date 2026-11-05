@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createCalendar, validateCalendar, encodeCalendar, decodeCalendar, calendarId, rememberHistory, historySuggestions, CALENDAR_MAX_BYTES, CALENDAR_MAX_NOTES, CALENDAR_MAX_HISTORY } from '../src/calendar/model.ts'
 import { dateNumber, validateMonth, monthDays, visibleMonthDays, isVisibleCalendarDate, normalizeVisibleDate, moveCalendarDate, shiftMonth, todayDate, monthSummary } from '../src/calendar/calendar.ts'
-import { dayAllocations, setDayAllocation, resizeAllocationBoundary } from '../src/calendar/allocation.ts'
+import { dayAllocations, setDayAllocation, setNoteAllocation, resizeAllocationBoundary } from '../src/calendar/allocation.ts'
+import { CalendarSession } from '../src/calendar/session.ts'
 
 function note(overrides = {}) { return { id: calendarId(), title: '项目会议', content: '现场记录\n下一步😀', date: '2026-11-04', color: '#4376d4', created_at: '2026-11-04T09:30:00.000Z', type: '工作日', ...overrides } }
 function book() { const value = createCalendar('团队日历😀'); value.notes.push(note()); rememberHistory(value, value.notes[0], '2026-11-04T09:30:00.000Z'); return value }
@@ -117,6 +118,132 @@ test('monthly day, hour and percentage summaries use actual weights and exclude 
  assert.deepEqual(rows.map(({ title, days, hours, percent }) => ({ title, days, hours, percent })), [
   { title: '研发', days: 1.75, hours: 14, percent: 87.5 }, { title: '会议', days: 0.25, hours: 2, percent: 12.5 },
  ])
+})
+
+test('direct percentage edits preserve the other proportions without divider snapping or unrelated changes', () => {
+ const value = book(), date = value.notes[0].date
+ value.notes = [note({ title: '设计', weight: .2 }), note({ title: '研发', weight: .3 }), note({ title: '测试', weight: .5 }), note({ date: '2026-11-05', weight: 1 }), note({ type: '非工作日' })]
+ const before = structuredClone(value), target = value.notes[0].id
+ setNoteAllocation(value, date, target, 12.5)
+ const rows = dayAllocations(value, date)
+ for (const [index, expected] of [.125, .328125, .546875].entries()) close(rows[index].weight, expected)
+ assert.equal(rows[0].percent, 12.5); close(rows.reduce((sum, row) => sum + row.hours, 0), 7)
+ assert.deepEqual(value.notes.slice(3), before.notes.slice(3)); assert.deepEqual(value.history, before.history)
+ for (let index = 0; index < 3; index++) assert.deepEqual({ ...value.notes[index], weight: before.notes[index].weight }, before.notes[index])
+ assert.deepEqual(decodeCalendar(encodeCalendar(value)), value)
+})
+
+test('direct hour edits use configured daily hours and accept precision beyond a half-hour step', () => {
+ const value = book(); value.workdayHours = 7.5; value.allocationDisplay = 'hours'
+ value.notes = [note({ weight: .2 }), note({ title: '研发', weight: .3 }), note({ title: '测试', weight: .5 })]
+ const target = value.notes[0], date = target.date
+ setNoteAllocation(value, date, target.id, 1.125)
+ let rows = dayAllocations(value, date)
+ close(rows[0].hours, 1.125); close(rows[0].weight, .15)
+ close(rows[1].weight, .31875); close(rows[2].weight, .53125)
+ close(rows.reduce((sum, row) => sum + row.hours, 0), 7.5)
+ value.workdayHours = .5
+ setNoteAllocation(value, date, target.id, .125, 'hours')
+ rows = dayAllocations(value, date); close(rows[0].weight, .25); close(rows[1].weight, .28125); close(rows[2].weight, .46875)
+ value.workdayHours = 24
+ setNoteAllocation(value, date, target.id, 3.75, 'hours')
+ rows = dayAllocations(value, date); close(rows[0].hours, 3.75); close(rows[1].weight, .31640625); close(rows[2].weight, .52734375)
+ validateCalendar(value)
+})
+
+test('direct allocation allows zero and full-day values and shares an all-zero remainder equally', () => {
+ const value = book(); value.notes = [note({ weight: 1 }), note({ title: '研发', weight: 0 }), note({ title: '测试', weight: 0 })]
+ const [a, b, c] = value.notes, date = a.date
+ setNoteAllocation(value, date, a.id, 25)
+ assert.deepEqual(value.notes.map(item => item.weight), [.25, .375, .375])
+ setNoteAllocation(value, date, a.id, 0)
+ assert.deepEqual(value.notes.map(item => item.weight), [0, .5, .5])
+ setNoteAllocation(value, date, a.id, 100)
+ assert.deepEqual(value.notes.map(item => item.weight), [1, 0, 0])
+ setNoteAllocation(value, date, c.id, 25)
+ assert.deepEqual(value.notes.map(item => item.weight), [.75, 0, .25])
+ setNoteAllocation(value, date, b.id, 100)
+ assert.deepEqual(value.notes.map(item => item.weight), [0, 1, 0]); validateCalendar(value)
+
+ // Positive shares remain meaningful even when their sum is much smaller
+ // than the file validator's tolerance; they are not an all-zero remainder.
+ value.notes[0].weight = 1; value.notes[1].weight = 1e-300; value.notes[2].weight = 3e-300
+ setNoteAllocation(value, date, a.id, 50)
+ assert.deepEqual(value.notes.map(item => item.weight), [.5, .125, .375]); validateCalendar(value)
+ value.notes[0].weight = 1 - Number.EPSILON; value.notes[1].weight = Number.EPSILON; value.notes[2].weight = 0
+ setNoteAllocation(value, date, b.id, 0)
+ assert.deepEqual(value.notes.map(item => item.weight), [1, 0, 0], 'explicit zero removes even a tiny positive share')
+})
+
+test('direct allocation rejects invalid values or targets without changing any model data', () => {
+ const value = book(); value.notes = [note({ weight: .4 }), note({ title: '研发', weight: .6 }), note({ type: '非工作日' })]
+ const before = structuredClone(value), target = value.notes[0], date = target.date
+ for (const invalid of [NaN, Infinity, -Infinity, -.01, 100.01, '25', null, undefined, {}, true]) {
+  assert.throws(() => setNoteAllocation(value, date, target.id, invalid, 'percent')); assert.deepEqual(value, before)
+ }
+ for (const display of ['days', null, false, '', {}]) {
+  assert.throws(() => setNoteAllocation(value, date, target.id, 20, display)); assert.deepEqual(value, before)
+ }
+ for (const [day, id] of [[date, 'missing'], ['2026-11-05', target.id], [date, value.notes[2].id]]) {
+  assert.throws(() => setNoteAllocation(value, day, id, 20), /工作事项/); assert.deepEqual(value, before)
+ }
+ for (const invalid of [-.01, 7.01]) {
+  assert.throws(() => setNoteAllocation(value, date, target.id, invalid, 'hours')); assert.deepEqual(value, before)
+ }
+})
+
+test('a lone work event must retain the whole day and no-op edits preserve legacy and float bytes', () => {
+ const single = book(), only = single.notes[0], before = structuredClone(single)
+ assert.throws(() => setNoteAllocation(single, only.date, only.id, 50), /占满全天/)
+ assert.throws(() => setNoteAllocation(single, only.date, only.id, 6.5, 'hours'), /占满全天/)
+ setNoteAllocation(single, only.date, only.id, 100); setNoteAllocation(single, only.date, only.id, 7, 'hours')
+ assert.deepEqual(single, before, 'single legacy event need not gain a weight property')
+
+ const legacy = book(); legacy.notes.push(note({ title: '研发' }), note({ title: '测试' }))
+ const session = new CalendarSession(encodeCalendar(legacy)), snapshot = session.inspect(), bytes = session.export().bytes
+ assert.equal(session.change(copy => setNoteAllocation(copy, only.date, legacy.notes[0].id, 100 / 3)), false)
+ assert.deepEqual(session.inspect(), snapshot); assert.deepEqual(session.export().bytes, bytes)
+ const floating = book(); floating.notes = [note({ weight: .7 }), note({ title: '研发', weight: .30000000000000004 })]
+ const floatSession = new CalendarSession(encodeCalendar(floating)), floatBytes = floatSession.export().bytes
+ assert.equal(floatSession.change(copy => setNoteAllocation(copy, only.date, floating.notes[1].id, 30)), false)
+ assert.deepEqual(floatSession.export().bytes, floatBytes); assert.equal(floatSession.inspect().dirty, false)
+})
+
+test('direct allocation commits once, can undo and redo, and survives a saved file in a new session', () => {
+ const value = book(); value.notes = [note({ weight: .2 }), note({ title: '研发', weight: .3 }), note({ title: '测试', weight: .5 })]
+ const target = value.notes[0], session = new CalendarSession(encodeCalendar(value)), before = session.export().bytes
+ assert.equal(session.change(copy => setNoteAllocation(copy, target.date, target.id, 17.25)), true)
+ assert.equal(session.revision, 1); assert.equal(session.inspect().dirty, true)
+ close(dayAllocations(session.model, target.date)[0].percent, 17.25)
+ const edited = structuredClone(session.model)
+ assert.equal(session.undo(), true); assert.deepEqual(session.export().bytes, before); assert.equal(session.inspect().dirty, false)
+ assert.equal(session.redo(), true); assert.deepEqual(session.model, edited)
+ const saved = session.export(); session.markSaved(saved.bytes)
+ const reopened = new CalendarSession(saved.bytes)
+ assert.notEqual(reopened.documentId, session.documentId); assert.deepEqual(reopened.model, edited)
+ const snapshot = session.inspect()
+ assert.throws(() => session.change(copy => setNoteAllocation(copy, target.date, target.id, 101)))
+ assert.deepEqual(session.inspect(), snapshot); assert.deepEqual(session.model, edited)
+ session.validateReceipt(saved.bytes)
+})
+
+test('direct allocation honors batched membership order and validates before touching the draft', () => {
+ const value = book(), a = value.notes[0], b = note({ title: '研发' }), c = note({ title: '测试' }), d = note({ title: '上线' })
+ const session = new CalendarSession(encodeCalendar(value))
+ session.change(copy => { copy.notes.push(b); setNoteAllocation(copy, a.date, a.id, 50) })
+ assert.deepEqual(session.model.notes.map(item => item.weight), [.5, .5])
+ session.change(copy => {
+  copy.notes.push(c)
+  const draft = structuredClone(copy)
+  assert.throws(() => setNoteAllocation(copy, a.date, a.id, 101)); assert.deepEqual(copy, draft)
+  setNoteAllocation(copy, a.date, a.id, 20)
+ })
+ assert.deepEqual(session.model.notes.map(item => item.weight), [.2, .4, .4])
+ session.change(copy => { setNoteAllocation(copy, a.date, a.id, 70); copy.notes.push(d) })
+ assert.deepEqual(session.model.notes.map(item => item.weight), [.25, .25, .25, .25])
+ session.undo(); assert.deepEqual(session.model.notes.map(item => item.weight), [.2, .4, .4])
+ session.change(copy => { copy.notes = copy.notes.filter(item => item.id !== b.id); setNoteAllocation(copy, a.date, a.id, 30) })
+ assert.deepEqual(session.model.notes.map(item => item.weight), [.3, .7])
 })
 
 test('calendar UTF-8 round trip keeps notes and independent reusable history', () => {
