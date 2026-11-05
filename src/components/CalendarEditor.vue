@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import Icon from './Icon.vue'
 import CalendarWorkCapsule, { type AllocationCommit } from '../calendar/components/CalendarWorkCapsule.vue'
 import { calendarId, encodeCalendar, historySuggestions, preserveHistory, rememberHistory, type CalendarAllocationDisplay, type CalendarBook, type CalendarHistoryItem, type CalendarNote, type CalendarWeekMode } from '../calendar/model'
-import { dayAllocations, resizeAllocationBoundary } from '../calendar/allocation'
+import { dayAllocations, resizeAllocationBoundary, setNoteAllocation } from '../calendar/allocation'
 import { CalendarSession } from '../calendar/session'
 import { moveCalendarDate, normalizeVisibleDate, visibleMonthDays, monthSummary, shiftMonth, todayDate, validateMonth } from '../calendar/calendar'
 import { loadCalendarAlmanac, type CalendarAlmanac, type CalendarDateDetails } from '../calendar/almanac'
@@ -23,10 +23,11 @@ useDialogFocus(dialogElement)
 const model = shallowRef<CalendarBook>(), loading = ref(true), problem = ref('')
 const month = ref(todayDate().slice(0, 7)), selectedDate = ref(todayDate()), selectedNoteId = ref<string|null>(null), query = ref('')
 const canUndo = ref(false), canRedo = ref(false), historyQuery = ref('')
-const dialog = ref<'note'|'delete'|'clear'|'almanac'|'day'|'settings'|null>(null), dialogError = ref('')
+const dialog = ref<'note'|'delete'|'clear'|'almanac'|'day'|'settings'|'allocation'|'summary'|null>(null), dialogError = ref('')
 const draft = ref<CalendarNote>(), editingNote = ref(false), titleDraft = ref('')
 const workdayHoursDraft = ref(7), allocationBusy = ref(false), allocationCancelToken = ref(0)
 const weekModeDraft = ref<CalendarWeekMode>('week'), allocationDisplayDraft = ref<CalendarAllocationDisplay>('percent')
+const allocationValueDraft = ref<number|string>(''), allocationInitialValue = ref(0), allocationUnit = ref<CalendarAllocationDisplay>('percent'), allocationReturnToDay = ref(false)
 const almanac = shallowRef<CalendarAlmanac>(), details = shallowRef<CalendarDateDetails>()
 const menu = ref<{ x: number; y: number; date: string }>(), drag = ref<{ id: string; generation: number; copy: boolean; element: HTMLElement }>(), dropDate = ref('')
 const holidayYears = shallowRef<HolidayYears>({}), holidayBusy = ref(false), holidayMessage = ref('自动更新中国大陆法定假日')
@@ -67,7 +68,7 @@ const history = computed(() => model.value ? historySuggestions(model.value, his
 const allDayNotes = computed(() => (model.value?.notes.filter(note => note.date === selectedDate.value) ?? []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at) || a.id.localeCompare(b.id)))
 const selectedLunar = computed(() => almanac.value?.day(selectedDate.value))
 const visibleYears = computed(() => [...new Set(days.value.flatMap(day => day.date ? [Number(day.date.slice(0, 4))] : []))].sort((a, b) => a - b))
-const dialogTitle = computed(() => dialog.value === 'note' ? editingNote.value ? '编辑事项' : '添加自定义事项' : dialog.value === 'clear' ? '清除当月事项' : dialog.value === 'delete' ? '删除事项' : dialog.value === 'day' ? `${selectedDate.value} 的事项` : dialog.value === 'settings' ? '日历本设置' : '日期详情')
+const dialogTitle = computed(() => dialog.value === 'note' ? editingNote.value ? '编辑事项' : '添加自定义事项' : dialog.value === 'clear' ? '清除当月事项' : dialog.value === 'delete' ? '删除事项' : dialog.value === 'day' ? `${selectedDate.value} 的事项` : dialog.value === 'settings' ? '日历本设置' : dialog.value === 'allocation' ? '修改工时分配' : dialog.value === 'summary' ? '全月工作汇总' : '日期详情')
 const deletableNote = computed(() => selected.value)
 const formatNumber = (value: number) => Number(value.toFixed(1)).toLocaleString('zh-CN')
 function summaryWork(item: { days: number; hours: number }, display = model.value?.allocationDisplay) {
@@ -77,6 +78,12 @@ const dayNotes = (date: string|null) => date ? byDate.value.get(date) ?? [] : []
 const workNotes = (date: string|null) => date ? workByDate.value.get(date) ?? [] : []
 const offNotes = (date: string|null) => dayNotes(date).filter(note => note.type === '非工作日')
 const dailyAllocations = computed(() => model.value ? dayAllocations(model.value, selectedDate.value) : [])
+const noteCounts = computed(() => {
+ const counts = new Map<string, number>()
+ for (const note of model.value?.notes ?? []) counts.set(note.date, (counts.get(note.date) ?? 0) + 1)
+ return counts
+})
+const allocationMaximum = computed(() => allocationUnit.value === 'percent' ? 100 : model.value?.workdayHours ?? 7)
 function noteAllocation(note: CalendarNote) { return dailyAllocations.value.find(item => item.noteId === note.id) }
 function allocationLabel(note: CalendarNote) {
  const item = noteAllocation(note)
@@ -166,6 +173,21 @@ function askDelete(id: string) {
 }
 function clearMonth() { if (controlsReady.value && notesInMonth.value.length) openDialog('clear') }
 function showDay(date: string) { if (controlsReady.value) { selectedDate.value = date; selectedNoteId.value = null; openDialog('day') } }
+function showSummary() { if (controlsReady.value) openDialog('summary') }
+function openAllocation(note: CalendarNote) {
+ if (!model.value || !editable.value || drag.value || allocationBusy.value || (dialog.value && dialog.value !== 'day')) return
+ const item = dayAllocations(model.value, note.date).find(item => item.noteId === note.id)
+ if (!item) return
+ allocationReturnToDay.value = dialog.value === 'day'
+ selectedDate.value = note.date; selectedNoteId.value = note.id; allocationUnit.value = model.value.allocationDisplay
+ allocationInitialValue.value = Number((allocationUnit.value === 'percent' ? item.percent : item.hours).toFixed(8))
+ allocationValueDraft.value = allocationInitialValue.value
+ openDialog('allocation')
+ void nextTick(() => {
+  const input = dialogElement.value?.querySelector<HTMLInputElement>('[data-testid="calendar-allocation-value"]')
+  input?.focus(); input?.select()
+ })
+}
 function editFromDay(id: string) { cancelDialog(); openNote(selectedDate.value, id) }
 function settings() { if (controlsReady.value && model.value) { titleDraft.value = model.value.title; workdayHoursDraft.value = model.value.workdayHours; weekModeDraft.value = model.value.weekMode; allocationDisplayDraft.value = model.value.allocationDisplay; openDialog('settings') } }
 async function showDateDetails(date = selectedDate.value) {
@@ -178,7 +200,11 @@ async function showDateDetails(date = selectedDate.value) {
   almanac.value = provider; details.value = provider.details(date)
  } catch { if (!disposed && owner === generation && dialog.value === 'almanac') dialogError.value = '此日期的农历详情暂不可用，日历事项不受影响。' }
 }
-function cancelDialog() { cancelAllocation(); dialog.value = null; dialogError.value = ''; draft.value = undefined; details.value = undefined; accept() }
+function cancelDialog() {
+ const returnToDay = dialog.value === 'allocation' && allocationReturnToDay.value
+ cancelAllocation(); dialog.value = returnToDay ? 'day' : null; dialogError.value = ''; draft.value = undefined; details.value = undefined; allocationReturnToDay.value = false; accept()
+ if (returnToDay) void nextTick(() => dialogElement.value?.querySelector<HTMLElement>(`[data-testid="calendar-note-value-${selectedNoteId.value}"]`)?.focus({ preventScroll: true }))
+}
 function deleteFromDay(id: string) { if (!allocationBusy.value) { cancelDialog(); askDelete(id) } }
 function submitDialog() {
  if (!session || !editable.value) return
@@ -198,6 +224,12 @@ function submitDialog() {
   } else if (dialog.value === 'clear') {
    const prefix = `${month.value}-`; session.change(book => { preserveHistory(book); book.notes = book.notes.filter(note => !note.date.startsWith(prefix)) })
   } else if (dialog.value === 'settings') session.change(book => { book.title = titleDraft.value.trim(); book.workdayHours = workdayHoursDraft.value; book.weekMode = weekModeDraft.value; book.allocationDisplay = allocationDisplayDraft.value })
+  else if (dialog.value === 'allocation') {
+   const id = selectedNoteId.value, value = allocationValueDraft.value
+   if (!id || typeof value !== 'number' || !Number.isFinite(value)) throw Error('请输入有效的工时数值。')
+   // Opening and confirming a rounded display value must not change saved precision.
+   if (value !== allocationInitialValue.value) session.change(book => setNoteAllocation(book, selectedDate.value, id, value, allocationUnit.value))
+  }
   cancelDialog(); problem.value = ''; accept()
   if (settingWeekMode && previousDate !== selectedDate.value) void nextTick(() => root.value?.querySelector<HTMLElement>(`[data-calendar-day="${selectedDate.value}"]`)?.focus({ preventScroll: true }))
  } catch (cause) { dialogError.value = cause instanceof Error ? cause.message : String(cause) }
@@ -410,7 +442,7 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
 </script>
 
 <template>
- <section ref="root" class="calendar-editor" :class="{'calendar-focus-mode': focusMode,'calendar-work-mode':model?.weekMode==='work','calendar-dragging':!!drag}" :style="{'--calendar-columns':columns,'--calendar-min-width':`${columns*90}px`}" :data-week-mode="model?.weekMode" data-testid="calendar-editor" data-kind="calendar" :data-document-id="document.id" :data-document-key="document.id" :aria-label="model?.title || '日历便笺'" tabindex="-1" @keydown="keydown">
+ <section ref="root" class="calendar-editor" :class="{'calendar-focus-mode': focusMode,'calendar-work-mode':model?.weekMode==='work','calendar-dragging':!!drag}" :style="{'--calendar-columns':columns}" :data-week-mode="model?.weekMode" data-testid="calendar-editor" data-kind="calendar" :data-document-id="document.id" :data-document-key="document.id" :aria-label="model?.title || '日历便笺'" tabindex="-1" @keydown="keydown">
   <p v-if="loading" class="calendar-loading">正在打开日历本…</p>
   <template v-else-if="model">
    <header class="calendar-toolbar" role="toolbar" aria-label="日历工具">
@@ -418,21 +450,19 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
     <div class="calendar-navigation"><button data-testid="calendar-prev" aria-label="上一月" :disabled="!controlsReady || month==='1900-01'" @click="navigate(-1)"><Icon name="chevron" :size="16" class="calendar-back"/></button><label class="calendar-month-label"><span>{{monthTitle}}</span><input data-testid="calendar-month" aria-label="选择月份" type="month" :value="month" min="1900-01" max="9999-12" :disabled="!controlsReady" @change="setMonth(($event.target as HTMLInputElement).value)"></label><button data-testid="calendar-next" aria-label="下一月" :disabled="!controlsReady || month==='9999-12'" @click="navigate(1)"><Icon name="chevron" :size="16"/></button><button data-testid="calendar-today" :disabled="!controlsReady" @click="today">今天</button></div>
     <div class="calendar-toolbar-actions"><button data-testid="calendar-settings" title="日历本设置" :disabled="!controlsReady" @click="settings">设置</button><button data-testid="calendar-add" class="calendar-primary" :disabled="!controlsReady" @click="openNote()"><Icon name="plus" :size="15"/>添加事项</button><button data-testid="calendar-undo" title="撤销" aria-label="撤销日历修改" :disabled="!controlsReady || !canUndo" @click="undo().catch(report)"><Icon name="undo" :size="15"/></button><button data-testid="calendar-redo" title="重做" aria-label="重做日历修改" :disabled="!controlsReady || !canRedo" @click="redo().catch(report)"><Icon name="redo" :size="15"/></button><button data-testid="calendar-clear-month" title="清除当前月所有事项" aria-label="清除当月事项" :disabled="!controlsReady || !notesInMonth.length" @click="clearMonth"><Icon name="trash" :size="15"/></button><label class="calendar-search"><Icon name="search" :size="14"/><input v-model="query" data-testid="calendar-search" type="search" aria-label="搜索当月事项" placeholder="搜索当月事项" maxlength="200" :disabled="!controlsReady"></label></div>
    </header>
-   <div v-if="summary.length" class="calendar-summary" data-testid="calendar-summary"><span class="calendar-summary-label" :title="model.weekMode==='work'?'全月统计，包含隐藏的周末事项':'全月工作事项统计'">{{model.weekMode==='work'?'全月工作 · 含周末':'全月工作'}}</span><div class="calendar-summary-tags"><span v-for="item in summary" :key="item.title" class="calendar-summary-tag" :style="{'--note-color':item.color}" :title="`${item.title} · ${summaryWork(item)} · ${formatNumber(item.percent)}%（${model.weekMode==='work'?'全月统计，包含隐藏的周末事项':'按全月实际工时分配统计'}）`"><span class="calendar-color-dot"/><span class="calendar-summary-name">{{item.title}}</span><span>{{summaryWork(item)}}</span><strong>{{formatNumber(item.percent)}}%</strong></span></div></div>
+   <div v-if="summary.length" class="calendar-summary" data-testid="calendar-summary"><span class="calendar-summary-label" :title="model.weekMode==='work'?'全月统计，包含隐藏的周末事项':'全月工作事项统计'">{{model.weekMode==='work'?'全月工作 · 含周末':'全月工作'}}</span><div class="calendar-summary-tags"><span v-for="item in summary" :key="item.title" class="calendar-summary-tag" :style="{'--note-color':item.color}" :title="`${item.title} · ${summaryWork(item)} · ${formatNumber(item.percent)}%（${model.weekMode==='work'?'全月统计，包含隐藏的周末事项':'按全月实际工时分配统计'}）`"><span class="calendar-color-dot"/><span class="calendar-summary-name">{{item.title}}</span><span>{{summaryWork(item)}}</span><strong>{{formatNumber(item.percent)}}%</strong></span></div><button type="button" class="calendar-summary-more" data-testid="calendar-summary-more" :disabled="!controlsReady" @click="showSummary">全部 {{summary.length}} 项</button></div>
    <p v-if="problem" class="calendar-error" role="alert" data-testid="calendar-error">{{problem}}<button aria-label="关闭提示" @click="problem=''">×</button></p>
    <div class="calendar-scroll">
     <div class="calendar-weekdays" role="row"><span v-for="(name,index) in visibleWeekdays" :key="name" role="columnheader" :class="{'calendar-weekend':index>=5}">{{name}}</span></div>
     <div class="calendar-grid" role="grid" :aria-label="monthTitle" aria-multiselectable="false">
      <template v-for="(day,index) in days" :key="day.date || index">
-      <div v-if="day.date" :data-testid="`calendar-day-${day.date}`" :data-calendar-day="day.date" class="calendar-day" :class="{'calendar-other-month':!day.inMonth,'calendar-weekend':day.weekday>=5,'calendar-day-selected':selectedDate===day.date,'calendar-day-today':day.isToday,'calendar-drop-target':dropDate===day.date}" role="gridcell" :tabindex="selectedDate===day.date?0:-1" :aria-label="`${day.date}${day.isToday?' 今天':''}，${dayNotes(day.date).length} 个事项`" :aria-selected="selectedDate===day.date" @click="selectDate(day.date)" @dblclick="openNote(day.date)" @contextmenu="contextMenu($event,day.date)" @keydown="dayKey($event,day.date)" @dragenter="dragOver($event,day.date)" @dragover="dragOver($event,day.date)" @dragleave="dragLeave($event,day.date)" @drop="drop($event,day.date)">
-       <div class="calendar-day-heading"><span class="calendar-day-number">{{day.day}}</span><span class="calendar-lunar" :title="almanac?.day(day.date).festival || almanac?.day(day.date).lunar">{{almanac?.day(day.date).festival || almanac?.day(day.date).lunar}}</span><span v-if="holiday(day.date)" class="calendar-holiday" :class="{'calendar-workday':holiday(day.date)?.workday}" :title="holiday(day.date)?.name">{{holiday(day.date)?.workday?'班':'休'}}</span></div>
+      <div v-if="day.date" :data-testid="`calendar-day-${day.date}`" :data-calendar-day="day.date" class="calendar-day" :class="{'calendar-other-month':!day.inMonth,'calendar-weekend':day.weekday>=5,'calendar-day-selected':selectedDate===day.date,'calendar-day-today':day.isToday,'calendar-drop-target':dropDate===day.date,'calendar-has-work':workNotes(day.date).length>0}" role="gridcell" :tabindex="selectedDate===day.date?0:-1" :aria-label="`${day.date}${day.isToday?' 今天':''}，${dayNotes(day.date).length} 个事项`" :aria-selected="selectedDate===day.date" @click="selectDate(day.date)" @dblclick="openNote(day.date)" @contextmenu="contextMenu($event,day.date)" @keydown="dayKey($event,day.date)" @dragenter="dragOver($event,day.date)" @dragover="dragOver($event,day.date)" @dragleave="dragLeave($event,day.date)" @drop="drop($event,day.date)">
+       <div class="calendar-day-heading"><span class="calendar-day-number">{{day.day}}</span><span class="calendar-lunar" :title="almanac?.day(day.date).festival || almanac?.day(day.date).lunar">{{almanac?.day(day.date).festival || almanac?.day(day.date).lunar}}</span><span v-if="holiday(day.date)" class="calendar-holiday" :class="{'calendar-workday':holiday(day.date)?.workday}" :title="holiday(day.date)?.name">{{holiday(day.date)?.workday?'班':'休'}}</span><button v-if="noteCounts.get(day.date)" type="button" class="calendar-day-allocation" :data-testid="`calendar-day-allocation-${day.date}`" :aria-label="`查看 ${day.date} 的全部 ${noteCounts.get(day.date)} 项事项并调整工时`" :disabled="!controlsReady" @click.stop="showDay(day.date)" @dblclick.stop><span :data-testid="(noteCounts.get(day.date)??0)>2?`calendar-more-${day.date}`:undefined">{{noteCounts.get(day.date)}} 项</span><span>调整</span></button></div>
        <div class="calendar-day-notes">
-        <CalendarWorkCapsule v-if="workNotes(day.date).length" :notes="workNotes(day.date)" :date="day.date" :workday-hours="model.workdayHours" :display="model.allocationDisplay" :disabled="capsuleDisabled" :selected-note-id="selectedNoteId" :search="query" :cancel-token="allocationCancelToken" @select="selectNote" @edit="openNote($event.date,$event.id)" @delete="askDelete($event.id)" @dragstart="startDrag" @dragend="cancelDrag" @contextmenu="(event,note)=>contextMenu(event,note.date)" @allocation-start="startAllocation" @allocation-commit="commitAllocation" @allocation-cancel="allocationBusy=false"/>
-        <button v-if="workNotes(day.date).length" class="calendar-day-allocation" :data-testid="`calendar-day-allocation-${day.date}`" :disabled="!controlsReady" @click.stop="showDay(day.date)" @dblclick.stop><span :data-testid="dayNotes(day.date).length>2?`calendar-more-${day.date}`:undefined">{{workNotes(day.date).length}} 项工作</span><span>调整</span></button>
+        <CalendarWorkCapsule v-if="workNotes(day.date).length" :notes="workNotes(day.date)" :date="day.date" :workday-hours="model.workdayHours" :display="model.allocationDisplay" :disabled="capsuleDisabled" :selected-note-id="selectedNoteId" :search="query" :cancel-token="allocationCancelToken" @select="selectNote" @edit="openNote($event.date,$event.id)" @delete="askDelete($event.id)" @dragstart="startDrag" @dragend="cancelDrag" @contextmenu="(event,note)=>contextMenu(event,note.date)" @edit-allocation="openAllocation" @allocation-start="startAllocation" @allocation-commit="commitAllocation" @allocation-cancel="allocationBusy=false"/>
         <div v-for="note in offNotes(day.date).slice(0,2)" :key="note.id" :data-testid="`calendar-note-${note.id}`" :data-note-id="note.id" class="calendar-note" :class="{'calendar-note-selected':selectedNoteId===note.id,'calendar-note-off':note.type==='非工作日'}" :style="{'--note-color':note.color}" :draggable="editable && !dialog" @dragstart="startDrag($event,note)" @dragend="cancelDrag" @contextmenu.stop="contextMenu($event,note.date)" @dblclick.stop="openNote(note.date,note.id)">
          <button :data-testid="`calendar-note-title-${note.id}`" class="calendar-note-title" :title="`${note.title} · ${note.type==='工作日'?'需要上班':'不需要上班'}${note.content?'\n'+note.content:''}`" :disabled="!editable || !!dialog" @click.stop="selectNote(note)" @keydown.enter.stop.prevent="openNote(note.date,note.id)">{{note.title}}</button><button :data-testid="`calendar-note-delete-${note.id}`" class="calendar-note-delete" :aria-label="`删除 ${note.title}`" :disabled="!controlsReady" @click.stop="askDelete(note.id)" @dblclick.stop><Icon name="close" :size="12"/></button>
         </div>
-        <button v-if="offNotes(day.date).length>2" class="calendar-more-notes" :data-testid="!workNotes(day.date).length?`calendar-more-${day.date}`:undefined" :disabled="!controlsReady" @click.stop="showDay(day.date)" @dblclick.stop>另有 {{offNotes(day.date).length-2}} 项非工作事项</button>
        </div>
        <span v-if="dropDate===day.date && drag" class="calendar-drop-hint">{{drag.copy?'复制':'移动'}}到这一天</span>
       </div>
@@ -448,7 +478,7 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
     <span class="calendar-menu-date">{{menu.date}}</span><button role="menuitem" data-testid="calendar-context-custom" @click="openNote(menu.date)"><Icon name="plus" :size="14"/>自定义</button><button role="menuitem" data-testid="calendar-context-annual-leave" @click="addPreset('年假')">年假</button><button role="menuitem" data-testid="calendar-context-sick-leave" @click="addPreset('病假')">病假</button><button role="menuitem" class="calendar-menu-secondary" data-testid="calendar-context-details" @click="showDateDetails(menu.date)">日期详情</button>
    </div>
    <div v-if="dialog && active" class="calendar-modal-backdrop" @keydown.esc.stop.prevent="cancelDialog">
-    <form ref="dialogElement" class="calendar-dialog" :class="{'calendar-note-form':dialog==='note'}" role="dialog" aria-modal="true" :aria-label="dialogTitle" :data-testid="dialog==='note'?'calendar-note-dialog':dialog==='almanac'?'calendar-almanac-dialog':dialog==='day'?'calendar-day-dialog':dialog==='settings'?'calendar-settings-dialog':'calendar-delete-dialog'" @submit.prevent="submitDialog">
+    <form ref="dialogElement" class="calendar-dialog" :class="{'calendar-note-form':dialog==='note'}" role="dialog" aria-modal="true" :aria-label="dialogTitle" :data-testid="dialog==='note'?'calendar-note-dialog':dialog==='almanac'?'calendar-almanac-dialog':dialog==='day'?'calendar-day-dialog':dialog==='settings'?'calendar-settings-dialog':dialog==='allocation'?'calendar-allocation-dialog':dialog==='summary'?'calendar-summary-dialog':'calendar-delete-dialog'" @submit.prevent="submitDialog">
      <header><h2>{{dialogTitle}}</h2><button type="button" data-testid="calendar-note-cancel" aria-label="取消并关闭" @click="cancelDialog"><Icon name="close" :size="18"/></button></header>
      <template v-if="dialog==='note' && draft">
       <section class="calendar-history-section"><label class="calendar-field"><span>历史事项</span><input v-model="historyQuery" data-testid="calendar-history-search" type="search" placeholder="搜索以前用过的事项" maxlength="200" autocomplete="off"></label><div v-if="history.length" class="calendar-history-items"><button v-for="item in history" :key="item.title" type="button" data-testid="calendar-history-item" :data-history-title="item.title" class="calendar-history-item" :style="{'--note-color':item.color}" :aria-pressed="draft.title===item.title && draft.color===item.color && draft.type===item.type" @click="useHistory(item)"><span class="calendar-color-dot"/><span class="calendar-history-title">{{item.title}}</span><small>{{item.type==='工作日'?'需要上班':'不需要上班'}}</small></button></div><p v-else class="calendar-form-hint">{{historyQuery?'没有匹配的历史事项。':'创建的事项会保留在这里，跨月份也可复用。'}}</p><p class="calendar-form-hint">选择历史事项会带入标题、颜色和上班属性，保留当前填写的内容。</p></section>
@@ -460,10 +490,17 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
      <template v-else-if="dialog==='delete'"><p>删除“{{deletableNote?.title}}”？</p><p class="calendar-form-hint">可通过撤销恢复。历史事项分类仍会保留。</p></template>
      <template v-else-if="dialog==='clear'"><p>清除 {{monthTitle}} 的 {{notesInMonth.length}} 个事项？</p><p class="calendar-form-hint">其他月份和历史事项保留，可通过一次撤销恢复。</p></template>
      <template v-else-if="dialog==='settings'"><p class="calendar-form-hint">应用于本日历本的所有日期，随日历本保存。</p><label class="calendar-field"><span>日历本名称</span><input v-model="titleDraft" data-testid="calendar-book-title" required maxlength="200" autocomplete="off"></label><div class="calendar-form-columns"><label class="calendar-field"><span>显示范围</span><select v-model="weekModeDraft" data-testid="calendar-week-mode"><option value="week">Week · 周一至周日</option><option value="work">Work · 周一至周五</option></select></label><label class="calendar-field"><span>工时显示</span><select v-model="allocationDisplayDraft" data-testid="calendar-allocation-display"><option value="percent">百分比</option><option value="hours">工时</option></select></label></div><label class="calendar-field"><span>每天工作时长（小时）</span><input v-model.number="workdayHoursDraft" data-testid="calendar-workday-hours" type="number" required min="0.5" max="24" step="0.5"></label><p class="calendar-form-hint">默认每天 7 小时。修改时长保留各事项比例；非工作事项不计工时。</p><p class="calendar-form-hint">Work 仅隐藏周末，保留事项和全月工时统计；法定假日仍按所在日期显示。</p></template>
-     <template v-else-if="dialog==='day' && model"><section v-if="workNotes(selectedDate).length" class="calendar-day-allocation-panel"><div class="calendar-day-allocation-heading"><strong>全天 {{model.workdayHours}} 小时</strong><span>{{model.allocationDisplay==='percent'?'每格 10%':'每格 0.5 小时'}}</span></div><CalendarWorkCapsule :notes="workNotes(selectedDate)" :date="selectedDate" :workday-hours="model.workdayHours" :display="model.allocationDisplay" :disabled="!editable" :selected-note-id="selectedNoteId" :cancel-token="allocationCancelToken" :drag-enabled="false" expanded @edit="editFromDay($event.id)" @delete="deleteFromDay($event.id)" @allocation-start="startAllocation" @allocation-commit="commitAllocation" @allocation-cancel="allocationBusy=false"/><p class="calendar-form-hint">拖动相邻分隔线，或选中分隔线后按方向键调整。加入或移出工作事项后，当天重新均分。</p></section><div class="calendar-day-list"><button v-for="note in allDayNotes" :key="note.id" type="button" :data-note-id="note.id" :style="{'--note-color':note.color}" :disabled="allocationBusy" @click="editFromDay(note.id)"><span class="calendar-color-dot"/><span><strong>{{note.title}}</strong><small>{{note.type==='工作日'?allocationLabel(note):'不需要上班 · 不计工时'}}{{note.content?' · '+note.content:''}}</small></span><Icon name="chevron" :size="15"/></button></div><p v-if="!allDayNotes.length" class="calendar-form-hint">这一天还没有事项。</p></template>
+     <template v-else-if="dialog==='day' && model"><section v-if="workNotes(selectedDate).length" class="calendar-day-allocation-panel"><div class="calendar-day-allocation-heading"><strong>全天 {{model.workdayHours}} 小时</strong><span>{{model.allocationDisplay==='percent'?'每格 10%':'每格 0.5 小时'}}</span></div><CalendarWorkCapsule :notes="workNotes(selectedDate)" :date="selectedDate" :workday-hours="model.workdayHours" :display="model.allocationDisplay" :disabled="!editable" :selected-note-id="selectedNoteId" :cancel-token="allocationCancelToken" :drag-enabled="false" expanded @edit="editFromDay($event.id)" @delete="deleteFromDay($event.id)" @edit-allocation="openAllocation" @allocation-start="startAllocation" @allocation-commit="commitAllocation" @allocation-cancel="allocationBusy=false"/><p class="calendar-form-hint">拖动相邻分隔线，或选中分隔线后按方向键调整。加入或移出工作事项后，当天重新均分。</p></section><div class="calendar-day-list"><button v-for="note in allDayNotes" :key="note.id" type="button" :data-note-id="note.id" :style="{'--note-color':note.color}" :disabled="allocationBusy" @click="editFromDay(note.id)"><span class="calendar-color-dot"/><span><strong>{{note.title}}</strong><small>{{note.type==='工作日'?allocationLabel(note):'不需要上班 · 不计工时'}}{{note.content?' · '+note.content:''}}</small></span><Icon name="chevron" :size="15"/></button></div><p v-if="!allDayNotes.length" class="calendar-form-hint">这一天还没有事项。</p></template>
+     <template v-else-if="dialog==='allocation' && selected && model">
+      <p><strong>{{selected.title}}</strong> · {{selectedDate}}</p>
+      <label class="calendar-field"><span>{{allocationUnit==='percent'?'分配比例（%）':'工作时长（小时）'}}</span><input v-model.number="allocationValueDraft" data-testid="calendar-allocation-value" type="number" required min="0" :max="allocationMaximum" step="any" :readonly="dailyAllocations.length===1" aria-describedby="calendar-allocation-hint"></label>
+      <p id="calendar-allocation-hint" class="calendar-form-hint">{{dailyAllocations.length===1?'当天只有一项工作，固定占满全天；添加其他工作事项后即可调整。':`可输入 0～${allocationMaximum}${allocationUnit==='percent'?'%':' 小时'}，支持小数。其他事项按原比例分配剩余工时；原来都为 0 时平均分配。`}}</p>
+      <p class="calendar-form-hint">当天合计保持 100%（{{model.workdayHours}} 小时），确认后可撤销。</p>
+     </template>
+     <template v-else-if="dialog==='summary'"><p class="calendar-form-hint">{{monthTitle}} · 全月统计{{model?.weekMode==='work'?'，包含隐藏的周末事项':''}}</p><div class="calendar-summary-list"><span v-for="item in summary" :key="item.title" class="calendar-summary-tag" :style="{'--note-color':item.color}" :title="`${item.title} · ${summaryWork(item)} · ${formatNumber(item.percent)}%`"><span class="calendar-color-dot"/><span class="calendar-summary-name">{{item.title}}</span><span>{{summaryWork(item)}}</span><strong>{{formatNumber(item.percent)}}%</strong></span></div></template>
      <template v-else-if="dialog==='almanac'"><div v-if="details" class="calendar-almanac"><div class="calendar-almanac-heading"><strong>{{details.date}}</strong><span>{{details.weekday}} · {{details.lunarDate}}</span><span v-if="details.festival">{{details.festival}}</span></div><dl><dt>干支</dt><dd>{{details.stems}}</dd><dt>生肖 / 星座</dt><dd>{{details.zodiac}} · {{details.constellation}}</dd><dt>纳音</dt><dd>{{details.sounds}}</dd><dt>宜</dt><dd>{{details.suitable.join(' · ')}}</dd><dt>忌</dt><dd>{{details.avoid.join(' · ')}}</dd></dl><p class="calendar-form-hint">传统历法信息仅供查看，不影响事项和工作日统计。</p></div><p v-else-if="!dialogError" class="calendar-form-hint">正在读取日期详情…</p></template>
      <p v-if="dialogError" class="calendar-dialog-error" role="alert">{{dialogError}}</p>
-     <footer><button type="button" @click="cancelDialog">{{dialog==='almanac'||dialog==='day'?'关闭':'取消'}}</button><button v-if="dialog!=='almanac'&&dialog!=='day'" type="submit" :data-testid="dialog==='note'?'calendar-note-confirm':dialog==='settings'?'calendar-settings-confirm':'calendar-delete-confirm'" :class="dialog==='delete'||dialog==='clear'?'calendar-delete-confirm':'calendar-primary'" :disabled="dialog==='note' && !draft?.title.trim()">{{dialog==='delete'?'删除':dialog==='clear'?'清除当月':editingNote&&dialog==='note'?'保存修改':'确定'}}</button></footer>
+     <footer><button type="button" @click="cancelDialog">{{dialog==='almanac'||dialog==='day'||dialog==='summary'?'关闭':'取消'}}</button><button v-if="dialog!=='almanac'&&dialog!=='day'&&dialog!=='summary'" type="submit" :data-testid="dialog==='note'?'calendar-note-confirm':dialog==='settings'?'calendar-settings-confirm':dialog==='allocation'?'calendar-allocation-confirm':'calendar-delete-confirm'" :class="dialog==='delete'||dialog==='clear'?'calendar-delete-confirm':'calendar-primary'" :disabled="dialog==='note' && !draft?.title.trim()">{{dialog==='delete'?'删除':dialog==='clear'?'清除当月':editingNote&&dialog==='note'?'保存修改':'确定'}}</button></footer>
     </form>
    </div>
   </Teleport>
@@ -482,4 +519,72 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
 .calendar-context-menu{position:fixed;width:210px;padding:5px;background:var(--ui-surface);color:var(--ui-text);border:1px solid var(--ui-line-strong);border-radius:7px;box-shadow:0 8px 28px #0002;z-index:75;display:flex;flex-direction:column;gap:2px}.calendar-menu-date{padding:4px 8px;font-size:10px;color:var(--ui-muted)}.calendar-context-menu button{display:flex;align-items:center;gap:7px;text-align:left;min-height:31px;padding:5px 9px;border-radius:4px;font-size:12px}.calendar-context-menu button:hover,.calendar-context-menu button:focus-visible{background:var(--ui-accent-soft);color:var(--ui-accent)}.calendar-menu-secondary{border-top:1px solid var(--ui-line);border-radius:0!important;margin-top:3px;color:var(--ui-muted)}
 .calendar-modal-backdrop{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:#0006;z-index:80}.calendar-dialog{width:min(540px,100%);max-height:calc(100dvh - 40px);overflow:auto;display:flex;flex-direction:column;gap:15px;background:var(--ui-surface);color:var(--ui-text);border:1px solid var(--ui-line);border-radius:10px;padding:22px;box-shadow:0 18px 70px #0004}.calendar-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:15px}.calendar-dialog h2{font-size:18px;line-height:1.4;margin:0}.calendar-dialog>header button{padding:4px;display:flex;border-radius:4px}.calendar-dialog button:hover{background:var(--ui-accent-soft)}.calendar-dialog p{margin:0}.calendar-field{display:flex;flex-direction:column;gap:6px;font-size:12px}.calendar-field>span{font-weight:600}.calendar-field input,.calendar-field textarea,.calendar-field select{width:100%;border:1px solid var(--ui-line-strong);background:var(--ui-surface);color:var(--ui-text);border-radius:5px;padding:8px;font-size:13px;min-height:35px}.calendar-field input:not([type=color]),.calendar-field select{height:var(--ui-control-height-form);min-height:var(--ui-control-height-form);padding:0 8px}.calendar-field textarea{resize:vertical}.calendar-form-columns{display:grid;grid-template-columns:1fr 1fr;gap:12px}.calendar-history-section{background:var(--ui-surface-muted);border:1px solid var(--ui-line);border-radius:6px;padding:11px;display:flex;flex-direction:column;gap:8px}.calendar-history-items{display:flex;flex-wrap:wrap;gap:5px;max-height:116px;overflow:auto}.calendar-history-item{max-width:100%;display:flex;align-items:center;gap:6px;border:1px solid var(--ui-line-strong);border-radius:20px;min-height:29px;padding:4px 9px;background:var(--ui-surface);font-size:11px}.calendar-history-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}.calendar-history-item small{font-size:10px;color:var(--ui-muted);white-space:nowrap}.calendar-history-item[aria-pressed=true]{border-color:var(--ui-accent);background:var(--ui-accent-soft)}.calendar-form-hint{font-size:11px!important;line-height:1.65;color:var(--ui-muted)}.calendar-colors{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.calendar-color-option{height:26px;width:26px;padding:0;border:2px solid transparent;border-radius:50%;color:#142239;font-size:14px;text-shadow:0 0 2px white}.calendar-color-option[aria-pressed=true]{outline:2px solid var(--ui-accent);outline-offset:2px}.calendar-colors input[type=color]{width:32px;height:30px;min-height:30px;padding:2px}.calendar-dialog>footer{display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--ui-line);padding-top:13px}.calendar-dialog>footer button{padding:7px 15px;border-radius:5px;font-size:12px;min-height:34px}.calendar-delete-confirm{background:var(--ui-danger)!important;color:var(--ui-surface)!important}.calendar-dialog-error{padding:8px 10px;border-radius:5px;background:var(--ui-danger-soft);color:var(--ui-danger);font-size:12px}.calendar-day-list{display:flex;flex-direction:column;gap:5px;max-height:400px;overflow:auto}.calendar-day-list>button{display:flex;align-items:center;gap:9px;padding:10px;border:1px solid var(--ui-line);border-radius:5px;text-align:left}.calendar-day-list>button>span:nth-child(2){min-width:0;flex:1}.calendar-day-list strong,.calendar-day-list small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.calendar-day-list small{font-size:11px;color:var(--ui-muted);margin-top:3px}.calendar-almanac-heading{display:flex;flex-direction:column;gap:6px;padding-bottom:15px;border-bottom:1px solid var(--ui-line)}.calendar-almanac-heading strong{font-size:22px;color:var(--ui-accent)}.calendar-almanac-heading span{font-size:12px;color:var(--ui-muted)}.calendar-almanac dl{display:grid;grid-template-columns:90px minmax(0,1fr);gap:12px 8px;font-size:12px;margin:18px 0}.calendar-almanac dt{color:var(--ui-muted)}.calendar-almanac dd{margin:0;overflow-wrap:anywhere;line-height:1.7}
 @media(max-width:900px){.calendar-toolbar{gap:7px;padding:7px 9px}.calendar-toolbar-actions{margin-left:0;flex:1}.calendar-search{margin-left:auto}.calendar-book-title{max-width:150px}.calendar-summary{padding:6px 9px}.calendar-selection{gap:6px;padding:0 8px}.calendar-selection-note{display:none}}@media(max-width:600px){.calendar-book-title{max-width:180px}.calendar-toolbar-actions{flex-basis:100%}.calendar-search input{width:125px}.calendar-modal-backdrop{padding:12px}.calendar-dialog{padding:16px;max-height:calc(100dvh - 24px)}.calendar-form-columns{grid-template-columns:1fr}.calendar-selection>span:not(.calendar-selection-tail){display:none}.calendar-selection button{padding:4px}.calendar-holiday-status{display:none!important}}
+/* Keep all six weeks inside the available workspace. Each cell reserves its
+ * header action before progressively revealing event previews. Full lists
+ * remain available through that action, regardless of the preview density. */
+.calendar-editor{overflow:hidden}
+.calendar-scroll{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.calendar-weekdays{flex:none;position:static;min-width:0;width:100%}
+.calendar-weekdays span{padding:4px 6px}
+.calendar-grid{flex:1;min-height:0;min-width:0;width:100%;grid-template-rows:repeat(6,minmax(0,1fr));overflow:hidden}
+.calendar-day{min-height:0;padding:2px 3px;gap:1px;overflow:hidden;container:calendar-cell / size}
+.calendar-day-heading{height:16px;min-height:16px;flex:none;gap:3px}
+.calendar-day-number{height:16px;width:18px;font-size:11px}
+.calendar-lunar{flex:1;font-size:9px}
+.calendar-holiday{font-size:8px;padding:0 2px}
+.calendar-day-allocation{flex:none;display:inline-flex;justify-content:center;gap:3px;max-width:calc(100% - 22px);height:16px;min-height:16px;padding:0 2px;border-radius:3px;white-space:nowrap;line-height:16px}
+.calendar-day-allocation:hover{background:var(--ui-accent-soft)}
+.calendar-day-notes{flex:1;min-height:0;gap:2px;overflow:hidden}
+.calendar-day .calendar-note-off{display:none;height:20px}
+.calendar-day .calendar-note-off .calendar-note-title{padding:1px 4px;line-height:18px}
+.calendar-grid :deep(.calendar-work-scroll){flex:none;min-height:0;overflow:hidden;padding:1px 2px}
+.calendar-grid :deep(.calendar-work-capsule){width:100%;min-width:0;height:20px;min-height:20px;border-radius:12px}
+.calendar-grid :deep(.calendar-work-segment){min-width:0}
+.calendar-grid :deep(.calendar-note-main){flex-direction:row;align-items:center;min-width:0;overflow:hidden;padding:0}
+.calendar-grid :deep(.calendar-note-main .calendar-note-title){display:flex;flex:1;height:20px;min-height:0;padding:0 2px;font-size:9px;line-height:20px}
+.calendar-grid :deep(.calendar-work-value){width:auto;max-width:100%;height:20px;min-height:0;padding:0 2px;line-height:20px;overflow:hidden}
+.calendar-grid :deep(.calendar-work-value strong){display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:10px;line-height:20px}
+.calendar-grid :deep(.calendar-work-divider){top:0;bottom:0;width:8px;right:-4px}
+.calendar-grid :deep(.calendar-work-divider:before){left:3px;top:4px;bottom:4px}
+.calendar-grid :deep(.calendar-work-divider:hover:before),.calendar-grid :deep(.calendar-work-divider:focus-visible:before),.calendar-grid :deep(.calendar-work-divider-active:before){left:2px}
+.calendar-summary-tags{flex:1;overflow:hidden}
+.calendar-summary-more{flex:none;min-height:24px;padding:3px 6px;border-radius:4px;font-size:11px;color:var(--ui-accent);white-space:nowrap}
+.calendar-summary-more:hover{background:var(--ui-accent-soft)}
+.calendar-summary-list{display:flex;flex-direction:column;gap:7px;min-width:0}
+.calendar-summary-list .calendar-summary-tag{max-width:none;flex-wrap:wrap;white-space:normal;padding:7px 9px}
+.calendar-summary-list .calendar-summary-name{flex:1 1 100px;max-width:none;white-space:normal;overflow-wrap:anywhere}
+@container calendar-cell (min-height:40px){
+ .calendar-day:not(.calendar-has-work) .calendar-note-off:first-of-type{display:flex}
+}
+@container calendar-cell (min-height:60px){
+ .calendar-day-heading{height:18px;min-height:18px}
+ .calendar-day-number{height:18px;width:20px}
+ .calendar-day-allocation{height:18px;min-height:18px;line-height:18px}
+ .calendar-day-notes{gap:3px}
+}
+@container calendar-cell (min-height:58px){
+ .calendar-grid :deep(.calendar-work-capsule){height:36px;min-height:36px}
+ .calendar-grid :deep(.calendar-note-main){flex-direction:column;align-items:stretch}
+ .calendar-grid :deep(.calendar-note-main .calendar-note-title){flex:none;min-height:15px;height:15px;padding:0 3px;font-size:9px;line-height:15px}
+ .calendar-grid :deep(.calendar-work-value){width:100%;height:19px;line-height:19px}
+ .calendar-grid :deep(.calendar-work-value strong){line-height:19px}
+}
+@container calendar-cell (min-height:62px){
+ .calendar-day:not(.calendar-has-work) .calendar-note-off{display:flex}
+}
+@container calendar-cell (min-height:86px){
+ .calendar-day.calendar-has-work .calendar-note-off:nth-of-type(2){display:flex}
+}
+@container calendar-cell (min-height:110px){
+ .calendar-day-heading{height:24px;min-height:24px}
+ .calendar-day-number{height:24px;width:24px;font-size:13px}
+ .calendar-lunar{font-size:10px}
+ .calendar-grid :deep(.calendar-work-capsule){height:43px;min-height:43px}
+ .calendar-grid :deep(.calendar-note-main .calendar-note-title){height:21px;min-height:21px;font-size:10px;line-height:21px}
+ .calendar-grid :deep(.calendar-work-value){height:22px;line-height:22px}
+ .calendar-grid :deep(.calendar-work-value strong){font-size:11px;line-height:22px}
+}
+@container calendar-cell (min-height:124px){
+ .calendar-day.calendar-has-work .calendar-note-off{display:flex}
+}
 </style>
