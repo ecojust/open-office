@@ -83,37 +83,57 @@ export function setDayAllocation(book: CalendarBook, date: string, allocations: 
  for (const note of notes) note.weight = byId.get(note.id)!
  edits.get(book)?.explicit.set(date, membership(notes))
 }
-/** Set one event exactly, without the divider's snapping. The other events
- * retain their relative shares of the remaining day; a previously empty
- * remainder is shared equally. Validate before changing this draft. */
-export function setNoteAllocation(book: CalendarBook, date: string, noteId: string, value: number, display: CalendarAllocationDisplay = book.allocationDisplay): void {
- if (!Number.isFinite(value) || (display !== 'percent' && display !== 'hours')) throw Error('请输入有效的工时数值和显示单位。')
+function noteAllocationEdit(book: CalendarBook, date: string, noteId: string, display: CalendarAllocationDisplay) {
+ if (display !== 'percent' && display !== 'hours') throw Error('请输入有效的工时显示单位。')
  const scale = display === 'percent' ? 100 : book.workdayHours
- if (!Number.isFinite(scale) || scale <= 0 || value < 0 || value > scale) throw Error(`请输入 0 到 ${scale} ${display === 'percent' ? '%' : '小时'}之间的数值。`)
+ if (!Number.isFinite(scale) || scale <= 0) throw Error('请输入有效的全天工作时长。')
  const notes = workNotes(book, date), index = notes.findIndex(note => note.id === noteId)
  if (index < 0) throw Error('请选择当天已有的工作事项。')
- if (notes.length === 1 && value !== scale) throw Error('当天只有一项工作，须占满全天；添加其他工作事项后可调整。')
  const context = edits.get(book), current = membership(notes)
  const membershipChanged = !!context && context.explicit.get(date) !== current && membership(workNotes(context.before, date)) !== current
  const shares = membershipChanged ? notes.map(() => 1 / notes.length) : weights(notes)
+ const previous = shares.slice(0, index).reduce((sum, share) => sum + share, 0)
+ return { notes, index, scale, shares, membershipChanged, capacity: Math.max(0, 1 - previous) }
+}
+/** Earlier segments are fixed. The final segment is the remaining day, so its
+ * value can only be changed by editing one of the segments before it. */
+export function noteAllocationLimits(book: CalendarBook, date: string, noteId: string, display: CalendarAllocationDisplay = book.allocationDisplay): { maximum: number; readonly: boolean } {
+ const { notes, index, scale, capacity } = noteAllocationEdit(book, date, noteId, display)
+ return { maximum: capacity * scale, readonly: index === notes.length - 1 }
+}
+/** Set one event exactly, without the divider's snapping. Preserve all earlier
+ * shares and distribute the remaining day only among later events, retaining
+ * their relative proportions (or equally when all later shares were zero).
+ * Validate before changing this draft. */
+export function setNoteAllocation(book: CalendarBook, date: string, noteId: string, value: number, display: CalendarAllocationDisplay = book.allocationDisplay): void {
+ if (!Number.isFinite(value)) throw Error('请输入有效的工时数值。')
+ const { notes, index, scale, shares, membershipChanged, capacity } = noteAllocationEdit(book, date, noteId, display)
+ if (value < 0 || value > scale) throw Error(`请输入 0 到 ${scale} ${display === 'percent' ? '%' : '小时'}之间的数值。`)
  const currentValue = shares[index]! * scale
  // A displayed floating-point round trip must not dirty an unchanged book,
  // including legacy files that have no explicit weight properties yet.
  const unchanged = value === currentValue || (value > 0 && value < scale && Math.abs(value - currentValue) <= Number.EPSILON * Math.max(Math.abs(value), Math.abs(currentValue)) * 4)
- if (!membershipChanged && unchanged) return
- const target = value / scale, remaining = 1 - target
- const otherIndices = notes.map((_, position) => position).filter(position => position !== index)
- const otherTotal = otherIndices.reduce((sum, position) => sum + shares[position]!, 0)
- const remainderIndex = otherIndices.reduce((largest, position) => shares[position]! > shares[largest]! ? position : largest, otherIndices[0] ?? index)
- const allocated = notes.map(note => ({ noteId: note.id, weight: 0 }))
+ if (unchanged) {
+  if (membershipChanged) setDayAllocation(book, date, notes.map((note, position) => ({ noteId: note.id, weight: shares[position]! })))
+  return
+ }
+ if (index === notes.length - 1) throw Error(notes.length === 1 ? '当天只有一项工作，须占满全天；添加其他工作事项后可调整。' : '最后一项工作使用剩余工时；请调整前面的事项，前序工时不会自动改变。')
+ const maximum = capacity * scale
+ const roundingTolerance = Number.EPSILON * Math.max(Math.abs(value), Math.abs(maximum)) * 4
+ if (value > maximum && value - maximum > roundingTolerance) throw Error(`前面的事项保持不变，此项最多可分配 ${maximum}${display === 'percent' ? '%' : ' 小时'}。`)
+ const target = Math.min(capacity, value / scale), remaining = capacity - target
+ const laterIndices = notes.map((_, position) => position).slice(index + 1)
+ const laterTotal = laterIndices.reduce((sum, position) => sum + shares[position]!, 0)
+ const remainderIndex = laterIndices.reduce((largest, position) => shares[position]! > shares[largest]! ? position : largest, laterIndices[0]!)
+ const allocated = notes.map((note, position) => ({ noteId: note.id, weight: shares[position]! }))
  allocated[index]!.weight = target
  let assigned = 0
- for (const position of otherIndices) {
+ for (const position of laterIndices) {
   if (position === remainderIndex) continue
-  const weight = remaining * (otherTotal > 0 ? shares[position]! / otherTotal : 1 / otherIndices.length)
+  const weight = remaining * (laterTotal > 0 ? shares[position]! / laterTotal : 1 / laterIndices.length)
   allocated[position]!.weight = weight; assigned += weight
  }
- if (otherIndices.length) allocated[remainderIndex]!.weight = remaining - assigned
+ allocated[remainderIndex]!.weight = remaining - assigned
  setDayAllocation(book, date, allocated)
 }
 /** position is the boundary measured from the beginning of the whole day, in
