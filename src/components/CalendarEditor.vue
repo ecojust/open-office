@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import Icon from './Icon.vue'
 import CalendarWorkCapsule, { type AllocationCommit } from '../calendar/components/CalendarWorkCapsule.vue'
 import { calendarId, encodeCalendar, historySuggestions, preserveHistory, rememberHistory, type CalendarAllocationDisplay, type CalendarBook, type CalendarHistoryItem, type CalendarNote, type CalendarWeekMode } from '../calendar/model'
-import { dayAllocations, resizeAllocationBoundary, setNoteAllocation } from '../calendar/allocation'
+import { dayAllocations, noteAllocationLimits, resizeAllocationBoundary, setNoteAllocation } from '../calendar/allocation'
 import { CalendarSession } from '../calendar/session'
 import { moveCalendarDate, normalizeVisibleDate, visibleMonthDays, monthSummary, shiftMonth, todayDate, validateMonth } from '../calendar/calendar'
 import { loadCalendarAlmanac, type CalendarAlmanac, type CalendarDateDetails } from '../calendar/almanac'
@@ -83,7 +83,11 @@ const noteCounts = computed(() => {
  for (const note of model.value?.notes ?? []) counts.set(note.date, (counts.get(note.date) ?? 0) + 1)
  return counts
 })
-const allocationMaximum = computed(() => allocationUnit.value === 'percent' ? 100 : model.value?.workdayHours ?? 7)
+const allocationLimits = computed(() => model.value && selectedNoteId.value && dialog.value === 'allocation'
+ ? noteAllocationLimits(model.value, selectedDate.value, selectedNoteId.value, allocationUnit.value)
+ : { maximum: 0, readonly: true })
+// Preserve no-op confirmation when the displayed initial value rounds just above the exact limit.
+const allocationMaximum = computed(() => Math.max(allocationLimits.value.maximum, allocationInitialValue.value))
 function noteAllocation(note: CalendarNote) { return dailyAllocations.value.find(item => item.noteId === note.id) }
 function allocationLabel(note: CalendarNote) {
  const item = noteAllocation(note)
@@ -493,9 +497,9 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
      <template v-else-if="dialog==='day' && model"><section v-if="workNotes(selectedDate).length" class="calendar-day-allocation-panel"><div class="calendar-day-allocation-heading"><strong>全天 {{model.workdayHours}} 小时</strong><span>{{model.allocationDisplay==='percent'?'每格 10%':'每格 0.5 小时'}}</span></div><CalendarWorkCapsule :notes="workNotes(selectedDate)" :date="selectedDate" :workday-hours="model.workdayHours" :display="model.allocationDisplay" :disabled="!editable" :selected-note-id="selectedNoteId" :cancel-token="allocationCancelToken" :drag-enabled="false" expanded @edit="editFromDay($event.id)" @delete="deleteFromDay($event.id)" @edit-allocation="openAllocation" @allocation-start="startAllocation" @allocation-commit="commitAllocation" @allocation-cancel="allocationBusy=false"/><p class="calendar-form-hint">拖动相邻分隔线，或选中分隔线后按方向键调整。加入或移出工作事项后，当天重新均分。</p></section><div class="calendar-day-list"><button v-for="note in allDayNotes" :key="note.id" type="button" :data-note-id="note.id" :style="{'--note-color':note.color}" :disabled="allocationBusy" @click="editFromDay(note.id)"><span class="calendar-color-dot"/><span><strong>{{note.title}}</strong><small>{{note.type==='工作日'?allocationLabel(note):'不需要上班 · 不计工时'}}{{note.content?' · '+note.content:''}}</small></span><Icon name="chevron" :size="15"/></button></div><p v-if="!allDayNotes.length" class="calendar-form-hint">这一天还没有事项。</p></template>
      <template v-else-if="dialog==='allocation' && selected && model">
       <p><strong>{{selected.title}}</strong> · {{selectedDate}}</p>
-      <label class="calendar-field"><span>{{allocationUnit==='percent'?'分配比例（%）':'工作时长（小时）'}}</span><input v-model.number="allocationValueDraft" data-testid="calendar-allocation-value" type="number" required min="0" :max="allocationMaximum" step="any" :readonly="dailyAllocations.length===1" aria-describedby="calendar-allocation-hint"></label>
-      <p id="calendar-allocation-hint" class="calendar-form-hint">{{dailyAllocations.length===1?'当天只有一项工作，固定占满全天；添加其他工作事项后即可调整。':`可输入 0～${allocationMaximum}${allocationUnit==='percent'?'%':' 小时'}，支持小数。其他事项按原比例分配剩余工时；原来都为 0 时平均分配。`}}</p>
-      <p class="calendar-form-hint">当天合计保持 100%（{{model.workdayHours}} 小时），确认后可撤销。</p>
+      <label class="calendar-field"><span>{{allocationUnit==='percent'?'分配比例（%）':'工作时长（小时）'}}</span><input v-model.number="allocationValueDraft" data-testid="calendar-allocation-value" type="number" required min="0" :max="allocationMaximum" step="any" :readonly="allocationLimits.readonly" aria-describedby="calendar-allocation-hint"></label>
+      <p id="calendar-allocation-hint" class="calendar-form-hint">{{dailyAllocations.length===1?'当天只有一项工作，固定占满全天；添加其他工作事项后即可调整。':allocationLimits.readonly?'最后一项保留剩余工时；要修改它，请先调整前面的事项。':'支持输入小数，前面的事项保持不变，当前事项不能超过剩余工时。确认后，仅后面的事项按原比例分配余量；原来都为 0 时平均分配。'}}</p>
+      <p class="calendar-form-hint">输入时不重新分配，点击「确定」后更新，可撤销。当天合计保持 100%（{{model.workdayHours}} 小时）。</p>
      </template>
      <template v-else-if="dialog==='summary'"><p class="calendar-form-hint">{{monthTitle}} · 全月统计{{model?.weekMode==='work'?'，包含隐藏的周末事项':''}}</p><div class="calendar-summary-list"><span v-for="item in summary" :key="item.title" class="calendar-summary-tag" :style="{'--note-color':item.color}" :title="`${item.title} · ${summaryWork(item)} · ${formatNumber(item.percent)}%`"><span class="calendar-color-dot"/><span class="calendar-summary-name">{{item.title}}</span><span>{{summaryWork(item)}}</span><strong>{{formatNumber(item.percent)}}%</strong></span></div></template>
      <template v-else-if="dialog==='almanac'"><div v-if="details" class="calendar-almanac"><div class="calendar-almanac-heading"><strong>{{details.date}}</strong><span>{{details.weekday}} · {{details.lunarDate}}</span><span v-if="details.festival">{{details.festival}}</span></div><dl><dt>干支</dt><dd>{{details.stems}}</dd><dt>生肖 / 星座</dt><dd>{{details.zodiac}} · {{details.constellation}}</dd><dt>纳音</dt><dd>{{details.sounds}}</dd><dt>宜</dt><dd>{{details.suitable.join(' · ')}}</dd><dt>忌</dt><dd>{{details.avoid.join(' · ')}}</dd></dl><p class="calendar-form-hint">传统历法信息仅供查看，不影响事项和工作日统计。</p></div><p v-else-if="!dialogError" class="calendar-form-hint">正在读取日期详情…</p></template>
@@ -536,12 +540,12 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
 .calendar-day-allocation:hover{background:var(--ui-accent-soft)}
 .calendar-day-notes{flex:1;min-height:0;gap:2px;overflow:hidden}
 .calendar-day .calendar-note-off{display:none;height:20px}
-.calendar-day .calendar-note-off .calendar-note-title{padding:1px 4px;line-height:18px}
+.calendar-day .calendar-note-off .calendar-note-title{padding:1px 4px;font-size:12px;line-height:18px}
 .calendar-grid :deep(.calendar-work-scroll){flex:none;min-height:0;overflow:hidden;padding:1px 2px}
-.calendar-grid :deep(.calendar-work-capsule){width:100%;min-width:0;height:20px;min-height:20px;border-radius:12px}
+.calendar-grid :deep(.calendar-work-capsule){width:100%;min-width:0;height:20px;min-height:20px}
 .calendar-grid :deep(.calendar-work-segment){min-width:0}
 .calendar-grid :deep(.calendar-note-main){flex-direction:row;align-items:center;min-width:0;overflow:hidden;padding:0}
-.calendar-grid :deep(.calendar-note-main .calendar-note-title){display:flex;flex:1;height:20px;min-height:0;padding:0 2px;font-size:9px;line-height:20px}
+.calendar-grid :deep(.calendar-note-main .calendar-note-title){display:flex;flex:1;height:20px;min-height:0;padding:0 2px;font-size:11px;line-height:20px}
 .calendar-grid :deep(.calendar-work-value){width:auto;max-width:100%;height:20px;min-height:0;padding:0 2px;line-height:20px;overflow:hidden}
 .calendar-grid :deep(.calendar-work-value strong){display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;font-size:10px;line-height:20px}
 .calendar-grid :deep(.calendar-work-divider){top:0;bottom:0;width:8px;right:-4px}
@@ -565,7 +569,7 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
 @container calendar-cell (min-height:58px){
  .calendar-grid :deep(.calendar-work-capsule){height:36px;min-height:36px}
  .calendar-grid :deep(.calendar-note-main){flex-direction:column;align-items:stretch}
- .calendar-grid :deep(.calendar-note-main .calendar-note-title){flex:none;min-height:15px;height:15px;padding:0 3px;font-size:9px;line-height:15px}
+ .calendar-grid :deep(.calendar-note-main .calendar-note-title){flex:none;min-height:15px;height:15px;padding:0 3px;font-size:11px;line-height:15px}
  .calendar-grid :deep(.calendar-work-value){width:100%;height:19px;line-height:19px}
  .calendar-grid :deep(.calendar-work-value strong){line-height:19px}
 }
@@ -580,7 +584,7 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
  .calendar-day-number{height:24px;width:24px;font-size:13px}
  .calendar-lunar{font-size:10px}
  .calendar-grid :deep(.calendar-work-capsule){height:43px;min-height:43px}
- .calendar-grid :deep(.calendar-note-main .calendar-note-title){height:21px;min-height:21px;font-size:10px;line-height:21px}
+ .calendar-grid :deep(.calendar-note-main .calendar-note-title){height:21px;min-height:21px;font-size:12px;line-height:21px}
  .calendar-grid :deep(.calendar-work-value){height:22px;line-height:22px}
  .calendar-grid :deep(.calendar-work-value strong){font-size:11px;line-height:22px}
 }

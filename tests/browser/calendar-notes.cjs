@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { chromium } = require('playwright');
+const { PNG } = require('pngjs');
 const root = path.resolve(__dirname, '../..');
 const focus = process.env.OFFICE_CALENDAR_FOCUS || '';
 const output = path.resolve(process.env.OFFICE_CALENDAR_OUTPUT || path.join(root, ['allocation-boundaries', 'week-settings', 'drag-summary', 'value-layout'].includes(focus) ? `test-results/calendar-notes-${focus}` : 'test-results/calendar-notes'));
@@ -209,11 +210,11 @@ async function valueLayoutChecks() {
   await check('quantity-double-click-and-enter-open-draft-dialog-with-cancel-and-no-op', async () => {
     const before = await exported(), original = await state();
     await openValue(); assert.equal(Number(await input().inputValue()), 20); assert.equal(await input().evaluate(e => e === document.activeElement), true);
-    await input().fill('42.5'); assert.deepEqual((await state()).book, before); assert.equal((await state()).revision, original.revision); await capture('calendar-direct-value-dialog');
+    for (const typed of ['4', '42', '42.5']) { await input().fill(typed); await frame(); assert.deepEqual((await state()).book, before, 'Typing only changes the draft'); assert.equal((await state()).revision, original.revision); } await capture('calendar-direct-value-dialog');
     await cancelValue(); assert.deepEqual(await exported(), before); assert.equal((await state()).revision, original.revision);
     await openValue('value-a', editor(), true); await dialog().getByTestId('calendar-allocation-confirm').click(); await frame(); assert.equal(await dialog().count(), 0); assert.deepEqual(await exported(), before); assert.equal((await state()).revision, original.revision);
   });
-  await check('direct-percent-change-preserves-other-ratios-and-is-one-undo', async () => {
+  await check('direct-percent-change-only-distributes-forward-and-is-one-undo', async () => {
     const before = await exported(), revision = (await state()).revision;
     await openValue(); await commitValue(40); await allocations('2026-11-04', { 'value-a': .4, 'value-b': .225, 'value-c': .375 });
     assert.equal((await state()).revision, revision + 1); assert.deepEqual((await exported()).notes.map(n => [n.id, n.date, n.title, n.content]), before.notes.map(n => [n.id, n.date, n.title, n.content]));
@@ -232,6 +233,18 @@ async function valueLayoutChecks() {
     }
     assert.deepEqual((await state()).book, before); assert.match(await dialog().innerText(), /全天|100%/); await cancelValue(); assert.deepEqual(await exported(), before);
   });
+  await check('middle-and-sequential-edits-keep-earlier-values-and-reject-overflow', async () => {
+    const before = await exported(), revision = (await state()).revision;
+    await openValue('value-b'); near(Number(await input().getAttribute('max')), 80, 'Middle percent maximum excludes the earlier 20%');
+    await input().fill('81'); await dialog().getByTestId('calendar-allocation-confirm').click(); await frame(); assert.ok(await dialog().isVisible()); assert.equal(await input().evaluate(e => e.validity.rangeOverflow), true); assert.deepEqual((await state()).book, before); assert.equal((await state()).revision, revision);
+    await commitValue(45); await allocations('2026-11-04', { 'value-a': .2, 'value-b': .45, 'value-c': .35 });
+    assert.deepEqual((await exported()).notes[0], before.notes[0], 'The earlier event is byte-for-byte unchanged'); await undo(); assert.deepEqual(await exported(), before);
+    await openValue('value-a'); await commitValue(40); await openValue('value-b'); near(Number(await input().getAttribute('max')), 60, 'Second edit retains the first edit'); await commitValue(35);
+    const sequential = await allocations('2026-11-04', { 'value-a': .4, 'value-b': .35, 'value-c': .25 });
+    await openValue('value-c'); assert.equal(await input().evaluate(e => e.readOnly), true); assert.equal(Number(await input().inputValue()), 25); assert.match(await dialog().innerText(), /最后|剩余/); await dialog().getByTestId('calendar-allocation-confirm').click(); await frame(); assert.deepEqual(await exported(), sequential);
+    await undo(); await allocations('2026-11-04', { 'value-a': .4, 'value-b': .225, 'value-c': .375 }); await undo(); assert.deepEqual(await exported(), before);
+    await openValue('value-b'); await commitValue(80); await allocations('2026-11-04', { 'value-a': .2, 'value-b': .8, 'value-c': 0 }); await undo(); assert.deepEqual(await exported(), before);
+  });
   await check('direct-value-handles-zero-full-and-previously-zero-peers', async () => {
     const before = await exported(); await openValue(); await commitValue(100); await allocations('2026-11-04', { 'value-a': 1, 'value-b': 0, 'value-c': 0 });
     await openValue(); await commitValue(60); await allocations('2026-11-04', { 'value-a': .6, 'value-b': .2, 'value-c': .2 });
@@ -242,15 +255,30 @@ async function valueLayoutChecks() {
     const before = await exported(); await editor().getByTestId('calendar-day-allocation-2026-11-04').click(); const details = page.getByTestId('calendar-day-dialog'); await details.waitFor();
     await openValue('value-b', details); await input().fill('46.5'); await cancelValue(); await details.waitFor(); assert.deepEqual((await state()).book, before);
     await openValue('value-b', details); await commitValue(44); await details.waitFor(); assert.equal(await page.getByTestId('calendar-note-dialog').count(), 0);
-    await details.getByTestId('calendar-note-cancel').click(); await frame(); await allocations('2026-11-04', { 'value-a': .16, 'value-b': .44, 'value-c': .4 }); await undo(); assert.deepEqual(await exported(), before);
+    await details.getByTestId('calendar-note-cancel').click(); await frame(); await allocations('2026-11-04', { 'value-a': .2, 'value-b': .44, 'value-c': .36 }); await undo(); assert.deepEqual(await exported(), before);
   });
   await check('direct-hours-accepts-precise-value-with-nondefault-day-and-survives-reopen', async () => {
     await settings({ allocationDisplay: 'hours', workdayHours: 8 }); const before = await exported(); await openValue(); assert.equal(Number(await input().inputValue()), 1.6);
     await commitValue(1.25); await allocations('2026-11-04', { 'value-a': .15625, 'value-b': .31640625, 'value-c': .52734375 });
-    const edited = await exported(); await undo(); assert.deepEqual(await exported(), before); await redo(); assert.deepEqual(await exported(), edited);
+    const firstEdit = await exported(); await openValue('value-b'); near(Number(await input().getAttribute('max')), 6.75, 'Hours maximum excludes earlier 1.25 hours');
+    await commitValue(3.5); await allocations('2026-11-04', { 'value-a': .15625, 'value-b': .4375, 'value-c': .40625 }); assert.deepEqual((await exported()).notes[0], firstEdit.notes[0]);
+    const edited = await exported(); await undo(); assert.deepEqual(await exported(), firstEdit); await undo(); assert.deepEqual(await exported(), before); await redo(); await redo(); assert.deepEqual(await exported(), edited);
     const download = await saveDownload('直接编辑工时.oocalendar', true), session = (await state()).documentId; assert.deepEqual(download.model, edited);
     await page.getByTestId('document-open-input').setInputFiles(download.target); await ready(); await month('2026-11'); assert.notEqual((await state()).documentId, session); assert.deepEqual(await exported(), edited);
-    await allocations('2026-11-04', { 'value-a': .15625, 'value-b': .31640625, 'value-c': .52734375 }); await capture('calendar-direct-hours-saved');
+    await allocations('2026-11-04', { 'value-a': .15625, 'value-b': .4375, 'value-c': .40625 }); await capture('calendar-direct-hours-saved');
+  });
+  await check('legacy-thirds-and-zero-tail-confirmation-keep-precision-and-prefix', async () => {
+    const legacy = { ...fixture, id: 'legacy-third-values', title: '旧文件均分精度', notes: fixture.notes.slice(0, 3).map(({ weight, ...rest }) => rest) };
+    await page.getByTestId('document-open-input').setInputFiles({ name: '旧均分精度.oocalendar', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(legacy)) }); await ready(); await month('2026-11');
+    const before = await exported(), revision = (await state()).revision;
+    await openValue('value-c'); assert.equal(await input().evaluate(e => e.readOnly), true); await dialog().getByTestId('calendar-allocation-confirm').click(); await frame(); assert.deepEqual(await exported(), before); assert.equal((await state()).revision, revision);
+    await openValue('value-b'); assert.equal(Number(await input().inputValue()), 33.33333333); await dialog().getByTestId('calendar-allocation-confirm').click(); await frame(); assert.deepEqual(await exported(), before); assert.equal((await state()).revision, revision);
+    await openValue('value-b'); await commitValue(20); await allocations('2026-11-04', { 'value-a': 1 / 3, 'value-b': .2, 'value-c': 1 - 1 / 3 - .2 }); await undo(); assert.deepEqual(await exported(), before);
+    const zeroTail = { ...fixture, id: 'zero-tail-values', title: '后续零分配', notes: [
+      { ...fixture.notes[0], weight: .2 }, { ...fixture.notes[1], weight: .8 }, { ...fixture.notes[2], weight: 0 }, { ...fixture.notes[2], id: 'value-d', weight: 0 },
+    ] };
+    await page.getByTestId('document-open-input').setInputFiles({ name: '后续零分配.oocalendar', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(zeroTail)) }); await ready(); await month('2026-11');
+    await openValue('value-b'); await commitValue(40); await allocations('2026-11-04', { 'value-a': .2, 'value-b': .4, 'value-c': .2, 'value-d': .2 });
   });
   const dense = { ...fixture, id: 'calendar-fit-density', title: '六行月历自适应布局验收', notes: [
     ...Array.from({ length: 8 }, (_, index) => ({ id: `dense-work-${index}`, date: '2026-11-04', title: `工作事项${index + 1}及其完整名称`, color: ['#3b82f6', '#16a34a', '#8b5cf6'][index % 3], weight: 1 / 8, type: '工作日', content: `工作正文${index + 1}`, created_at: '2026-11-01T10:00:00.000Z' })),
@@ -303,6 +331,60 @@ async function valueLayoutChecks() {
       await page.setViewportSize({ width: 900, height: 640 }); await frame();
     }
     await page.setViewportSize({ width: 1360, height: 900 }); await frame();
+  });
+}
+
+async function capsuleSeamChecks() {
+  const groups = [
+    ['2026-11-03', 'single', [1]], ['2026-11-04', 'multi', [.2, .3, .5]],
+    ['2026-11-05', 'tiny', [.01, .98, .01]], ['2026-11-06', 'zero', [0, .4, .6, 0]],
+  ];
+  const fixture = { format: 'open-office-calendar', version: 1, id: 'capsule-edge-fixture', title: '胶囊边缘贴合验收', workdayHours: 7, allocationDisplay: 'percent', weekMode: 'week', history: [], notes: groups.flatMap(([date, prefix, weights]) => weights.map((weight, i) => ({ id: `edge-${prefix}-${i}`, date, title: `${prefix} 工作 ${i + 1}`, weight, color: ['#3b82f6', '#16a34a', '#8b5cf6', '#f59e0b'][i], type: '工作日', content: '', created_at: '2026-11-01T10:00:00.000Z' }))) };
+  await page.getByTestId('document-open-input').setInputFiles({ name: '胶囊圆角验收.oocalendar', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) }); await ready(); await month('2026-11');
+  async function paintedEdges(target, label, expectedHeight) {
+    const geometry = await target.evaluate(node => {
+      const r = node.getBoundingClientRect(), style = getComputedStyle(node);
+      const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1; const context = canvas.getContext('2d'); context.fillStyle = style.backgroundColor; context.fillRect(0, 0, 1, 1);
+      return { width: r.width, height: r.height, titleFonts: [...node.querySelectorAll('.calendar-note-title')].map(title => getComputedStyle(title).fontSize), radius: Math.min(parseFloat(style.borderTopLeftRadius), r.width / 2, r.height / 2), background: [...context.getImageData(0, 0, 1, 1).data], controls: [...node.querySelectorAll('.calendar-work-delete')].filter(item => Number(getComputedStyle(item).opacity) > 0).map(item => { const b = item.getBoundingClientRect(); return { x: b.x - r.x, right: b.right - r.x, y: b.y - r.y, bottom: b.bottom - r.y }; }), segments: [...node.querySelectorAll('.calendar-work-segment')].map(item => { const b = item.getBoundingClientRect(); return { x: b.x - r.x, right: b.right - r.x, y: b.y - r.y, height: b.height }; }) };
+    });
+    near(geometry.height, expectedHeight, `${label}: actual capsule height`);
+    near(geometry.segments[0].x, 0, `${label}: first fill starts at outer bounds`); near(geometry.segments.at(-1).right, geometry.width, `${label}: last fill ends at outer bounds`);
+    for (let i = 0; i < geometry.segments.length; i++) { near(geometry.segments[i].y, 0, `${label}: segment top`); near(geometry.segments[i].height, geometry.height, `${label}: full height fill`); if (i) near(geometry.segments[i - 1].right, geometry.segments[i].x, `${label}: adjoining fills`); }
+    const filename = `capsule-${label}.png`, png = PNG.sync.read(await target.screenshot({ path: path.join(output, filename) })); report.screenshots.push(filename);
+    const sx = png.width / geometry.width, sy = png.height / geometry.height, r = geometry.radius, inset = 1.5; let samples = 0, gaps = 0;
+    for (let y = 0; y < png.height; y++) for (let x = 0; x < png.width; x++) {
+      const px = (x + .5) / sx, py = (y + .5) / sy, edge = Math.min(px, geometry.width - px), vertical = Math.min(py, geometry.height - py);
+      if (edge > r + 1 || edge < inset || vertical < inset) continue;
+      if (geometry.controls.some(control => px >= control.x - 1 && px <= control.right + 1 && py >= control.y - 1 && py <= control.bottom + 1)) continue;
+      if (edge < r && vertical < r && Math.hypot(edge - r, vertical - r) > r - inset) continue;
+      samples++; const offset = (y * png.width + x) * 4;
+      if ([0, 1, 2].every(channel => Math.abs(png.data[offset + channel] - geometry.background[channel]) <= 2)) gaps++;
+    }
+    assert.ok(samples >= 30, `${label}: enough interior corner pixels are inspected`); assert.equal(gaps, 0, `${label}: no unpainted surface pixels inside the rounded outer edge`);
+    report.capsuleEdgeEvidence ||= []; report.capsuleEdgeEvidence.push({ label, samples, gaps, ...geometry }); persist();
+  }
+  await check('capsule-outer-edge-and-event-fills-stay-contiguous-at-every-height', async () => {
+    for (const [width, height, capsuleHeight] of [[900, 640, 20], [1360, 900, 36], [1600, 1200, 43]]) {
+      await page.setViewportSize({ width, height }); await frame();
+      for (const theme of ['light', 'dark']) {
+        await page.getByTestId(`theme-${theme}`).click(); await page.mouse.move(5, 5); await frame();
+        for (const [date, prefix] of groups) await paintedEdges(capsule(date), `${prefix}-${capsuleHeight}-${theme}`, capsuleHeight);
+      }
+    }
+    await page.setViewportSize({ width: 1360, height: 900 }); await page.getByTestId('theme-light').click(); await frame();
+    await title('edge-multi-1').click(); await paintedEdges(capsule('2026-11-04'), 'multi-selected-hover', 36);
+    await title('edge-single-0').focus(); await page.keyboard.press('Tab'); await frame();
+    const focused = editor().getByTestId('calendar-note-value-edge-single-0'); assert.equal(await focused.evaluate(node => node === document.activeElement), true); await paintedEdges(capsule('2026-11-03'), 'single-keyboard-focus', 36);
+    for (const theme of ['light', 'dark']) {
+      await page.getByTestId(`theme-${theme}`).click();
+      for (const [date, prefix] of groups) {
+        await editor().getByTestId(`calendar-day-allocation-${date}`).click(); const details = page.getByTestId('calendar-day-dialog'); await details.waitFor(); await page.mouse.move(5, 5);
+        await paintedEdges(details.getByTestId(`calendar-work-capsule-${date}`), `${prefix}-expanded-${theme}`, 60); await details.getByTestId('calendar-note-cancel').click();
+      }
+    }
+    await page.getByTestId('theme-light').click(); await frame();
+    const before = await exported(); await resize('2026-11-04', 'edge-multi-0', 'edge-multi-1', .3); await allocations('2026-11-04', { 'edge-multi-0': .3, 'edge-multi-1': .2, 'edge-multi-2': .5 }); await undo(); assert.deepEqual(await exported(), before);
+    await capture('calendar-capsule-edges-overview');
   });
 }
 
@@ -396,7 +478,7 @@ function completeReport() { report.sourcesAfter = hashes(); assert.deepEqual(rep
     if (focus === 'allocation-boundaries') { await allocationBoundaryChecks(); completeReport(); return; }
     if (focus === 'week-settings') { await weekSettingsChecks(); completeReport(); return; }
     if (focus === 'drag-summary') { await dragSummaryChecks(); completeReport(); return; }
-    if (focus === 'value-layout') { await valueLayoutChecks(); completeReport(); return; }
+    if (focus === 'value-layout') { await valueLayoutChecks(); await capsuleSeamChecks(); completeReport(); return; }
     let first, second, saved, firstKey;
     await check('new-calendar-has-42-cells-and-date-click-only-selects', async () => {
       await page.getByTestId('shell-new').click(); await page.getByTestId('shell-new-calendar').click(); await ready(); firstKey = (await active()).key;
@@ -504,6 +586,7 @@ function completeReport() { report.sourcesAfter = hashes(); assert.deepEqual(rep
       await capture('calendar-desktop-light'); await page.getByTestId('theme-dark').click(); await capture('calendar-desktop-dark'); await page.setViewportSize({ width: 800, height: 640 }); await frame(); assert.equal(await editor().getByRole('gridcell').count(), 42); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true); await capture('calendar-narrow-dark');
     });
     await valueLayoutChecks();
+    await capsuleSeamChecks();
     completeReport();
   } catch (error) { report.failure = { message: error.message, stack: error.stack }; if (page && !page.isClosed()) { try { await capture('failure'); report.failure.text = (await page.locator('body').innerText()).slice(-10000); } catch {} } process.exitCode = 1; }
   finally { await browser?.close(); await server?.close(); persist(); console.log(JSON.stringify({ ok: report.ok, stage: report.stage, checks: report.checks.length, report: path.join(output, 'report.json'), failure: report.failure?.message })); }
