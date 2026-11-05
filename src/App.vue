@@ -285,15 +285,15 @@ const editor = () => activeRustWord.value ? rustWordHandles.get(activeKey.value)
 const kindNames: Record<Kind,string> = { word:'文字文档', sheet:'电子表格', presentation:'演示文稿', pdf:'PDF 文档', note:'笔记本', canvas:'画布', diagram:'代码图表', schedule:'计划排期', calendar:'日历便笺' }
 const icons: Record<Kind,string> = {word:'file',sheet:'sheet',presentation:'presentation',pdf:'pdf',note:'notebook',canvas:'canvas',diagram:'code-diagram',schedule:'schedule',calendar:'schedule'}
 const helpTools: { kind: Kind; name: string; description: string }[] = [
+  { kind: 'note', name: '笔记本', description: '分区记录笔记，自由摆放文字与图片。' },
+  { kind: 'canvas', name: '画布', description: '绘制图形、连线与手绘，梳理想法和流程。' },
+  { kind: 'diagram', name: '代码图表', description: '用简洁代码绘制时序图等图表，实时预览。' },
+  { kind: 'schedule', name: '计划排期', description: '安排项目日期、角色分工与事件，直观调整时间。' },
+  { kind: 'calendar', name: '日历便笺', description: '按月记录事项，查看农历节假日，复用历史事项与属性。' },
   { kind: 'word', name: '文字', description: '撰写文章、整理报告，完成图文排版。' },
   { kind: 'sheet', name: '表格', description: '记录数据、计算公式，制作分析图表。' },
   { kind: 'presentation', name: '演示', description: '制作幻灯片，用模板呈现汇报与创意。' },
   { kind: 'pdf', name: 'PDF', description: '阅读和编辑文档，添加批注、签名与图章。' },
-  { kind: 'note', name: '笔记本', description: '分区记录笔记，自由摆放文字与图片。' },
-  { kind: 'canvas', name: '画布', description: '绘制图形、连线与手绘，梳理想法和流程。' },
-  { kind: 'schedule', name: '计划排期', description: '安排项目日期、角色分工与事件，直观调整时间。' },
-  { kind: 'calendar', name: '日历便笺', description: '按月记录事项，查看农历节假日，复用历史事项与属性。' },
-  { kind: 'diagram', name: '代码图表', description: '用简洁代码绘制时序图等图表，实时预览。' },
 ]
 const filteredRecents = computed(() => recents.value.filter(r => r.name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase())))
 const message = (e:unknown) => e instanceof Error ? e.message : String(e)
@@ -1493,7 +1493,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <details ref="newMenu" class="new-document-menu" @keydown.esc.stop.prevent="closeNewMenu(true)">
           <summary data-testid="shell-new" aria-label="新建文档" title="新建文档 · Ctrl / ⌘ N"><Icon name="plus" :size="18"/><span class="file-action-label">新建</span><Icon name="chevron-down" :size="12"/></summary>
           <div class="new-document-options" role="group" aria-label="选择新建文档类型">
-            <button v-for="kind in (['word','sheet','presentation','pdf','note','canvas','diagram','schedule','calendar'] as const)" :key="kind" :data-testid="'shell-new-'+kind" @click="globalNewDocument(kind)"><Icon :name="icons[kind]" :size="18"/><span>{{kindNames[kind]}}</span></button>
+            <button v-for="kind in (['note','canvas','diagram','schedule','calendar','word','sheet','presentation','pdf'] as const)" :key="kind" :data-testid="'shell-new-'+kind" @click="globalNewDocument(kind)"><Icon :name="icons[kind]" :size="18"/><span>{{kindNames[kind]}}</span></button>
           </div>
         </details>
         <div class="global-file-actions">
@@ -1519,15 +1519,15 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       <main class="home-main">
         <div class="home-heading"><div><span class="eyebrow">本地工作空间</span><h1>工作台</h1><p>新建一份文档，或继续编辑本机文件。</p></div></div>
         <section class="create-grid" aria-label="新建文件">
-          <button class="create-card word" @click="newDocument('word')"><span class="document-art"><Icon name="file" :size="28"/></span><span class="card-bottom"><span><strong>文字文档</strong><small>文字排版、表格与图片编辑</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
-          <button class="create-card sheet" @click="newDocument('sheet')"><span class="document-art"><Icon name="sheet" :size="28"/></span><span class="card-bottom"><span><strong>电子表格</strong><small>数据整理与公式计算</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
-          <button class="create-card presentation" @click="newDocument('presentation')"><span class="document-art"><Icon name="presentation" :size="28"/></span><span class="card-bottom"><span><strong>演示文稿</strong><small>幻灯片设计与演示</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
-          <button class="create-card pdf" @click="newDocument('pdf')"><span class="document-art"><Icon name="pdf" :size="28"/></span><span class="card-bottom"><span><strong>PDF 工作室</strong><small>文字编辑、批注与页面整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
           <button class="create-card note" data-testid="home-new-note" @click="newDocument('note')"><span class="document-art"><Icon name="notebook" :size="28"/></span><span class="card-bottom"><span><strong>笔记本</strong><small>分区与页面、灵感记录和待办</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
           <button class="create-card canvas" data-testid="home-new-canvas" @click="newDocument('canvas')"><span class="document-art"><Icon name="canvas" :size="28"/></span><span class="card-bottom"><span><strong>画布</strong><small>流程连线、自由绘制与灵感整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
           <button class="create-card diagram" data-testid="home-new-diagram" @click="newDocument('diagram')"><span class="document-art"><Icon name="code-diagram" :size="28"/></span><span class="card-bottom"><span><strong>代码图表</strong><small>代码绘图、实时预览与图表模板</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
           <button class="create-card schedule" data-testid="home-new-schedule" @click="newDocument('schedule')"><span class="document-art"><Icon name="schedule" :size="28"/></span><span class="card-bottom"><span><strong>计划排期</strong><small>项目日历、角色分工与事件安排</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
           <button class="create-card calendar" data-testid="home-new-calendar" @click="newDocument('calendar')"><span class="document-art"><Icon name="schedule" :size="28"/></span><span class="card-bottom"><span><strong>日历便笺</strong><small>农历节假日、事项与历史复用</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card word" @click="newDocument('word')"><span class="document-art"><Icon name="file" :size="28"/></span><span class="card-bottom"><span><strong>文字文档</strong><small>文字排版、表格与图片编辑</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card sheet" @click="newDocument('sheet')"><span class="document-art"><Icon name="sheet" :size="28"/></span><span class="card-bottom"><span><strong>电子表格</strong><small>数据整理与公式计算</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card presentation" @click="newDocument('presentation')"><span class="document-art"><Icon name="presentation" :size="28"/></span><span class="card-bottom"><span><strong>演示文稿</strong><small>幻灯片设计与演示</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card pdf" @click="newDocument('pdf')"><span class="document-art"><Icon name="pdf" :size="28"/></span><span class="card-bottom"><span><strong>PDF 工作室</strong><small>文字编辑、批注与页面整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
         </section>
         <section class="recent-section"><div class="section-heading"><h2>最近打开 <span>{{recents.length}}</span></h2><label class="search-box"><Icon name="search" :size="18"/><input v-model="search" placeholder="查找最近的文件" aria-label="查找最近的文件"/></label></div>
           <div ref="recentList" class="recent-list" role="region" aria-label="最近打开的文件" tabindex="0">
@@ -1535,7 +1535,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
             <template v-else><button v-for="item in filteredRecents" :key="item.id" class="recent-row" @click="openRecent(item)"><span class="file-icon" :class="item.kind"><Icon :name="icons[item.kind]"/></span><span class="recent-name">{{item.name}}<small>{{kindNames[item.kind]}} · {{item.extension.toUpperCase()}}</small></span><time>{{new Date(item.lastOpenedAt* (item.lastOpenedAt<1e12?1000:1)).toLocaleDateString('zh-CN')}}</time><Icon name="arrow" :size="18"/></button></template>
           </div>
         </section>
-        <footer class="home-footer"><span>文档 · 表格 · 演示 · PDF · 笔记本 · 画布 · 代码图表 · 计划排期 · 日历便笺</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
+        <footer class="home-footer"><span>笔记本 · 画布 · 代码图表 · 计划排期 · 日历便笺 · 文档 · 表格 · 演示 · PDF</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
       </main>
     </div>
     <section v-show="!home" class="editor-workspace" :inert="editorInputBlocked">
