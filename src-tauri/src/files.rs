@@ -21,6 +21,7 @@ use std::{
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 use tempfile::NamedTempFile;
+use unicode_normalization::UnicodeNormalization;
 
 const DOCUMENT_LIMIT: u64 = 100 * 1024 * 1024;
 const IMAGE_LIMIT: u64 = 20 * 1024 * 1024;
@@ -272,6 +273,16 @@ pub struct SaveDocumentRequest {
     pub protected_document_ids: Vec<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RenameDocumentRequest {
+    pub document_id: String,
+    pub name: String,
+    pub expected_sha256: String,
+    #[serde(default)]
+    pub protected_document_ids: Vec<String>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedDocument {
@@ -289,6 +300,19 @@ pub enum SaveResult {
     Saved { document: SavedDocument },
     Cancelled,
     Conflict { message: String },
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "status", rename_all = "lowercase")]
+pub enum RenameResult {
+    Renamed {
+        document: SavedDocument,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        warning: Option<String>,
+    },
+    Conflict {
+        message: String,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -592,6 +616,159 @@ impl DocumentStore {
         Ok(())
     }
 
+    /// Move only an already approved file within its current directory. The
+    /// capability ID and content hash survive; pending editor bytes are not part
+    /// of this operation and must not be acknowledged as saved by the caller.
+    fn rename_existing(
+        &self,
+        record: &StoredDocument,
+        name: &str,
+        expected_sha256: &str,
+        protected_document_ids: &[String],
+    ) -> Result<RenameResult, String> {
+        validate_file_name(name, record.extension)?;
+        validate_protected_document_ids(protected_document_ids)?;
+        if !valid_hash(expected_sha256) || !expected_sha256.eq_ignore_ascii_case(&record.sha256) {
+            return Ok(RenameResult::Conflict {
+                message: "当前文档版本已过期，请重新打开或另存为后再重命名。".into(),
+            });
+        }
+        if let Err(message) = verify_record_path(record) {
+            return Ok(RenameResult::Conflict { message });
+        }
+        let bytes = read_document(&record.path)?;
+        if hash_bytes(&bytes) != record.sha256 {
+            return Ok(RenameResult::Conflict {
+                message: "磁盘文件已被其他应用修改，未重命名。请重新打开，或将当前内容另存为。"
+                    .into(),
+            });
+        }
+        let parent = record.path.parent().ok_or("文档位置缺少父目录。")?;
+        let destination = parent.join(name);
+        let receipt = |path: &Path| -> Result<SavedDocument, String> {
+            Ok(SavedDocument {
+                id: record.id.clone(),
+                name: file_name(path)?,
+                extension: record.extension,
+                kind: record.kind.unwrap_or_else(|| record.extension.kind()),
+                sha256: record.sha256.clone(),
+                size_bytes: bytes.len() as u64,
+            })
+        };
+        if destination == record.path {
+            return Ok(RenameResult::Renamed {
+                document: receipt(&record.path)?,
+                warning: None,
+            });
+        }
+        let mut records = self.records()?;
+        if records.iter().any(|other| {
+            other.id != record.id
+                && same_document_name(&other.path, &destination)
+                && protected_document_ids.contains(&other.id)
+        }) {
+            return Ok(RenameResult::Conflict {
+                message: "此名称对应的文件已在其他标签中打开，请使用其他名称。".into(),
+            });
+        }
+        match fs::symlink_metadata(&destination) {
+            Ok(_) => {
+                return Ok(RenameResult::Conflict {
+                    message: "同目录下已存在此名称，未覆盖原文件。请使用其他名称。".into(),
+                })
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("无法检查重命名位置：{error}")),
+        }
+        // A deleted, closed recent entry may have occupied the new name earlier.
+        // The moving document retains its identity rather than adopting that ID.
+        records.retain(|other| {
+            other.id == record.id
+                || !same_document_name(&other.path, &destination)
+                || !fs::symlink_metadata(&other.path)
+                    .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
+        });
+        let renamed = records
+            .iter_mut()
+            .find(|other| other.id == record.id)
+            .ok_or("文档授权已失效，请重新打开后重试。")?;
+        renamed.path = destination.clone();
+        renamed.last_opened_at = now_millis();
+        let staged_history = self.stage_history(&records)?;
+        // Recheck after preparing history. Never grant a path through a replaced
+        // parent or overwrite a target created between validation and the move.
+        if let Err(message) = verify_record_path(record) {
+            return Ok(RenameResult::Conflict { message });
+        }
+        if hash_bytes(&read_document(&record.path)?) != record.sha256 {
+            return Ok(RenameResult::Conflict {
+                message: "重命名前文件又被其他应用修改，原位置已保留，请重新打开或另存为。".into(),
+            });
+        }
+        match rename_without_overwrite(&record.path, &destination) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                return Ok(RenameResult::Conflict {
+                    message: "此名称已被其他文件占用，未覆盖原文件。请使用其他名称。".into(),
+                })
+            }
+            Err(error) => return Err(format!("重命名失败，原文件未改动：{error}")),
+        }
+        // macOS may normalize Unicode names on disk. Store the canonical spelling
+        // just as open does, without following a raced link to another directory.
+        let mut warnings = Vec::new();
+        let mut staged_history = Some(staged_history);
+        let mut destination = destination;
+        match fs::canonicalize(&destination) {
+            Ok(canonical)
+                if canonical.parent() == Some(parent)
+                    && same_document_name(&canonical, &destination)
+                    && fs::symlink_metadata(&destination)
+                        .is_ok_and(|metadata| metadata.is_file()) =>
+            {
+                if canonical != destination {
+                    destination = canonical;
+                    records
+                        .iter_mut()
+                        .find(|entry| entry.id == record.id)
+                        .unwrap()
+                        .path = destination.clone();
+                    // Discard the earlier spelling even if restaging fails.
+                    staged_history = match self.stage_history(&records) {
+                        Ok(staged) => Some(staged),
+                        Err(error) => {
+                            warnings.push(format!("文件已重命名，但最近文件记录更新失败：{error}"));
+                            None
+                        }
+                    };
+                }
+            }
+            _ => warnings.push("文件已重命名，但无法复核新位置，请保留当前标签并检查文件。".into()),
+        }
+        // Renaming and updating recent history are separate filesystem writes.
+        // Once the file moved, always report its actual identity and name, even
+        // if the history update fails; a later save can retry that update.
+        match self.inner.documents.lock() {
+            Ok(mut current) => *current = records,
+            Err(poisoned) => {
+                *poisoned.into_inner() = records;
+                self.inner.documents.clear_poison();
+                warnings.push("文件已重命名，内存文件记录已恢复，请再次保存确认。".into());
+            }
+        }
+        if let Some(staged) = staged_history {
+            if let Err(error) = staged.persist(&self.inner.history_path) {
+                warnings.push(format!(
+                    "文件已重命名，但最近文件记录更新失败。请保留当前标签并再次保存：{error}"
+                ));
+            }
+        }
+        Ok(RenameResult::Renamed {
+            document: receipt(&destination)?,
+            warning: (!warnings.is_empty()).then(|| warnings.join("\n")),
+        })
+    }
+
     fn save_to_target(
         &self,
         snapshot: TargetSnapshot,
@@ -739,6 +916,37 @@ fn file_name(path: &Path) -> Result<String, String> {
         .ok_or_else(|| "文件名不是有效的 Unicode 文本。".into())
 }
 
+/// A missing open file cannot be canonicalized. Compare its approved directory
+/// and conservatively reserve case variants of its name on every platform, so
+/// Windows/macOS volumes cannot rebind another live tab through capitalization
+/// or canonically equivalent Unicode spellings (NFC versus NFD on macOS).
+fn same_document_name(left: &Path, right: &Path) -> bool {
+    let (Some(left_parent), Some(right_parent)) = (left.parent(), right.parent()) else {
+        return false;
+    };
+    let (Ok(left_parent), Ok(right_parent)) = (
+        fs::canonicalize(left_parent),
+        fs::canonicalize(right_parent),
+    ) else {
+        return false;
+    };
+    left_parent == right_parent
+        && left.file_name().and_then(|name| name.to_str()).map(|name| {
+            name.nfd()
+                .flat_map(char::to_lowercase)
+                .nfd()
+                .collect::<String>()
+        }) == right
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| {
+                name.nfd()
+                    .flat_map(char::to_lowercase)
+                    .nfd()
+                    .collect::<String>()
+            })
+}
+
 fn validate_file_name(name: &str, extension: DocExt) -> Result<(), String> {
     if name.is_empty()
         || name.len() > 240
@@ -809,25 +1017,24 @@ fn valid_notebook(bytes: &[u8]) -> bool {
     };
     let mut ids = std::collections::HashSet::new();
     let valid_node = |node: &serde_json::Value,
-                      titled: bool,
+                      title_limit: Option<usize>,
                       ids: &mut std::collections::HashSet<String>| {
         let Some(id) = node.get("id").and_then(|value| value.as_str()) else {
             return false;
         };
         valid_id(id)
                 && ids.insert(id.to_owned())
-                && (!titled
-                    || node
+                && title_limit.is_none_or(|limit| node
                         .get("title")
                         .and_then(|value| value.as_str())
                         .is_some_and(|title| {
-                            title.chars().count() <= 200
+                            title.chars().count() <= limit
                                 && !title.chars().any(|character| {
                                     matches!(character, '\u{0}'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}')
                                 })
                         }))
     };
-    if !valid_node(&notebook, true, &mut ids) {
+    if !valid_node(&notebook, Some(240), &mut ids) {
         return false;
     }
     let Some(sections) = notebook.get("sections").and_then(|value| value.as_array()) else {
@@ -840,7 +1047,7 @@ fn valid_notebook(bytes: &[u8]) -> bool {
     let mut region_count = 0;
     let mut block_count = 0;
     for section in sections {
-        if !valid_node(section, true, &mut ids) {
+        if !valid_node(section, Some(200), &mut ids) {
             return false;
         }
         let Some(pages) = section.get("pages").and_then(|value| value.as_array()) else {
@@ -852,7 +1059,7 @@ fn valid_notebook(bytes: &[u8]) -> bool {
         }
         let mut parents = std::collections::HashMap::new();
         for page in pages {
-            if !valid_node(page, true, &mut ids) {
+            if !valid_node(page, Some(200), &mut ids) {
                 return false;
             }
             let mut block_lists = Vec::new();
@@ -880,7 +1087,7 @@ fn valid_notebook(bytes: &[u8]) -> bool {
                     return false;
                 }
                 for region in regions {
-                    if !valid_node(region, false, &mut ids) {
+                    if !valid_node(region, None, &mut ids) {
                         return false;
                     }
                     let geometry = |name: &str, minimum: f64| {
@@ -928,7 +1135,7 @@ fn valid_notebook(bytes: &[u8]) -> bool {
                     return false;
                 }
                 for block in blocks {
-                    if !valid_node(block, false, &mut ids)
+                    if !valid_node(block, None, &mut ids)
                         || !matches!(
                             block.get("type").and_then(|value| value.as_str()),
                             Some(
@@ -1160,7 +1367,8 @@ fn valid_calendar_header(value: &serde_json::Value) -> bool {
     };
     if value.get("format").and_then(|v| v.as_str()) != Some("open-office-calendar")
         || value.get("version").and_then(|v| v.as_u64()) != Some(1)
-        || !field(value, "title").is_some_and(valid_title)
+        || !field(value, "title")
+            .is_some_and(|title| !trimmed_title(title).is_empty() && valid_text(title, 240))
         || !value.get("workdayHours").is_none_or(|hours| {
             hours
                 .as_f64()
@@ -1443,6 +1651,77 @@ fn verify_record_path(record: &StoredDocument) -> Result<(), String> {
     Ok(())
 }
 
+/// Unlike std::fs::rename on Unix, these native operations never replace an
+/// existing destination. Checking existence alone would leave a clobber race.
+fn rename_without_overwrite(source: &Path, destination: &Path) -> std::io::Result<()> {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        use std::{ffi::CString, os::unix::ffi::OsStrExt};
+        let source = CString::new(source.as_os_str().as_bytes())?;
+        let destination = CString::new(destination.as_os_str().as_bytes())?;
+        #[cfg(target_os = "macos")]
+        let result = {
+            unsafe extern "C" {
+                fn renamex_np(
+                    old: *const std::ffi::c_char,
+                    new: *const std::ffi::c_char,
+                    flags: u32,
+                ) -> i32;
+            }
+            // Darwin RENAME_EXCL, available on every supported macOS version.
+            unsafe { renamex_np(source.as_ptr(), destination.as_ptr(), 0x0000_0004) }
+        };
+        #[cfg(target_os = "linux")]
+        let result = {
+            unsafe extern "C" {
+                fn renameat2(
+                    old_dir: i32,
+                    old: *const std::ffi::c_char,
+                    new_dir: i32,
+                    new: *const std::ffi::c_char,
+                    flags: u32,
+                ) -> i32;
+            }
+            // Linux AT_FDCWD and RENAME_NOREPLACE. No unsafe rename fallback on
+            // filesystems/kernels that do not implement the exclusive operation.
+            unsafe { renameat2(-100, source.as_ptr(), -100, destination.as_ptr(), 1) }
+        };
+        return if result == 0 {
+            Ok(())
+        } else {
+            Err(std::io::Error::last_os_error())
+        };
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn MoveFileExW(source: *const u16, destination: *const u16, flags: u32) -> i32;
+        }
+        let source: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
+        let destination: Vec<u16> = destination
+            .as_os_str()
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        // Deliberately omit MOVEFILE_REPLACE_EXISTING and MOVEFILE_COPY_ALLOWED.
+        return if unsafe { MoveFileExW(source.as_ptr(), destination.as_ptr(), 0) } != 0 {
+            Ok(())
+        } else {
+            Err(std::io::Error::last_os_error())
+        };
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        let _ = (source, destination);
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "此系统不支持安全重命名。",
+        ))
+    }
+}
+
 struct TargetSnapshot {
     path: PathBuf,
     sha256: Option<String>,
@@ -1671,6 +1950,26 @@ pub fn list_recent_documents(
             })
         })
         .collect()
+}
+
+#[tauri::command]
+pub async fn rename_document(
+    request: RenameDocumentRequest,
+    store: State<'_, DocumentStore>,
+) -> Result<RenameResult, String> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _operation = store.begin_operation()?;
+        let record = store.record(&request.document_id)?;
+        store.rename_existing(
+            &record,
+            &request.name,
+            &request.expected_sha256,
+            &request.protected_document_ids,
+        )
+    })
+    .await
+    .map_err(|error| format!("重命名文件操作异常：{error}"))?
 }
 
 #[tauri::command]
@@ -2103,9 +2402,11 @@ mod tests {
             ("/version", 2.into()),
             ("/id", "invalid id".into()),
             ("/title", " ".into()),
-            ("/title", "日".repeat(201).into()),
+            ("/title", "日".repeat(241).into()),
             ("/notes/0/id", "calendar-1".into()),
             ("/notes/0/title", serde_json::Value::Null),
+            ("/notes/0/title", "日".repeat(201).into()),
+            ("/history/0/title", "日".repeat(201).into()),
             ("/notes/0/content", "文".repeat(20_001).into()),
             ("/notes/0/content", "invalid\u{0}content".into()),
             ("/notes/0/color", "#123".into()),
@@ -2964,7 +3265,12 @@ mod tests {
             ("/format", serde_json::json!("unknown")),
             ("/version", serde_json::json!(3)),
             ("/id", serde_json::json!("not valid")),
-            ("/title", serde_json::json!("字".repeat(201))),
+            ("/title", serde_json::json!("字".repeat(241))),
+            ("/sections/0/title", serde_json::json!("字".repeat(201))),
+            (
+                "/sections/0/pages/0/title",
+                serde_json::json!("字".repeat(201)),
+            ),
             ("/sections", serde_json::json!([])),
             ("/sections/0/pages", serde_json::json!([])),
             ("/sections/0/pages/0/blocks", serde_json::json!([])),
@@ -3540,6 +3846,424 @@ mod tests {
             Err(ReplaceError::Conflict(_))
         ));
         assert_eq!(fs::read(path).unwrap(), b"someone else's new file");
+    }
+
+    #[test]
+    fn filename_length_titles_open_save_and_reopen_in_all_structured_formats() {
+        let directory = tempfile::tempdir().unwrap();
+        let fixtures = [
+            (DocExt::Oonote, notebook_fixture()),
+            (DocExt::Oonote, notebook_v2_fixture()),
+            (DocExt::Ooschedule, schedule_fixture()),
+            (DocExt::Oocalendar, calendar_fixture()),
+            (
+                DocExt::Owflow,
+                serde_json::from_slice(&workflow_fixture("board")).unwrap(),
+            ),
+            (
+                DocExt::Owflow,
+                serde_json::from_slice(&workflow_fixture("mermaid")).unwrap(),
+            ),
+        ];
+        for (index, (extension, fixture)) in fixtures.into_iter().enumerate() {
+            let folder = directory.path().join(index.to_string());
+            fs::create_dir(&folder).unwrap();
+            let data = folder.join("data");
+            let store = DocumentStore::new(data.clone()).unwrap();
+            for length in 201..=229 {
+                let title = "A".repeat(length);
+                let name = format!("{title}.{}", extension.as_str());
+                validate_file_name(&name, extension).unwrap();
+                let mut value = fixture.clone();
+                value["title"] = title.clone().into();
+                let bytes = serde_json::to_vec(&value).unwrap();
+                validate_document_signature(&bytes, extension).unwrap();
+                let path = folder.join(&name);
+                fs::write(&path, &bytes).unwrap();
+                let opened = store.register_open(path.clone()).unwrap();
+                assert_eq!(opened.name, name);
+                let SaveResult::Saved { document } = store
+                    .save_existing(
+                        &store.record(&opened.id).unwrap(),
+                        extension,
+                        Some(&opened.sha256),
+                        bytes.clone(),
+                    )
+                    .unwrap()
+                else {
+                    panic!("save failed for {extension:?} with {length} title characters")
+                };
+                assert_eq!(document.id, opened.id);
+                assert_eq!(fs::read(&path).unwrap(), bytes);
+                let restored = DocumentStore::new(data.clone()).unwrap();
+                let reopened = restored
+                    .register_open(restored.approved_document_path(&opened.id).unwrap())
+                    .unwrap();
+                assert_eq!(reopened.id, opened.id);
+                assert_eq!(reopened.name, name);
+                let model: serde_json::Value =
+                    serde_json::from_slice(&STANDARD.decode(reopened.base64).unwrap()).unwrap();
+                assert_eq!(model["title"], title);
+            }
+        }
+        // Envelope title limits allow a filename-derived title; the independent
+        // filename contract still bounds the full name, including its extension.
+        for (extension, mut fixture) in [
+            (DocExt::Oonote, notebook_fixture()),
+            (DocExt::Oonote, notebook_v2_fixture()),
+            (DocExt::Oocalendar, calendar_fixture()),
+        ] {
+            fixture["title"] = "A".repeat(240).into();
+            validate_document_signature(&serde_json::to_vec(&fixture).unwrap(), extension).unwrap();
+            assert!(validate_file_name(
+                &format!("{}.{}", "A".repeat(240), extension.as_str()),
+                extension
+            )
+            .is_err());
+            fixture["title"] = "A".repeat(241).into();
+            assert!(
+                validate_document_signature(&serde_json::to_vec(&fixture).unwrap(), extension)
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn rename_preserves_capability_bytes_permissions_and_subsequent_save_target() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let source = directory.path().join("原始项目.ooschedule");
+        let bytes = serde_json::to_vec(&schedule_fixture()).unwrap();
+        fs::write(&source, &bytes).unwrap();
+        let store = DocumentStore::new(data.clone()).unwrap();
+        let opened = store.register_open(source.clone()).unwrap();
+        let record = store.record(&opened.id).unwrap();
+        let result = store
+            .rename_existing(&record, "项目二期.ooschedule", &opened.sha256, &[])
+            .unwrap();
+        let RenameResult::Renamed { document, warning } = result else {
+            panic!("rename failed")
+        };
+        assert!(warning.is_none());
+        assert_eq!(document.id, opened.id);
+        assert_eq!(document.sha256, opened.sha256);
+        assert_eq!(document.size_bytes, opened.size_bytes);
+        assert_eq!(document.name, "项目二期.ooschedule");
+        assert_eq!(document.kind, DocumentKind::Schedule);
+        assert!(!source.exists());
+        let destination = directory.path().join(&document.name);
+        assert_eq!(
+            fs::read(&destination).unwrap(),
+            bytes,
+            "rename never saves editor drafts"
+        );
+        let restored = DocumentStore::new(data).unwrap();
+        assert_eq!(
+            restored.approved_document_path(&opened.id).unwrap(),
+            fs::canonicalize(&destination).unwrap()
+        );
+        let mut changed = schedule_fixture();
+        changed["title"] = "项目二期".into();
+        let changed_bytes = serde_json::to_vec(&changed).unwrap();
+        assert!(matches!(
+            restored
+                .save_existing(
+                    &restored.record(&opened.id).unwrap(),
+                    DocExt::Ooschedule,
+                    Some(&document.sha256),
+                    changed_bytes.clone()
+                )
+                .unwrap(),
+            SaveResult::Saved { .. }
+        ));
+        assert_eq!(fs::read(destination).unwrap(), changed_bytes);
+        assert!(
+            !source.exists(),
+            "later autosaves must not recreate the old path"
+        );
+    }
+
+    #[test]
+    fn rename_conflicts_and_invalid_names_leave_files_and_identity_unchanged() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("report.docx");
+        let bytes = zip_header_fixture(b"original");
+        fs::write(&source, &bytes).unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let opened = store.register_open(source.clone()).unwrap();
+        let record = store.record(&opened.id).unwrap();
+        for name in [
+            "../escape.docx",
+            "sub/escape.docx",
+            "new.xlsx",
+            ".hidden.docx",
+            "CON.docx",
+        ] {
+            assert!(
+                store
+                    .rename_existing(&record, name, &opened.sha256, &[])
+                    .is_err(),
+                "{name}"
+            );
+        }
+        fs::write(directory.path().join("occupied.docx"), b"other document").unwrap();
+        fs::create_dir(directory.path().join("folder.docx")).unwrap();
+        for name in ["occupied.docx", "folder.docx"] {
+            assert!(matches!(
+                store
+                    .rename_existing(&record, name, &opened.sha256, &[])
+                    .unwrap(),
+                RenameResult::Conflict { .. }
+            ));
+        }
+        assert_eq!(
+            fs::read(directory.path().join("occupied.docx")).unwrap(),
+            b"other document"
+        );
+        assert_eq!(fs::read(&source).unwrap(), bytes);
+        assert_eq!(store.record(&opened.id).unwrap().path, record.path);
+        assert!(store
+            .rename_existing(&record, "new.docx", &opened.sha256, &["bad-id".into()])
+            .is_err());
+    }
+
+    #[test]
+    fn rename_rejects_stale_versions_external_changes_and_deleted_sources() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("report.docx");
+        let original = zip_header_fixture(b"original");
+        fs::write(&source, &original).unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let opened = store.register_open(source.clone()).unwrap();
+        let record = store.record(&opened.id).unwrap();
+        for expected in ["".to_string(), "invalid".into(), "0".repeat(64)] {
+            assert!(matches!(
+                store
+                    .rename_existing(&record, "new.docx", &expected, &[])
+                    .unwrap(),
+                RenameResult::Conflict { .. }
+            ));
+        }
+        let same = store
+            .rename_existing(&record, "report.docx", &opened.sha256, &[])
+            .unwrap();
+        assert!(matches!(same, RenameResult::Renamed { warning: None, .. }));
+        fs::write(&source, b"external update").unwrap();
+        assert!(matches!(
+            store
+                .rename_existing(&record, "new.docx", &opened.sha256, &[])
+                .unwrap(),
+            RenameResult::Conflict { .. }
+        ));
+        assert_eq!(fs::read(&source).unwrap(), b"external update");
+        fs::remove_file(&source).unwrap();
+        assert!(matches!(
+            store
+                .rename_existing(&record, "new.docx", &opened.sha256, &[])
+                .unwrap(),
+            RenameResult::Conflict { .. }
+        ));
+        assert!(!directory.path().join("new.docx").exists());
+    }
+
+    #[test]
+    fn rename_protects_other_open_capabilities_even_when_their_file_is_missing() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("source.docx");
+        let destination = directory.path().join("Other.docx");
+        fs::write(&source, zip_header_fixture(b"source")).unwrap();
+        fs::write(&destination, zip_header_fixture(b"other")).unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let opened = store.register_open(source.clone()).unwrap();
+        let other = store.register_open(destination.clone()).unwrap();
+        fs::remove_file(&destination).unwrap();
+        let record = store.record(&opened.id).unwrap();
+        assert!(matches!(
+            store
+                .rename_existing(&record, "other.docx", &opened.sha256, &[other.id.clone()])
+                .unwrap(),
+            RenameResult::Conflict { .. }
+        ));
+        assert!(source.exists());
+        let RenameResult::Renamed { document, .. } = store
+            .rename_existing(&record, "other.docx", &opened.sha256, &[])
+            .unwrap()
+        else {
+            panic!("rename failed")
+        };
+        assert_eq!(document.id, opened.id);
+        assert!(
+            store.record(&other.id).is_err(),
+            "closed stale recent identity is not adopted"
+        );
+    }
+
+    #[test]
+    fn rename_reserves_unicode_equivalent_names_of_missing_open_documents() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("source.docx");
+        let occupied = directory.path().join("Café.docx");
+        let proposed = "CAFE\u{301}.docx";
+        fs::write(&source, zip_header_fixture(b"source")).unwrap();
+        fs::write(&occupied, zip_header_fixture(b"other")).unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let opened = store.register_open(source.clone()).unwrap();
+        let other = store.register_open(occupied.clone()).unwrap();
+        fs::remove_file(&occupied).unwrap();
+        let record = store.record(&opened.id).unwrap();
+        assert!(matches!(
+            store
+                .rename_existing(&record, proposed, &opened.sha256, &[other.id.clone()])
+                .unwrap(),
+            RenameResult::Conflict { .. }
+        ));
+        assert!(source.exists());
+        assert!(!directory.path().join(proposed).exists());
+        let RenameResult::Renamed { document, warning } = store
+            .rename_existing(&record, proposed, &opened.sha256, &[])
+            .unwrap()
+        else {
+            panic!("rename failed")
+        };
+        assert!(warning.is_none());
+        assert_eq!(document.id, opened.id);
+        assert!(store.record(&other.id).is_err());
+        assert_eq!(
+            store.approved_document_path(&opened.id).unwrap(),
+            fs::canonicalize(directory.path().join(proposed)).unwrap()
+        );
+    }
+
+    #[test]
+    fn exclusive_rename_never_overwrites_a_target_created_after_validation() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("source.docx");
+        let destination = directory.path().join("target.docx");
+        fs::write(&source, b"original").unwrap();
+        assert!(!destination.exists());
+        fs::write(&destination, b"racing new file").unwrap();
+        assert_eq!(
+            rename_without_overwrite(&source, &destination)
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::AlreadyExists
+        );
+        assert_eq!(fs::read(source).unwrap(), b"original");
+        assert_eq!(fs::read(destination).unwrap(), b"racing new file");
+    }
+
+    #[test]
+    fn rename_history_failures_report_the_actual_file_location() {
+        let directory = tempfile::tempdir().unwrap();
+        let data = directory.path().join("data");
+        let source = directory.path().join("report.docx");
+        fs::write(&source, zip_header_fixture(b"source")).unwrap();
+        let store = DocumentStore::new(data.clone()).unwrap();
+        let opened = store.register_open(source.clone()).unwrap();
+        let record = store.record(&opened.id).unwrap();
+        fs::remove_dir_all(&data).unwrap();
+        fs::write(&data, b"cannot stage history").unwrap();
+        assert!(store
+            .rename_existing(&record, "new.docx", &opened.sha256, &[])
+            .is_err());
+        assert!(source.exists());
+        assert_eq!(store.record(&opened.id).unwrap().path, record.path);
+        fs::remove_file(&data).unwrap();
+        fs::create_dir(&data).unwrap();
+        fs::create_dir(&store.inner.history_path).unwrap();
+        let RenameResult::Renamed { document, warning } = store
+            .rename_existing(&record, "new.docx", &opened.sha256, &[])
+            .unwrap()
+        else {
+            panic!("rename failed")
+        };
+        assert!(warning.is_some());
+        assert!(!source.exists());
+        assert_eq!(
+            store.approved_document_path(&opened.id).unwrap(),
+            fs::canonicalize(directory.path().join("new.docx")).unwrap()
+        );
+        assert_eq!(document.name, "new.docx");
+        assert_eq!(document.sha256, opened.sha256);
+        let encoded = serde_json::to_value(document).unwrap();
+        assert!(encoded.get("path").is_none());
+        fs::remove_dir(&store.inner.history_path).unwrap();
+        assert!(matches!(
+            store
+                .save_existing(
+                    &store.record(&opened.id).unwrap(),
+                    DocExt::Docx,
+                    Some(&opened.sha256),
+                    zip_header_fixture(b"saved draft")
+                )
+                .unwrap(),
+            SaveResult::Saved { .. }
+        ));
+        assert_eq!(
+            DocumentStore::new(data)
+                .unwrap()
+                .approved_document_path(&opened.id)
+                .unwrap(),
+            store.approved_document_path(&opened.id).unwrap()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rename_rejects_source_and_destination_symlinks_and_preserves_permissions() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("report.docx");
+        let outside = directory.path().join("outside.docx");
+        fs::write(&source, zip_header_fixture(b"source")).unwrap();
+        fs::write(&outside, zip_header_fixture(b"outside")).unwrap();
+        fs::set_permissions(&source, fs::Permissions::from_mode(0o640)).unwrap();
+        let store = DocumentStore::new(directory.path().join("data")).unwrap();
+        let opened = store.register_open(source.clone()).unwrap();
+        let record = store.record(&opened.id).unwrap();
+        symlink(&outside, directory.path().join("link.docx")).unwrap();
+        symlink(
+            directory.path().join("missing"),
+            directory.path().join("dangling.docx"),
+        )
+        .unwrap();
+        for name in ["link.docx", "dangling.docx"] {
+            assert!(matches!(
+                store
+                    .rename_existing(&record, name, &opened.sha256, &[])
+                    .unwrap(),
+                RenameResult::Conflict { .. }
+            ));
+        }
+        assert!(matches!(
+            store
+                .rename_existing(&record, "moved.docx", &opened.sha256, &[])
+                .unwrap(),
+            RenameResult::Renamed { .. }
+        ));
+        assert_eq!(
+            fs::metadata(directory.path().join("moved.docx"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o640
+        );
+        symlink(&outside, directory.path().join("moved.docx.tmp")).unwrap();
+        fs::remove_file(directory.path().join("moved.docx")).unwrap();
+        symlink(&outside, directory.path().join("moved.docx")).unwrap();
+        assert!(matches!(
+            store
+                .rename_existing(
+                    &store.record(&opened.id).unwrap(),
+                    "later.docx",
+                    &opened.sha256,
+                    &[]
+                )
+                .unwrap(),
+            RenameResult::Conflict { .. }
+        ));
+        assert_eq!(fs::read(outside).unwrap(), zip_header_fixture(b"outside"));
     }
 
     #[test]

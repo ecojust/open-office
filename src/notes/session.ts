@@ -12,6 +12,7 @@ export class NotebookSession {
  private receipt?: { revision: number; bytes: Uint8Array }
  constructor(bytes?: Uint8Array, title?: string) {
   this.value = bytes?.length ? decodeNotebook(bytes) : createNotebook(title)
+  if (title !== undefined) this.value = validateNotebook({ ...this.value, title })
   this.baseline = JSON.stringify(this.value)
   this.history = [this.baseline]
  }

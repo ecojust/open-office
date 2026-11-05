@@ -21,7 +21,8 @@ export class CalendarSession {
  private cursor = 0
  private receipt?: { revision: number; bytes: Uint8Array; content: string }
  constructor(bytes?: Uint8Array, title?: string) {
-  this.value = own(bytes === undefined ? createCalendar(title) : decodeCalendar(bytes))
+  const value = bytes === undefined ? createCalendar(title) : decodeCalendar(bytes)
+  this.value = own(title === undefined ? value : validateCalendar({ ...value, title }))
   this.content = JSON.stringify(this.value)
   this.baseline = this.content
   this.history = [this.content]

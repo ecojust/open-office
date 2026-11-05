@@ -10,14 +10,14 @@ import { loadCalendarAlmanac, type CalendarAlmanac, type CalendarDateDetails } f
 import { executeCalendarTool } from '../calendar/mcp'
 import { getHolidayClient, flushHolidayCache } from '../schedule/holiday-native'
 import type { HolidayYears } from '../schedule/holidays'
-import { base64ToBytes, bytesToBase64, type EditorExport, type Extension } from '../shared/document'
+import { base64ToBytes, bytesToBase64, saveFileName, type EditorExport, type Extension } from '../shared/document'
 import { useDialogFocus } from '../shared/dialog-focus'
 import { printHtml } from '../shared/printing'
 import type { Appearance } from '../shared/appearance'
 import type { NativeDocument } from '../types'
 
 const props = withDefaults(defineProps<{ document: NativeDocument; active?: boolean; disabled?: boolean; theme?: Appearance; focusMode?: boolean }>(), { active: true, disabled: false, theme: 'system', focusMode: false })
-const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: 'new'|'open'|'save'|'saveAs'|'print'|'close'] }>()
+const emit = defineEmits<{ ready: []; dirty: [value: boolean]; 'title-change': [title: string]; error: [message: string]; status: [message: string]; 'file-action': [action: 'new'|'open'|'save'|'saveAs'|'print'|'close'] }>()
 const root = ref<HTMLElement>(), dialogElement = ref<HTMLElement>(), menuElement = ref<HTMLElement>()
 useDialogFocus(dialogElement)
 const model = shallowRef<CalendarBook>(), loading = ref(true), problem = ref('')
@@ -108,10 +108,16 @@ function normalizeSelection(focusGrid = false) {
  selectedDate.value = date; selectedNoteId.value = null
  if (focusGrid) void nextTick(() => root.value?.querySelector<HTMLElement>(`[data-calendar-day="${date}"]`)?.focus({ preventScroll: true }))
 }
+let emittedTitle: string | undefined
+function validateDocumentTitle(title: string) {
+ saveFileName(title, 'oocalendar')
+ if (Array.from(title).length > 240) throw Error('名称不能超过 240 字。')
+}
 function accept() {
  if (!session) return
  const gridHadFocus = !!root.value?.querySelector('.calendar-grid')?.contains(document.activeElement)
  model.value = session.model
+ if (emittedTitle !== model.value.title) { emittedTitle = model.value.title; emit('title-change', model.value.title) }
  const snapshot = session.inspect(); canUndo.value = snapshot.canUndo; canRedo.value = snapshot.canRedo
  if (selectedNoteId.value && !model.value.notes.some(note => note.id === selectedNoteId.value)) selectedNoteId.value = null
  normalizeSelection(gridHadFocus)
@@ -119,7 +125,7 @@ function accept() {
 }
 function change(edit: (book: CalendarBook) => void): boolean {
  if (!session) return false
- try { session.change(edit); accept(); problem.value = ''; return true } catch (cause) { report(cause); return false }
+ try { session.change(copy => { edit(copy); if (copy.title !== session!.model.title) validateDocumentTitle(copy.title) }); accept(); problem.value = ''; return true } catch (cause) { report(cause); return false }
 }
 function requireReady() {
  if (!session || disposed || loading.value) throw Error('请等待日历本打开。')
@@ -227,7 +233,7 @@ function submitDialog() {
    const id = selectedNoteId.value; session.change(book => { preserveHistory(book); book.notes = book.notes.filter(note => note.id !== id) })
   } else if (dialog.value === 'clear') {
    const prefix = `${month.value}-`; session.change(book => { preserveHistory(book); book.notes = book.notes.filter(note => !note.date.startsWith(prefix)) })
-  } else if (dialog.value === 'settings') session.change(book => { book.title = titleDraft.value.trim(); book.workdayHours = workdayHoursDraft.value; book.weekMode = weekModeDraft.value; book.allocationDisplay = allocationDisplayDraft.value })
+  } else if (dialog.value === 'settings') session.change(book => { validateDocumentTitle(titleDraft.value.trim()); book.title = titleDraft.value.trim(); book.workdayHours = workdayHoursDraft.value; book.weekMode = weekModeDraft.value; book.allocationDisplay = allocationDisplayDraft.value })
   else if (dialog.value === 'allocation') {
    const id = selectedNoteId.value, value = allocationValueDraft.value
    if (!id || typeof value !== 'number' || !Number.isFinite(value)) throw Error('请输入有效的工时数值。')
@@ -344,6 +350,13 @@ async function undo() { requireReady(); if (session!.undo()) accept() }
 async function redo() { requireReady(); if (session!.redo()) accept() }
 async function inspect() { if (!session) throw Error('请等待日历本打开。'); return { ...session.inspect(), book: structuredClone(session.model), view: view(), gestureActive: allocationBusy.value } }
 async function prepareDeactivate() { requireReady(); closeMenu(); return session!.inspect() }
+async function setDocumentTitle(title: string) {
+ validateDocumentTitle(title)
+ await prepareDeactivate()
+ requireReady()
+ if (session!.change(copy => { copy.title = title })) lastExport = undefined
+ accept()
+}
 async function canBackgroundExport() { return !!session && !disposed && !loading.value && !dialog.value && !drag.value && !allocationBusy.value }
 async function exportFile(options: { format?: Extension; background?: boolean } = {}): Promise<EditorExport> {
  requireReady()
@@ -352,9 +365,9 @@ async function exportFile(options: { format?: Extension; background?: boolean } 
   return { base64: bytesToBase64(encodeCalendar(session!.model)), extension: 'json', saveAs: true, dirty: snapshot.dirty, revision: `${snapshot.documentId}:${snapshot.revision}` }
  }
  if (options.format && options.format !== 'oocalendar') throw Error('日历本支持保存为 .oocalendar。')
- const result = session!.export(), base64 = bytesToBase64(result.bytes)
+ const title = session!.model.title, result = session!.export(), base64 = bytesToBase64(result.bytes)
  lastExport = { generation, base64 }
- return { base64, extension: 'oocalendar', name: props.document.name.replace(/\.[^.]+$/, '') + '.oocalendar', dirty: result.snapshot.dirty, revision: `${result.snapshot.documentId}:${result.snapshot.revision}` }
+ return { base64, extension: 'oocalendar', title, name: props.document.name.replace(/\.[^.]+$/, '') + '.oocalendar', dirty: result.snapshot.dirty, revision: `${result.snapshot.documentId}:${result.snapshot.revision}` }
 }
 async function markSaved(base64?: string) {
  requireReady()
@@ -413,12 +426,16 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
  const owner = generation
  const guard = () => { assertCurrent(); if (disposed || owner !== generation || !props.active) throw Error('MCP 日历本已切换，请重新开启服务。') }
  guard(); requireReady()
+ if (name === 'calendar_edit') for (const operation of args.operations as { op: string; title?: string }[]) {
+  if (operation.op === 'book.title') validateDocumentTitle(operation.title!.trim())
+ }
  const result = executeCalendarTool({ session: session!, view, setView(value) { month.value = value.month; selectedDate.value = value.selectedDate; selectedNoteId.value = value.selectedNoteId; query.value = value.search; normalizeSelection() }, changed: accept }, name, args, guard)
  closeMenu(); await nextTick(); guard(); return result
 }
 
 watch(() => props.document.id, async () => {
  const owner = ++generation
+ emittedTitle = undefined
  cancelDrag(); cancelAllocation(); closeMenu(false); loading.value = true; problem.value = ''; dialog.value = null; selectedNoteId.value = null; lastExport = undefined; query.value = ''
  try {
   const bytes = props.document.base64 ? base64ToBytes(props.document.base64) : undefined
@@ -442,7 +459,7 @@ onMounted(() => {
 })
 function closeOnResize() { closeMenu(false) }
 onBeforeUnmount(() => { disposed = true; generation++; holidayRequest++; clearInterval(timer); window.removeEventListener('pointerdown', outsideMenu); window.removeEventListener('resize', closeOnResize); cancelDrag(); cancelAllocation(); session = undefined })
-defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, inspect, syncRevision: inspect, canBackgroundExport, undo, redo, search, print, focus })
+defineExpose({ mcpExecute, setDocumentTitle, prepareDeactivate, exportFile, markSaved, discardChanges, inspect, syncRevision: inspect, canBackgroundExport, undo, redo, search, print, focus })
 </script>
 
 <template>
@@ -493,7 +510,7 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
      </template>
      <template v-else-if="dialog==='delete'"><p>删除“{{deletableNote?.title}}”？</p><p class="calendar-form-hint">可通过撤销恢复。历史事项分类仍会保留。</p></template>
      <template v-else-if="dialog==='clear'"><p>清除 {{monthTitle}} 的 {{notesInMonth.length}} 个事项？</p><p class="calendar-form-hint">其他月份和历史事项保留，可通过一次撤销恢复。</p></template>
-     <template v-else-if="dialog==='settings'"><p class="calendar-form-hint">应用于本日历本的所有日期，随日历本保存。</p><label class="calendar-field"><span>日历本名称</span><input v-model="titleDraft" data-testid="calendar-book-title" required maxlength="200" autocomplete="off"></label><div class="calendar-form-columns"><label class="calendar-field"><span>显示范围</span><select v-model="weekModeDraft" data-testid="calendar-week-mode"><option value="week">Week · 周一至周日</option><option value="work">Work · 周一至周五</option></select></label><label class="calendar-field"><span>工时显示</span><select v-model="allocationDisplayDraft" data-testid="calendar-allocation-display"><option value="percent">百分比</option><option value="hours">工时</option></select></label></div><label class="calendar-field"><span>每天工作时长（小时）</span><input v-model.number="workdayHoursDraft" data-testid="calendar-workday-hours" type="number" required min="0.5" max="24" step="0.5"></label><p class="calendar-form-hint">默认每天 7 小时。修改时长保留各事项比例；非工作事项不计工时。</p><p class="calendar-form-hint">Work 仅隐藏周末，保留事项和全月工时统计；法定假日仍按所在日期显示。</p></template>
+     <template v-else-if="dialog==='settings'"><p class="calendar-form-hint">应用于本日历本的所有日期，随日历本保存。</p><label class="calendar-field"><span>日历本名称</span><input v-model="titleDraft" data-testid="calendar-book-title" required maxlength="240" autocomplete="off"></label><div class="calendar-form-columns"><label class="calendar-field"><span>显示范围</span><select v-model="weekModeDraft" data-testid="calendar-week-mode"><option value="week">Week · 周一至周日</option><option value="work">Work · 周一至周五</option></select></label><label class="calendar-field"><span>工时显示</span><select v-model="allocationDisplayDraft" data-testid="calendar-allocation-display"><option value="percent">百分比</option><option value="hours">工时</option></select></label></div><label class="calendar-field"><span>每天工作时长（小时）</span><input v-model.number="workdayHoursDraft" data-testid="calendar-workday-hours" type="number" required min="0.5" max="24" step="0.5"></label><p class="calendar-form-hint">默认每天 7 小时。修改时长保留各事项比例；非工作事项不计工时。</p><p class="calendar-form-hint">Work 仅隐藏周末，保留事项和全月工时统计；法定假日仍按所在日期显示。</p></template>
      <template v-else-if="dialog==='day' && model"><section v-if="workNotes(selectedDate).length" class="calendar-day-allocation-panel"><div class="calendar-day-allocation-heading"><strong>全天 {{model.workdayHours}} 小时</strong><span>{{model.allocationDisplay==='percent'?'每格 10%':'每格 0.5 小时'}}</span></div><CalendarWorkCapsule :notes="workNotes(selectedDate)" :date="selectedDate" :workday-hours="model.workdayHours" :display="model.allocationDisplay" :disabled="!editable" :selected-note-id="selectedNoteId" :cancel-token="allocationCancelToken" :drag-enabled="false" expanded @edit="editFromDay($event.id)" @delete="deleteFromDay($event.id)" @edit-allocation="openAllocation" @allocation-start="startAllocation" @allocation-commit="commitAllocation" @allocation-cancel="allocationBusy=false"/><p class="calendar-form-hint">拖动相邻分隔线，或选中分隔线后按方向键调整。加入或移出工作事项后，当天重新均分。</p></section><div class="calendar-day-list"><button v-for="note in allDayNotes" :key="note.id" type="button" :data-note-id="note.id" :style="{'--note-color':note.color}" :disabled="allocationBusy" @click="editFromDay(note.id)"><span class="calendar-color-dot"/><span><strong>{{note.title}}</strong><small>{{note.type==='工作日'?allocationLabel(note):'不需要上班 · 不计工时'}}{{note.content?' · '+note.content:''}}</small></span><Icon name="chevron" :size="15"/></button></div><p v-if="!allDayNotes.length" class="calendar-form-hint">这一天还没有事项。</p></template>
      <template v-else-if="dialog==='allocation' && selected && model">
       <p><strong>{{selected.title}}</strong> · {{selectedDate}}</p>

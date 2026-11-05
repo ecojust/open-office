@@ -5,7 +5,7 @@ const bytes = model => { const data = Buffer.from(JSON.stringify(model, null, 2)
 // Validator fixture only; this is never installed-app or native process evidence.
 export function workflowReport() {
   const documents = ['canvas', 'diagram'].map((kind, index) => {
-    const model = { format: 'open-workflow', version: 1, id: `doc-${kind}`, title: `native-${kind}`, kind: kind === 'canvas' ? 'board' : 'mermaid',
+    const model = { format: 'open-workflow', version: 1, id: `doc-${kind}`, title: `native-workspace-${kind}`, kind: kind === 'canvas' ? 'board' : 'mermaid',
       scene: { elements: [], background: '#ffffff', grid: true, defaultStyle: { ...EXPECTED_STYLE } },
       source: kind === 'canvas' ? '' : INITIAL_DIAGRAM_SOURCE, diagramStyle: 'classic', createdAt: '2026-10-17T00:00:00.000Z', updatedAt: '2026-10-17T00:00:00.000Z' };
     const initial = bytes(model), documentId = index * 2 + 1, revision = kind === 'canvas' ? 2 : 1;

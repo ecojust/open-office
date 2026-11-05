@@ -93,7 +93,7 @@ export function validateDocument(value: unknown): WorkflowDocument {
   if (raw.format !== 'open-workflow' || raw.version !== 1) throw new Error('文件格式或版本不受支持；当前支持画布与代码图表文档 v1。')
   const doc: WorkflowDocument = {
     format: 'open-workflow', version: 1, id: string(raw.id, '文档 ID', 512) || newId('doc'),
-    title: string(raw.title, '标题', 200) || '未命名', kind: choice(raw.kind, ['flow', 'board', 'mermaid'], '文档类型'),
+    title: string(raw.title, '标题', 240) || '未命名', kind: choice(raw.kind, ['flow', 'board', 'mermaid'], '文档类型'),
     scene: validateScene(raw.scene), source: string(raw.source ?? '', '图表源码', 500000),
     diagramStyle: normalizeDiagramStyle(raw.diagramStyle),
     createdAt: validDate(raw.createdAt), updatedAt: validDate(raw.updatedAt),

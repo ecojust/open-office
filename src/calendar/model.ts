@@ -11,6 +11,7 @@ export const CALENDAR_MAX_BYTES = 8 * 1024 * 1024
 export const CALENDAR_MAX_NOTES = 10000
 export const CALENDAR_MAX_HISTORY = 100
 export const CALENDAR_MAX_TITLE = 200
+export const CALENDAR_MAX_BOOK_TITLE = 240
 export const CALENDAR_MAX_CONTENT = 20000
 
 let sequence = 0
@@ -63,7 +64,7 @@ export function validateCalendar(value: unknown): CalendarBook {
  if (allocationDisplay !== 'percent' && allocationDisplay !== 'hours') throw Error('工时显示请选择百分比或小时。')
  const weekMode = root.weekMode === undefined ? 'week' : root.weekMode
  if (weekMode !== 'week' && weekMode !== 'work') throw Error('周视图请选择 Week 或 Work。')
- const result: CalendarBook = { format: 'open-office-calendar', version: 1, id: id(root.id), title: text(root.title, CALENDAR_MAX_TITLE, '日历本名称', true), workdayHours, allocationDisplay, weekMode, notes: [], history: [] }
+ const result: CalendarBook = { format: 'open-office-calendar', version: 1, id: id(root.id), title: text(root.title, CALENDAR_MAX_BOOK_TITLE, '日历本名称', true), workdayHours, allocationDisplay, weekMode, notes: [], history: [] }
  result.notes = list(root.notes, CALENDAR_MAX_NOTES, '事项').map(raw => {
   const note = object(raw)
   if (typeof note.date !== 'string') throw Error('事项日期必须为 YYYY-MM-DD。')

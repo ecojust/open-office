@@ -5,16 +5,16 @@ import NotebookCanvas from './NotebookCanvas.vue'
 import type { NativeDocument } from '../types'
 import type { Appearance } from '../shared/appearance'
 import { useDialogFocus } from '../shared/dialog-focus'
-import { base64ToBytes, bytesToBase64, type EditorExport, type Extension } from '../shared/document'
+import { base64ToBytes, bytesToBase64, saveFileName, type EditorExport, type Extension } from '../shared/document'
 import { printHtml, type PrintOutcome } from '../shared/printing'
-import { blankPage, blankRegion, descendantPageIds, noteId, noteTitle, pageHierarchy, pageText, NOTE_MAX_PAGE_DEPTH, type Notebook, type NoteRegion } from '../notes/model'
+import { blankPage, blankRegion, descendantPageIds, noteId, noteTitle, notebookTitle, pageHierarchy, pageText, NOTE_MAX_PAGE_DEPTH, type Notebook, type NoteRegion } from '../notes/model'
 import { NotebookSession } from '../notes/session'
 import { editNotebook, findNotePage, type NoteEditOperation } from '../notes/mcp'
 import { renderBlocks } from '../notes/dom'
 import { noteSearchMatches, searchSegments } from '../notes/search'
 
 const props = withDefaults(defineProps<{ document: NativeDocument; active?: boolean; disabled?: boolean; theme?: Appearance }>(), { active: true, disabled: false, theme: 'system' })
-const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: 'new'|'open'|'save'|'saveAs'|'print'|'close'] }>()
+const emit = defineEmits<{ ready: []; dirty: [value: boolean]; 'title-change': [title: string]; error: [message: string]; status: [message: string]; 'file-action': [action: 'new'|'open'|'save'|'saveAs'|'print'|'close'] }>()
 const canvas = ref<InstanceType<typeof NotebookCanvas>>(), titleInput = ref<HTMLInputElement>(), searchInput = ref<HTMLInputElement>(), dialogInput = ref<HTMLInputElement>()
 const dialogElement = ref<HTMLElement>(), pageMenuElement = ref<HTMLElement>()
 useDialogFocus(dialogElement)
@@ -25,7 +25,7 @@ const undoAvailable = ref(false), redoAvailable = ref(false), dirty = ref(false)
 const smartAlignment = ref(true), snapToGrid = ref(true)
 // Invalid titles remain editable drafts when shell barriers cause a rerender.
 const titleDraft = ref<string>()
-const dialog = ref<{ title: string; message?: string; value: string; destructive: boolean; apply: (value: string) => void }>()
+const dialog = ref<{ title: string; message?: string; value: string; destructive: boolean; documentName: boolean; apply: (value: string) => void }>()
 const pageMenu = ref<{ sectionId: string; pageId: string; x: number; y: number }>()
 let menuTrigger: HTMLElement | undefined
 let session: NotebookSession | undefined, disposed = false, token = 0
@@ -48,16 +48,22 @@ function report(cause: unknown) {
  problem.value = cause instanceof Error ? cause.message : String(cause)
  if (loading.value) emit('error', problem.value)
 }
+let emittedTitle: string | undefined
+function validateDocumentTitle(title: string) {
+ saveFileName(title, 'oonote')
+ if (Array.from(title).length > 240) throw Error('名称不能超过 240 字。')
+}
 function accept() {
  if (!session) return
  model.value = session.model
+ if (emittedTitle !== model.value.title) { emittedTitle = model.value.title; emit('title-change', model.value.title) }
  const state = session.inspect(); undoAvailable.value = state.canUndo; redoAvailable.value = state.canRedo
  dirty.value = state.dirty || pending.value || titlePending.value || composing.value || canvasBusy.value
  emit('dirty', dirty.value)
 }
 function change(edit: (copy: Notebook) => void) {
  if (!session) return
- session.change(edit); accept(); problem.value = ''
+ session.change(copy => { edit(copy); if (copy.title !== session!.model.title) validateDocumentTitle(copy.title) }); accept(); problem.value = ''
 }
 function commitRegions(regions: NoteRegion[]): boolean {
  const id = currentPage.value
@@ -89,14 +95,14 @@ async function selectPage(sectionId: string, pageId: string) {
  await nextTick(); render()
  if (query.value.trim() && !noteSearchMatches(page.value?.title ?? '',query.value).length) canvas.value?.revealMatch()
 }
-function openDialog(title: string, value: string, apply: (value: string) => void, message?: string) {
+function openDialog(title: string, value: string, apply: (value: string) => void, message?: string, documentName = false) {
  if (!controlsReady.value || !commitBody()) return
- closePageMenu(); dialog.value = { title, value, apply, destructive: !!message, message }
+ closePageMenu(); dialog.value = { title, value, apply, destructive: !!message, message, documentName }
  nextTick(() => { dialogInput.value?.focus(); dialogInput.value?.select() })
 }
 function confirmDialog() {
  const current = dialog.value; if (!current) return
- try { current.apply(current.destructive ? '' : noteTitle(current.value)); dialog.value = undefined; nextTick(render) } catch (cause) { report(cause) }
+ try { current.apply(current.destructive ? '' : current.documentName ? notebookTitle(current.value) : noteTitle(current.value)); dialog.value = undefined; nextTick(render) } catch (cause) { report(cause) }
 }
 function addSection() {
  openDialog('新建分区', '新分区', value => {
@@ -190,13 +196,20 @@ function keydown(event: KeyboardEvent) {
  else if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'y') { event.preventDefault(); event.stopPropagation(); void redo().catch(report) }
 }
 async function inspect() { if (!session) throw Error('请等待笔记打开。'); return { ...session.inspect(), dirty: session.inspect().dirty || composing.value || pending.value || titlePending.value || canvasBusy.value } }
+async function setDocumentTitle(title: string) {
+ validateDocumentTitle(title)
+ await prepareDeactivate()
+ requireReady()
+ if (session!.change(copy => { copy.title = title })) lastExport = undefined
+ accept()
+}
 async function canBackgroundExport() { return !!session && !disposed && !loading.value && !composing.value && !pending.value && !titlePending.value && !dialog.value && !canvasBusy.value }
 async function exportFile(options: { format?: Extension; background?: boolean } = {}): Promise<EditorExport> {
  requireReady()
  if (options.format && options.format !== 'oonote') throw Error('笔记支持保存为 .oonote；如需 PDF，请使用打印功能。')
- const result = session!.export(), base64 = bytesToBase64(result.bytes)
+ const title = session!.model.title, result = session!.export(), base64 = bytesToBase64(result.bytes)
  lastExport = { token, base64, revision: result.snapshot.revision }
- return { base64, extension: 'oonote', name: props.document.name.replace(/\.[^.]+$/, '') + '.oonote', dirty: result.snapshot.dirty, revision: `${result.snapshot.documentId}:${result.snapshot.revision}` }
+ return { base64, extension: 'oonote', title, name: props.document.name.replace(/\.[^.]+$/, '') + '.oonote', dirty: result.snapshot.dirty, revision: `${result.snapshot.documentId}:${result.snapshot.revision}` }
 }
 async function markSaved(base64?: string, _options: { background?: boolean } = {}) {
  requireReady()
@@ -242,7 +255,7 @@ async function print(): Promise<PrintOutcome> {
 function focus() { canvas.value?.focus() }
 watch(()=>[props.active,props.disabled],()=>{if(!controlsReady.value)closePageMenu()})
 watch(() => props.document.id, async () => {
- const owner = ++token; loading.value = true
+ const owner = ++token; loading.value = true; emittedTitle = undefined
  try {
   const next = new NotebookSession(props.document.base64 ? base64ToBytes(props.document.base64) : undefined, props.document.name.replace(/\.[^.]+$/, ''))
   if (disposed || owner !== token) return
@@ -308,7 +321,7 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
  }
  throw Error('当前编辑器不支持此 MCP 工具。')
 }
-defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, inspect, syncRevision: inspect, canBackgroundExport, undo, redo, search, print, focus })
+defineExpose({ mcpExecute, setDocumentTitle, prepareDeactivate, exportFile, markSaved, discardChanges, inspect, syncRevision: inspect, canBackgroundExport, undo, redo, search, print, focus })
 </script>
 
 <template>
@@ -338,7 +351,7 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
   <div v-if="problem" class="note-problem" role="alert">{{ problem }}<button aria-label="关闭提示" @click="problem = ''"><Icon name="close" :size="14" /></button></div>
   <div class="note-workspace" :class="{ 'show-navigation': navigation }">
    <aside class="note-sidebar" aria-label="笔记本导航">
-    <div class="note-notebook-title"><Icon name="folder" :size="20" /><button :disabled="!controlsReady" title="重命名笔记本" @click="openDialog('重命名笔记本', model?.title ?? '', value => change(copy => { copy.title = value }))">{{ model?.title || '笔记本' }}</button></div>
+    <div class="note-notebook-title"><Icon name="folder" :size="20" /><button :disabled="!controlsReady" title="重命名笔记本" @click="openDialog('重命名笔记本', model?.title ?? '', value => change(copy => { copy.title = value }), undefined, true)">{{ model?.title || '笔记本' }}</button></div>
     <label class="note-search"><Icon name="search" :size="16" /><input ref="searchInput" v-model="query" placeholder="搜索整个笔记本" aria-label="搜索整个笔记本" /></label>
     <div v-if="query.trim()" class="note-search-results" aria-label="搜索结果">
      <p>{{ results.length }} 个匹配页面</p>
@@ -370,7 +383,7 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
   <div v-if="dialog" class="note-modal-backdrop" @keydown.esc.prevent="dialog = undefined">
    <form ref="dialogElement" class="note-dialog" role="dialog" aria-modal="true" :aria-label="dialog.title" @submit.prevent="confirmDialog">
     <h2>{{ dialog.title }}</h2><p v-if="dialog.message">{{ dialog.message }}</p>
-    <input v-else ref="dialogInput" v-model="dialog.value" :aria-label="dialog.title" autocomplete="off" />
+    <input v-else ref="dialogInput" v-model="dialog.value" :aria-label="dialog.title" :maxlength="dialog.documentName ? 240 : 200" autocomplete="off" />
     <div><button type="button" @click="dialog = undefined">取消</button><button type="submit" :class="{ danger: dialog.destructive }">{{ dialog.destructive ? '确认删除' : '确定' }}</button></div>
    </form>
   </div>

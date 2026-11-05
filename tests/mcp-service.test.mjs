@@ -132,11 +132,93 @@ test('MCP an unchanged current document keeps its explicitly started session', a
   const h = harness()
   await h.start()
   const running = h.controller.inspect()
-  h.setDocument({ id: 'doc-a', kind: 'word', title: 'Renamed.docx' })
+  h.setDocument({ id: 'doc-a', kind: 'word', title: 'A.docx' })
   await h.controller.contextChanged()
   assert.deepEqual(h.controller.inspect(), running)
   assert.equal(h.calls.some(call => call[0] === 'stop'), false)
   await h.controller.dispose()
+})
+
+
+test('MCP renaming the same document revokes the old title and requires explicit restart', async () => {
+  const h = harness(), document = { id: 'doc-a', kind: 'word', title: 'A.docx' }
+  h.setDocument(document)
+  await h.start()
+  const sessionId = h.controller.inspect().sessionId
+  document.title = '新版.docx'
+  await h.controller.contextChanged()
+  assert.equal(h.controller.inspect().phase, 'stopped')
+  h.emit({ sessionId, requestId: 'old-title-request' })
+  for (let count = 0; count < 5; count++) await Promise.resolve()
+  assert.equal(h.executed.length, 0)
+  assert.equal(h.calls.filter(call => call[0] === 'start').length, 1)
+  assert.equal(h.calls.find(call => call[0] === 'start')[2].title, 'A.docx', 'Startup metadata is an immutable snapshot of the advertised name')
+  await h.start()
+  assert.equal(h.calls.filter(call => call[0] === 'start').at(-1)[2].title, '新版.docx')
+  assert.notEqual(h.controller.inspect().sessionId, sessionId)
+  await h.controller.dispose()
+})
+
+test('MCP a rename during startup cannot publish the stale document title', async () => {
+  for (const notify of [true, false]) {
+    const gate = deferred(), starts = []
+    const h = harness({ transport: { start(...args) { starts.push(args); return gate.promise } } })
+    const startup = h.start()
+    await eventually(() => starts.length === 1)
+    h.setDocument({ id: 'doc-a', kind: 'word', title: 'Renamed.docx' })
+    const renamed = notify ? h.controller.contextChanged() : Promise.resolve()
+    if (notify) assert.equal(h.controller.inspect().phase, 'stopping')
+    gate.resolve({ running: true, sessionId: 'old-name-session', documentId: 'doc-a', endpoint: 'http://127.0.0.1:38487/mcp', port: 38487 })
+    await Promise.all([startup, renamed])
+    assert.equal(h.controller.inspect().phase, 'stopped')
+    assert.ok(h.calls.some(call => call[0] === 'stop' && call[1] === 'old-name-session'))
+    assert.equal(h.changes.some(state => state.phase === 'running'), false)
+    await h.controller.dispose()
+  }
+})
+
+test('MCP a tool rename completes its result before stopping and revoking queued calls', async () => {
+  for (const failure of [undefined, 'editor', 'completion']) {
+    const gate = deferred(), order = [], replies = []
+    const h = harness({
+      execute: async (request, assertCurrent) => {
+        assertCurrent()
+        h.setDocument({ id: 'doc-a', kind: 'word', title: 'Renamed.docx' })
+        assertCurrent()
+        if (failure === 'editor') throw Error('后续编辑失败')
+        return { title: 'Renamed.docx' }
+      },
+      transport: {
+        async complete(_sessionId, requestId, result) {
+          order.push('complete-start'); replies.push({ requestId, result })
+          await gate.promise
+          order.push('complete-end')
+          if (failure === 'completion') throw Error('客户端已离线')
+        },
+        async stop() { order.push('stop'); return stopped() },
+      },
+    })
+    await h.start()
+    const sessionId = h.controller.inspect().sessionId
+    h.emit({ toolName: 'document_edit', requestId: 'rename' })
+    h.emit({ toolName: 'document_edit', requestId: 'queued' })
+    await eventually(() => replies.length === 1)
+    assert.equal(h.controller.inspect().phase, 'running', 'The rename response still belongs to the active session until completion')
+    assert.deepEqual(order, ['complete-start'])
+    assert.equal(replies[0].requestId, 'rename')
+    if (failure === 'editor') {
+      assert.equal(replies[0].result.isError, true)
+      assert.match(replies[0].result.content[0].text, /后续编辑失败/)
+    } else assert.deepEqual(JSON.parse(replies[0].result.content[0].text), { title: 'Renamed.docx' })
+    gate.resolve()
+    await eventually(() => h.controller.inspect().phase === 'stopped')
+    h.emit({ sessionId, requestId: 'after-rename' })
+    for (let count = 0; count < 10; count++) await Promise.resolve()
+    assert.deepEqual(order, ['complete-start', 'complete-end', 'stop'])
+    assert.equal(h.executed.length, 1, 'Queued calls under the stale name never reach the editor')
+    assert.equal(replies.length, 1)
+    await h.controller.dispose()
+  }
 })
 
 test('MCP native startup failure clears any partial listener and never displays Running', async () => {
@@ -237,6 +319,9 @@ test('MCP foreign document identifiers and unobserved current-document changes a
   await h.start()
   h.emit({ requestId: 'wrong-target', documentId: 'doc-b' })
   await eventually(() => h.completed.length === 1)
+  // Let the first response's post-completion context check finish before
+  // independently exercising an unobserved document switch.
+  for (let count = 0; count < 5; count++) await Promise.resolve()
   h.setDocument({ id: 'doc-b', kind: 'sheet', title: 'B.xlsx' })
   h.emit({ requestId: 'stale-target', documentId: 'doc-a' })
   await eventually(() => h.completed.length === 2)

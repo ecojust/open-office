@@ -4,7 +4,7 @@ import { NOTEBOOK_NATIVE_CHECKS, NOTEBOOK_NATIVE_LIMITATIONS, NOTEBOOK_PAGE_TITL
 const bytes = model => { const data = Buffer.from(JSON.stringify(model)); return { base64: data.toString('base64'), sha256: createHash('sha256').update(data).digest('hex'), size: data.length }; };
 // Validator fixture only; it is never installed-app or native process evidence.
 export function notebookReport() {
-  const model = { format: 'open-office-notebook', version: 2, id: 'notebook', title: 'native-notebook', sections: [{ id: 'section', title: '日常笔记',
+  const model = { format: 'open-office-notebook', version: 2, id: 'notebook', title: 'native-workspace', sections: [{ id: 'section', title: '日常笔记',
     pages: [{ id: 'page', title: '无标题页面', regions: [{ id: 'region', x: 24, y: 24, width: 480,
       blocks: [{ id: 'block', type: 'paragraph', content: [] }] }] }] }] };
   const initial = bytes(model);

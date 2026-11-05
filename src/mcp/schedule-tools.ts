@@ -22,14 +22,14 @@ const trackHeight: McpSchema = { type: 'integer', enum: Array.from({ length: (SC
 const dayWidth: McpSchema = { type: 'number', minimum: 36, maximum: 160 }
 const mode = enumeration('people', 'global')
 const project = object({
- format: { const: 'open-office-schedule' }, version: { const: 1 }, id, title: text(200, true), startDate: date, endDate: date, dailyRate,
+ format: { const: 'open-office-schedule' }, version: { const: 1 }, id, title: text(240, true), startDate: date, endDate: date, dailyRate,
  calendar: object(calendarFields, ['hideWeekends', 'hideHolidays', 'extraHolidays', 'excludedHolidays']),
  roles: array(object({ id, ...roleFields }, ['id', 'name', 'role', 'color']), SCHEDULE_MAX_ROLES),
  events: array(object({ id, ...eventFields }, ['id', 'roleId', 'title', 'startDate', 'endDate', 'height', 'slot', 'notes']), SCHEDULE_MAX_EVENTS),
  layout: object({ trackHeights: { type: 'object', additionalProperties: trackHeight, maxProperties: SCHEDULE_MAX_ROLES + SCHEDULE_MAX_EVENTS + 1 } }, ['trackHeights']),
 }, ['format', 'version', 'id', 'title', 'startDate', 'endDate', 'calendar', 'roles', 'events'])
 const operations = [
- operation('project.update', { patch: patch({ title: text(200, true), startDate: date, endDate: date, dailyRate: nullable(dailyRate) }) }, ['patch']),
+ operation('project.update', { patch: patch({ title: text(240, true), startDate: date, endDate: date, dailyRate: nullable(dailyRate) }) }, ['patch']),
  operation('role.add', { role: object({ id, ...roleFields }, ['name']), index: { type: 'integer', minimum: 0, maximum: SCHEDULE_MAX_ROLES } }, ['role']),
  operation('role.update', { roleId: id, patch: patch(roleFields) }, ['roleId', 'patch']),
  operation('role.delete', { roleId: id }, ['roleId']),

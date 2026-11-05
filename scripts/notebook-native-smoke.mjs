@@ -60,7 +60,7 @@ export function validateNativeNotebookReport(report, workspace) {
   const initial = notebookBytes(persistence.initialBase64, persistence.initialSha256, persistence.initialSizeBytes, 'initial');
   const saved = notebookBytes(persistence.readbackBase64, persistence.finalSha256, persistence.finalSizeBytes, 'saved');
   const section = initial.sections[0], page = section.pages[0], region = page.regions[0], block = region.blocks[0];
-  assert.deepEqual(initial, { format: 'open-office-notebook', version: 2, id: initial.id, title: 'native-notebook',
+  assert.deepEqual(initial, { format: 'open-office-notebook', version: 2, id: initial.id, title: 'native-workspace',
     sections: [{ id: section.id, title: '日常笔记', pages: [{ id: page.id, title: '无标题页面',
       regions: [{ id: region.id, x: 24, y: 24, width: 480, blocks: [{ id: block.id, type: 'paragraph', content: [] }] }] }] }] }, 'Native notebook: initial content differs');
   // The browser may replace the empty paragraph node during insertion. Its new
