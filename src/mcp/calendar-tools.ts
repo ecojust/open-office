@@ -1,4 +1,4 @@
-import { CALENDAR_MAX_CONTENT, CALENDAR_MAX_NOTES, CALENDAR_MAX_TITLE } from '../calendar/model.ts'
+import { CALENDAR_MAX_CONTENT, CALENDAR_MAX_NOTES, CALENDAR_MAX_TITLE, CALENDAR_MAX_BOOK_TITLE } from '../calendar/model.ts'
 import { tool, type McpSchema } from './tool-schema.ts'
 
 const id: McpSchema = { type: 'string', minLength: 1, maxLength: 100, pattern: '^[A-Za-z0-9_-]+$' }
@@ -20,7 +20,7 @@ const noteFields = {
  type: noteType,
 }
 const operations = [
- operation('book.title', { title: text(CALENDAR_MAX_TITLE, true) }, ['title']),
+ operation('book.title', { title: text(CALENDAR_MAX_BOOK_TITLE, true) }, ['title']),
  operation('book.settings', { patch: patch({ workdayHours, allocationDisplay, weekMode }) }, ['patch']),
  operation('note.add', { note: object({ id, ...noteFields }, ['title', 'date']) }, ['note']),
  operation('note.update', { noteId: id, patch: patch(noteFields) }, ['noteId', 'patch']),

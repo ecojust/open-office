@@ -73,7 +73,7 @@ export async function runCalendarNativeSmoke(adapter: CalendarNativeSmokeAdapter
   let unobserve: (() => void) | undefined, closedDocuments = 0
   try {
     await adapter.setAutosave(false)
-    const mounted = await bounded(adapter.open({ id: '', kind: 'calendar', extension: 'oocalendar', name: 'native-calendar.oocalendar', base64: '', sha256: '', sizeBytes: 0 }), 'new calendar')
+    const mounted = await bounded(adapter.open({ id: '', kind: 'calendar', extension: 'oocalendar', name: 'native-workspace.oocalendar', base64: '', sha256: '', sizeBytes: 0 }), 'new calendar')
     keys.push(mounted.key)
     const baseline = await bounded(mounted.editor.exportFile({ format: 'oocalendar' }), 'blank calendar export')
     const initial = await digest(baseline.base64)

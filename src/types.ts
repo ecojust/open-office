@@ -36,6 +36,17 @@ export type SaveResult =
   | { status: 'cancelled' }
   | { status: 'conflict'; message: string }
 
+export interface RenameDocumentRequest {
+  documentId: string
+  name: string
+  expectedSha256: string
+  protectedDocumentIds?: string[]
+}
+
+export type RenameResult =
+  | { status: 'renamed'; document: DocumentReceipt; warning?: string }
+  | { status: 'conflict'; message: string }
+
 export interface AppBootstrap {
   origin: string
   basePath: string

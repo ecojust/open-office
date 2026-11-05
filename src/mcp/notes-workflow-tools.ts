@@ -21,7 +21,7 @@ const block: McpSchema = { anyOf: [
 const geometry = { x: num(0,20000), y: num(0,20000), width: num(80,20000), height: num(40,20000) }
 const blocks = array(block,20000,1)
 const noteOperations: McpSchema[] = [
- operation('notebook.rename',{ title: str('笔记本名称') },['title']),
+ operation('notebook.rename',{ title: str('笔记本名称',240) },['title']),
  operation('section.add',{ id,title: str('分区名称'),index },['title']),
  operation('section.rename',{ sectionId:id,title:str('分区名称') },['sectionId','title']),
  operation('section.delete',{ sectionId:id },['sectionId']),
@@ -59,7 +59,7 @@ const canvasOperations = [
  operation('align',{ids,alignment:enumeration('left','center','right','top','middle','bottom')},['ids','alignment']),
  operation('distribute',{ids,axis:enumeration('horizontal','vertical')},['ids','axis']),
  operation('layout',{direction:enumeration('TB','LR','BT','RL')}),
- operation('settings',{title:str('文档标题'),background:str('画布颜色',100),grid:bool,defaultStyle:style}),
+ operation('settings',{title:str('文档标题',240),background:str('画布颜色',100),grid:bool,defaultStyle:style}),
  operation('template',{templateId:str('模板ID',100),x:num(-1000000,1000000),y:num(-1000000,1000000)},['templateId']),
 ]
 export const canvasEditingTools = [
@@ -71,5 +71,5 @@ export const canvasEditingTools = [
 export const diagramEditingTools = [
  tool('diagram_read','读取当前图表源码、标题、样式及解析状态。',true),
  tool('diagram_list_templates','列出内置代码图表模板和可用样式。',true,{query:str('按模板名称/类型筛选',100)}),
- tool('diagram_update','修改图表源码、标题、风格，或应用templateId。source与templateId不能同时提供；新源码须能成功解析。全部变化一次撤销，源码与预览同步更新。',false,{ source:str('图表源码',500000),templateId:str('内置模板ID',100),title:str('文档标题'),style:enumeration('classic','minimal','blueprint','ink','sketch','forest','ocean','sunset','lavender','midnight') }),
+ tool('diagram_update','修改图表源码、标题、风格，或应用templateId。source与templateId不能同时提供；新源码须能成功解析。全部变化一次撤销，源码与预览同步更新。',false,{ source:str('图表源码',500000),templateId:str('内置模板ID',100),title:str('文档标题',240),style:enumeration('classic','minimal','blueprint','ink','sketch','forest','ocean','sunset','lavender','midnight') }),
 ]

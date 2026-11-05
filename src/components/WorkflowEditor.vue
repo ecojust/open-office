@@ -15,12 +15,12 @@ import { sceneToSvg } from '../workflow/core/svg'
 import { clone, newId, DEFAULT_STYLE, type Scene, type WorkflowDocument, type ShapeElement } from '../workflow/core/types'
 import type { DiagramStyleId } from '../workflow/core/diagram-appearance'
 import type { NativeDocument } from '../types'
-import { base64ToBytes, bytesToBase64, type EditorExport, type Extension } from '../shared/document'
+import { base64ToBytes, bytesToBase64, saveFileName, type EditorExport, type Extension } from '../shared/document'
 import { printHtml, type PrintOutcome } from '../shared/printing'
 
 const props = withDefaults(defineProps<{ document: NativeDocument; active?: boolean; disabled?: boolean; theme?: 'light' | 'dark' }>(), { active: true, disabled: false, theme: 'light' })
 const emit = defineEmits<{
- ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string];
+ ready: []; dirty: [value: boolean]; 'title-change': [title: string]; error: [message: string]; status: [message: string];
  'file-action': [action: 'new' | 'open' | 'save' | 'saveAs' | 'print' | 'close'];
  'create-canvas': [document: WorkflowDocument]; export: [output: EditorExport];
 }>()
@@ -37,9 +37,15 @@ function report(cause: unknown) {
  problem.value = cause instanceof Error ? cause.message : String(cause)
  emit('error', problem.value)
 }
+let emittedTitle: string | undefined
+function validateDocumentTitle(title: string) {
+ saveFileName(title, 'owflow')
+ if (Array.from(title).length > 240) throw Error('名称不能超过 240 字。')
+}
 function accept() {
  if (!session) return
  model.value = session.model
+ if (emittedTitle !== model.value.title) { emittedTitle = model.value.title; emit('title-change', model.value.title) }
  const state = session.inspect()
  canUndo.value = state.canUndo; canRedo.value = state.canRedo
  emit('dirty', state.dirty || pending.value)
@@ -47,7 +53,7 @@ function accept() {
 function setPending(value: boolean) { pending.value = value; accept() }
 function change(edit: (document: WorkflowDocument) => void): boolean {
  if (!session || disposed) return false
- try { session.change(edit); problem.value = ''; accept(); return true } catch (cause) { report(cause); return false }
+ try { session.change(copy => { edit(copy); if (copy.title !== session!.model.title) validateDocumentTitle(copy.title) }); problem.value = ''; accept(); return true } catch (cause) { report(cause); return false }
 }
 function changeScene(scene: Scene, label: string) {
  if (change(document => { document.scene = scene })) emit('status', label)
@@ -71,6 +77,13 @@ async function inspect() {
  return { ...current.inspect(), dirty: current.inspect().dirty || pending.value }
 }
 async function prepareDeactivate() { await flush(); return inspect() }
+async function setDocumentTitle(title: string) {
+ validateDocumentTitle(title)
+ await prepareDeactivate()
+ requireLoaded()
+ if (session!.change(copy => { copy.title = title })) lastExport = undefined
+ accept()
+}
 async function canBackgroundExport() {
  return !!session && !disposed && !loading.value && !pending.value && !child()?.hasPendingEdits()
 }
@@ -82,9 +95,9 @@ async function exportFile(options: { format?: Extension; background?: boolean } 
  const format = options.format ?? 'owflow'
  const name = props.document.name.replace(/\.[^.]+$/, '')
  if (format === 'owflow') {
-  const output = current.export(), base64 = bytesToBase64(output.bytes)
+  const title = current.model.title, output = current.export(), base64 = bytesToBase64(output.bytes)
   lastExport = { token, base64 }
-  return { base64, extension: 'owflow', name: `${name}.owflow`, dirty: output.snapshot.dirty, revision: `${output.snapshot.documentId}:${output.snapshot.revision}` }
+  return { base64, extension: 'owflow', title, name: `${name}.owflow`, dirty: output.snapshot.dirty, revision: `${output.snapshot.documentId}:${output.snapshot.revision}` }
  }
  const formats = diagram.value ? ['svg', 'png', 'mmd'] : ['svg', 'png', 'drawio', 'excalidraw']
  if (!formats.includes(format)) throw Error('当前文档不支持导出为此格式。')
@@ -149,7 +162,7 @@ async function inspectModel() { return clone(requireLoaded().model) }
 function focus() { if (diagram.value) codeEditor.value?.focus() }
 
 watch(() => props.document.id, async () => {
- const owner = ++token; loading.value = true; problem.value = ''; pending.value = false
+ const owner = ++token; loading.value = true; problem.value = ''; pending.value = false; emittedTitle = undefined
  try {
   let document: WorkflowDocument
   if (props.document.base64) {
@@ -160,8 +173,8 @@ watch(() => props.document.id, async () => {
    if (imported.warnings.length) emit('status', imported.warnings.join('；'))
   } else {
    document = createDocument(props.document.kind === 'diagram' ? 'mermaid' : 'board')
-   document.title = props.document.name.replace(/\.[^.]+$/, '').slice(0, 200)
   }
+  document.title = props.document.name.replace(/\.[^.]+$/, '')
   if ((document.kind === 'mermaid') !== (props.document.kind === 'diagram')) throw Error('文档内容与编辑器类型不匹配。')
   if (disposed || owner !== token) return
   session = new WorkflowSession(document); lastExport = undefined; accept()
@@ -203,9 +216,9 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
  }
  let editResult: ReturnType<typeof editCanvas> | undefined
  if (name === 'canvas_edit' && !diagram.value) {
-  current.change(copy => { editResult = editCanvas(copy,args.operations as CanvasEditOperation[]) })
+  current.change(copy => { editResult = editCanvas(copy,args.operations as CanvasEditOperation[]); if (copy.title !== current.model.title) validateDocumentTitle(copy.title) })
  } else if (name === 'diagram_update' && diagram.value) {
-  current.change(copy => updateDiagram(copy,args as DiagramUpdate))
+  current.change(copy => { updateDiagram(copy,args as DiagramUpdate); if (copy.title !== current.model.title) validateDocumentTitle(copy.title) })
  } else if (name === 'document_undo' || name === 'document_redo') {
   if (name === 'document_undo') current.undo(); else current.redo()
  } else if (name === 'canvas_add_shape' && !diagram.value) {
@@ -222,7 +235,7 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
  await nextTick(); guard()
  return { ...await inspect(), ...(editResult ? { created: editResult.created } : {}) }
 }
-defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, inspect, inspectModel, syncRevision: inspect, canBackgroundExport, undo, redo, print, focus })
+defineExpose({ mcpExecute, setDocumentTitle, prepareDeactivate, exportFile, markSaved, discardChanges, inspect, inspectModel, syncRevision: inspect, canBackgroundExport, undo, redo, print, focus })
 </script>
 
 <template>

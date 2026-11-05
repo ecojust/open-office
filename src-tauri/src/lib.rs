@@ -190,6 +190,7 @@ pub fn run() {
             files::open_recent,
             files::list_recent_documents,
             files::save_document,
+            files::rename_document,
             files::pick_image,
             clipboard::clipboard_images,
             print::print_pdf,
@@ -269,6 +270,7 @@ pub fn run() {
                 .permission("allow-open-recent")
                 .permission("allow-list-recent-documents")
                 .permission("allow-save-document")
+                .permission("allow-rename-document")
                 .permission("allow-pick-image")
                 .permission("allow-clipboard-images")
                 .permission("allow-print-pdf")

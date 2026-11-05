@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "lockfileSha256": "1705e13bbada2769c64e9a4474025922a8bf6e8d102b989549ad0bb977691687",
+  "lockfileSha256": "aeb4c583711c6e0b4faa5687921c0470ce37ddcac3f80aaa4b6c9b58d8b4ca46",
   "lockfiles": [
     {
       "path": "src-tauri/Cargo.lock",
-      "sha256": "1705e13bbada2769c64e9a4474025922a8bf6e8d102b989549ad0bb977691687",
-      "externalPackageCount": 426
+      "sha256": "aeb4c583711c6e0b4faa5687921c0470ce37ddcac3f80aaa4b6c9b58d8b4ca46",
+      "externalPackageCount": 425
     }
   ],
   "scope": "External packages in the native Tauri Cargo.lock, including platform-specific and build dependencies. Active WASM editors have separate dependency indexes. Local workspace crates are excluded; a locked package is not proof that it is linked into each platform binary.",
@@ -3456,18 +3456,6 @@
       ]
     },
     {
-      "name": "signal-hook-registry",
-      "version": "1.4.8",
-      "license": "MIT OR Apache-2.0",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "checksum": "c4db69cba1110affc0e9f7bcd48bbf87b3f4fc7c61fc9155afd4c469eb3d6c1b",
-      "availableForThisAudit": true,
-      "licenseFiles": [
-        "rust/signal-hook-registry@1.4.8/LICENSE-APACHE",
-        "rust/signal-hook-registry@1.4.8/LICENSE-MIT"
-      ]
-    },
-    {
       "name": "simd-adler32",
       "version": "0.3.10",
       "license": "MIT",
@@ -4007,17 +3995,6 @@
       ]
     },
     {
-      "name": "tokio-macros",
-      "version": "2.7.2",
-      "license": "MIT",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "checksum": "78773a2a397f451582ce068015985c33193cf6dea8b74d2a639fe457b2f07b0e",
-      "availableForThisAudit": true,
-      "licenseFiles": [
-        "rust/tokio-macros@2.7.2/LICENSE"
-      ]
-    },
-    {
       "name": "tokio-util",
       "version": "0.7.20",
       "license": "MIT",
@@ -4262,6 +4239,18 @@
         "rust/unicode-ident@1.0.27/LICENSE-APACHE",
         "rust/unicode-ident@1.0.27/LICENSE-MIT",
         "rust/unicode-ident@1.0.27/LICENSE-UNICODE"
+      ]
+    },
+    {
+      "name": "unicode-normalization",
+      "version": "0.1.25",
+      "license": "MIT OR Apache-2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "5fd4f6878c9cb28d874b009da9e8d183b5abc80117c40bbd187a1fde336be6e8",
+      "availableForThisAudit": true,
+      "licenseFiles": [
+        "rust/unicode-normalization@0.1.25/LICENSE-APACHE",
+        "rust/unicode-normalization@0.1.25/LICENSE-MIT"
       ]
     },
     {

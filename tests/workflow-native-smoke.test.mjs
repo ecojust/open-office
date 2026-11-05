@@ -23,7 +23,7 @@ test('native canvas and diagram acceptance validates exact disk content, origina
 test('native workflow gate accepts the real new sequence diagram and rejects the former flowchart default', () => {
   const report = workflowReport(), doc = report.documents[1];
   const initial = createDocument('mermaid');
-  initial.title = 'native-diagram';
+  initial.title = 'native-workspace-diagram';
   const installInitial = () => {
     // Exercise production creation and serialization, while the gate retains its
     // independent literal expectation rather than importing the sample itself.

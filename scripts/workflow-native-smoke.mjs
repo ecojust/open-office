@@ -65,7 +65,7 @@ function validateDocument(report, kind) {
   check(typeof persistence.targetId === 'string' && persistence.targetId.length > 0 && persistence.targetId.length <= 256, `${kind} file identity missing`);
   const initial = fileModel(persistence.initialBase64, persistence.initialSha256, persistence.initialSizeBytes, `${kind} initial`);
   const saved = fileModel(persistence.readbackBase64, persistence.finalSha256, persistence.finalSizeBytes, `${kind} saved`);
-  assert.deepEqual(initial, { format: 'open-workflow', version: 1, id: initial.id, title: `native-${kind}`, kind: kind === 'canvas' ? 'board' : 'mermaid',
+  assert.deepEqual(initial, { format: 'open-workflow', version: 1, id: initial.id, title: `native-workspace-${kind}`, kind: kind === 'canvas' ? 'board' : 'mermaid',
     scene: { elements: [], background: '#ffffff', grid: true, defaultStyle: { ...EXPECTED_STYLE } },
     source: kind === 'canvas' ? '' : INITIAL_DIAGRAM_SOURCE, diagramStyle: 'classic', createdAt: initial.createdAt, updatedAt: initial.createdAt }, `Native workflow: ${kind} initial content differs`);
   check(Date.parse(saved.updatedAt) >= Date.parse(initial.updatedAt), `${kind} save timestamp moved backwards`);

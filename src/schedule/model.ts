@@ -43,7 +43,7 @@ export function validateSchedule(value: unknown): ScheduleProject {
  }
  const extraHolidays = holidayList(rawCalendar.extraHolidays), excludedHolidays = holidayList(rawCalendar.excludedHolidays)
  if (extraHolidays.some(day => excludedHolidays.includes(day))) throw Error('同一天不能同时添加和排除为假日。')
- const result: ScheduleProject = { format: 'open-office-schedule', version: 1, id: id(root.id), title: text(root.title, 200, '项目名称', true), startDate, endDate, calendar: { hideWeekends: rawCalendar.hideWeekends, hideHolidays: rawCalendar.hideHolidays, extraHolidays, excludedHolidays }, roles: [], events: [] }
+ const result: ScheduleProject = { format: 'open-office-schedule', version: 1, id: id(root.id), title: text(root.title, 240, '项目名称', true), startDate, endDate, calendar: { hideWeekends: rawCalendar.hideWeekends, hideHolidays: rawCalendar.hideHolidays, extraHolidays, excludedHolidays }, roles: [], events: [] }
  if (root.dailyRate !== undefined) {
   if (typeof root.dailyRate !== 'number' || !Number.isFinite(root.dailyRate) || root.dailyRate < 0 || root.dailyRate > MAX_SCHEDULE_DAILY_RATE || Math.round(root.dailyRate * 100) / 100 !== root.dailyRate) throw Error('工时价格须为 0 至 1,000,000 元/人天，最多保留两位小数。')
   result.dailyRate = root.dailyRate === 0 ? 0 : root.dailyRate

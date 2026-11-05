@@ -13,6 +13,7 @@ export class ScheduleSession {
  private receipt?: { revision: number; bytes: Uint8Array; content: string }
  constructor(bytes?: Uint8Array, title?: string) {
   this.value = bytes === undefined ? createSchedule(title) : decodeSchedule(bytes)
+  if (title !== undefined) this.value = validateSchedule({ ...this.value, title })
   this.baseline = JSON.stringify(this.value)
   this.history = [this.baseline]
  }

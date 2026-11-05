@@ -24,6 +24,7 @@ export function createNotebook(title = '我的笔记本'): Notebook { return { f
 function object(value: unknown): Record<string, unknown> { if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('笔记文件结构不正确。'); return value as Record<string, unknown> }
 function text(value: unknown, max: number): string { if (typeof value !== 'string' || Array.from(value).length > max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value)) throw Error('笔记文字无效或过长。'); return value }
 export function noteTitle(value: string): string { const title = text(value.trim(), 200); if (!title) throw Error('名称不能为空。'); return title }
+export function notebookTitle(value: string): string { const title = text(value.trim(), 240); if (!title) throw Error('名称不能为空。'); return title }
 export function validateImage(dataUrl: unknown): string {
  if (typeof dataUrl !== 'string') throw Error('图片数据无效。')
  const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl)
@@ -134,7 +135,7 @@ export function validateNotebook(value: unknown): Notebook {
   return result
  })
  if (root.format !== 'open-office-notebook' || (root.version !== 1 && root.version !== 2)) throw Error('此笔记格式或版本暂不支持。请选择 .oonote 文件。')
- const result: Notebook = { format: 'open-office-notebook', version: 2, id: id(root.id), title: text(root.title, 200), sections: [] }
+ const result: Notebook = { format: 'open-office-notebook', version: 2, id: id(root.id), title: text(root.title, 240), sections: [] }
  result.sections = list(root.sections, 100).map(rawSection => {
   const section = object(rawSection), sectionId = id(section.id)
   const pages = list(section.pages, 2000).map(rawPage => {

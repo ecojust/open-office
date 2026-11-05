@@ -33,6 +33,7 @@ export function createMcpService(options: {
   let lifecycle: Promise<unknown> = Promise.resolve(), calls: Promise<unknown> = Promise.resolve()
   let listener: (() => void) | undefined, listening: Promise<void> | undefined
   let allowed = new Set<string>(), heartbeatPending = false
+  let documentTitle: string | undefined
   const received = new Set<string>()
   function update(next: McpServiceState) { state = next; options.changed({ ...next }) }
   function serialize<T>(work: () => Promise<T>): Promise<T> {
@@ -72,8 +73,13 @@ export function createMcpService(options: {
         result = { content: [{ type: 'text', text: message(cause) }], isError: true }
       }
       // A stopped server has already completed or cancelled its waiters.
-      if (version === generation && state.sessionId === request.sessionId)
+      if (version === generation && state.sessionId === request.sessionId) {
         await transport.complete(request.sessionId, request.requestId, result).catch(() => undefined)
+        // A tool may rename its own document. Deliver that result before
+        // revoking the old advertised title and any queued requests.
+        if (version === generation && state.sessionId === request.sessionId)
+          await contextChanged().catch(() => undefined)
+      }
     }
     calls = calls.then(run, run)
   }
@@ -101,21 +107,29 @@ export function createMcpService(options: {
   async function start(config: McpConfig, document: McpDocument, tools: McpToolDefinition[]) {
     if (disposed || state.phase === 'starting' || state.phase === 'running') return
     if (state.phase === 'stopping' || state.phase === 'error') await stop()
-    const version = ++generation
-    const current = () => !disposed && generation === version && options.currentDocument()?.id === document.id
-    update({ phase: 'starting', documentId: document.id })
+    const version = ++generation, binding = { ...document }
+    documentTitle = binding.title
+    const ownsStart = () => !disposed && generation === version
+    const current = () => ownsStart() && options.currentDocument()?.id === binding.id && options.currentDocument()?.title === binding.title
+    const discardStaleStart = async (sessionId?: string | null) => {
+      if (sessionId) await transport.stop(sessionId)
+      // Also cover a name change during native startup before the host's
+      // context watcher runs, without overwriting a newer lifecycle state.
+      if (ownsStart()) { ++generation; allowed.clear(); received.clear(); update({ phase: 'stopped' }) }
+    }
+    update({ phase: 'starting', documentId: binding.id })
     return serialize(async () => {
       try {
         await ensureListener()
-        if (!current()) return
+        if (!current()) { await discardStaleStart(); return }
         const permitted = config.allowEdits ? tools : tools.filter(tool => tool.annotations?.readOnlyHint === true)
-        const next = await transport.start(config, document, permitted)
-        if (!current()) { if (next.sessionId) await transport.stop(next.sessionId); return }
-        if (!next.running || !next.sessionId || next.documentId !== document.id || !next.endpoint) throw Error('MCP 服务未成功启动。')
+        const next = await transport.start(config, binding, permitted)
+        if (!current()) { await discardStaleStart(next.sessionId); return }
+        if (!next.running || !next.sessionId || next.documentId !== binding.id || !next.endpoint) throw Error('MCP 服务未成功启动。')
         allowed = new Set(permitted.map(tool => tool.name))
-        update({ phase: 'running', sessionId: next.sessionId, documentId: document.id, endpoint: next.endpoint })
+        update({ phase: 'running', sessionId: next.sessionId, documentId: binding.id, endpoint: next.endpoint })
       } catch (cause) {
-        if (current()) {
+        if (ownsStart()) {
           // Cover partial native start failures before allowing another attempt.
           await transport.stop().catch(() => undefined)
           update({ phase: 'error', error: message(cause) })
@@ -140,7 +154,8 @@ export function createMcpService(options: {
     } finally { heartbeatPending = false }
   }
   function contextChanged() {
-    if (state.phase !== 'stopped' && state.documentId !== options.currentDocument()?.id) return stop()
+    const current = options.currentDocument()
+    if (state.phase !== 'stopped' && (state.documentId !== current?.id || documentTitle !== current?.title)) return stop()
     return Promise.resolve()
   }
   async function dispose() {

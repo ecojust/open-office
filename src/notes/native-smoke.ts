@@ -65,7 +65,7 @@ export async function runNotebookNativeSmoke(adapter: NotebookNativeSmokeAdapter
   let unobserve: (() => void) | undefined, closedDocuments = 0
   try {
     await adapter.setAutosave(false)
-    const mounted = await bounded(adapter.open({ id: '', kind: 'note', extension: 'oonote', name: 'native-notebook.oonote', base64: '', sha256: '', sizeBytes: 0 }), 'new notebook')
+    const mounted = await bounded(adapter.open({ id: '', kind: 'note', extension: 'oonote', name: 'native-workspace.oonote', base64: '', sha256: '', sizeBytes: 0 }), 'new notebook')
     keys.push(mounted.key)
     const baseline = await bounded(mounted.editor.exportFile({ format: 'oonote' }), 'blank notebook export')
     const initial = await digest(baseline.base64)

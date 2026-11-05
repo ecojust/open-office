@@ -19,6 +19,7 @@ fn main() {
             "open_recent",
             "list_recent_documents",
             "save_document",
+            "rename_document",
             "pick_image",
             "clipboard_images",
             "print_pdf",

@@ -11,13 +11,13 @@ import { editSchedule, importSchedule, readScheduleCalendar, readScheduleWorkloa
 import type { HolidayYears } from '../schedule/holidays'
 import { getHolidayClient, flushHolidayCache } from '../schedule/holiday-native'
 import { ScheduleSession } from '../schedule/session'
-import { base64ToBytes, bytesToBase64, type EditorExport, type Extension } from '../shared/document'
+import { base64ToBytes, bytesToBase64, saveFileName, type EditorExport, type Extension } from '../shared/document'
 import { useDialogFocus } from '../shared/dialog-focus'
 import type { Appearance } from '../shared/appearance'
 import type { NativeDocument } from '../types'
 
 const props = withDefaults(defineProps<{ document: NativeDocument; active?: boolean; disabled?: boolean; theme?: Appearance; focusMode?: boolean }>(), { active: true, disabled: false, theme: 'system', focusMode: false })
-const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; import: []; export: [format: 'json'|'png']; 'file-action': [action: 'new'|'open'|'save'|'saveAs'|'print'|'close'] }>()
+const emit = defineEmits<{ ready: []; dirty: [value: boolean]; 'title-change': [title: string]; error: [message: string]; status: [message: string]; import: []; export: [format: 'json'|'png']; 'file-action': [action: 'new'|'open'|'save'|'saveAs'|'print'|'close'] }>()
 const root = ref<HTMLElement>(), dialogElement = ref<HTMLElement>(), timeline = ref<InstanceType<typeof ScheduleTimeline>>()
 useDialogFocus(dialogElement)
 const model = shallowRef<ScheduleProject>(), mode = ref<'people'|'global'>('people'), selectedId = ref(''), dayWidth = ref(64)
@@ -79,9 +79,15 @@ async function refreshHolidays(force = false) {
  } finally { if (!disposed && token === holidayRequest) holidayLoading.value = false }
 }
 watch(() => requestedYears.value.join(','), () => { void refreshHolidays() })
+let emittedTitle: string | undefined
+function validateDocumentTitle(title: string) {
+ saveFileName(title, 'ooschedule')
+ if (Array.from(title).length > 240) throw Error('名称不能超过 240 字。')
+}
 function accept() {
  if (!session) return
  model.value = session.model
+ if (emittedTitle !== model.value.title) { emittedTitle = model.value.title; emit('title-change', model.value.title) }
  const snapshot = session.inspect(); canUndo.value = snapshot.canUndo; canRedo.value = snapshot.canRedo
  if (selectedId.value && !model.value.events.some(event => event.id === selectedId.value)) selectedId.value = ''
  // A gesture preview is not an edit. Shell actions may cancel the preview;
@@ -90,7 +96,7 @@ function accept() {
 }
 function change(edit: (copy: ScheduleProject) => void): boolean {
  if (!session) return false
- try { session.change(edit); accept(); problem.value = ''; return true } catch (cause) { report(cause); return false }
+ try { session.change(copy => { edit(copy); if (copy.title !== session!.model.title) validateDocumentTitle(copy.title) }); accept(); problem.value = ''; return true } catch (cause) { report(cause); return false }
 }
 function requireReady() {
  if (!session || disposed || loading.value) throw Error('请等待排期打开。')
@@ -146,6 +152,7 @@ function submitDialog() {
  try {
   const kind = dialog.value
   if (kind === 'project') session.change(copy => {
+   validateDocumentTitle(projectDraft.value.title.trim())
    copy.title = projectDraft.value.title.trim(); copy.startDate = projectDraft.value.startDate; copy.endDate = projectDraft.value.endDate
    if (projectDraft.value.dailyRate === '') delete copy.dailyRate
    else copy.dailyRate = Number(projectDraft.value.dailyRate)
@@ -209,6 +216,13 @@ async function undo() { requireReady(); if (session!.undo()) accept() }
 async function redo() { requireReady(); if (session!.redo()) accept() }
 async function inspect() { if (!session) throw Error('请等待排期打开。'); return { ...session.inspect(), dirty: session.inspect().dirty || gestureBusy.value } }
 async function prepareDeactivate() { requireReady(); return session!.inspect() }
+async function setDocumentTitle(title: string) {
+ validateDocumentTitle(title)
+ await prepareDeactivate()
+ requireReady()
+ if (session!.change(copy => { copy.title = title })) lastExport = undefined
+ accept()
+}
 async function canBackgroundExport() { return !!session && !disposed && !loading.value && !gestureBusy.value && !dialog.value }
 async function exportFile(options: { format?: Extension; background?: boolean } = {}): Promise<EditorExport> {
  requireReady()
@@ -219,9 +233,9 @@ async function exportFile(options: { format?: Extension; background?: boolean } 
   return { base64: bytesToBase64(bytes), extension: options.format, saveAs: true, dirty: snapshot.dirty, revision: `${snapshot.documentId}:${snapshot.revision}` }
  }
  if (options.format && options.format !== 'ooschedule') throw Error('排期支持保存为 .ooschedule。')
- const result = session!.export(), base64 = bytesToBase64(result.bytes)
+ const title = session!.model.title, result = session!.export(), base64 = bytesToBase64(result.bytes)
  lastExport = { generation, base64 }
- return { base64, extension: 'ooschedule', name: props.document.name.replace(/\.[^.]+$/, '') + '.ooschedule', dirty: result.snapshot.dirty, revision: `${result.snapshot.documentId}:${result.snapshot.revision}` }
+ return { base64, extension: 'ooschedule', title, name: props.document.name.replace(/\.[^.]+$/, '') + '.ooschedule', dirty: result.snapshot.dirty, revision: `${result.snapshot.documentId}:${result.snapshot.revision}` }
 }
 async function markSaved(base64?: string) {
  requireReady()
@@ -288,8 +302,8 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
  }
  let result: ReturnType<typeof editSchedule> | undefined
  guard()
- if (name === 'schedule_edit') current.change(copy => { result = editSchedule(copy, args.operations as ScheduleEditOperation[]) })
- else if (name === 'schedule_import') current.change(copy => importSchedule(copy, args.project))
+ if (name === 'schedule_edit') current.change(copy => { result = editSchedule(copy, args.operations as ScheduleEditOperation[]); if (copy.title !== current.model.title) validateDocumentTitle(copy.title) })
+ else if (name === 'schedule_import') current.change(copy => { importSchedule(copy, args.project); if (copy.title !== current.model.title) validateDocumentTitle(copy.title) })
  else if (name === 'document_undo') current.undo()
  else if (name === 'document_redo') current.redo()
  else throw Error('计划排期不支持此 MCP 工具。')
@@ -299,6 +313,7 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
 }
 watch(() => props.document.id, async () => {
  const current = ++generation
+ emittedTitle = undefined
  timeline.value?.cancelGesture(); loading.value = true; problem.value = ''; dialog.value = null; selectedId.value = ''; lastExport = undefined
  try {
   const bytes = props.document.base64 ? base64ToBytes(props.document.base64) : undefined
@@ -314,7 +329,7 @@ watch(() => props.focusMode, closeMenus)
 watch(controlsReady, ready => { if (!ready) closeMenus() })
 onMounted(() => { holidayTimer = setInterval(() => { if (props.active) void refreshHolidays() }, 24 * 60 * 60 * 1000); window.addEventListener('pointerdown', outsideMenu) })
 onBeforeUnmount(() => { disposed = true; generation++; holidayRequest++; clearInterval(holidayTimer); window.removeEventListener('pointerdown', outsideMenu); timeline.value?.cancelGesture(); session = undefined })
-defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChanges, inspect, syncRevision: inspect, canBackgroundExport, undo, redo, focus })
+defineExpose({ mcpExecute, setDocumentTitle, prepareDeactivate, exportFile, markSaved, discardChanges, inspect, syncRevision: inspect, canBackgroundExport, undo, redo, focus })
 </script>
 
 <template>
@@ -352,7 +367,7 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
   <div v-if="dialog" class="schedule-modal-backdrop" @keydown.esc.stop.prevent="cancelDialog">
    <form ref="dialogElement" class="schedule-dialog" :class="{'schedule-dialog-wide':dialog==='roles'}" role="dialog" aria-modal="true" :aria-label="dialogTitle" :data-testid="`schedule-${dialog}-dialog`" @submit.prevent="submitDialog">
     <header><div><span class="schedule-eyebrow">项目排期</span><h2>{{dialogTitle}}</h2></div><button type="button" aria-label="取消并关闭" @click="cancelDialog"><Icon name="close" :size="18"/></button></header>
-    <template v-if="dialog==='project'"><label>项目名称<input v-model="projectDraft.title" data-testid="schedule-project-title" required maxlength="200" autocomplete="off" placeholder="例如：新产品上线计划"></label><div class="schedule-form-columns"><label>开始日期<input v-model="projectDraft.startDate" data-testid="schedule-project-start" type="date" required></label><label>结束日期<input v-model="projectDraft.endDate" data-testid="schedule-project-end" type="date" required></label></div><label>工时单价（元 / 人天）<input v-model.number="projectDraft.dailyRate" data-testid="schedule-project-daily-rate" type="number" min="0" :max="MAX_SCHEDULE_DAILY_RATE" step="0.01" inputmode="decimal" aria-describedby="schedule-rate-hint" placeholder="可选，例如 1000"></label><p id="schedule-rate-hint" class="schedule-form-hint">所有人员使用同一单价；总预算 = 已排总人天 × 单价。悬停人员总工时可查看预算，留空表示暂未设置。</p><p class="schedule-form-hint">周号可在「视图」中选择按年或按项目，两种模式均从周一开周。缩小范围时，已有事件必须仍在项目日期内。</p></template>
+    <template v-if="dialog==='project'"><label>项目名称<input v-model="projectDraft.title" data-testid="schedule-project-title" required maxlength="240" autocomplete="off" placeholder="例如：新产品上线计划"></label><div class="schedule-form-columns"><label>开始日期<input v-model="projectDraft.startDate" data-testid="schedule-project-start" type="date" required></label><label>结束日期<input v-model="projectDraft.endDate" data-testid="schedule-project-end" type="date" required></label></div><label>工时单价（元 / 人天）<input v-model.number="projectDraft.dailyRate" data-testid="schedule-project-daily-rate" type="number" min="0" :max="MAX_SCHEDULE_DAILY_RATE" step="0.01" inputmode="decimal" aria-describedby="schedule-rate-hint" placeholder="可选，例如 1000"></label><p id="schedule-rate-hint" class="schedule-form-hint">所有人员使用同一单价；总预算 = 已排总人天 × 单价。悬停人员总工时可查看预算，留空表示暂未设置。</p><p class="schedule-form-hint">周号可在「视图」中选择按年或按项目，两种模式均从周一开周。缩小范围时，已有事件必须仍在项目日期内。</p></template>
     <template v-if="dialog==='roles'"><p class="schedule-form-hint">每位人员一条轨道，事件沿用人员颜色。角色可以填写产品、设计、开发等职能。</p><div class="schedule-role-labels"><span>名称</span><span>角色 / 职能</span><span>颜色</span><span/></div><div class="schedule-role-list"><div v-for="role in rolesDraft" :key="role.id" class="schedule-role-draft" :data-role-draft="role.id"><input v-model="role.name" data-testid="role-name" aria-label="人员名称" required maxlength="100" placeholder="姓名"><input v-model="role.role" data-testid="role-job" aria-label="角色职能" maxlength="100" placeholder="例如：设计"><input v-model="role.color" data-testid="role-color" aria-label="人员颜色" type="color"><button type="button" :aria-label="`移除 ${role.name || '人员'}`" @click="removeRole(role.id)"><Icon name="close" :size="15"/></button></div></div><p v-if="!rolesDraft.length" class="schedule-form-hint">还没有人员，点击下方按钮添加。</p><button type="button" data-testid="schedule-role-add" class="schedule-add-role" @click="addRole"><Icon name="plus" :size="15"/>添加人员</button></template>
     <template v-if="dialog==='calendar'"><p class="schedule-form-hint">自动获取中国大陆官方放假安排，每 24 小时检查更新；断网使用缓存或内置数据。周末开关独立生效，调休上班的周六、周日也默认隐藏。</p><label>新增假日<textarea v-model="holidayDraft.extra" data-testid="schedule-extra-holidays" rows="4" placeholder="每行一个日期，例如 2027-01-01"/></label><label>排除已收录的假日<textarea v-model="holidayDraft.excluded" data-testid="schedule-excluded-holidays" rows="3" placeholder="需要显示为普通日期的官方假日，每行一个"/></label><p class="schedule-form-hint">日期格式为 YYYY-MM-DD。手动设置优先于自动数据；更新和显示开关不改写事件的起止日期。</p></template>
     <template v-if="dialog==='event' && eventDraft"><label>事件名称<input v-model="eventDraft.title" data-testid="schedule-event-title" required maxlength="200" autocomplete="off" placeholder="例如：完成交互设计"></label><label>负责人 / 轨道<select v-model="eventDraft.roleId" data-testid="schedule-event-role"><option :value="null">整体计划（固定轨道）</option><option v-for="role in model?.roles" :key="role.id" :value="role.id">{{role.name}}{{role.role?' · '+role.role:''}}</option></select></label><div class="schedule-form-columns"><label>开始日期<input v-model="eventDraft.startDate" data-testid="schedule-event-start" type="date" :min="model?.startDate" :max="model?.endDate" required></label><label>结束日期<input v-model="eventDraft.endDate" data-testid="schedule-event-end" type="date" :min="model?.startDate" :max="model?.endDate" required></label></div><label>显示高度<select v-model.number="eventDraft.height" data-testid="schedule-event-height" @change="eventDraft.height===1 && (eventDraft.slot=0)"><option :value="1">100% · 全天</option><option :value="0.5">50% · 上午或下午</option></select></label><label v-if="eventDraft.height===0.5">时段<select v-model.number="eventDraft.slot" data-testid="schedule-event-slot"><option :value="0">上午 · 轨道上半部</option><option :value="1">下午 · 轨道下半部</option></select></label><label>备注<textarea v-model="eventDraft.notes" data-testid="schedule-event-notes" rows="3" maxlength="20000" placeholder="可选，记录交付要求或协作事项"/></label><p class="schedule-form-hint">起止日期包含当天。半高事件可选择上午或下午；同一人员同一天仍只允许一个事件。</p></template>

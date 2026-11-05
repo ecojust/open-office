@@ -79,7 +79,7 @@ export async function runWorkflowNativeSmoke(adapter: WorkflowNativeSmokeAdapter
     for (const [index, kind] of (['canvas', 'diagram'] as const).entries()) {
       const result: DocumentReport = { kind }, check = index * 4
       report.documents.push(result)
-      const mounted = await bounded(adapter.open({ id: '', kind, extension: 'owflow', name: `native-${kind}.owflow`, base64: '', sha256: '', sizeBytes: 0 }), `new ${kind}`)
+      const mounted = await bounded(adapter.open({ id: '', kind, extension: 'owflow', name: `native-workspace-${kind}.owflow`, base64: '', sha256: '', sizeBytes: 0 }), `new ${kind}`)
       keys.push(mounted.key)
       const baseline = await bounded(mounted.editor.exportFile({ format: 'owflow' }), `blank ${kind} export`), initial = await digest(baseline.base64)
       const temporary = await bounded(invoke<NativeDocument>('smoke_prepare_document', { base64: baseline.base64, extension: 'owflow' }), `isolated ${kind} file`)

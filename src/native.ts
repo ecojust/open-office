@@ -1,6 +1,6 @@
 import { invoke, isTauri as detectTauri } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { AppBootstrap, NativeDocument, NativeImage, RecentDocument, SaveDocumentRequest, SaveResult } from './types'
+import type { AppBootstrap, NativeDocument, NativeImage, RecentDocument, SaveDocumentRequest, SaveResult, RenameDocumentRequest, RenameResult } from './types'
 import type { PrintOutcome } from './shared/printing'
 
 export const isTauri = (): boolean => detectTauri()
@@ -9,6 +9,7 @@ export const openDocument = (): Promise<NativeDocument | null> => invoke('open_d
 export const openRecent = (documentId: string): Promise<NativeDocument> => invoke('open_recent', { documentId })
 export const listRecentDocuments = (): Promise<RecentDocument[]> => invoke('list_recent_documents')
 export const saveDocument = (request: SaveDocumentRequest): Promise<SaveResult> => invoke('save_document', { request })
+export const renameDocument = (request: RenameDocumentRequest): Promise<RenameResult> => invoke('rename_document', { request })
 export const pickImage = (): Promise<NativeImage | null> => invoke('pick_image')
 export const clipboardImages = (): Promise<NativeImage[]> => invoke('clipboard_images')
 export const printPdf = (base64: string, title: string): Promise<PrintOutcome> => invoke('print_pdf', { base64, title })

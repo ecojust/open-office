@@ -1,4 +1,4 @@
-import { blankPage, blankRegion, descendantPageIds, noteId, noteTitle, type Notebook, type NoteBlock, type NotePage, type NoteRegion, type NoteSection } from './model.ts'
+import { blankPage, blankRegion, descendantPageIds, noteId, noteTitle, notebookTitle, type Notebook, type NoteBlock, type NotePage, type NoteRegion, type NoteSection } from './model.ts'
 
 export type NoteEditOperation =
  | { op: 'notebook.rename'; title: string }
@@ -43,7 +43,7 @@ export function editNotebook(notebook: Notebook, operations: readonly NoteEditOp
  let pageId: string | undefined
  for (const operation of operations) {
   switch (operation.op) {
-   case 'notebook.rename': notebook.title = noteTitle(operation.title); break
+   case 'notebook.rename': notebook.title = notebookTitle(operation.title); break
    case 'section.add': {
     const section: NoteSection = { id: operation.id ?? noteId(), title: noteTitle(operation.title), pages: [blankPage()] }
     insert(notebook.sections, section, operation.index); created.push({ type: 'section', id: section.id }, { type: 'page', id: section.pages[0]!.id }); pageId = section.pages[0]!.id; break

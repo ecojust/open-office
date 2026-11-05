@@ -43,7 +43,7 @@ import type { NotebookNativeSmokeAdapter } from './notes/native-smoke'
 import type { CalendarNativeSmokeAdapter } from './calendar/native-smoke'
 import { bytesToBase64, base64ToBytes, extensionOf, kindOf, documentKindOf, withExtension, defaultSaveExtension, isImportOnly, validateDocumentSignature, saveFormats, saveFileName, type SaveExtension, type Kind, type Extension, type EditorHandle, type EditorExport } from './shared/document'
 
-interface Tab { key: string; document: NativeDocument; fileId?: string; requiresSaveAs?: boolean; importWarnings?:string[]; dirty: boolean; ready: boolean; loadError?: string; autoSavedAt?: number }
+interface Tab { key: string; document: NativeDocument; fileId?: string; persistedName?: string; nameRevision?: number; requiresSaveAs?: boolean; importWarnings?:string[]; dirty: boolean; ready: boolean; loadError?: string; autoSavedAt?: number }
 const appVersion = __APP_VERSION__
 const buildVersion = __BUILD_VERSION__
 const brandIcon = new URL('./brand-mark.png', document.baseURI).href
@@ -195,6 +195,9 @@ const mcpState = shallowRef<McpServiceState>({ phase: 'stopped' })
 const recentList = ref<HTMLElement>()
 watch(search, () => { if(recentList.value) recentList.value.scrollTop = 0 }, { flush: 'post' })
 const saveAsDraft = ref<{ key:string; kind:Kind; format:SaveExtension; name:string; error:string } | null>(null)
+const renameDraft = ref<{ key:string; name:string; extension:Extension; error:string } | null>(null)
+const renameDialog = ref<HTMLElement>(), renameComposing = ref(false)
+useDialogFocus(renameDialog)
 type TemplateDraft = { kind:'save'; key:string; name:string; error:string } | { kind:'apply'|'delete'; key:string; template:PresentationTemplate; error:string }
 const templateDraft = ref<TemplateDraft | null>(null), templateDialog = ref<HTMLElement>()
 const templatePanelOpen = ref(false), templateListLoading = ref(false), templateListError = ref('')
@@ -203,8 +206,8 @@ let templateListRequest = 0
 useDialogFocus(templateDialog)
 watch([templatePanelOpen, activeRustPresentation, home], () => nextTick(() => window.dispatchEvent(new Event('resize'))))
 const composing = ref(false), backgroundSaving = ref(false)
-const globalActionsBlocked = computed(() => !!busy.value || !!saveAsDraft.value || !!templateDraft.value || !!closeTarget.value || help.value || mcpSettingsOpen.value || mcpWorking.value)
-const editorInputBlocked = computed(() => (!!busy.value && !backgroundSaving.value) || !!saveAsDraft.value || !!templateDraft.value || !!closeTarget.value || help.value || mcpSettingsOpen.value || mcpMutating.value)
+const globalActionsBlocked = computed(() => !!busy.value || !!saveAsDraft.value || !!renameDraft.value || !!templateDraft.value || !!closeTarget.value || help.value || mcpSettingsOpen.value || mcpWorking.value)
+const editorInputBlocked = computed(() => (!!busy.value && !backgroundSaving.value) || !!saveAsDraft.value || !!renameDraft.value || !!templateDraft.value || !!closeTarget.value || help.value || mcpSettingsOpen.value || mcpMutating.value)
 const currentDocument = computed(() => home.value ? undefined : active.value)
 const documentActionsDisabled = computed(() => globalActionsBlocked.value || !currentDocument.value?.ready)
 const printDisabled = computed(() => documentActionsDisabled.value || typeof editor()?.print !== 'function')
@@ -370,6 +373,11 @@ async function toggleMcp() {
   } catch (cause) { error.value = message(cause) }
 }
 watch([activeKey, home], () => { void mcpService.contextChanged().catch(cause => { error.value = message(cause) }) }, { flush:'sync' })
+watch(() => currentDocument.value?.document.name, () => {
+  // A rename performed by an MCP tool must reply before retiring its session.
+  // The service checks the new title after completing that request.
+  if (!mcpWorking.value) void mcpService.contextChanged().catch(cause => { error.value = message(cause) })
+}, { flush:'sync' })
 let mcpHeartbeatTimer:ReturnType<typeof setInterval>|undefined
 onMounted(() => {
   void readMcpSettings()
@@ -410,6 +418,42 @@ function nativeTransactionalEditor<T extends object>(handle:T):T {
 function dirtyFor(id:string|undefined, value:boolean) {
   const tab=tabs.value.find(t=>t.key===id)
   if(tab && value) tab.dirty=true
+}
+const fileTitle = (name:string) => name.replace(/\.[^.]+$/, '')
+const sameTitle = (left:string,right:string) => left.normalize('NFC') === right.normalize('NFC')
+function sameDocumentName(left:string,right:string) {
+  return sameTitle(fileTitle(left),fileTitle(right)) && left.split('.').at(-1)?.toLowerCase() === right.split('.').at(-1)?.toLowerCase()
+}
+function pendingDocumentName(tab:Tab) { return tab.persistedName !== undefined && !sameDocumentName(tab.document.name,tab.persistedName) }
+function updateTabDocument(tab:Tab, patch:Partial<NativeDocument>) {
+  tab.document = { ...tab.document, ...patch, id:tab.key }
+  // Mounted editors retain their sessions and history; update their metadata
+  // explicitly instead of leaving entries pointing at an old receipt object.
+  for (const entries of [rustWordEntries,rustSheetEntries,rustPresentationEntries,rustPdfEntries,noteEntries,workflowEntries,scheduleEntries,calendarEntries]) {
+    entries.value = entries.value.map(entry => entry.document.id === tab.key ? { ...entry, document:tab.document } : entry) as typeof entries.value
+  }
+}
+function documentName(tab:Tab, title:string) {
+  if (Array.from(title).length > 240) throw Error('名称不能超过 240 字。')
+  const name = saveFileName(title,defaultSaveExtension(tab.document.extension,tab.document.kind))
+  return withExtension(name,tab.document.extension)
+}
+function documentTitleFor(id:string,title:string) {
+  const tab=tabs.value.find(item=>item.key===id)
+  if(!tab||sameTitle(fileTitle(tab.document.name),title))return
+  try {
+    const name=documentName(tab,title)
+    tab.nameRevision=(tab.nameRevision??0)+1
+    updateTabDocument(tab,{name})
+    tab.dirty=true;tab.autoSavedAt=undefined
+  } catch(cause) { error.value=message(cause) }
+}
+async function applyDocumentTitle(tab:Tab,title:string,forceModel=false) {
+  const name=documentName(tab,title), handle=requireEditor(tab)
+  if(!forceModel&&sameTitle(fileTitle(tab.document.name),title))return
+  if(handle.setDocumentTitle)await handle.setDocumentTitle(title)
+  if(activeKey.value!==tab.key||handleFor(tab)!==handle)throw Error('文档已切换，名称修改已取消。')
+  if(tab.document.name!==name)documentTitleFor(tab.key,title)
 }
 function readyFor(id:string|undefined) { const tab=tabs.value.find(t=>t.key===id); if(tab) {tab.ready=true;tab.loadError=undefined;smokeStage('editor-ready',tab.document.kind)} }
 function editorError(id:string|undefined,value:string) {
@@ -511,7 +555,7 @@ async function addDocument(doc:NativeDocument, fileId?:string) {
     if(appDisposed)return
     const requiresConversion=isImportOnly(doc.extension)||defaultSaveExtension(doc.extension,doc.kind)!==doc.extension
     const importWarnings=[...(requiresConversion?['此格式需要转换后保存，原文件保留。']:[]),...(sheetPrepared?.warnings??presentationPrepared?.warnings??pdfPrepared?.warnings??workflowWarnings)]
-    const tab:Tab={key,document:{...doc,id:key},fileId,requiresSaveAs:requiresConversion,importWarnings,dirty:!fileId,ready:false}
+    const tab:Tab={key,document:{...doc,id:key},fileId,persistedName:doc.base64?doc.name:undefined,nameRevision:0,requiresSaveAs:requiresConversion,importWarnings,dirty:!fileId,ready:false}
     await stash()
     if(appDisposed)return
     tabs.value.push(tab); const storedTab=tabs.value[tabs.value.length-1]!; activeKey.value=key; home.value=false
@@ -645,39 +689,86 @@ async function saveActive(saveAs=false, format?:Extension, chosenName?:string, d
   const requestedFormat=format||defaultSaveExtension(tab.document.extension,tab.document.kind)
   if(!formatsFor(tab).some(option=>option.extension===requestedFormat))throw Error('当前编辑器不支持此保存格式。')
   const handle=requireEditor(tab)
+  const isCopy=(tab.document.kind==='sheet'&&['csv','tsv','pdf'].includes(requestedFormat))||(isWorkflowKind(tab.document.kind)&&requestedFormat!=='owflow')||(!!format && format!==tab.document.extension)
+  const protectSource=tab.requiresSaveAs||isImportOnly(tab.document.extension)
+  const saveName=()=>chosenName||withExtension(tab.document.name,requestedFormat).replace(/\.[^.]+$/, (protectSource?' - 副本.':'.')+requestedFormat)
   if(directOnly&&!await handle.canBackgroundExport?.())return false
-  const exported=await handle.exportFile({format:requestedFormat,...(directOnly?{background:true}:{})})
-  if(activeKey.value!==tab.key)throw Error('文档已切换，本次保存已取消。')
+  // A browser download has no later filename picker. Put its chosen title into
+  // the snapshot before creating the one download; cancelling the dialog never edits it.
+  if(!native.isTauri()&&!isCopy&&!sameTitle(fileTitle(saveName()),fileTitle(tab.document.name)))await applyDocumentTitle(tab,fileTitle(saveName()))
+  let exported=await handle.exportFile({format:requestedFormat,...(directOnly?{background:true}:{})})
+  if(activeKey.value!==tab.key||handleFor(tab)!==handle)throw Error('文档已切换，本次保存已取消。')
   if(exported.extension!==requestedFormat)throw Error('编辑器返回的格式与所选格式不一致，保存已取消。')
   if(directOnly&&(!directAllowed()||exported.saveAs||exported.extension!==tab.document.extension))return false
   if(exported.dirty)tab.dirty=true
-  const isCopy=(tab.document.kind==='sheet'&&['csv','tsv','pdf'].includes(requestedFormat))||(isWorkflowKind(tab.document.kind)&&requestedFormat!=='owflow')||(!!format && format!==tab.document.extension)
-  const protectSource=tab.requiresSaveAs||isImportOnly(tab.document.extension)
-  // The shell owns the saved filename; editor snapshots may still carry the
-  // original import name after a same-format Save As.
-  const exportName=withExtension(tab.document.name||exported.name||'未命名',exported.extension)
-  const name=chosenName||(protectSource?exportName.replace(/\.[^.]+$/,` - 副本.${exported.extension}`):exportName)
+  if(!isCopy&&exported.title!==undefined&&!sameTitle(exported.title,fileTitle(tab.document.name))) {
+    if(directOnly)return false
+    throw Error('导出期间名称已有修改，请重新保存。')
+  }
+  const exportName=withExtension(tab.document.name,exported.extension)
+  // A browser title may already include the import-copy suffix applied above.
+  const name=chosenName||(!native.isTauri()&&!isCopy?exportName:protectSource?exportName.replace(/\.[^.]+$/,' - 副本.'+exported.extension):exportName)
+  saveFileName(fileTitle(name),requestedFormat as SaveExtension)
+  const nameRevision=tab.nameRevision??0
   if(!native.isTauri()) {
     download(exported.base64,name)
-    if(!isCopy) { tab.document={...tab.document,base64:exported.base64,name,extension:exported.extension};tab.requiresSaveAs=false;tab.importWarnings=[];await handle.markSaved?.(exported.base64);tab.dirty=(isWorkflowKind(tab.document.kind)||tab.document.kind==='schedule'||tab.document.kind==='calendar')?!!(await handle.inspect?.())?.dirty:false }
+    if(!isCopy) {
+      tab.persistedName=name
+      updateTabDocument(tab,{base64:exported.base64,name,extension:exported.extension})
+      tab.requiresSaveAs=false;tab.importWarnings=[]
+      await handle.markSaved?.(exported.base64)
+      tab.dirty=!!(await handle.inspect?.())?.dirty||pendingDocumentName(tab)
+    }
     status.value='已生成下载文件';return true
   }
   const request:SaveDocumentRequest={documentId:isCopy||protectSource?undefined:tab.fileId,name,extension:exported.extension,base64:exported.base64,expectedSha256:isCopy||protectSource?undefined:tab.document.sha256,saveAs:saveAs||isCopy||protectSource||exported.saveAs||!tab.fileId}
   const protectedDocumentIds=[...new Set(tabs.value.filter(other=>(other.key!==tab.key||isCopy||protectSource)&&other.fileId).map(other=>other.fileId!))]
   if(protectedDocumentIds.length)request.protectedDocumentIds=protectedDocumentIds
-  const result=await native.saveDocument(request)
+  let renameWarning=''
+  if(!request.saveAs&&tab.fileId&&!sameDocumentName(name,tab.persistedName??tab.document.name)) {
+    const renamed=await native.renameDocument({documentId:tab.fileId,name,expectedSha256:tab.document.sha256,protectedDocumentIds})
+    if(renamed.status==='conflict') {error.value=renamed.message;return false}
+    // The disk move has happened even if the later content write fails. Retain
+    // its real identity and hash, while preserving any newer pending title.
+    tab.fileId=renamed.document.id;tab.persistedName=renamed.document.name
+    updateTabDocument(tab,{...renamed.document,name:tab.document.name})
+    tab.dirty=true
+    request.documentId=tab.fileId;request.expectedSha256=renamed.document.sha256
+    renameWarning=renamed.warning??''
+    await refreshRecents()
+  }
+  let result=await native.saveDocument(request)
   if(smokeMode.value)nativeSmokeSaveObserver?.(request,result)
-  if(result.status==='cancelled') return false
-  if(result.status==='conflict') { error.value=`${result.message} 请使用“另存为”保留当前修改。`;return false }
+  if(result.status==='cancelled')return false
+  if(result.status==='conflict') {error.value=result.message+' 请使用“另存为”保留当前修改。';return false}
   if(!isCopy) {
-    tab.fileId=result.document.id
-    tab.document={...result.document,id:tab.key,base64:exported.base64}
-    tab.requiresSaveAs=false
-    tab.importWarnings=[]
-    await handle.markSaved?.(exported.base64,directOnly?{background:true}:undefined);tab.dirty=(isWorkflowKind(tab.document.kind)||tab.document.kind==='schedule'||tab.document.kind==='calendar')?!!(await handle.inspect?.())?.dirty:false
+    const titleUnchanged=(tab.nameRevision??0)===nameRevision
+    tab.fileId=result.document.id;tab.persistedName=result.document.name
+    updateTabDocument(tab,{...result.document,base64:exported.base64,name:titleUnchanged?result.document.name:tab.document.name})
+    tab.requiresSaveAs=false;tab.importWarnings=[]
+    // Acknowledge only the snapshot actually written. The native Save As picker
+    // may choose another stem; persist that title in a second version-checked
+    // write before reporting a clean document. Failure keeps this new file dirty.
+    await handle.markSaved?.(exported.base64,directOnly?{background:true}:undefined)
+    if(titleUnchanged&&exported.title!==undefined&&!sameTitle(exported.title,fileTitle(result.document.name))) {
+      tab.dirty=true
+      await applyDocumentTitle(tab,fileTitle(result.document.name),true)
+      exported=await handle.exportFile({format:requestedFormat})
+      if(exported.extension!==requestedFormat||exported.title===undefined||!sameTitle(exported.title,fileTitle(result.document.name)))throw Error('名称与保存内容尚未同步，请再次保存。')
+      const correction:SaveDocumentRequest={documentId:tab.fileId,name:result.document.name,extension:exported.extension,base64:exported.base64,expectedSha256:result.document.sha256,saveAs:false,protectedDocumentIds:tabs.value.flatMap(other=>other.key!==tab.key&&other.fileId?[other.fileId]:[])}
+      result=await native.saveDocument(correction)
+      if(smokeMode.value)nativeSmokeSaveObserver?.(correction,result)
+      if(result.status!=='saved') {error.value=result.status==='conflict'?result.message:'名称同步尚未写入文件，请再次保存。';return false}
+      tab.fileId=result.document.id;tab.persistedName=result.document.name
+      updateTabDocument(tab,{...result.document,base64:exported.base64})
+      await handle.markSaved?.(exported.base64)
+    }
+    tab.dirty=!!(await handle.inspect?.())?.dirty||pendingDocumentName(tab)
     if(!directOnly){tab.autoSavedAt=undefined;autosaveWaiting.value=undefined}
   }
-  await refreshRecents();status.value=isCopy?`${exported.extension.toUpperCase()} 副本已保存`:'已保存到本机';return true
+  await refreshRecents()
+  status.value=(isCopy?exported.extension.toUpperCase()+' 副本已保存':'已保存到本机')+(renameWarning?'；'+renameWarning:'')
+  return true
 }
 function openSaveAs() {
   const tab=active.value
@@ -758,7 +849,7 @@ async function confirmPresentationTemplate() {
         const source = await loadPresentationTemplate(draft.template)
         if (currentDocument.value?.key !== draft.key) throw Error('当前演示文稿已切换，模板切换已取消。')
         const snapshot = await handle.applyTemplate(source.base64)
-        tab.dirty = snapshot.dirty; tab.autoSavedAt = undefined
+        tab.dirty = snapshot.dirty || pendingDocumentName(tab); tab.autoSavedAt = undefined
         tab.importWarnings = [...(snapshot.warnings ?? [])]
         autosaveWaiting.value = undefined
         status.value = `已切换为“${draft.template.name}”，可通过撤销恢复`
@@ -777,7 +868,48 @@ async function confirmPresentationTemplate() {
     }
   }
 }
-function changeTab(tab:Tab) {void task('正在切换文档',()=>activate(tab))}
+let tabActivation:{key:string;promise:Promise<void>}|undefined
+function changeTab(tab:Tab) {
+  if(globalActionsBlocked.value||(!home.value&&activeKey.value===tab.key))return
+  const pending={key:tab.key,promise:task('正在切换文档',()=>activate(tab))}
+  tabActivation=pending
+  void pending.promise.finally(()=>{if(tabActivation===pending)tabActivation=undefined})
+}
+async function openRename(tab:Tab) {
+  if(tabActivation?.key===tab.key)await tabActivation.promise
+  if(globalActionsBlocked.value||!tabs.value.some(item=>item.key===tab.key))return
+  await task('正在准备修改名称',async()=>{
+    await activate(tab);await awaitReady(tab)
+    await requireEditor(tab).prepareDeactivate()
+    if(activeKey.value!==tab.key)throw Error('文档已切换，请重新修改名称。')
+    renameComposing.value=false
+    renameDraft.value={key:tab.key,name:fileTitle(tab.document.name),extension:tab.document.extension,error:''}
+  })
+  await nextTick()
+  renameDialog.value?.querySelector<HTMLInputElement>('input')?.select()
+}
+function cancelRename() { if(!busy.value&&!renameComposing.value)renameDraft.value=null }
+function renameKeydown(event:KeyboardEvent) {
+  if(event.isComposing||event.keyCode===229||renameComposing.value) {
+    if(event.key==='Enter'||event.key==='Escape') {event.preventDefault();event.stopPropagation()}
+    return
+  }
+  if(event.key==='Escape') {event.preventDefault();event.stopPropagation();cancelRename()}
+}
+async function confirmRename() {
+  const draft=renameDraft.value
+  if(!draft||busy.value||renameComposing.value)return
+  draft.error=''
+  try {
+    await editorTransaction('正在修改名称',async()=>{
+      const tab=active.value
+      if(!tab||tab.key!==draft.key)throw Error('文档已切换，请重新修改名称。')
+      await applyDocumentTitle(tab,draft.name)
+      renameDraft.value=null
+      status.value='名称已更新，保存时同步文件名。'
+    })
+  } catch(cause) {draft.error=message(cause)}
+}
 async function removeTab(tab:Tab, discardConfirmed=false) {
   if(tab.key===activeKey.value) {
     if(tab.ready)await editor()?.discardChanges?.({force:discardConfirmed})
@@ -804,7 +936,7 @@ function closeTab(tab:Tab) {
   if(tab.dirty) {closeTarget.value=tab;return}
   void task('正在检查文档',async()=>{
     if(tab.key===activeKey.value&&tab.ready) {
-      try {const snapshot=await capture(tab);tab.document=snapshot.document}
+      try {const snapshot=await capture(tab);updateTabDocument(tab,snapshot.document)}
       catch(e) {tab.dirty=true;error.value=message(e);closeTarget.value=tab;return}
     }
     if(tab.dirty) {closeTarget.value=tab;return}
@@ -844,7 +976,7 @@ async function closeAllTabs() {
     await rustPresentationHandles.get(activeKey.value)?.stopPresentation()
     const tab=active.value
     if(tab?.ready) {
-      try {const snapshot=await capture(tab);tab.document=snapshot.document}
+      try {const snapshot=await capture(tab);updateTabDocument(tab,snapshot.document)}
       catch(cause) {tab.dirty=true;error.value=message(cause)}
     }
     if(tabs.value.some(tab=>tab.dirty))closeTarget.value='all'
@@ -855,13 +987,14 @@ async function closeWindow() {
   await mcpService.stop().catch(cause => { error.value = message(cause) })
   if(busy.value) {pendingWindowClose=true;return}
   saveAsDraft.value=null
+  renameDraft.value=null
   templateDraft.value=null
   await task('正在检查未保存修改',async()=>{
     // Stop the show inside the same input barrier as the unsaved-content check.
     await rustPresentationHandles.get(activeKey.value)?.stopPresentation()
     const tab=active.value
     if(tab?.ready) {
-      try {const snapshot=await capture(tab);tab.document=snapshot.document}
+      try {const snapshot=await capture(tab);updateTabDocument(tab,snapshot.document)}
       catch(e) {tab.dirty=true;error.value=message(e)}
     }
     if(tabs.value.some(t=>t.dirty))closeTarget.value='window'
@@ -988,7 +1121,7 @@ const autosave=createAutosaveScheduler({
   readState(){const tab=active.value;return {enabled:autosaveEnabled.value,native:native.isTauri(),key:tab?.key,fileId:tab?.fileId,
     dirty:!!tab?.dirty,ready:!!tab?.ready,requiresSaveAs:!!tab?.requiresSaveAs,
     canSaveDirectly:!!tab&&!!handleFor(tab)&&!isImportOnly(tab.document.extension)&&defaultSaveExtension(tab.document.extension,tab.document.kind)===tab.document.extension,
-    busy:!!busy.value,modal:!!saveAsDraft.value||!!templateDraft.value||!!closeTarget.value||help.value||mcpSettingsOpen.value,
+    busy:!!busy.value,modal:!!saveAsDraft.value||!!renameDraft.value||!!templateDraft.value||!!closeTarget.value||help.value||mcpSettingsOpen.value,
     composing:composing.value||Date.now()-lastInputAt.value<1200,remoteEditing:mcpWorking.value}},
   async save(target){
     const tab=active.value
@@ -1261,14 +1394,14 @@ onMounted(async()=>{
             bindTemporaryFile:async(key,file)=>{
               const tab=tabs.value.find(item=>item.key===key)
               if(!tab||tab.fileId||tab.document.kind!=='note'||file.kind!=='note'||file.extension!=='oonote')throw Error('Invalid temporary notebook capability')
-              tab.fileId=file.id;tab.document={...file,id:key};tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false
+              tab.fileId=file.id;tab.persistedName=file.name;updateTabDocument(tab,file);tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false
               await nextTick()
             },
             state:key=>{
               const tab=tabs.value.find(item=>item.key===key)
               if(!tab)throw Error('Native notebook tab closed unexpectedly')
               return {active:activeKey.value===key&&!home.value,ready:tab.ready,dirty:tab.dirty,busy:!!busy.value||autosave.running,fileId:tab.fileId,sha256:tab.document.sha256,
-                modal:!!saveAsDraft.value||!!templateDraft.value||!!closeTarget.value||help.value}
+                modal:!!saveAsDraft.value||!!renameDraft.value||!!templateDraft.value||!!closeTarget.value||help.value}
             },
             autosaveEnabled:()=>autosaveEnabled.value,
             setAutosave:async enabled=>{autosaveEnabled.value=enabled;await nextTick();autosave.notify()},
@@ -1304,14 +1437,14 @@ onMounted(async()=>{
             bindTemporaryFile:async(key,file)=>{
               const tab=tabs.value.find(item=>item.key===key)
               if(!tab||tab.fileId||!['canvas','diagram'].includes(tab.document.kind)||file.kind!==tab.document.kind||file.extension!=='owflow')throw Error('Invalid temporary workflow capability')
-              tab.fileId=file.id;tab.document={...file,id:key};tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false
+              tab.fileId=file.id;tab.persistedName=file.name;updateTabDocument(tab,file);tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false
               await nextTick()
             },
             state:key=>{
               const tab=tabs.value.find(item=>item.key===key)
               if(!tab)throw Error('Native workflow tab closed unexpectedly')
               return {active:activeKey.value===key&&!home.value,ready:tab.ready,dirty:tab.dirty,busy:!!busy.value||autosave.running,fileId:tab.fileId,sha256:tab.document.sha256,
-                modal:!!saveAsDraft.value||!!templateDraft.value||!!closeTarget.value||help.value}
+                modal:!!saveAsDraft.value||!!renameDraft.value||!!templateDraft.value||!!closeTarget.value||help.value}
             },
             autosaveEnabled:()=>autosaveEnabled.value,
             setAutosave:async enabled=>{autosaveEnabled.value=enabled;await nextTick();autosave.notify()},
@@ -1346,14 +1479,14 @@ onMounted(async()=>{
             bindTemporaryFile:async(key,file)=>{
               const tab=tabs.value.find(item=>item.key===key)
               if(!tab||tab.fileId||tab.document.kind!=='calendar'||file.kind!=='calendar'||file.extension!=='oocalendar')throw Error('Invalid temporary calendar capability')
-              tab.fileId=file.id;tab.document={...file,id:key};tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false
+              tab.fileId=file.id;tab.persistedName=file.name;updateTabDocument(tab,file);tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false
               await nextTick()
             },
             state:key=>{
               const tab=tabs.value.find(item=>item.key===key)
               if(!tab)throw Error('Native calendar tab closed unexpectedly')
               return {active:activeKey.value===key&&!home.value,ready:tab.ready,dirty:tab.dirty,busy:!!busy.value||autosave.running,fileId:tab.fileId,sha256:tab.document.sha256,
-                modal:!!saveAsDraft.value||!!templateDraft.value||!!closeTarget.value||help.value}
+                modal:!!saveAsDraft.value||!!renameDraft.value||!!templateDraft.value||!!closeTarget.value||help.value}
             },
             autosaveEnabled:()=>autosaveEnabled.value,
             setAutosave:async enabled=>{autosaveEnabled.value=enabled;await nextTick();autosave.notify()},
@@ -1431,14 +1564,14 @@ onMounted(async()=>{
             bindTemporaryFile:async(key,file)=>{
               const tab=tabs.value.find(item=>item.key===key)
               if(!tab||tab.fileId||tab.document.kind!=='word'||file.kind!=='word'||file.extension!=='docx')throw Error('Invalid temporary autosave capability')
-              tab.fileId=file.id;tab.document={...file,id:key};tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false
+              tab.fileId=file.id;tab.persistedName=file.name;updateTabDocument(tab,file);tab.requiresSaveAs=false;tab.importWarnings=[];tab.dirty=false
               await nextTick()
             },
             state:key=>{
               const tab=tabs.value.find(item=>item.key===key)
               if(!tab)throw Error('Native autosave tab closed unexpectedly')
               return {active:activeKey.value===key&&!home.value,dirty:tab.dirty,ready:tab.ready,saving:autosave.running||!!busy.value,fileId:tab.fileId,requiresSaveAs:!!tab.requiresSaveAs,sha256:tab.document.sha256,
-                modal:!!saveAsDraft.value||!!templateDraft.value||!!closeTarget.value||help.value}
+                modal:!!saveAsDraft.value||!!renameDraft.value||!!templateDraft.value||!!closeTarget.value||help.value}
             },
             autosaveEnabled:()=>autosaveEnabled.value,
             setAutosave:async enabled=>{autosaveEnabled.value=enabled;await nextTick();autosave.notify()},
@@ -1547,7 +1680,7 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       <div v-show="!focusMode" class="tab-strip" :inert="globalActionsBlocked">
         <button class="home-tab" @click="home=true" aria-label="工作台" title="工作台"><Icon name="home" :size="18"/></button>
         <div ref="tabBar" class="tab-bar">
-          <div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" :title="tab.document.name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div>
+          <div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" :title="tab.document.name+' · 双击修改名称'" @click="changeTab(tab)" @dblclick.stop.prevent="openRename(tab)" @keydown.f2.stop.prevent="openRename(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div>
         </div>
         <button class="new-tab" @click="home=true" aria-label="新建文档" title="新建文档"><Icon name="plus" :size="18"/></button>
         <button class="close-all-tabs" data-testid="tabs-close-all" :disabled="globalActionsBlocked||!tabs.length" @click="closeAllTabs" title="批量关闭所有文档"><Icon name="close" :size="15"/><span>全部关闭</span></button>
@@ -1568,10 +1701,10 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
         <RustSheetEditor :theme="appearance" v-for="entry in rustSheetEntries" :key="entry.document.id" v-show="activeRustSheet&&activeKey===entry.document.id" :ref="handle=>setRustSheetHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustSheet&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <RustPresentationEditor :theme="appearance" v-for="entry in rustPresentationEntries" :key="entry.document.id" v-show="activeRustPresentation&&activeKey===entry.document.id" :ref="handle=>setRustPresentationHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPresentation&&activeKey===entry.document.id" :disabled="editorInputBlocked" :templates-open="templatePanelOpen" @toggle-templates="activeKey===entry.document.id&&togglePresentationTemplates()" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
         <RustPdfEditor :focus-mode="focusMode" :theme="appearance" v-for="entry in rustPdfEntries" :key="entry.document.id" v-show="activeRustPdf&&activeKey===entry.document.id" :ref="handle=>setRustPdfHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustPdf&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
-        <NotebookEditor :theme="appearance" v-for="entry in noteEntries" :key="entry.document.id" v-show="activeNote&&activeKey===entry.document.id" :ref="handle=>setNoteHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeNote&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
-        <ScheduleEditor :focus-mode="focusMode" :theme="effectiveAppearance" v-for="entry in scheduleEntries" :key="entry.document.id" v-show="activeSchedule&&activeKey===entry.document.id" :ref="handle=>setScheduleHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeSchedule&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)" @import="importSchedule(entry.document.id)" @export="exportScheduleCopy(entry.document.id,$event)"/>
-        <CalendarEditor :focus-mode="focusMode" :theme="effectiveAppearance" v-for="entry in calendarEntries" :key="entry.document.id" v-show="activeCalendar&&activeKey===entry.document.id" :ref="handle=>setCalendarHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeCalendar&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
-        <WorkflowEditor :theme="effectiveAppearance" v-for="entry in workflowEntries" :key="entry.document.id" v-show="activeWorkflow&&activeKey===entry.document.id" :ref="handle=>setWorkflowHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeWorkflow&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)" @create-canvas="activeKey===entry.document.id&&createCanvasCopy($event)" @export="exportWorkflowCopy(entry.document.id,$event)"/>
+        <NotebookEditor :theme="appearance" v-for="entry in noteEntries" :key="entry.document.id" v-show="activeNote&&activeKey===entry.document.id" :ref="handle=>setNoteHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeNote&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @title-change="documentTitleFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
+        <ScheduleEditor :focus-mode="focusMode" :theme="effectiveAppearance" v-for="entry in scheduleEntries" :key="entry.document.id" v-show="activeSchedule&&activeKey===entry.document.id" :ref="handle=>setScheduleHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeSchedule&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @title-change="documentTitleFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)" @import="importSchedule(entry.document.id)" @export="exportScheduleCopy(entry.document.id,$event)"/>
+        <CalendarEditor :focus-mode="focusMode" :theme="effectiveAppearance" v-for="entry in calendarEntries" :key="entry.document.id" v-show="activeCalendar&&activeKey===entry.document.id" :ref="handle=>setCalendarHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeCalendar&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @title-change="documentTitleFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
+        <WorkflowEditor :theme="effectiveAppearance" v-for="entry in workflowEntries" :key="entry.document.id" v-show="activeWorkflow&&activeKey===entry.document.id" :ref="handle=>setWorkflowHandle(entry.document.id,handle)" :document="entry.document" :active="!home&&activeWorkflow&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @title-change="documentTitleFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)" @create-canvas="activeKey===entry.document.id&&createCanvasCopy($event)" @export="exportWorkflowCopy(entry.document.id,$event)"/>
       </div>
       <PresentationTemplates v-if="!home&&activeRustPresentation&&templatePanelOpen" class="template-panel" :templates="presentationTemplates" :loading="templateListLoading" :error="templateListError" :disabled="documentActionsDisabled" @select="openPresentationTemplateDialog('apply',$event)" @save="openPresentationTemplateDialog('save')" @delete="openPresentationTemplateDialog('delete',$event)" @retry="refreshPresentationTemplates" @close="templatePanelOpen=false"/>
       </div>
@@ -1580,6 +1713,15 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
     <McpSettingsDialog v-if="mcpSettingsOpen" :config="mcpConfig" :running="mcpState.phase==='running'" :native-available="native.isTauri()" :saving="mcpSettingsBusy" :error="mcpSettingsError" @save="saveMcpSettings" @close="!mcpSettingsBusy&&(mcpSettingsOpen=false)"/>
     <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{error}}</span><button @click="error=''" aria-label="关闭错误提示"><Icon name="close" :size="16"/></button></div>
     <div v-if="busy&&!backgroundSaving" class="busy-overlay" role="status"><span class="busy-pill"><i/>{{busy}}</span></div>
+    <div v-if="renameDraft" class="modal-backdrop" @click.self="cancelRename" @keydown="renameKeydown">
+      <form ref="renameDialog" class="modal save-format-dialog" role="dialog" aria-modal="true" aria-labelledby="document-rename-title" data-testid="document-rename-dialog" @submit.prevent="confirmRename">
+        <h2 id="document-rename-title">修改名称</h2>
+        <label class="save-name-label">名称<span class="save-name-input"><input v-model="renameDraft.name" :disabled="!!busy" maxlength="240" data-testid="document-rename-input" aria-label="名称，不含扩展名" autocomplete="off" spellcheck="false" @compositionstart="renameComposing=true" @compositionend="renameComposing=false"/><span>.{{renameDraft.extension}}</span></span></label>
+        <p class="save-format-note">名称同步用于标签和项目；保存时更新文件名，扩展名保持不变。</p>
+        <p v-if="renameDraft.error" role="alert" class="save-format-error">{{renameDraft.error}}</p>
+        <div class="modal-actions"><button type="button" :disabled="!!busy" data-testid="document-rename-cancel" @click="cancelRename">取消</button><button type="submit" :disabled="!!busy" class="primary" data-testid="document-rename-confirm">确定</button></div>
+      </form>
+    </div>
     <div v-if="saveAsDraft" class="modal-backdrop" @click.self="cancelSaveAs" @keydown.esc.stop.prevent="cancelSaveAs">
       <form ref="saveAsDialog" class="modal save-format-dialog" role="dialog" aria-modal="true" aria-labelledby="save-format-title" data-testid="save-format-dialog" @submit.prevent="confirmSaveAs">
         <h2 id="save-format-title">另存为</h2>

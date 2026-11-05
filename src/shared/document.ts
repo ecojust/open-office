@@ -30,8 +30,10 @@ export function saveFileName(stem: string, extension: SaveExtension): string {
  if (new TextEncoder().encode(name).length > 240) throw Error('文件名过长，请缩短后再保存。')
  return name
 }
-export type EditorExport = {base64:string; extension:Extension; name?:string; saveAs?:boolean; dirty?:boolean; revision?:string}
+export type EditorExport = {base64:string; extension:Extension; name?:string; title?:string; saveAs?:boolean; dirty?:boolean; revision?:string}
 export type EditorHandle = {
+ /** Update the top-level project/book title without changing pages or remounting the editor. */
+ setDocumentTitle?(title:string):Promise<void>;
  /** Bounded tools for the active document; guard must run immediately before every mutation. */
  mcpExecute?(name:string,args:Record<string,unknown>,assertCurrent:()=>void):Promise<unknown>;
  /** Commit queued input while retaining the live model and undo history; never export or acknowledge a save. */
