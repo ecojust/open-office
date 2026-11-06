@@ -97,7 +97,8 @@ test('graph XML flattens groups to world coordinates and reports unsupported fea
   assert.equal(result.scene.elements[0].text, '标题\n说明')
   assert.equal(result.scene.elements[0].shape, 'rectangle')
   assert.ok(result.warnings.some(value => value.includes('分组')))
-  assert.ok(result.warnings.some(value => value.includes('旋转')))
+  assert.equal(result.scene.elements[0].rotation, 30)
+  assert.ok(!result.warnings.some(value => value.includes('转为未旋转')))
   assert.ok(result.warnings.some(value => value.includes('mxgraph.custom.server')))
   assert.ok(result.warnings.some(value => value.includes('纯文本')))
 })
@@ -169,7 +170,7 @@ test('board JSON binds text even when label appears before its container and rem
   assert.ok(result.warnings.some(value => value.includes('绑定')))
 })
 
-test('board JSON retains frames and flat groups while reporting rotation and non-safe images', () => {
+test('board JSON retains rotations, frames and flat groups while reporting non-safe images', () => {
   const result = importBoardJson(JSON.stringify({ type: 'excalidraw', elements: [
     { id: 'frame', type: 'frame', width: 100, height: 100 },
     { id: 'r', type: 'rectangle', x: 5, y: 6, width: 30, height: 50, angle: 0.5, groupIds: ['group'], roughness: 2, fillStyle: 'hachure' },
@@ -180,7 +181,8 @@ test('board JSON retains frames and flat groups while reporting rotation and non
   assert.equal(result.scene.elements.find(element => element.id === 'frame').shape, 'frame')
   assert.equal(result.scene.elements.find(element => element.id === 'r').groupId, 'group')
   assert.equal(result.scene.elements.find(element => element.id === 'img').shape, 'rectangle')
-  for (const fragment of ['frame', '旋转', '纹理', 'SVG']) assert.ok(result.warnings.some(value => value.includes(fragment)), fragment)
+  assert.ok(Math.abs(result.scene.elements.find(element => element.id === 'r').rotation - 0.5 * 180 / Math.PI) < 1e-8)
+  for (const fragment of ['frame', '纹理', 'SVG']) assert.ok(result.warnings.some(value => value.includes(fragment)), fragment)
 })
 
 test('board JSON rejects malformed JSON, wrong documents, duplicate IDs and unsafe numeric input', () => {

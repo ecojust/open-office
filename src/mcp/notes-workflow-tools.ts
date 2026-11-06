@@ -44,7 +44,7 @@ const point = object({ x:num(-1000000,1000000),y:num(-1000000,1000000) },['x','y
 const endpoint = object({ x:num(-1000000,1000000),y:num(-1000000,1000000),nodeId:canvasId },['x','y'])
 const style = object({ stroke:str('描边颜色',100),fill:str('填充颜色',100),strokeWidth:num(0,100),fontSize:num(1,500),textAlign:enumeration('left','center','right'),opacity:num(0,1),dashed:bool,roughness:enumeration('clean','sketch'),strokePattern:enumeration('solid','dashed','dotted') })
 const common = { id:canvasId,style,locked:bool,groupId:canvasId }
-const shapeFields = { shape:enumeration('rectangle','ellipse','diamond','note','text','image','triangle','hexagon','star','parallelogram','cylinder','cloud','frame','brace-left','brace-right','brace-top','brace-bottom'),x:num(-1000000,1000000),y:num(-1000000,1000000),width:num(1,100000),height:num(1,100000),cornerRadius:num(0,100000),text:str('图形文字',100000),imageData:str('内嵌PNG/JPEG/WebP data URL；不接受网址或路径',14680064) }
+const shapeFields = { shape:enumeration('rectangle','ellipse','diamond','note','text','image','triangle','hexagon','star','parallelogram','cylinder','cloud','frame','brace-left','brace-right','brace-top','brace-bottom'),x:num(-1000000,1000000),y:num(-1000000,1000000),width:num(1,100000),height:num(1,100000),rotation:{ ...num(-360,360),description:'图形自身顺时针旋转角度；保存时规范为0到360度，不含360。' },cornerRadius:num(0,100000),text:str('图形文字',100000),imageData:str('内嵌PNG/JPEG/WebP data URL；不接受网址或路径',14680064) }
 const edgeFields = { from:endpoint,to:endpoint,label:str('连线标签',100000),arrow:enumeration('end','both','none'),route:enumeration('straight','orthogonal') }
 const strokeFields = { points:array(point,100000,1),brush:enumeration('pen','pencil','marker','brush','highlighter','rainbow'),pressures:array(num(0,1),100000),closed:bool }
 const element: McpSchema = { anyOf: [object({ ...common,type:enumeration('shape'),...shapeFields },['type','shape']),object({ ...common,type:enumeration('edge'),...edgeFields },['type','from','to']),object({ ...common,type:enumeration('stroke'),...strokeFields },['type','points'])] }
@@ -55,6 +55,8 @@ const canvasOperations = [
  operation('update',{ id:canvasId,patch:{ ...object({ ...shapeFields,...edgeFields,...strokeFields,style,locked:bool,groupId:nullable(canvasId) }),minProperties:1 } },['id','patch']),
  ...['delete','group','ungroup'].map(op=>operation(op,{ids},['ids'])),
  ...['move','duplicate'].map(op=>operation(op,{ids,...offsets},['ids'])),
+ operation('rotate',{ids,degrees:{ ...num(-360,360),default:5,description:'围绕完整选区中心顺时针旋转的角度，负数逆时针；默认5度。组合自动展开。' }},['ids']),
+ operation('scale',{ids,factor:{ ...num(.01,100),description:'等比缩放倍数，受文档尺寸/样式合法范围限制；组合自动展开。' },anchor:{ ...point,description:'保持不动的画布坐标；省略时使用完整选区中心。' }},['ids','factor']),
  operation('reorder',{ids,order:enumeration('front','back','forward','backward')},['ids','order']),
  operation('align',{ids,alignment:enumeration('left','center','right','top','middle','bottom')},['ids','alignment']),
  operation('distribute',{ids,axis:enumeration('horizontal','vertical')},['ids','axis']),
@@ -62,11 +64,16 @@ const canvasOperations = [
  operation('settings',{title:str('文档标题',240),background:str('画布颜色',100),grid:bool,defaultStyle:style}),
  operation('template',{templateId:str('模板ID',100),x:num(-1000000,1000000),y:num(-1000000,1000000)},['templateId']),
 ]
+const canvasSelectElements = tool('canvas_select_elements','选择画布元素，只改变视图；ids为空数组可清除选择。focus=true将选区中心移到画布中央，保留当前缩放，无选择时聚焦全部图形。fit=true自动缩放以适应整个画布；fit和focus不能同时为true。',true,{ ids:array(canvasId,5000),fit:bool,focus:bool },['ids'])
+canvasSelectElements.inputSchema.anyOf = [
+ { properties: { fit: { const: false } } },
+ { properties: { focus: { const: false } } },
+]
 export const canvasEditingTools = [
- tool('canvas_read_elements','读取画布元素的完整可编辑属性与ID，支持按ID筛选和分页；图片仅返回说明，局部update会保留图片数据。',true,{ids,offset:index,limit:{type:'integer',minimum:1,maximum:200}}),
+ tool('canvas_read_elements','读取画布元素的完整可编辑属性与ID，包括图形旋转角度rotation（省略表示0度），支持按ID筛选和分页；图片仅返回说明，局部update会保留图片数据。',true,{ids,offset:index,limit:{type:'integer',minimum:1,maximum:200}}),
  tool('canvas_list_templates','列出可插入画布的内置模板。',true),
- tool('canvas_select_elements','选择画布元素并可适应画布显示；只改变视图。ids为空数组可清除选择。',true,{ ids:array(canvasId,5000),fit:bool },['ids']),
- tool('canvas_edit','原子编辑画布：所有图形、图片、连线和笔迹的增删改、移动、复制、样式、圆角、文字、锁定、组合、层级、对齐、分布、自动布局及模板；settings修改背景/网格/默认样式。被锁定元素需先update locked:false解锁。删除图形会移除相关未锁定连线。仅修改传入属性；图片必须内嵌。每次调用可撤销，页面实时刷新。',false,{operations:array({anyOf:canvasOperations},100,1),fit:bool},['operations']),
+ canvasSelectElements,
+ tool('canvas_edit','原子编辑画布：所有图形、图片、连线和笔迹的增删改、移动、复制、等比缩放scale、旋转rotate、样式、圆角、文字、锁定、组合、层级、对齐、分布、自动布局及模板；settings修改背景/网格/默认样式。rotate默认顺时针5度；scale/rotate会展开完整组合，组合含锁定成员时拒绝变换，请先update locked:false解锁。删除图形会移除相关未锁定连线。仅修改传入属性；图片必须内嵌。每次调用可撤销，页面实时刷新。',false,{operations:array({anyOf:canvasOperations},100,1),fit:bool},['operations']),
 ]
 export const diagramEditingTools = [
  tool('diagram_read','读取当前图表源码、标题、样式及解析状态。',true),

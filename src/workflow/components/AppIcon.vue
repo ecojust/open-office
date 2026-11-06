@@ -32,7 +32,7 @@ const paths: Record<string, string> = {
   'align-left': 'M3 3v18M7 6h14v4H7zM7 14h9v4H7z', 'align-center': 'M12 2v3m0 5v4m0 5v3M3 6h18v4H3zM7 14h10v4H7z', 'align-right': 'M21 3v18M3 6h14v4H3zM8 14h9v4H8z',
   'align-top': 'M3 3h18M6 7h4v14H6zM14 7h4v9h-4z', 'align-middle': 'M2 12h3m5 0h4m5 0h3M6 3h4v18H6zM14 7h4v10h-4z', 'align-bottom': 'M3 21h18M6 3h4v14H6zM14 8h4v9h-4z',
   'distribute-horizontal': 'M3 3v18M21 3v18M6 8h4v8H6zM14 8h4v8h-4z', 'distribute-vertical': 'M3 3h18M3 21h18M8 6h8v4H8zM8 14h8v4H8z',
-  minus: 'M5 12h14', fit: 'M3 8V3h5m8 0h5v5m0 8v5h-5M8 21H3v-5M8 8h8v8H8z', expand: 'M3 9V3h6m6 0h6v6m0 6v6h-6M9 21H3v-6M3 3l6 6m6 6 6 6M21 3l-6 6m-6 6-6 6',
+  minus: 'M5 12h14', fit: 'M3 8V3h5m8 0h5v5m0 8v5h-5M8 21H3v-5M8 8h8v8H8z', focus: 'M12 3v3m0 12v3M3 12h3m12 0h3M18 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0M14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0', expand: 'M3 9V3h6m6 0h6v6m0 6v6h-6M9 21H3v-6M3 3l6 6m6 6 6 6M21 3l-6 6m-6 6-6 6',
   lock: 'M5 10h14v11H5zM8 10V7a4 4 0 0 1 8 0v3M12 14v3', unlock: 'M5 10h14v11H5zM8 10V7a4 4 0 0 1 7.5-2M12 14v3',
   copy: 'M8 8h12v13H8zM16 8V3H3v13h5', duplicate: 'M7 7h14v14H7zM17 7V3H3v14h4M11 14h6m-3-3v6', paste: 'M8 5H5v16h14V5h-3M8 3h8v4H8zM9 12h6m-6 4h6',
   front: 'M4 3h16M12 17V7m-4 4 4-4 4 4M5 17v4h14v-4', forward: 'M12 20V4m-5 5 5-5 5 5M5 16h4m6 0h4', backward: 'M12 4v16m-5-5 5 5 5-5M5 8h4m6 0h4', back: 'M4 21h16M12 7v10m-4-4 4 4 4-4M5 7V3h14v4',

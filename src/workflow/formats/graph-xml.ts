@@ -1,6 +1,6 @@
 import { Inflate, strFromU8 } from 'fflate'
-import { DEFAULT_STYLE, type ElementStyle, type Endpoint, type ImportedScene, type Scene, type SceneElement, type ShapeElement } from '../core/types.ts'
-import { edgePoints, isBraceShape, shapeOutline, braceTextBounds, rectangleCornerRadius } from '../core/geometry.ts'
+import { DEFAULT_STYLE, type ElementStyle, type Endpoint, type ImportedScene, type Scene, type SceneElement, type ShapeElement, type Point } from '../core/types.ts'
+import { edgePoints, isBraceShape, shapeOutline, braceTextBounds, rectangleCornerRadius, normalizedRotation, rotatePoint, elementBounds } from '../core/geometry.ts'
 import { resolveStrokePattern, sceneDefaultStyle } from '../core/appearance.ts'
 import { validateElementStyle } from '../core/documents.ts'
 import { readBrushData } from '../core/brushes.ts'
@@ -78,7 +78,6 @@ function readStyle(map: Record<string, string>, warnings: Set<string>): ElementS
   const supported = new Set(['shape', 'ellipse', 'rhombus', 'text', 'group', 'strokeColor', 'fillColor', 'fontColor', 'strokeWidth', 'fontSize', 'align', 'opacity', 'dashed', 'dashPattern', 'sketch', 'rotation', 'gradientColor', 'shadow', 'rounded', 'arcSize', 'absoluteArcSize', 'fontStyle', 'image', 'movable', 'exitX', 'exitY', 'entryX', 'entryY', 'edgeStyle', 'curved', 'startArrow', 'endArrow', 'html', 'whiteSpace'])
   const unknown = Object.keys(map).filter(key => !supported.has(key))
   if (unknown.length) warnings.add(`部分样式暂不支持，已简化：${unknown.slice(0, 8).join('、')}${unknown.length > 8 ? '等' : ''}。`)
-  if (Number(map.rotation || 0)) warnings.add('旋转图形已转为未旋转的图形，位置可能与原图不同。')
   if (map.gradientColor || map.shadow === '1' || Number(map.fontStyle || 0)) warnings.add('渐变、阴影及特殊字体样式已简化。')
   if (map.fontColor && map.strokeColor && map.fontColor !== map.strokeColor) warnings.add('独立的文字颜色已与图形线条颜色统一。')
   const pattern = map.dashPattern?.trim().split(/\s+/).map(Number)
@@ -121,7 +120,8 @@ function importModel(model: Element, title: string): ImportedScene {
   const root = direct(model, 'root')
   if (!root) throw new Error('图形 XML 页面缺少 root 图形数据。')
   const cells = Array.from(root.getElementsByTagName('mxCell'))
-  if (cells.length > MAX_ELEMENTS + 2) throw new Error('单页最多支持 5000 个图形。')
+  // Rotated brace captions use separate ordinary text vertices externally.
+  if (cells.length > MAX_ELEMENTS * 2 + 2) throw new Error('单页最多支持 5000 个图形。')
   const cellMap = new Map<string, Element>()
   const idMap = new Map<string, string>()
   const usedIds = new Set<string>()
@@ -136,9 +136,14 @@ function importModel(model: Element, title: string): ImportedScene {
     }
     cellMap.set(id, cell); idMap.set(id, targetId)
   }
-  const positions = new Map<string, { x: number; y: number; width: number; height: number }>()
+  type Positioned = { x: number; y: number; width: number; height: number; rotation: number; originX: number; originY: number }
+  const origin: Positioned = { x: 0, y: 0, width: 0, height: 0, rotation: 0, originX: 0, originY: 0 }
+  function parentPoint(point: Point, parent: Positioned): Point {
+    return { x: parent.originX + point.x, y: parent.originY + point.y }
+  }
+  const positions = new Map<string, Positioned>()
   const ancestors = new Set<string>()
-  function position(id: string): { x: number; y: number; width: number; height: number } {
+  function position(id: string): Positioned {
     const cached = positions.get(id)
     if (cached) return cached
     if (ancestors.has(id)) throw new Error('图形 XML 图形存在循环的父子关系。')
@@ -146,22 +151,35 @@ function importModel(model: Element, title: string): ImportedScene {
     const cell = cellMap.get(id)
     const geometry = cell ? direct(cell, 'mxGeometry') : undefined
     const parentId = cell?.getAttribute('parent')
-    const parent = parentId && cellMap.has(parentId) ? position(parentId) : { x: 0, y: 0, width: 0, height: 0 }
+    const parent = parentId && cellMap.has(parentId) ? position(parentId) : origin
     let x = finite(geometry?.getAttribute('x') ?? null)
     let y = finite(geometry?.getAttribute('y') ?? null)
-    if (geometry?.getAttribute('relative') === '1' && cell?.getAttribute('vertex') === '1') {
+    const relative = geometry?.getAttribute('relative') === '1' && cell?.getAttribute('vertex') === '1'
+    if (relative) {
       x *= parent.width; y *= parent.height
       const offset = children(geometry, 'mxPoint').find(point => point.getAttribute('as') === 'offset')
       x += finite(offset?.getAttribute('x') ?? null); y += finite(offset?.getAttribute('y') ?? null)
       warnings.add('相对定位与端口节点已展开为普通图形。')
     }
-    const result = { x: x + parent.x, y: y + parent.y, width: Math.max(1, finite(geometry?.getAttribute('width') ?? null, 120)), height: Math.max(1, finite(geometry?.getAttribute('height') ?? null, 70)) }
+    const width = Math.max(1, finite(geometry?.getAttribute('width') ?? null, 120)), height = Math.max(1, finite(geometry?.getAttribute('height') ?? null, 70))
+    // mxGraph stores ordinary group rotations in each child's geometry/style
+    // (mxVertexHandler.rotateCell); parent rotation is not an SVG transform.
+    // Its relative ports alone rotate their displayed position. Keep that
+    // position separate from origin, which descendants and edge points inherit.
+    const logical = parentPoint({ x, y }, parent)
+    let center = { x: logical.x + width / 2, y: logical.y + height / 2 }
+    if (relative && (!parentId || cellMap.get(parentId)?.getAttribute('edge') !== '1')) center = rotatePoint(center, { x: parent.x + parent.width / 2, y: parent.y + parent.height / 2 }, parent.rotation)
+    const rotation = normalizedRotation(finite(styleMap(cell?.getAttribute('style') || '').rotation ?? null))
+    const result = { x: center.x - width / 2, y: center.y - height / 2, width, height, rotation, originX: logical.x, originY: logical.y }
     positions.set(id, result); ancestors.delete(id)
     return result
   }
   const elements: SceneElement[] = []
   const nodes = new Map<string, ShapeElement>()
+  const braceLabels: Element[] = []
   for (const [id, cell] of cellMap) {
+    const labelFor = cell.getAttribute('openWorkflowBraceLabelFor')
+    if (labelFor && isBraceShape(cellMap.get(labelFor)?.getAttribute('openWorkflowShape'))) { braceLabels.push(cell); continue }
     const braceShape = cell.getAttribute('openWorkflowShape')
     if (cell.getAttribute('vertex') !== '1' && !isBraceShape(braceShape)) continue
     const map = styleMap(cell.getAttribute('style') || '')
@@ -180,9 +198,10 @@ function importModel(model: Element, title: string): ImportedScene {
     if (shape === 'image' && !imageData) { shape = 'rectangle'; warnings.add('外部图片、SVG 图片或无效图片已替换为占位矩形；仅支持内嵌 PNG/JPEG/WebP。') }
     if (cell.getAttribute('parent') && cellMap.get(cell.getAttribute('parent')!)?.getAttribute('vertex') === '1') warnings.add('分组和容器关系已展开为普通图形。')
     const wrapper = cell.parentNode?.nodeType === 1 ? cell.parentNode as Element : null
-    const label = cell.getAttribute('value') || (wrapper?.tagName !== 'root' ? wrapper?.getAttribute('label') : '') || ''
-    const bounds = isBraceShape(braceShape) ? { x: finite(cell.getAttribute('openWorkflowX')), y: finite(cell.getAttribute('openWorkflowY')), width: Math.max(1, finite(cell.getAttribute('openWorkflowWidth'), 160)), height: Math.max(1, finite(cell.getAttribute('openWorkflowHeight'), 180)) } : position(id)
-    const node: ShapeElement = { id: idMap.get(id)!, type: 'shape', shape, ...bounds, text: plainLabel(label, warnings, map.html === '1'), style, ...(cell.getAttribute('openWorkflowGroup') ? { groupId: cell.getAttribute('openWorkflowGroup')! } : {}), locked: cell.getAttribute('openWorkflowLocked') === '1' || map.movable === '0', ...(shape === 'image' ? { imageData } : {}) }
+    const label = cell.getAttribute('value') || (isBraceShape(braceShape) ? cell.getAttribute('openWorkflowText') : '') || (wrapper?.tagName !== 'root' ? wrapper?.getAttribute('label') : '') || ''
+    const positioned = isBraceShape(braceShape) ? { x: finite(cell.getAttribute('openWorkflowX')), y: finite(cell.getAttribute('openWorkflowY')), width: Math.max(1, finite(cell.getAttribute('openWorkflowWidth'), 160)), height: Math.max(1, finite(cell.getAttribute('openWorkflowHeight'), 180)), rotation: normalizedRotation(finite(cell.getAttribute('openWorkflowRotation'))) } : position(id)
+    const { x, y, width, height, rotation } = positioned, bounds = { x, y, width, height }
+    const node: ShapeElement = { id: idMap.get(id)!, type: 'shape', shape, ...bounds, ...(rotation ? { rotation } : {}), text: plainLabel(label, warnings, map.html === '1'), style, ...(cell.getAttribute('openWorkflowGroup') ? { groupId: cell.getAttribute('openWorkflowGroup')! } : {}), locked: cell.getAttribute('openWorkflowLocked') === '1' || map.movable === '0', ...(shape === 'image' ? { imageData } : {}) }
     if (shape === 'rectangle') {
       const native = cell.getAttribute('openWorkflowCornerRadius')
       const radius = native !== null ? cornerRadius(native) : map.rounded === '1'
@@ -191,47 +210,68 @@ function importModel(model: Element, title: string): ImportedScene {
     } else if (map.rounded === '1' && !['ellipse', 'image', 'text'].includes(shape)) warnings.add('非矩形的圆角样式暂不支持，已保留原形状。')
     nodes.set(id, node); elements.push(node)
   }
+  for (const label of braceLabels) {
+    const parent = nodes.get(label.getAttribute('openWorkflowBraceLabelFor')!)
+    if (!parent) continue
+    const map = styleMap(label.getAttribute('style') || ''), style = readStyle(map, warnings)
+    const rotation = normalizedRotation(finite(map.rotation ?? null))
+    if (rotation !== (parent.rotation ?? 0)) warnings.add('绑定文字的独立旋转已跟随所属图形。')
+    parent.text = plainLabel(label.getAttribute('value') || '', warnings, map.html === '1')
+    parent.style.fontSize = style.fontSize; parent.style.textAlign = style.textAlign
+  }
   for (const [id, cell] of cellMap) {
     if (cell.getAttribute('edge') !== '1' || isBraceShape(cell.getAttribute('openWorkflowShape'))) continue
     const map = styleMap(cell.getAttribute('style') || '')
     const style = readStyle(map, warnings)
     const geometry = direct(cell, 'mxGeometry')
     const parentId = cell.getAttribute('parent')
-    const parent = parentId && cellMap.has(parentId) ? position(parentId) : { x: 0, y: 0 }
+    const parent = parentId && cellMap.has(parentId) ? position(parentId) : origin
     const geometryPoints = geometry ? children(geometry, 'mxPoint') : []
     function endpoint(which: 'source' | 'target'): Endpoint {
       const nodeId = cell.getAttribute(which)
       const node = nodeId ? nodes.get(nodeId) : undefined
       const point = geometryPoints.find(point => point.getAttribute('as') === `${which}Point`)
       if (node) {
-        if (point) return { nodeId: node.id, x: finite(point.getAttribute('x')) + parent.x, y: finite(point.getAttribute('y')) + parent.y }
+        if (point) return { nodeId: node.id, ...parentPoint({ x: finite(point.getAttribute('x')), y: finite(point.getAttribute('y')) }, parent) }
         const horizontal = finite(map[which === 'source' ? 'exitX' : 'entryX'] ?? null, 0.5)
         const vertical = finite(map[which === 'source' ? 'exitY' : 'entryY'] ?? null, 0.5)
-        return { nodeId: node.id, x: node.x + node.width * horizontal, y: node.y + node.height * vertical }
+        return { nodeId: node.id, ...rotatePoint({ x: node.x + node.width * horizontal, y: node.y + node.height * vertical }, { x: node.x + node.width / 2, y: node.y + node.height / 2 }, node.rotation ?? 0) }
       }
       if (nodeId) warnings.add('部分连线的端点引用不受支持或不存在，已保留为自由端点。')
-      return { x: finite(point?.getAttribute('x') ?? null) + parent.x, y: finite(point?.getAttribute('y') ?? null) + parent.y }
+      return parentPoint({ x: finite(point?.getAttribute('x') ?? null), y: finite(point?.getAttribute('y') ?? null) }, parent)
     }
     let from = endpoint('source'); let to = endpoint('target')
     const pointsContainer = geometry ? children(geometry, 'Array').find(array => array.getAttribute('as') === 'points') : undefined
-    const waypoints = pointsContainer ? children(pointsContainer, 'mxPoint').map(point => ({ x: finite(point.getAttribute('x')) + parent.x, y: finite(point.getAttribute('y')) + parent.y })) : []
+    let waypoints = pointsContainer ? children(pointsContainer, 'mxPoint').map(point => parentPoint({ x: finite(point.getAttribute('x')), y: finite(point.getAttribute('y')) }, parent)) : []
+    const rotation = normalizedRotation(finite(map.rotation ?? null))
+    if (rotation) {
+      const bounds = elementBounds({ id: '', type: 'stroke', points: [from, ...waypoints, to], style, locked: false })
+      const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
+      if (from.nodeId || to.nodeId) warnings.add('连线的独立旋转已转换为自由端点，以保留旋转后的位置。')
+      from = rotatePoint({ x: from.x, y: from.y }, center, rotation); to = rotatePoint({ x: to.x, y: to.y }, center, rotation)
+      waypoints = waypoints.map(point => rotatePoint(point, center, rotation))
+    }
     if (cell.getAttribute('openWorkflowType') === 'stroke') {
       const points = cell.getAttribute('openWorkflowSinglePoint') === '1' ? [from] : [from, ...waypoints, to]
       const metadata = readBrushData(cell.hasAttribute('openWorkflowBrush') ? cell.getAttribute('openWorkflowBrush') : undefined, cell.hasAttribute('openWorkflowPressures') ? JSON.parse(cell.getAttribute('openWorkflowPressures')!) : undefined, points.length)
       if (metadata.brush) warnings.add('笔触通过本软件元数据恢复；外部软件显示为普通线条，压感、纹理、扁头和彩虹效果以原生文件或图像导出为准。')
       elements.push({ id: idMap.get(id)!, type: 'stroke', ...(cell.getAttribute('openWorkflowClosed') === '1' ? { closed: true } : {}), points, ...metadata, style, ...(cell.getAttribute('openWorkflowGroup') ? { groupId: cell.getAttribute('openWorkflowGroup')! } : {}), locked: cell.getAttribute('openWorkflowLocked') === '1' }); continue
     }
+    const orthogonal = map.edgeStyle === 'orthogonalEdgeStyle' || map.edgeStyle === 'elbowEdgeStyle'
+    const rotatedRoute = orthogonal && rotation % 90 !== 0
+    if (rotatedRoute) warnings.add('旋转后的正交连线已简化为直线，端点位置得到保留。')
     if (waypoints.length) warnings.add('手工连线折点已简化为自动直线或正交连线。')
     if (map.curved === '1' || (map.edgeStyle && !['orthogonalEdgeStyle', 'elbowEdgeStyle'].includes(map.edgeStyle))) warnings.add('曲线和特殊连线路由已简化。')
     const start = Boolean(map.startArrow && map.startArrow !== 'none')
     const end = map.endArrow !== 'none'
     if (start && !end) [from, to] = [to, from]
-    elements.push({ id: idMap.get(id)!, type: 'edge', from, to, label: plainLabel(cell.getAttribute('value') || '', warnings, map.html === '1'), arrow: start && end ? 'both' : start || end ? 'end' : 'none', route: map.edgeStyle === 'orthogonalEdgeStyle' || map.edgeStyle === 'elbowEdgeStyle' ? 'orthogonal' : 'straight', style, ...(cell.getAttribute('openWorkflowGroup') ? { groupId: cell.getAttribute('openWorkflowGroup')! } : {}), locked: cell.getAttribute('openWorkflowLocked') === '1' })
+    elements.push({ id: idMap.get(id)!, type: 'edge', from, to, label: plainLabel(cell.getAttribute('value') || '', warnings, map.html === '1'), arrow: start && end ? 'both' : start || end ? 'end' : 'none', route: orthogonal && !rotatedRoute ? 'orthogonal' : 'straight', style, ...(cell.getAttribute('openWorkflowGroup') ? { groupId: cell.getAttribute('openWorkflowGroup')! } : {}), locked: cell.getAttribute('openWorkflowLocked') === '1' })
   }
   // Resolve bindings after all vertices exist, then restore the file's layer order.
   // Filled ink, labels and connectors may be interleaved with ordinary shapes.
   const layerOrder = new Map([...cellMap.keys()].map((id, index) => [idMap.get(id)!, index]))
   elements.sort((a, b) => layerOrder.get(a.id)! - layerOrder.get(b.id)!)
+  if (elements.length > MAX_ELEMENTS) throw new Error('单页最多支持 5000 个图形。')
   if (elements.reduce((sum, element) => sum + (element.type === 'stroke' ? element.points.length : 0), 0) > 100000) throw new Error('笔迹总点数超过 100000。')
   const defaultStyleText = model.getAttribute('openWorkflowDefaultStyle')
   const defaultStyle = defaultStyleText ? validateElementStyle(JSON.parse(defaultStyleText)) : undefined
@@ -266,14 +306,24 @@ function writeStyle(style: ElementStyle): string {
 /** Exports ordinary editable mxCells; own stroke metadata preserves freehand round trips. */
 export function exportGraphXml(scene: Scene, title: string): string {
   const cellId = (id: string): string => `wf-${id}`
+  const takenIds = new Set(scene.elements.flatMap(element => [element.id, cellId(element.id)]))
+  function labelId(id: string): string { let result = `${cellId(id)}__label`; while (takenIds.has(result)) result += '_'; takenIds.add(result); return result }
   const point = (as: string, value: Endpoint): string => `<mxPoint x="${value.x}" y="${value.y}" as="${as}"/>`
   const elements = scene.elements.map(element => {
     const attributes = `id="${xml(cellId(element.id))}" openWorkflowId="${xml(element.id)}" openWorkflowLocked="${element.locked ? 1 : 0}"${element.groupId ? ` openWorkflowGroup="${xml(element.groupId)}"` : ''} parent="1"`
     if (element.type === 'shape') {
       if (isBraceShape(element.shape)) {
         const points = shapeOutline(element), text = braceTextBounds(element), midpoint = points[Math.floor(points.length / 2)]!
-        const metadata = `openWorkflowShape="${element.shape}" openWorkflowX="${element.x}" openWorkflowY="${element.y}" openWorkflowWidth="${element.width}" openWorkflowHeight="${element.height}" openWorkflowCompatibility="外部软件显示为开放线条；括弧编辑与绑定语义依赖本软件元数据"`
-        return `<mxCell ${attributes} ${metadata} edge="1" value="${xml(element.text)}" style="${xml(`${writeStyle({ ...element.style, fill: 'none' })}endArrow=none;startArrow=none;`)}"><mxGeometry relative="1" as="geometry">${point('sourcePoint', points[0]!)}${point('targetPoint', points.at(-1)!)}<Array as="points">${points.slice(1, -1).map(value => `<mxPoint x="${value.x}" y="${value.y}"/>`).join('')}</Array><mxPoint x="${text.x + text.width / 2 - midpoint.x}" y="${text.y + text.height / 2 - midpoint.y}" as="offset"/></mxGeometry></mxCell>`
+        const rotatedCaption = Boolean(element.rotation && element.text)
+        const metadata = `openWorkflowShape="${element.shape}" openWorkflowX="${element.x}" openWorkflowY="${element.y}" openWorkflowWidth="${element.width}" openWorkflowHeight="${element.height}"${element.rotation ? ` openWorkflowRotation="${element.rotation}"` : ''}${rotatedCaption ? ` openWorkflowText="${xml(element.text)}"` : ''} openWorkflowCompatibility="外部软件显示为开放线条；括弧编辑与绑定语义依赖本软件元数据"`
+        const path = `<mxCell ${attributes} ${metadata} edge="1" value="${xml(rotatedCaption ? '' : element.text)}" style="${xml(`${writeStyle({ ...element.style, fill: 'none' })}endArrow=none;startArrow=none;`)}"><mxGeometry relative="1" as="geometry">${point('sourcePoint', points[0]!)}${point('targetPoint', points.at(-1)!)}<Array as="points">${points.slice(1, -1).map(value => `<mxPoint x="${value.x}" y="${value.y}"/>`).join('')}</Array><mxPoint x="${text.x + text.width / 2 - midpoint.x}" y="${text.y + text.height / 2 - midpoint.y}" as="offset"/></mxGeometry></mxCell>`
+        if (!rotatedCaption) return path
+        // An edge rotation would rotate the already-baked brace path again.
+        // Use an ordinary rotated text vertex for the caption, then merge it
+        // back into the editable brace when this interchange file is reopened.
+        const center = rotatePoint({ x: text.x + text.width / 2, y: text.y + text.height / 2 }, { x: element.x + element.width / 2, y: element.y + element.height / 2 }, element.rotation!)
+        const caption = `<mxCell id="${xml(labelId(element.id))}" openWorkflowBraceLabelFor="${xml(cellId(element.id))}" parent="1" vertex="1" value="${xml(element.text)}" style="${xml(`shape=text;${writeStyle({ ...element.style, fill: 'none' })}rotation=${element.rotation};`)}"><mxGeometry x="${center.x - text.width / 2}" y="${center.y - text.height / 2}" width="${text.width}" height="${text.height}" as="geometry"/></mxCell>`
+        return path + caption
       }
       const shape = element.shape === 'diamond' ? 'rhombus' : element.shape === 'text' ? 'text' : element.shape
       const imageData = element.shape === 'image' ? safeImage(element.imageData) : undefined
@@ -281,7 +331,7 @@ export function exportGraphXml(scene: Scene, title: string): string {
       const image = imageData ? `image=${imageData.replace(';base64,', ',')};` : ''
       const radius = rectangleCornerRadius(element), rounded = radius ? `rounded=1;absoluteArcSize=1;arcSize=${radius * 2};` : ''
       const radiusMetadata = element.shape === 'rectangle' && element.cornerRadius ? ` openWorkflowCornerRadius="${cornerRadius(String(element.cornerRadius))}"` : ''
-      return `<mxCell ${attributes}${radiusMetadata} vertex="1" value="${xml(element.text)}" style="${xml(`shape=${shape};${writeStyle(element.style)}${image}${rounded}`)}"><mxGeometry x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" as="geometry"/></mxCell>`
+      return `<mxCell ${attributes}${radiusMetadata} vertex="1" value="${xml(element.text)}" style="${xml(`shape=${shape};${writeStyle(element.style)}${element.rotation ? `rotation=${element.rotation};` : ''}${image}${rounded}`)}"><mxGeometry x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" as="geometry"/></mxCell>`
     }
     if (element.type === 'stroke') {
       if (!element.points.length) throw new Error('笔迹没有坐标，无法导出。')

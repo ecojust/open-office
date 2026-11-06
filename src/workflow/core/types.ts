@@ -23,6 +23,8 @@ export interface ShapeElement {
   y: number
   width: number
   height: number
+  /** Clockwise degrees around the shape center; omitted means no rotation. */
+  rotation?: number
   /** Rectangle corner radius in canvas units; omitted means square corners. */
   cornerRadius?: number
   text: string

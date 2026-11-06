@@ -1,5 +1,5 @@
 import { newId, type EdgeElement, type Point, type Scene, type SceneElement } from './types.ts'
-import { combineBounds, distanceToSegment, edgePoints, elementBounds, outlineDistance, pointInPolygon, pointInside, shapeContainsPoint, type Bounds } from './geometry.ts'
+import { combineBounds, distanceToSegment, edgePoints, elementBounds, outlineDistance, pointInPolygon, pointInside, shapeContainsPoint, shapeCorners, unrotatePointForShape, type Bounds } from './geometry.ts'
 import { brushHit } from './brushes.ts'
 
 /** Return a stable, scene-ordered selection, expanding the scene's flat groups. */
@@ -138,11 +138,13 @@ export function hitTestElement(scene: Scene, point: Point, zoom: number): SceneE
     const element = scene.elements[index]!
     const tolerance = 6 / scale + Math.max(0, element.style.strokeWidth) / 2
     if (element.type === 'shape') {
-      if (point.x < element.x - tolerance || point.x > element.x + element.width + tolerance || point.y < element.y - tolerance || point.y > element.y + element.height + tolerance) continue
+      const bounds = elementBounds(element)
+      if (point.x < bounds.x - tolerance || point.x > bounds.x + bounds.width + tolerance || point.y < bounds.y - tolerance || point.y > bounds.y + bounds.height + tolerance) continue
       if (element.shape === 'frame') {
         const { x, y, width, height } = element
         const titleHeight = Math.min(height, Math.max(28, element.style.fontSize * 1.5 + 12))
-        if (pointInside(point, { x, y, width, height: titleHeight }) || pathHit([{ x, y }, { x: x + width, y }, { x: x + width, y: y + height }, { x, y: y + height }], point, tolerance, true)) return element
+        const local = unrotatePointForShape(element, point)
+        if (pointInside(local, { x, y, width, height: titleHeight }) || pathHit([{ x, y }, { x: x + width, y }, { x: x + width, y: y + height }, { x, y: y + height }], local, tolerance, true)) return element
       } else if (shapeContainsPoint(element, point) || outlineDistance(element, point) <= tolerance) return element
     } else if (element.type === 'edge') {
       if (pathHit(edgePoints(element, scene), point, tolerance)) return element
@@ -158,14 +160,10 @@ export function hitTestElement(scene: Scene, point: Point, zoom: number): SceneE
 export function frameContents(scene: Scene, frameId: string): string[] {
   const frame = scene.elements.find(element => element.id === frameId)
   if (frame?.type !== 'shape' || frame.shape !== 'frame') return []
-  const bounds = elementBounds(frame)
+  const bounds = { x: frame.x, y: frame.y, width: frame.width, height: frame.height }
   return scene.elements.filter(element => {
     if (element.id === frameId || (element.type === 'shape' && element.shape === 'frame')) return false
-    if (element.type === 'shape') {
-      const b = elementBounds(element)
-      return pointInside({ x: b.x, y: b.y }, bounds) && pointInside({ x: b.x + b.width, y: b.y + b.height }, bounds)
-    }
-    const points = element.type === 'edge' ? edgePoints(element, scene) : element.points
-    return points.length > 0 && points.every(point => pointInside(point, bounds))
+    const points = element.type === 'shape' ? shapeCorners(element) : element.type === 'edge' ? edgePoints(element, scene) : element.points
+    return points.length > 0 && points.every(point => pointInside(unrotatePointForShape(frame, point), bounds))
   }).map(element => element.id)
 }
