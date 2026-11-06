@@ -207,11 +207,12 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
   try { compileCodeDiagram(current.model.source) } catch (cause) { parseError = cause instanceof Error ? cause.message : String(cause) }
   return { title: current.model.title, source: current.model.source, style: current.model.diagramStyle ?? 'classic', valid: !parseError, parseError }
  }
+ if (name === 'canvas_select_elements' && !diagram.value && args.fit === true && args.focus === true) throw Error('适应画布与保持缩放的聚焦不能同时开启。')
  await flush(); guard()
  if (name === 'canvas_select_elements' && !diagram.value) {
   const ids = args.ids as string[]
   if (ids.some(id => !current.model.scene.elements.some(element => element.id === id))) throw Error('画布元素不存在。')
-  sceneEditor.value?.selectElements(ids, args.fit === true); await nextTick(); guard()
+  sceneEditor.value?.selectElements(ids, args.fit === true, args.focus === true); await nextTick(); guard()
   return { ...await inspect(), selectedIds: ids }
  }
  let editResult: ReturnType<typeof editCanvas> | undefined

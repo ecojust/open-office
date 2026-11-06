@@ -3,6 +3,7 @@ import type { DocumentKind, ElementStyle, Scene, SceneElement, WorkflowDocument 
 import { resolveStrokePattern, sceneDefaultStyle } from './appearance.ts'
 import { normalizeDiagramStyle } from './diagram-appearance.ts'
 import { readBrushData } from './brushes.ts'
+import { normalizedRotation } from './geometry.ts'
 
 export const MAX_FILE_BYTES = 50 * 1024 * 1024
 const MAX_ELEMENTS = 5000
@@ -60,7 +61,8 @@ export function validateScene(value: unknown): Scene {
       if (shape.startsWith('brace-')) base.style.fill = 'none'
       if (shape === 'image' && !safeImage(e.imageData)) throw new Error('图片必须是内嵌 PNG、JPEG 或 WebP（不超过 10 MB）。')
       const cornerRadius = shape === 'rectangle' && e.cornerRadius !== undefined ? number(e.cornerRadius, '圆角', 0, Number.MAX_VALUE) : 0
-      return { ...base, type: 'shape', shape, x: number(e.x, 'X'), y: number(e.y, 'Y'), width: number(e.width, '宽度', 1, 100000), height: number(e.height, '高度', 1, 100000), text: string(e.text ?? '', '文本'), ...(cornerRadius ? { cornerRadius } : {}), ...(e.imageData && shape === 'image' ? { imageData: e.imageData } : {}) }
+      const rotation = e.rotation === undefined ? 0 : normalizedRotation(number(e.rotation, '旋转角度', -Number.MAX_VALUE, Number.MAX_VALUE))
+      return { ...base, type: 'shape', shape, x: number(e.x, 'X'), y: number(e.y, 'Y'), width: number(e.width, '宽度', 1, 100000), height: number(e.height, '高度', 1, 100000), text: string(e.text ?? '', '文本'), ...(rotation ? { rotation } : {}), ...(cornerRadius ? { cornerRadius } : {}), ...(e.imageData && shape === 'image' ? { imageData: e.imageData } : {}) }
     }
     if (e.type === 'edge') {
       const endpoint = (value: unknown) => {
@@ -119,7 +121,7 @@ export function contentKey(doc: WorkflowDocument): string {
   const styleKey = (s: ElementStyle) => [s.stroke, s.fill, s.strokeWidth, s.fontSize, s.textAlign, s.opacity, resolveStrokePattern(s), s.roughness ?? 'clean']
   const elements = doc.scene.elements.map(element => {
     const base = [element.id, element.type, element.locked, styleKey(element.style), ...(element.groupId ? [element.groupId] : [])]
-    if (element.type === 'shape') return [...base, element.shape, element.x, element.y, element.width, element.height, element.text, element.imageData ?? null, ...(element.shape === 'rectangle' && element.cornerRadius ? [{ cornerRadius: element.cornerRadius }] : [])]
+    if (element.type === 'shape') return [...base, element.shape, element.x, element.y, element.width, element.height, element.text, element.imageData ?? null, ...(element.shape === 'rectangle' && element.cornerRadius ? [{ cornerRadius: element.cornerRadius }] : []), ...(normalizedRotation(element.rotation ?? 0) ? [{ rotation: normalizedRotation(element.rotation!) }] : [])]
     if (element.type === 'edge') return [...base, [element.from.x, element.from.y, element.from.nodeId ?? null], [element.to.x, element.to.y, element.to.nodeId ?? null], element.label, element.arrow, element.route]
     return [...base, element.points.map(point => [point.x, point.y]), ...(element.closed ? [true] : []), ...(element.brush !== undefined || element.pressures !== undefined ? [{ brush: element.brush ?? null, pressures: element.pressures ?? null }] : [])]
   })

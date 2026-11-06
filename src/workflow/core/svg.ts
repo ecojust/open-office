@@ -1,5 +1,5 @@
 import type { ElementStyle, Point, Scene, SceneElement, ShapeElement, StrokeElement } from './types.ts'
-import { edgePoints, pathMidpoint, pointsPath, sceneBounds, shapeOutline, isBraceShape, bracePath, braceTextBounds, rectangleCornerRadius } from './geometry.ts'
+import { edgePoints, pathMidpoint, pointsPath, sceneBounds, localShapeOutline, isBraceShape, bracePath, braceTextBounds, rectangleCornerRadius, center, normalizedRotation, unrotatePointForShape } from './geometry.ts'
 import { anchoredPolygon, sketchEllipse, sketchPolyline } from './sketch.ts'
 import { resolveStrokePattern } from './appearance.ts'
 import { brushOutlinePath, brushPaintPasses, brushPolyline, brushRadiusAt, rainbowSegments } from './brushes.ts'
@@ -82,11 +82,11 @@ function boundAnchors(node: ShapeElement, scene: Scene): Point[] {
     if (edge.from.nodeId === node.id) anchors.push(points[0]!)
     if (edge.to.nodeId === node.id) anchors.push(points[points.length - 1]!)
   }
-  return anchors
+  return anchors.map(point => unrotatePointForShape(node, point))
 }
 function sketchShape(node: ShapeElement, scene: Scene, hitTargets: boolean): string {
   const { x, y, width: w, height: h } = node
-  const anchors = boundAnchors(node, scene), vertices = shapeOutline(node, anchors), radius = rectangleCornerRadius(node)
+  const anchors = boundAnchors(node, scene), vertices = localShapeOutline(node, anchors), radius = rectangleCornerRadius(node)
   const geometry = node.shape === 'ellipse' ? `ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}"` : radius ? `rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${radius}" ry="${radius}"` : `path d="${pointsPath(vertices)} Z"`
   const fill = node.shape === 'frame' ? '' : `<${geometry} fill="${color(node.style.fill)}" stroke="none" opacity="${Math.max(0, Math.min(1, node.style.opacity))}"/>`
   const hit = hitTargets ? `<${geometry} fill="${node.shape === 'frame' ? 'none' : 'transparent'}" stroke="transparent" stroke-width="${Math.max(16, node.style.strokeWidth)}" pointer-events="${node.shape === 'frame' ? 'stroke' : 'all'}"/>` : ''
@@ -158,7 +158,7 @@ export function elementToSvg(element: SceneElement, scene: Scene, hitTargets = f
       markup = `<path data-brace-hit="true" d="${path}" fill="none" stroke="transparent" stroke-width="${Math.max(16, element.style.strokeWidth)}" pointer-events="stroke"/>`
       if (element.text) { const bounds = braceLabelHitBounds(element); markup += `<rect data-brace-label-hit="true" x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}" fill="transparent" stroke="none" pointer-events="all"/>` }
     }
-    markup += isSketch(element.style) ? sketchMarkup(sketchPolyline(anchoredPolygon(shapeOutline(element), boundAnchors(element, scene), false), element.id, element.style.strokeWidth), element.style) : `<path d="${path}" ${styleAttrs(element.style, 'none')}/>`
+    markup += isSketch(element.style) ? sketchMarkup(sketchPolyline(anchoredPolygon(localShapeOutline(element), boundAnchors(element, scene), false), element.id, element.style.strokeWidth), element.style) : `<path d="${path}" ${styleAttrs(element.style, 'none')}/>`
   }
   else if (shape === 'frame') {
     const headerHeight = Math.min(h, Math.max(28, element.style.fontSize * 1.5 + 12))
@@ -168,11 +168,13 @@ export function elementToSvg(element: SceneElement, scene: Scene, hitTargets = f
   else if (isSketch(element.style) && !['image', 'text'].includes(shape)) markup = sketchShape(element, scene, hitTargets)
   else if (shape === 'ellipse') markup = `<ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}" ${attrs}/>`
   else if (shape === 'diamond') markup = `<path d="M${x + w / 2} ${y} L${x + w} ${y + h / 2} L${x + w / 2} ${y + h} L${x} ${y + h / 2} Z" ${attrs}/>`
-  else if (['triangle', 'hexagon', 'star', 'parallelogram', 'cylinder', 'cloud'].includes(shape)) markup = `<path d="${pointsPath(shapeOutline(element))} Z" ${attrs}/>`
+  else if (['triangle', 'hexagon', 'star', 'parallelogram', 'cylinder', 'cloud'].includes(shape)) markup = `<path d="${pointsPath(localShapeOutline(element))} Z" ${attrs}/>`
   else if (shape === 'image' && safeImageData(element.imageData)) markup = `<image x="${x}" y="${y}" width="${w}" height="${h}" href="${escapeXml(element.imageData)}" preserveAspectRatio="xMidYMid meet" opacity="${element.style.opacity}"/>`
   else if (shape === 'text') markup = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="transparent"/>`
   else markup = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${shape === 'note' ? 2 : rectangleCornerRadius(element)}" ry="${shape === 'note' ? 2 : rectangleCornerRadius(element)}" ${attrs}/>${shape === 'note' ? `<path d="M${x + w - 18} ${y + h} L${x + w - 18} ${y + h - 18} L${x + w} ${y + h - 18}" fill="#0000000b" stroke="${color(element.style.stroke)}" stroke-opacity=".2"/>` : ''}`
-  return markup + (shape === 'cylinder' ? cylinderSeam(element) : '') + textMarkup(element)
+  markup += (shape === 'cylinder' ? cylinderSeam(element) : '') + textMarkup(element)
+  const rotation = normalizedRotation(element.rotation ?? 0), pivot = center(element)
+  return rotation ? `<g transform="rotate(${rotation} ${pivot.x} ${pivot.y})">${markup}</g>` : markup
 }
 export function sceneToSvg(scene: Scene, options: { background?: boolean } = {}): string {
   const bounds = sceneBounds(scene), pad = Math.max(32, ...scene.elements.map(e => e.style.strokeWidth / 2 + 12 + (e.type === 'edge' && e.arrow !== 'none' ? Math.max(8, e.style.strokeWidth * 3.5) : 0))), x = bounds.x - pad, y = bounds.y - pad, width = Math.max(64, bounds.width + pad * 2), height = Math.max(64, bounds.height + pad * 2)

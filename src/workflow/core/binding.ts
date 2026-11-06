@@ -1,5 +1,5 @@
 import type { Point, Scene, ShapeElement } from './types.ts'
-import { outlineDistance } from './geometry.ts'
+import { elementBounds, outlineDistance } from './geometry.ts'
 
 /** The attraction area remains fourteen screen pixels at every canvas zoom. */
 export const BINDING_DISTANCE_PX = 14
@@ -18,7 +18,8 @@ export function findBindingTarget(scene: Scene, point: Point, zoom: number, excl
   for (let index = scene.elements.length - 1; index >= 0; index--) {
     const node = scene.elements[index]!
     if (node.type !== 'shape' || node.shape === 'text' || excluded.has(node.id) || !(node.width > 0) || !(node.height > 0)) continue
-    if (point.x < node.x - maximum || point.x > node.x + node.width + maximum || point.y < node.y - maximum || point.y > node.y + node.height + maximum) continue
+    const bounds = elementBounds(node)
+    if (point.x < bounds.x - maximum || point.x > bounds.x + bounds.width + maximum || point.y < bounds.y - maximum || point.y > bounds.y + bounds.height + maximum) continue
     const candidate = outlineDistance(node, point)
     if (candidate === 0) return node
     if (candidate <= maximum + 1e-9 && candidate < distance - 1e-9) { closest = node; distance = candidate }

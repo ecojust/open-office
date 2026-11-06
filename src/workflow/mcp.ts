@@ -1,6 +1,7 @@
-import { clone, DEFAULT_STYLE, newId, type ElementStyle, type Scene, type SceneElement, type WorkflowDocument } from './core/types.ts'
+import { clone, DEFAULT_STYLE, newId, type ElementStyle, type Point, type Scene, type SceneElement, type WorkflowDocument } from './core/types.ts'
 import { safeColor, validateScene } from './core/documents.ts'
-import { alignElements, distributeElements, groupElements, ungroupElements, type Alignment, type DistributionAxis } from './core/board-tools.ts'
+import { alignElements, distributeElements, expandedSelection, groupElements, ungroupElements, type Alignment, type DistributionAxis } from './core/board-tools.ts'
+import { canTransformSelection, rotateSelection, scaleSelection, selectionBounds } from './core/transforms.ts'
 import { reorderElements, selectionScene, type ReorderOperation } from './core/selection.ts'
 import { edgePoints } from './core/geometry.ts'
 import { sceneDefaultStyle } from './core/appearance.ts'
@@ -16,6 +17,8 @@ export type CanvasEditOperation =
  | { op: 'update'; id: string; patch: Record<string, unknown> & { style?: Partial<ElementStyle> } }
  | { op: 'delete' | 'group' | 'ungroup'; ids: string[] }
  | { op: 'duplicate' | 'move'; ids: string[]; dx?: number; dy?: number }
+ | { op: 'rotate'; ids: string[]; degrees?: number }
+ | { op: 'scale'; ids: string[]; factor: number; anchor?: Point }
  | { op: 'reorder'; ids: string[]; order: ReorderOperation }
  | { op: 'align'; ids: string[]; alignment: Alignment }
  | { op: 'distribute'; ids: string[]; axis: DistributionAxis }
@@ -33,6 +36,13 @@ function translate(element: SceneElement, dx: number, dy: number) {
  else for (const endpoint of [element.from, element.to]) if (!endpoint.nodeId) { endpoint.x += dx; endpoint.y += dy }
 }
 function checkOffset(dx: number, dy: number) { if (![dx,dy].every(value => Number.isFinite(value) && Math.abs(value) <= 1000000)) throw Error('移动距离无效。') }
+function transformIds(scene: Scene, ids: readonly string[]): string[] {
+ selectedElements(scene, ids)
+ const expanded = expandedSelection(scene, ids)
+ selectedElements(scene, expanded, true)
+ if (!canTransformSelection(scene, expanded)) throw Error('请选择可变换的画布元素，并先解锁所有组合成员。')
+ return expanded
+}
 function mergeStyle(base: ElementStyle, patch: Partial<ElementStyle> = {}): ElementStyle {
  for (const key of ['stroke','fill'] as const) if (patch[key] !== undefined && safeColor(patch[key],'invalid') === 'invalid') throw Error('颜色格式无效。')
  const result = { ...base, ...patch }
@@ -60,7 +70,7 @@ export function editCanvas(document: WorkflowDocument, operations: readonly Canv
     const element = selectedElements(scene, [operation.id])[0]!, patch = clone(operation.patch)
     if ('id' in patch || 'type' in patch) throw Error('不能改变元素标识或类型。')
     if (element.locked && Object.keys(patch).some(key => key !== 'locked')) throw Error(`请先解锁画布元素：${element.id}`)
-    const fields = element.type === 'shape' ? ['shape','x','y','width','height','cornerRadius','text','imageData'] : element.type === 'edge' ? ['from','to','label','arrow','route'] : ['points','brush','pressures','closed']
+    const fields = element.type === 'shape' ? ['shape','x','y','width','height','rotation','cornerRadius','text','imageData'] : element.type === 'edge' ? ['from','to','label','arrow','route'] : ['points','brush','pressures','closed']
     if (Object.keys(patch).some(key => ![...fields,'style','locked','groupId'].includes(key))) throw Error('修改属性与画布元素类型不匹配。')
     const style = mergeStyle(element.style,patch.style)
     Object.assign(element, patch, { style })
@@ -82,6 +92,20 @@ export function editCanvas(document: WorkflowDocument, operations: readonly Canv
    case 'move': {
     const dx = operation.dx ?? 0, dy = operation.dy ?? 0; checkOffset(dx,dy)
     for (const element of selectedElements(scene, operation.ids, true)) translate(element, dx, dy)
+    break
+   }
+   case 'rotate': {
+    const degrees = operation.degrees === undefined ? 5 : operation.degrees
+    if (!Number.isFinite(degrees) || Math.abs(degrees) > 360) throw Error('旋转角度需为 -360 到 360 度之间的有限数值。')
+    scene = rotateSelection(scene, transformIds(scene, operation.ids), degrees)
+    break
+   }
+   case 'scale': {
+    if (!Number.isFinite(operation.factor) || operation.factor < .01 || operation.factor > 100) throw Error('缩放倍数需为 0.01 到 100 之间的有限数值。')
+    const ids = transformIds(scene, operation.ids), bounds = selectionBounds(scene, ids)!
+    const anchor = operation.anchor === undefined ? { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 } : operation.anchor
+    if (!anchor || ![anchor.x, anchor.y].every(value => Number.isFinite(value) && Math.abs(value) <= 1000000)) throw Error('缩放锚点坐标无效。')
+    scene = scaleSelection(scene, ids, anchor, operation.factor)
     break
    }
    case 'duplicate': {

@@ -1,5 +1,5 @@
 import { DEFAULT_STYLE, type ElementStyle, type Endpoint, type ImportedScene, type Scene, type SceneElement, type ShapeElement } from '../core/types.ts'
-import { edgePoints, elementBounds, isBraceShape, shapeOutline, braceTextBounds, rectangleCornerRadius } from '../core/geometry.ts'
+import { edgePoints, elementBounds, isBraceShape, shapeOutline, braceTextBounds, rectangleCornerRadius, normalizedRotation, rotatePoint } from '../core/geometry.ts'
 import { resolveStrokePattern, sceneDefaultStyle } from '../core/appearance.ts'
 import { validateElementStyle } from '../core/documents.ts'
 import { readBrushData } from '../core/brushes.ts'
@@ -35,7 +35,6 @@ function color(value: unknown, fallback: string, warnings: Set<string>): string 
 }
 
 function styleOf(element: Json, warnings: Set<string>): ElementStyle {
-  if (finite(element.angle) !== 0) warnings.add('旋转图形已转为未旋转的图形，位置可能与原图不同。')
   if (Array.isArray(element.groupIds) && element.groupIds.length > 1) warnings.add('嵌套分组已合并为最外层组合。')
   if (element.frameId) warnings.add('框架位置得到保留；frame 裁剪关系已展开。')
   const roughness = finite(element.roughness) > 0 ? 'sketch' : 'clean'
@@ -56,13 +55,22 @@ function styleOf(element: Json, warnings: Set<string>): ElementStyle {
   }
 }
 
+function rotationOf(element: Json): number { return normalizedRotation(finite(element.angle) * 180 / Math.PI) }
+
 function worldPoints(element: Json, minimum = 2, maximum = 100000): { x: number; y: number }[] {
   if (!Array.isArray(element.points) || element.points.length < minimum || element.points.length > maximum) throw new Error('白板 JSON 线条缺少有效的 points 数据。')
   const x = finite(element.x); const y = finite(element.y)
-  return element.points.map(point => {
+  const points = element.points.map(point => {
     if (!Array.isArray(point) || point.length < 2) throw new Error('白板 JSON 线条坐标格式不正确。')
     return { x: finite(point[0]) + x, y: finite(point[1]) + y }
   })
+  const rotation = rotationOf(element)
+  if (!rotation) return points
+  // Linear elements can contain negative local points; x + width / 2 is not
+  // their rotation center. Use the actual point bounds, as the source format does.
+  const bounds = elementBounds({ id: '', type: 'stroke', points, style: DEFAULT_STYLE, locked: false })
+  const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
+  return points.map(point => rotatePoint(point, center, rotation))
 }
 
 /** Basic structural import, without executing embedded content or loading remote assets. */
@@ -104,6 +112,7 @@ export function importBoardJson(text: string): ImportedScene {
       if (parent && ['rectangle', 'ellipse', 'diamond', 'stickynote', 'image', 'arrow', 'line', 'frame'].includes(String(parent.type))) { pendingLabels.push(element); continue }
     }
     const style = styleOf(element, warnings)
+    const rotation = rotationOf(element)
     const locked = element.locked === true
     const groupIds = Array.isArray(element.groupIds) ? element.groupIds.filter((id): id is string => typeof id === 'string' && !!id && id.length <= 512) : []
     let result: SceneElement
@@ -126,11 +135,17 @@ export function importBoardJson(text: string): ImportedScene {
       let from: Endpoint = points[0]!; let to: Endpoint = points.at(-1)!
       if (isObject(element.startBinding) && typeof element.startBinding.elementId === 'string') from = { ...from, nodeId: element.startBinding.elementId }
       if (isObject(element.endBinding) && typeof element.endBinding.elementId === 'string') to = { ...to, nodeId: element.endBinding.elementId }
+      if (rotation && (from.nodeId || to.nodeId)) {
+        from = { x: from.x, y: from.y }; to = { x: to.x, y: to.y }
+        warnings.add('连线的独立旋转已转换为自由端点，以保留旋转后的位置。')
+      }
+      const rotatedRoute = element.elbowed === true && rotation % 90 !== 0
+      if (rotatedRoute) warnings.add('旋转后的正交连线已简化为直线，端点位置得到保留。')
       const start = element.startArrowhead != null
       const end = element.endArrowhead != null || (kind === 'arrow' && element.endArrowhead === undefined)
       if ((start && !['arrow', 'triangle'].includes(String(element.startArrowhead))) || (end && element.endArrowhead && !['arrow', 'triangle'].includes(String(element.endArrowhead)))) warnings.add('特殊箭头端点已简化为普通箭头。')
       if (start && !end) [from, to] = [to, from]
-      result = { id, type: 'edge', from, to, label: '', arrow: start && end ? 'both' : start || end ? 'end' : 'none', route: element.elbowed === true ? 'orthogonal' : 'straight', style, locked }
+      result = { id, type: 'edge', from, to, label: '', arrow: start && end ? 'both' : start || end ? 'end' : 'none', route: element.elbowed === true && !rotatedRoute ? 'orthogonal' : 'straight', style, locked }
     } else {
       let shape: ShapeElement['shape'] = kind === 'stickynote' ? 'note' : kind as ShapeElement['shape']
       let imageData: string | undefined
@@ -157,6 +172,10 @@ export function importBoardJson(text: string): ImportedScene {
         if (radius) result.cornerRadius = radius
       }
     }
+    if (result.type === 'shape') {
+      const angle = native?.type === 'brace' && native.rotation !== undefined ? normalizedRotation(finite(native.rotation)) : rotation
+      if (angle) result.rotation = angle
+    }
     if (groupIds.length) result.groupId = groupIds.at(-1)
     elements.push(result); mapped.set(id, result)
   }
@@ -164,6 +183,8 @@ export function importBoardJson(text: string): ImportedScene {
     const parent = mapped.get(label.containerId as string)
     if (!parent || parent.type === 'stroke') continue
     styleOf(label, warnings)
+    const labelRotation = rotationOf(label)
+    if (labelRotation !== (parent.type === 'shape' ? parent.rotation ?? 0 : 0)) warnings.add('绑定文字的独立旋转已跟随所属图形。')
     const value = safeText(label.text)
     if (parent.type === 'shape') parent.text = label.nativeBraceLabel === true ? value : parent.text ? `${parent.text}\n${value}` : value
     else parent.label = parent.label ? `${parent.label}\n${value}` : value
@@ -191,9 +212,13 @@ export function exportBoardJson(scene: Scene): string {
   const takenIds = new Set(scene.elements.map(element => element.id))
   function labelId(id: string): string { let result = `${id}__label`; while (takenIds.has(result)) result += '_'; takenIds.add(result); return result }
   function base(element: SceneElement): Json {
-    return { id: element.id, angle: 0, strokeColor: element.style.stroke, backgroundColor: element.style.fill, fillStyle: 'solid', strokeWidth: element.style.strokeWidth, strokeStyle: resolveStrokePattern(element.style), roughness: element.style.roughness === 'sketch' ? 1 : 0, opacity: element.style.opacity * 100, groupIds: element.groupId ? [element.groupId] : [], frameId: null, roundness: null, seed: 1, version: 1, versionNonce: 0, isDeleted: false, boundElements: [], updated, link: null, locked: element.locked }
+    return { id: element.id, angle: element.type === 'shape' ? (element.rotation ?? 0) * Math.PI / 180 : 0, strokeColor: element.style.stroke, backgroundColor: element.style.fill, fillStyle: 'solid', strokeWidth: element.style.strokeWidth, strokeStyle: resolveStrokePattern(element.style), roughness: element.style.roughness === 'sketch' ? 1 : 0, opacity: element.style.opacity * 100, groupIds: element.groupId ? [element.groupId] : [], frameId: null, roundness: null, seed: 1, version: 1, versionNonce: 0, isDeleted: false, boundElements: [], updated, link: null, locked: element.locked }
   }
   function textElement(id: string, value: string, x: number, y: number, width: number, height: number, element: SceneElement, containerId: string | null): Json {
+    if (element.type === 'shape' && element.rotation) {
+      const center = rotatePoint({ x: x + width / 2, y: y + height / 2 }, { x: element.x + element.width / 2, y: element.y + element.height / 2 }, element.rotation)
+      x = center.x - width / 2; y = center.y - height / 2
+    }
     return { ...base(element), id, type: 'text', x, y, width, height, text: value, originalText: value, fontSize: element.style.fontSize, fontFamily: 2, textAlign: element.style.textAlign, verticalAlign: containerId ? 'middle' : 'top', containerId, autoResize: false, lineHeight: 1.25, backgroundColor: 'transparent' }
   }
   const bindings = new Map<string, { id: string; type: string }[]>()
@@ -203,7 +228,7 @@ export function exportBoardJson(scene: Scene): string {
     if (element.type === 'shape') {
       if (isBraceShape(element.shape)) {
         const points = shapeOutline(element), bounds = elementBounds({ ...element, type: 'stroke', points })
-        Object.assign(result, { type: 'freedraw', x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, points: points.map(point => [point.x - bounds.x, point.y - bounds.y]), backgroundColor: 'transparent', pressures: [], simulatePressure: true, lastCommittedPoint: null, customData: { openWorkflow: { type: 'brace', shape: element.shape, bounds: { x: element.x, y: element.y, width: element.width, height: element.height }, text: element.text, fontSize: element.style.fontSize, textAlign: element.style.textAlign, compatibility: '外部软件显示为普通笔迹与独立文字；括弧编辑与绑定语义依赖本软件元数据' } } })
+        Object.assign(result, { type: 'freedraw', angle: 0, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, points: points.map(point => [point.x - bounds.x, point.y - bounds.y]), backgroundColor: 'transparent', pressures: [], simulatePressure: true, lastCommittedPoint: null, customData: { openWorkflow: { type: 'brace', shape: element.shape, ...(element.rotation ? { rotation: element.rotation } : {}), bounds: { x: element.x, y: element.y, width: element.width, height: element.height }, text: element.text, fontSize: element.style.fontSize, textAlign: element.style.textAlign, compatibility: '外部软件显示为普通笔迹与独立文字；括弧编辑与绑定语义依赖本软件元数据' } } })
         elements.push(result)
         if (element.text) {
           const label = braceTextBounds(element), id = labelId(element.id)

@@ -28,7 +28,7 @@ Open Office 桌面版可作为本机 MCP 服务，供支持 Streamable HTTP 的 
 | 演示文稿（`presentation`） | `presentation_list_commands`、`presentation_describe_command`、`presentation_query`、`presentation_list_templates` | `presentation_execute_command`：页面增删复制、文字/形状/图片/表格/图表、主题母版、过渡动画、备注批注；`presentation_apply_template` 应用模板 |
 | PDF（`pdf`） | `pdf_list_commands`、`pdf_query`、`pdf_read` | `pdf_execute_command`：文字图像、批注高亮、签名图章、表单及其动作/脚本内容、文档脚本内容、内嵌字体、书签链接、页面管理、水印页眉等 |
 | 笔记本（`note`） | `note_read`、`note_read_page` | `note_edit`：分区/页面/子页增删改和移动，区域位置尺寸、富文本、待办及图片；`note_select_page` 显示指定页面 |
-| 画布（`canvas`） | `canvas_read`、`canvas_read_elements`、`canvas_list_templates` | `canvas_edit`：全部图形、连线、笔迹和图片的内容样式、位置尺寸、锁定、组合、层级、对齐布局及模板；`canvas_select_elements` 选择或定位元素 |
+| 画布（`canvas`） | `canvas_read`、`canvas_read_elements`、`canvas_list_templates` | `canvas_edit`：全部图形、连线、笔迹和图片的内容样式、位置尺寸、旋转、等比缩放、锁定、组合、层级、对齐布局及模板；`canvas_select_elements` 选择元素、保持缩放聚焦或自动缩放适应画布 |
 | 代码图表（`diagram`） | `diagram_read`、`diagram_read_source`、`diagram_list_templates` | `diagram_update`：源码、标题、风格及模板；保留 `diagram_set_source` |
 | 计划排期（`schedule`） | `schedule_read`、`schedule_read_calendar`、`schedule_read_workload` | `schedule_edit`：项目、单价、人员、事件、日历、周号、轨道高度；`schedule_import` 导入完整排期，`schedule_export` 导出 JSON／PNG；`schedule_set_view` 切换视图、缩放、选择事件，`schedule_refresh_holidays` 更新假日 |
 | 日历便笺（`calendar`） | `calendar_read`、`calendar_export` | `calendar_edit`：日历本改名、每天工时、Week／Work 与显示单位、增删改事项、移动、复制、清除指定月、每日工时分配；`calendar_set_view` 切换月份、日期／事项选择与搜索 |

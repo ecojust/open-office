@@ -2,8 +2,29 @@ import type { EdgeElement, Point, Scene, SceneElement, ShapeElement } from './ty
 import { brushRadiusAt } from './brushes.ts'
 
 export interface Bounds { x: number; y: number; width: number; height: number }
+export function normalizedRotation(degrees: number): number {
+  if (!Number.isFinite(degrees)) throw Error('旋转角度不是有效数值。')
+  const value = ((degrees % 360) + 360) % 360
+  return Math.abs(value) < 1e-10 || Math.abs(value - 360) < 1e-10 ? 0 : value
+}
+export function rotatePoint(point: Point, pivot: Point, degrees: number): Point {
+  const angle = normalizedRotation(degrees) * Math.PI / 180
+  if (!angle) return { ...point }
+  const cos = Math.cos(angle), sin = Math.sin(angle), dx = point.x - pivot.x, dy = point.y - pivot.y
+  return { x: pivot.x + dx * cos - dy * sin, y: pivot.y + dx * sin + dy * cos }
+}
+export function unrotatePointForShape(node: ShapeElement, point: Point): Point { return rotatePoint(point, center(node), -(node.rotation ?? 0)) }
+/** The logical node rectangle in world coordinates, including its label area. */
+export function shapeCorners(node: ShapeElement): Point[] {
+  const { x, y, width, height } = node, pivot = center(node)
+  return [{ x, y }, { x: x + width, y }, { x: x + width, y: y + height }, { x, y: y + height }].map(point => rotatePoint(point, pivot, node.rotation ?? 0))
+}
 export function elementBounds(element: SceneElement): Bounds {
-  if (element.type === 'shape') return { x: element.x, y: element.y, width: element.width, height: element.height }
+  if (element.type === 'shape') {
+    if (!normalizedRotation(element.rotation ?? 0)) return { x: element.x, y: element.y, width: element.width, height: element.height }
+    const corners = shapeCorners(element), x = Math.min(...corners.map(p => p.x)), y = Math.min(...corners.map(p => p.y))
+    return { x, y, width: Math.max(...corners.map(p => p.x)) - x, height: Math.max(...corners.map(p => p.y)) - y }
+  }
   const points = element.type === 'stroke' ? element.points : [element.from, element.to]
   if (!points.length) return { x: 0, y: 0, width: 0, height: 0 }
   let x = Infinity, y = Infinity, right = -Infinity, bottom = -Infinity
@@ -126,8 +147,8 @@ function nearestOnPolyline(points: Point[], point: Point): Point {
   return { ...closest }
 }
 
-/** One shared outline is used for rendering, binding, and pointer hit testing. */
-export function shapeOutline(node: ShapeElement, anchors: Point[] = []): Point[] {
+/** Unrotated geometry, for markup enclosed in the node's SVG rotation. */
+export function localShapeOutline(node: ShapeElement, anchors: Point[] = []): Point[] {
   const { x, y, width: w, height: h } = node
   if (isBraceShape(node.shape)) return braceOutline(node)
   const radius = rectangleCornerRadius(node)
@@ -163,7 +184,14 @@ export function shapeOutline(node: ShapeElement, anchors: Point[] = []): Point[]
   } else points = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }]
   return points.map(p => ({ x: x + p.x * w, y: y + p.y * h }))
 }
+/** Shared world-space outline for binding, export and pointer hit testing. */
+export function shapeOutline(node: ShapeElement, anchors: Point[] = []): Point[] {
+  const rotation = normalizedRotation(node.rotation ?? 0)
+  if (!rotation) return localShapeOutline(node, anchors)
+  return localShapeOutline(node, anchors.map(point => unrotatePointForShape(node, point))).map(point => rotatePoint(point, center(node), rotation))
+}
 export function shapeContainsPoint(node: ShapeElement, point: Point): boolean {
+  if (normalizedRotation(node.rotation ?? 0)) return shapeContainsPoint({ ...node, rotation: 0 }, unrotatePointForShape(node, point))
   if (node.width <= 0 || node.height <= 0) return false
   const radius = rectangleCornerRadius(node)
   if (radius) return roundedRectangleDistance(node, point, radius) <= 1e-10
@@ -173,6 +201,7 @@ export function shapeContainsPoint(node: ShapeElement, point: Point): boolean {
 }
 /** Exterior distance; a frame's empty interior deliberately is not an attachment target. */
 export function outlineDistance(node: ShapeElement, point: Point): number {
+  if (normalizedRotation(node.rotation ?? 0)) return outlineDistance({ ...node, rotation: 0 }, unrotatePointForShape(node, point))
   const radius = rectangleCornerRadius(node)
   if (radius) return Math.max(0, roundedRectangleDistance(node, point, radius))
   if (node.shape !== 'frame' && !isBraceShape(node.shape) && shapeContainsPoint(node, point)) return 0
@@ -193,6 +222,7 @@ export function outlineDistance(node: ShapeElement, point: Point): number {
 }
 /** Ray/shape intersection makes an edge follow its node without storing stale anchors. */
 export function shapeAnchor(node: ShapeElement, toward: Point): Point {
+  if (normalizedRotation(node.rotation ?? 0)) return rotatePoint(shapeAnchor({ ...node, rotation: 0 }, unrotatePointForShape(node, toward)), center(node), node.rotation!)
   if (isBraceShape(node.shape)) return nearestOnPolyline(shapeOutline(node), toward)
   const c = center(node), dx = toward.x - c.x, dy = toward.y - c.y
   if (!dx && !dy) return shapeAnchor(node, { x: c.x, y: c.y + 1 })
@@ -239,8 +269,8 @@ function routeCrossesBounds(points: Point[], bounds: Bounds, skipFirst = false, 
 function avoidNodeObstacles(points: Point[], fromNode: ShapeElement, toNode: ShapeElement, shapes: ShapeElement[]): Point[] {
   // Captions and enclosing frames must not turn an ordinary edge into a diagram-sized detour.
   const obstacles = shapes.filter(node => node !== fromNode && node !== toNode && node.shape !== 'text' && node.shape !== 'frame' && !isBraceShape(node.shape))
-  if (!obstacles.some(node => routeCrossesBounds(points, node))) return points
-  const bounds = combineBounds([fromNode, toNode, ...obstacles]), fromCenter = center(fromNode), toCenter = center(toNode)
+  if (!obstacles.some(node => routeCrossesBounds(points, elementBounds(node)))) return points
+  const bounds = combineBounds([fromNode, toNode, ...obstacles].map(elementBounds)), fromCenter = center(fromNode), toCenter = center(toNode)
   const candidates: Point[][] = []
   for (const y of [bounds.y - 44, bounds.y + bounds.height + 44]) {
     const from = shapeAnchor(fromNode, { x: fromCenter.x, y }), to = shapeAnchor(toNode, { x: toCenter.x, y })
@@ -252,10 +282,10 @@ function avoidNodeObstacles(points: Point[], fromNode: ShapeElement, toNode: Sha
   }
   let shortest = Infinity, result = points
   for (const candidate of candidates) {
-    if (obstacles.some(node => routeCrossesBounds(candidate, { x: node.x - 6, y: node.y - 6, width: node.width + 12, height: node.height + 12 }))) continue
+    if (obstacles.some(node => { const b = elementBounds(node); return routeCrossesBounds(candidate, { x: b.x - 6, y: b.y - 6, width: b.width + 12, height: b.height + 12 }) })) continue
     // A departure may touch its own bounding box for nonrectangular shapes, but the
     // rest of the detour must not pass through either endpoint node.
-    if (routeCrossesBounds(candidate, fromNode, true) || routeCrossesBounds(candidate, toNode, false, true)) continue
+    if (routeCrossesBounds(candidate, elementBounds(fromNode), true) || routeCrossesBounds(candidate, elementBounds(toNode), false, true)) continue
     let length = 0
     for (let index = 1; index < candidate.length; index++) length += Math.abs(candidate[index]!.x - candidate[index - 1]!.x) + Math.abs(candidate[index]!.y - candidate[index - 1]!.y)
     if (length < shortest) { shortest = length; result = candidate }
@@ -267,7 +297,7 @@ export function edgePoints(edge: EdgeElement, scene: Scene): Point[] {
   const fromNode = shapes.find(n => n.id === edge.from.nodeId), toNode = shapes.find(n => n.id === edge.to.nodeId)
   const fromCenter = fromNode ? center(fromNode) : edge.from, toCenter = toNode ? center(toNode) : edge.to
   if (fromNode && fromNode === toNode) {
-    const right = fromNode.x + fromNode.width + 44, top = fromNode.y - 32
+    const bounds = elementBounds(fromNode), right = bounds.x + bounds.width + 44, top = bounds.y - 32
     const start = shapeAnchor(fromNode, { x: right, y: fromCenter.y }), end = shapeAnchor(fromNode, { x: fromCenter.x, y: top })
     return [start, { x: right, y: start.y }, { x: right, y: top }, { x: end.x, y: top }, end]
   }
@@ -281,11 +311,11 @@ export function edgePoints(edge: EdgeElement, scene: Scene): Point[] {
       // Cardinal anchors remain on the real outline for rectangles, diamonds, and ellipses.
       if (reverse && returning) {
         if (horizontal) {
-          const y = Math.min(fromNode.y, toNode.y) - 44
+          const y = Math.min(elementBounds(fromNode).y, elementBounds(toNode).y) - 44
           const from = shapeAnchor(fromNode, { x: fromCenter.x, y }), to = shapeAnchor(toNode, { x: toCenter.x, y })
           return finishRoute([from, { x: from.x, y }, { x: to.x, y }, to])
         }
-        const x = Math.max(fromNode.x + fromNode.width, toNode.x + toNode.width) + 44
+        const x = Math.max(elementBounds(fromNode).x + elementBounds(fromNode).width, elementBounds(toNode).x + elementBounds(toNode).width) + 44
         const from = shapeAnchor(fromNode, { x, y: fromCenter.y }), to = shapeAnchor(toNode, { x, y: toCenter.y })
         return finishRoute([from, { x, y: from.y }, { x, y: to.y }, to])
       }
