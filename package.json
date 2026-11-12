@@ -1,6 +1,6 @@
 {
   "name": "open-office",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -55,6 +55,11 @@
     "branding:check:dist": "node scripts/check-office-branding.mjs --no-source --dist"
   },
   "dependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
+    "@lezer/highlight": "1.2.5",
     "@tauri-apps/api": "2.12.3",
     "fflate": "0.8.2",
     "lunar-typescript": "1.8.6",

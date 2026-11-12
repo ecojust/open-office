@@ -1,0 +1,17 @@
+{
+  "name": "@lezer/highlight",
+  "version": "1.2.5",
+  "repository": {
+    "type": "git",
+    "url": "git+https://code.haverbeke.berlin/lezer/highlight.git"
+  },
+  "license": "MIT",
+  "resolved": "https://registry.npmjs.org/@lezer/highlight/-/highlight-1.2.5.tgz",
+  "integrity": "sha512-O1GMVKgtf5YspFaRzpmqkVgMtIk2HG9uMAbH6wdAIdNh3TVzCsch/+cRi+6l2//UGDKe6NB9BW3cvuR5ezMQ0w==",
+  "licenseFiles": [
+    {
+      "file": "LICENSE",
+      "sha256": "568902fb66eaf1f11750e966b33fd7b5d7c618e65af09f35ef843635bcf5f1ba"
+    }
+  ]
+}

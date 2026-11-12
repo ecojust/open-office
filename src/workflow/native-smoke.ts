@@ -67,6 +67,23 @@ function visibleText(element: HTMLElement, kind: WorkflowKind): string {
 }
 function hasExpectedText(text: string, kind: WorkflowKind) { return kind === 'canvas' ? text === CANVAS_TEXT : text.includes('原生代码图表') && text.includes('本地保存与重开') }
 
+/** Exercise the browser's contenteditable input path, including CodeMirror's DOM observer. */
+export function inputDiagramSource(control: HTMLElement, text: string): void {
+  assert(control.isContentEditable, 'diagram text control unavailable')
+  control.focus()
+  const selection = window.getSelection(), range = document.createRange()
+  assert(selection, 'native WebView selection unavailable')
+  range.selectNodeContents(control); selection.removeAllRanges(); selection.addRange(range)
+  assert(document.execCommand('insertText', false, text), 'native diagram contenteditable insertion failed')
+  control.blur()
+}
+
+/** The two-line smoke fixture is fully visible, so read back its rendered source DOM. */
+export function diagramSourceText(element: HTMLElement): string | undefined {
+  const control = element.querySelector<HTMLElement>('[data-testid="diagram-source"]')
+  return control ? [...control.querySelectorAll('.cm-line')].map(line => line.textContent ?? '').join('\n') : undefined
+}
+
 /** Mounted native WebView editing and approved original-file saves with real disk readback. */
 export async function runWorkflowNativeSmoke(adapter: WorkflowNativeSmokeAdapter): Promise<WorkflowNativeSmokeReport> {
   if (!isTauri()) throw Error('A real native WebView is required for workflow verification')
@@ -99,14 +116,23 @@ export async function runWorkflowNativeSmoke(adapter: WorkflowNativeSmokeAdapter
           stage.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, button: 0, detail: 2, clientX: box.left + 200, clientY: box.top + 160 }))
           await waitFor(() => !!mounted.element.querySelector('[aria-label="编辑图形文字"]'), 'canvas inline text control')
         }
-        const control = mounted.element.querySelector<HTMLTextAreaElement>(kind === 'canvas' ? '[aria-label="编辑图形文字"]' : '[data-testid="diagram-source"]')
-        assert(control && !control.disabled, `${kind} text control unavailable`)
-        control.focus(); control.value = text
-        control.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text })); control.blur()
+        if (kind === 'canvas') {
+          const control = mounted.element.querySelector<HTMLTextAreaElement>('[aria-label="编辑图形文字"]')
+          assert(control && !control.disabled, 'canvas text control unavailable')
+          control.focus(); control.value = text
+          control.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text })); control.blur()
+        } else {
+          const control = mounted.element.querySelector<HTMLElement>('[data-testid="diagram-source"]')
+          assert(control, 'diagram text control unavailable')
+          inputDiagramSource(control, text)
+        }
         await waitFor(async () => { const state = await mounted.editor.inspect(); return state.dirty && state.revision > before.revision && adapter.state(mounted.key).dirty && hasExpectedText(visibleText(mounted.element, kind), kind) }, `${kind} DOM input and rendered content`)
       } finally { mounted.element.removeEventListener('input', input); mounted.element.removeEventListener('dblclick', doubleClick) }
       const after = await mounted.editor.inspect()
-      assert(inputEvents === 1 && doubleClickEvents === (kind === 'canvas' ? 1 : 0) && after.documentId === before.documentId, `${kind} input did not reach its session`)
+      // One multiline insertText command may emit one combined input event or
+      // separate text/newline/text events for this two-line diagram fixture.
+      const validInputEvents = kind === 'canvas' ? inputEvents === 1 : inputEvents >= 1 && inputEvents <= 3
+      assert(validInputEvents && doubleClickEvents === (kind === 'canvas' ? 1 : 0) && after.documentId === before.documentId, `${kind} input did not reach its session`)
       result.editing = { text, inputEvents, doubleClickEvents, before, after, visibleText: visibleText(mounted.element, kind) }
       report.checks.push(WORKFLOW_NATIVE_CHECKS[check]!)
       const saves: SaveReceipt[] = []
@@ -136,7 +162,7 @@ export async function runWorkflowNativeSmoke(adapter: WorkflowNativeSmokeAdapter
       const reopened = await bounded(adapter.open(saved), `reopen ${kind} from disk`); keys.push(reopened.key)
       await waitFor(() => hasExpectedText(visibleText(reopened.element, kind), kind), `${kind} reopened rendered content`)
       const snapshot = await reopened.editor.inspect(), exported = await reopened.editor.exportFile({ format: 'owflow' }), state = adapter.state(reopened.key)
-      const reopenedText = kind === 'canvas' ? visibleText(reopened.element, kind) : reopened.element.querySelector<HTMLTextAreaElement>('[data-testid="diagram-source"]')?.value
+      const reopenedText = kind === 'canvas' ? visibleText(reopened.element, kind) : diagramSourceText(reopened.element)
       assert(reopened.key !== mounted.key && snapshot.documentId !== after.documentId && snapshot.revision === 0 && !snapshot.dirty && state.active && state.ready && !state.dirty && state.fileId === saved.id && state.sha256 === final.sha256, `${kind} reopen reused a session or lost its file identity`)
       assert(exported.base64 === saved.base64 && reopenedText === text && reopened.element.dataset.kind === kind, `${kind} reopen lost content or classification`)
       result.reopened = { keyChanged: true, fileId: saved.id, kind, sha256: final.sha256, snapshot, exportedBase64: exported.base64, text: reopenedText, visibleText: visibleText(reopened.element, kind) }

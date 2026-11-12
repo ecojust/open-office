@@ -1,0 +1,17 @@
+{
+  "name": "@codemirror/streamparser",
+  "version": "6.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://code.haverbeke.berlin/codemirror/streamparser.git"
+  },
+  "license": "MIT",
+  "resolved": "https://registry.npmjs.org/@codemirror/streamparser/-/streamparser-6.0.0.tgz",
+  "integrity": "sha512-JTFPF6xrfjt0mnfGPgzcLiMwYmvIyNaoizp8BYzv8FE8KrT6GBGDZ190rtt+O7Wke3gG/MFHyiY9YGNeimof4w==",
+  "licenseFiles": [
+    {
+      "file": "LICENSE",
+      "sha256": "05c6130cda97e7600ca91427a41e8a065efcf82365fc0293e7de80faec494c07"
+    }
+  ]
+}

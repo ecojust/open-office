@@ -47,6 +47,22 @@ test('native workflow gate accepts the real new sequence diagram and rejects the
   assert.throws(() => validateNativeWorkflowReport(report, workspaceReport()), /diagram initial content differs/);
 });
 
+test('multiline diagram input accepts bounded native event aggregation while canvas keeps one event', () => {
+  for (const inputEvents of [1, 2, 3]) {
+    const report = workflowReport(); report.documents[1].editing.inputEvents = inputEvents;
+    assert.doesNotThrow(() => validateNativeWorkflowReport(report, workspaceReport()));
+  }
+  for (const index of [0, 1]) {
+    for (const inputEvents of [undefined, null, true, '1', -1, 0, .5, 4, NaN, Infinity, ...(index === 0 ? [2, 3] : [])]) {
+      const report = workflowReport(); report.documents[index].editing.inputEvents = inputEvents;
+      assert.throws(() => validateNativeWorkflowReport(report, workspaceReport()), /DOM edit evidence differs/);
+    }
+  }
+  const report = workflowReport(); report.documents[1].editing.inputEvents = 3;
+  rewriteSaved(report.documents[1], model => { model.source += '\n extra'; });
+  assert.throws(() => validateNativeWorkflowReport(report, workspaceReport()), /independently parsed saved content differs/);
+});
+
 test('workflow gate rejects browser reports, missing document coverage, incomplete edits and cleanup', () => {
   for (const value of [undefined, null, [], {}, { ok: true }]) assert.throws(() => validateNativeWorkflowReport(value, workspaceReport()), /Native workflow/);
   for (const mutate of [
@@ -57,7 +73,7 @@ test('workflow gate rejects browser reports, missing document coverage, incomple
     r => { r.cleanup.closedDocuments = 3; }, r => { r.error = 'failed'; }, r => { r.cleanupError = 'failed'; },
   ]) { const report = workflowReport(); mutate(report); assert.throws(() => validateNativeWorkflowReport(report, workspaceReport()), /Native workflow/); }
   for (const index of [0, 1]) for (const mutate of [
-    d => { d.kind = 'notebook'; }, d => { d.editing.inputEvents = 0; }, d => { d.editing.inputEvents = 2; },
+    d => { d.kind = 'notebook'; }, d => { d.editing.inputEvents = 0; }, d => { d.editing.inputEvents = index === 0 ? 2 : 4; },
     d => { d.editing.doubleClickEvents++; }, d => { d.editing.text = 'incorrect'; }, d => { d.editing.visibleText = ''; },
     d => { d.editing.before.dirty = true; }, d => { d.editing.before.revision = 1; },
     d => { d.editing.after.documentId++; }, d => { d.editing.after.revision = 0; }, d => { d.editing.after.dirty = false; },

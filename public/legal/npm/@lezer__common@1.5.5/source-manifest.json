@@ -1,0 +1,17 @@
+{
+  "name": "@lezer/common",
+  "version": "1.5.5",
+  "repository": {
+    "type": "git",
+    "url": "git+https://code.haverbeke.berlin/lezer/common.git"
+  },
+  "license": "MIT",
+  "resolved": "https://registry.npmjs.org/@lezer/common/-/common-1.5.5.tgz",
+  "integrity": "sha512-Pw7PVCndruF1pb3ebCxpSVpkMHSDjwRCLcTRw+RizUKco5QbWylwq2g4lnG/RYN7yTTQDXE9F77MwtkAyphrjg==",
+  "licenseFiles": [
+    {
+      "file": "LICENSE",
+      "sha256": "568902fb66eaf1f11750e966b33fd7b5d7c618e65af09f35ef843635bcf5f1ba"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "crelt",
+  "version": "1.0.7",
+  "repository": {
+    "type": "git",
+    "url": "git+https://code.haverbeke.berlin/marijn/crelt.git"
+  },
+  "license": "MIT",
+  "resolved": "https://registry.npmjs.org/crelt/-/crelt-1.0.7.tgz",
+  "integrity": "sha512-aK6BbWfhf4U/wCcLHKPJl/xa6VkVstRaPywWtMKGwuOLc/wZTyQYuoxgvZnNsBvv7Kg3YTBQYYBCggcviQczuA==",
+  "licenseFiles": [
+    {
+      "file": "LICENSE",
+      "sha256": "23852ebf6aef7fadffc92514b3c5df163a8651f2c3ed0dbb494cb49d93bd5de5"
+    }
+  ]
+}

@@ -10,7 +10,7 @@ const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
 const output = path.resolve(process.env.OFFICE_WORKFLOW_OUTPUT || path.join(root, 'test-results/workflow-editors'));
 fs.mkdirSync(output, { recursive: true });
-const report = { ok: false, runtime: 'Real Vue shell, canvas and code diagram editors in Chromium; native save receipt stub', checks: [], screenshots: [], errors: [], consoleErrors: [], externalRequests: [], limitations: ['Native file dialogs, filesystem writes and platform WebViews are not exercised.', 'Composition events are synthetic and do not claim physical operating-system IME validation.', 'macOS gesture events and Ctrl+wheel pinch are synthetic; plain mouse wheel uses browser input.'] };
+const report = { ok: false, runtime: 'Real Vue shell, canvas and code diagram editors in Chromium; native save receipt stub', checks: [], screenshots: [], errors: [], consoleErrors: [], externalRequests: [], limitations: ['Native file dialogs, filesystem writes and platform WebViews are not exercised.', 'Composition uses Chromium CDP IME input and does not claim physical operating-system IME validation.', 'macOS gesture events and Ctrl+wheel pinch are synthetic; plain mouse wheel uses browser input.'] };
 const persist = () => fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(report, null, 2));
 let server, browser, page;
 const nativeStub = `
@@ -39,6 +39,9 @@ export async function saveDocument(request) {
 const editor = () => page.locator('[data-testid="workflow-editor"]:visible');
 const scene = () => editor().getByTestId('scene-editor');
 const source = () => editor().getByTestId('diagram-source');
+// Read the editor document, including folded and virtualized lines.
+async function sourceValue() { return source().evaluate(element => element.closest('.diagram-source-editor').__vueParentComponent.exposed.value); }
+async function selectSource(start, end = start) { await source().evaluate((element, range) => element.closest('.diagram-source-editor').__vueParentComponent.exposed.setSelectionRange(range.start, range.end), { start, end }); }
 async function check(name, action) { report.stage = name; persist(); await action(); report.checks.push(name); persist(); }
 async function frame() { await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))); }
 async function poll(fn, description, timeout = 15000) {
@@ -141,19 +144,19 @@ async function saveAs(format, name) {
       await undo(); assert.equal((await model()).scene.elements.length, 1); await capture('canvas-light');
     });
     await check('code-editor-preview-and-source-tab-isolation', async () => {
-      await goHome(); await page.getByTestId('home-new-diagram').click(); await ready('diagram'); firstDiagram = await active(); originalSource = await source().inputValue();
+      await goHome(); await page.getByTestId('home-new-diagram').click(); await ready('diagram'); firstDiagram = await active(); originalSource = await sourceValue();
       assert.match(originalSource, /^sequenceDiagram\n/); assert.equal(await editor().locator('.diagram-preview-kind').textContent(), '时序图');
       const edited = 'flowchart LR\n  A[本地文档] --> B[共享工具栏]\n  B --> C[独立标签]';
       await source().fill(edited);
       await switchTab(firstCanvas.name); await ready('canvas'); assert.equal((await model()).scene.elements[0].text, '季度计划与执行');
-      await switchTab(firstDiagram.name); await ready('diagram'); assert.equal(await source().inputValue(), edited);
+      await switchTab(firstDiagram.name); await ready('diagram'); assert.equal(await sourceValue(), edited);
       await poll(async () => (await editor().getByTestId('diagram-preview').textContent()).includes('共享工具栏'), 'edited source appears in SVG preview');
       assert.equal(await editor().getByTestId('diagram-error').count(), 0);
-      await undo(); assert.equal(await source().inputValue(), originalSource); await redo(); assert.equal(await source().inputValue(), edited);
+      await undo(); assert.equal(await sourceValue(), originalSource); await redo(); assert.equal(await sourceValue(), edited);
       diagramSaved = await save(); firstDiagram = await active(); assert.equal(JSON.parse(Buffer.from(diagramSaved.request.base64, 'base64')).source, edited);
     });
-    await check('code-preview-mouse-zoom-pinch-limits-and-clean-document', async () => {
-      const previousSource = await source().inputValue();
+    await check('code-preview-native-scroll-ctrl-zoom-pinch-limits-and-clean-document', async () => {
+      const previousSource = await sourceValue();
       await source().fill('flowchart TD\n' + Array.from({ length: 8 }, (_, index) => ` N${index}[步骤 ${index + 1}] --> N${index + 1}[步骤 ${index + 2}]`).join('\n'));
       await save(); await frame();
       const before = await state(), beforeModel = await model(), rootScroll = await page.evaluate(() => ({ x: scrollX, y: scrollY, scale: visualViewport.scale }));
@@ -161,24 +164,29 @@ async function saveAs(format, name) {
       const zoomValue = editor().getByRole('button', { name: '重置预览缩放', exact: true });
       const box = await viewport.boundingBox(); assert.ok(box);
       const anchor = { x: box.x + box.width * .53, y: box.y + box.height * .32 };
+      await page.mouse.move(anchor.x, anchor.y); await page.mouse.wheel(0, 180);
+      await poll(async () => await viewport.evaluate(element => element.scrollTop) > 0, 'plain wheel scrolls preview');
+      assert.equal(await zoomValue.textContent(), '100%', 'plain wheel preserves preview zoom');
+      await viewport.evaluate(element => { element.scrollTop = 0; }); await frame();
       const initialPage = await pageContent.boundingBox(); assert.ok(initialPage);
       const point = { x: (anchor.x - initialPage.x) / initialPage.width, y: (anchor.y - initialPage.y) / initialPage.height };
-      await page.mouse.move(anchor.x, anchor.y); await page.mouse.wheel(0, -140);
-      await poll(async () => parseInt(await zoomValue.textContent()) > 100, 'plain mouse wheel zooms in'); await frame();
+      await page.keyboard.down('Control'); await page.mouse.wheel(0, -140); await page.keyboard.up('Control');
+      await poll(async () => parseInt(await zoomValue.textContent()) > 100, 'Ctrl+mouse wheel zooms in'); await frame();
       const enlarged = await pageContent.boundingBox(); assert.ok(enlarged);
       assert.ok(Math.abs(enlarged.x + point.x * enlarged.width - anchor.x) < 2, 'horizontal diagram point stays under pointer');
       assert.ok(Math.abs(enlarged.y + point.y * enlarged.height - anchor.y) < 2, 'vertical diagram point stays under pointer');
       const enlargedZoom = parseInt(await zoomValue.textContent());
-      await page.mouse.wheel(0, 100); await poll(async () => parseInt(await zoomValue.textContent()) < enlargedZoom, 'mouse wheel zooms out');
+      await page.keyboard.down('Control'); await page.mouse.wheel(0, 100); await page.keyboard.up('Control'); await poll(async () => parseInt(await zoomValue.textContent()) < enlargedZoom, 'Ctrl+mouse wheel zooms out');
       const reducedZoom = parseInt(await zoomValue.textContent());
       async function syntheticWheel(deltaY, options = {}) {
         return viewport.evaluate((element, input) => { const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: input.anchor.x, clientY: input.anchor.y, deltaY: input.deltaY, ...input.options }); element.dispatchEvent(event); return event.defaultPrevented; }, { deltaY, options, anchor });
       }
+      assert.equal(await syntheticWheel(70), false, 'plain wheel keeps its native default action');
       assert.equal(await syntheticWheel(-70, { ctrlKey: true }), true, 'Ctrl+wheel pinch is consumed by preview'); await frame();
       assert.ok(parseInt(await zoomValue.textContent()) > reducedZoom);
-      for (let index = 0; index < 4; index++) { await syntheticWheel(-1000, { deltaMode: 1 }); await frame(); }
+      for (let index = 0; index < 4; index++) { await syntheticWheel(-1000, { deltaMode: 1, ctrlKey: true }); await frame(); }
       assert.equal(await zoomValue.textContent(), '300%'); assert.equal(await editor().getByRole('button', { name: '放大预览', exact: true }).isDisabled(), true);
-      for (let index = 0; index < 4; index++) { await syntheticWheel(10, { deltaMode: 2 }); await frame(); }
+      for (let index = 0; index < 4; index++) { await syntheticWheel(10, { deltaMode: 2, ctrlKey: true }); await frame(); }
       assert.equal(await zoomValue.textContent(), '40%'); assert.equal(await editor().getByRole('button', { name: '缩小预览', exact: true }).isDisabled(), true);
       await zoomValue.click(); await frame(); assert.equal(await zoomValue.textContent(), '100%');
       for (const [type, scale] of [['gesturestart', 1], ['gesturechange', 1.5], ['gestureend', 1.5]]) {
@@ -192,33 +200,97 @@ async function saveAs(format, name) {
       assert.deepEqual(await state(), before, 'zoom does not dirty document or add undo entries'); assert.deepEqual(await model(), beforeModel);
       await zoomValue.click(); await source().fill(previousSource); diagramSaved = await save(); await frame();
     });
+    await check('code-workspace-resizes-with-pointer-keyboard-and-narrow-layout', async () => {
+      const before = await state(), beforeModel = await model();
+      const splitter = editor().getByTestId('diagram-splitter'), panel = editor().locator('.diagram-source-panel');
+      assert.equal(await splitter.getAttribute('role'), 'separator'); assert.equal(await splitter.getAttribute('aria-orientation'), 'vertical');
+      const initial = await panel.boundingBox(), handle = await splitter.boundingBox();
+      await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2); await page.mouse.down();
+      await page.mouse.move(handle.x + 140, handle.y + handle.height / 2, { steps: 8 }); await page.mouse.up(); await frame();
+      assert.ok((await panel.boundingBox()).width > initial.width + 100, 'drag changes source pane width');
+      await splitter.focus(); const dragged = Number(await splitter.getAttribute('aria-valuenow'));
+      await page.keyboard.press('ArrowLeft'); assert.ok(Number(await splitter.getAttribute('aria-valuenow')) < dragged);
+      await page.keyboard.press('Home'); assert.equal(await splitter.getAttribute('aria-valuenow'), await splitter.getAttribute('aria-valuemin'));
+      await page.keyboard.press('End'); assert.equal(await splitter.getAttribute('aria-valuenow'), await splitter.getAttribute('aria-valuemax'));
+      await splitter.dblclick(); await frame();
+      assert.ok(Math.abs((await panel.boundingBox()).width - initial.width) < 2, 'double click restores default split');
+      await page.setViewportSize({ width: 640, height: 850 }); await frame();
+      assert.equal(await splitter.getAttribute('aria-orientation'), 'horizontal');
+      const narrow = await panel.boundingBox(); await splitter.focus(); await page.keyboard.press('ArrowDown'); await frame();
+      assert.ok((await panel.boundingBox()).height > narrow.height, 'narrow layout separator adjusts source pane height');
+      await splitter.dblclick(); await page.setViewportSize({ width: 1480, height: 1000 }); await frame();
+      assert.deepEqual(await state(), before, 'resizing does not dirty document or add history'); assert.deepEqual(await model(), beforeModel);
+    });
+    await check('source-hash-comments-colors-folding-and-hidden-code-preservation', async () => {
+      const previous = await sourceValue();
+      const code = '# diagram comment\nflowchart TD\nsubgraph outer[外层]\n  subgraph inner[内层]\n    A["保留 # 标签"] --> B[完成]\n  end\nend\nstyle A fill:#eff6ff,stroke:#334155\nC[外部节点] --> A';
+      await source().fill(code); await save(); await frame();
+      assert.equal(await editor().getByTestId('diagram-error').count(), 0);
+      assert.match(await editor().getByTestId('diagram-preview').textContent(), /保留 # 标签/);
+      const colors = await source().evaluate(element => {
+        const select = className => { const token = element.querySelector(className); return token && { text: token.textContent, color: getComputedStyle(token).color }; };
+        return { keyword: select('.cm-keyword'), comment: select('.cm-comment'), string: select('.cm-string') };
+      });
+      assert.ok(colors.keyword && colors.comment && colors.string, 'keywords, comments and labels have syntax token spans');
+      assert.equal(new Set(Object.values(colors).map(token => token.color)).size, 3, 'syntax categories have distinct colors');
+      const savedState = await state();
+      const fold = editor().locator('.cm-foldGutter .cm-gutterElement:visible').filter({ hasText: '⌄' });
+      assert.ok(await fold.count() >= 2, 'nested blocks expose folding controls');
+      await fold.nth(1).click(); await frame();
+      assert.equal(await editor().locator('.cm-foldPlaceholder').count(), 1);
+      assert.equal(await sourceValue(), code, 'folding keeps the complete source');
+      assert.deepEqual(await state(), savedState, 'folding does not dirty source or change undo history');
+      // Fold the outer block after its child, then edit a visible line outside it.
+      await fold.first().click(); await frame();
+      assert.equal(await editor().locator('.cm-foldPlaceholder').count(), 1, 'parent fold hides nested marker');
+      const position = code.indexOf('外部节点'); await selectSource(position, position + '外部节点'.length); await source().focus();
+      await page.keyboard.insertText('折叠时编辑');
+      const edited = code.replace('外部节点', '折叠时编辑'); await save();
+      assert.equal(await sourceValue(), edited, 'editing beside folded text preserves hidden source');
+      await editor().locator('.cm-foldPlaceholder').first().click(); await frame();
+      if (await editor().locator('.cm-foldPlaceholder').count()) await editor().locator('.cm-foldPlaceholder').first().click();
+      assert.equal(await editor().locator('.cm-foldPlaceholder').count(), 0); assert.equal(await sourceValue(), edited);
+      await source().focus(); await page.keyboard.press('Control+z'); await frame();
+      assert.equal(await sourceValue(), code, 'keyboard undo remains connected to document history');
+      await selectSource(code.indexOf('A["'), code.indexOf('A["') + 1); await frame();
+      assert.ok(await editor().getByTestId('diagram-source-overlay').locator('[data-source-element-id]').count() > 0, 'cursor offsets still locate preview after comment and folding');
+      await capture('diagram-source-highlighting');
+      await source().fill(previous); diagramSaved = await save();
+    });
     await check('code-template-and-style-galleries-with-undo', async () => {
-      const before = await source().inputValue();
+      const before = await sourceValue();
       await editor().getByTestId('diagram-template-toggle').click(); assert.equal(await editor().locator('[data-template-id]').count(), 46);
       assert.equal(new Set(await editor().locator('[data-diagram-kind]').evaluateAll(nodes => nodes.map(node => node.dataset.diagramKind))).size, 22);
       await editor().getByRole('searchbox', { name: '搜索图表模板' }).fill('时序'); assert.ok(await editor().locator('[data-template-id]').count() > 0);
       await editor().locator('[data-template-id]').first().click(); await editor().getByTestId('diagram-confirm-template').click();
-      assert.notEqual(await source().inputValue(), before); await undo(); assert.equal(await source().inputValue(), before);
+      assert.notEqual(await sourceValue(), before); await undo(); assert.equal(await sourceValue(), before);
       await editor().getByTestId('diagram-style-toggle').click(); assert.equal(await editor().getByTestId('diagram-style-card').count(), 10);
       await editor().locator('[data-diagram-style="forest"]').click();
       if (await editor().getByTestId('diagram-style-panel').isVisible()) await editor().getByRole('button', { name: '完成', exact: true }).click();
-      assert.equal((await model()).diagramStyle, 'forest'); assert.equal(await source().inputValue(), before); await capture('diagram-light');
+      assert.equal((await model()).diagramStyle, 'forest'); assert.equal(await sourceValue(), before); await capture('diagram-light');
     });
     await check('source-errors-are-visible-and-editable-source-can-still-be-saved', async () => {
-      const valid = await source().inputValue(), invalid = 'flowchart LR\n  this is an invalid statement ???';
+      const valid = await sourceValue(), invalid = 'flowchart LR\n  this is an invalid statement ???';
       await source().fill(invalid); await editor().getByTestId('diagram-error').waitFor(); assert.equal(await source().getAttribute('aria-invalid'), 'true');
+      await editor().getByTestId('diagram-error').getByRole('button', { name: '定位到第 2 行' }).click();
+      const selectedError = await source().evaluate(element => { const api = element.closest('.diagram-source-editor').__vueParentComponent.exposed; return api.value.slice(api.selectionStart, api.selectionEnd); });
+      assert.equal(selectedError, invalid.split('\n')[1], 'error action selects the offending source line');
       const saved = await save(); assert.equal(JSON.parse(Buffer.from(saved.request.base64, 'base64')).source, invalid);
       assert.equal(await editor().getByTestId('diagram-export-image').isDisabled(), true);
-      await undo(); assert.equal(await source().inputValue(), valid); await editor().getByTestId('diagram-preview').waitFor();
+      await undo(); assert.equal(await sourceValue(), valid); await editor().getByTestId('diagram-preview').waitFor();
     });
     await check('unfinished-source-composition-blocks-export-without-losing-input', async () => {
-      const before = await model(), draft = 'flowchart LR\n  A[中文输入中] --> B[确认后保留]';
-      await source().focus(); await source().dispatchEvent('compositionstart');
-      await source().evaluate((element, value) => { element.value = value; element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertCompositionText', data: '中文输入中', isComposing: true })); }, draft);
+      const previous = await sourceValue(), baseline = 'flowchart LR\n  A[待输入] --> B[确认后保留]';
+      await source().fill(baseline); await save();
+      const before = await model(), composingText = '中文输入中', draft = baseline.replace('待输入', composingText);
+      await source().focus(); await selectSource(baseline.indexOf('待输入'), baseline.indexOf('待输入') + 3); await frame();
+      const ime = await context.newCDPSession(page);
+      await ime.send('Input.imeSetComposition', { text: composingText, selectionStart: composingText.length, selectionEnd: composingText.length }); await frame();
       const during = await page.evaluate(async () => { const a = document.querySelector('#app').__vue_app__._instance.setupState, h = a.workflowHandles.get(a.activeKey); let error = ''; try { await h.exportFile(); } catch(cause) { error = cause.message; } return { canExport: await h.canBackgroundExport(), error, state: await h.inspect() }; });
       assert.equal(during.canExport, false); assert.equal(during.state.dirty, true); assert.match(during.error, /输入法|输入/); assert.equal((await model()).source, before.source);
-      await source().dispatchEvent('compositionend'); await editor().getByRole('button', { name: '重置预览缩放' }).click(); await poll(async () => (await model()).source === draft, 'composition commits after confirmation');
-      await undo(); assert.equal(await source().inputValue(), before.source);
+      await ime.send('Input.insertText', { text: composingText }); await ime.detach(); await frame(); await editor().getByRole('button', { name: '重置预览缩放' }).click(); await poll(async () => (await model()).source === draft, 'composition commits after confirmation');
+      await undo(); assert.equal(await sourceValue(), before.source);
+      await source().fill(previous); await save();
     });
     await check('svg-and-png-export-use-host-save-without-retargeting-document', async () => {
       const before = await active();
@@ -271,7 +343,12 @@ async function saveAs(format, name) {
       await page.getByTestId('document-open-input').setInputFiles({ name: '多页图形.drawio', mimeType: 'application/xml', buffer: Buffer.from(xml) });
       await poll(async () => await page.locator('.document-tab').count() === before + 2, 'both XML pages become independent tabs'); await ready('canvas');
       const names = await page.locator('.document-tab .tab-name').allTextContents(); const imported = names.filter(name => name.includes('多页图形')); assert.equal(imported.length, 2);
-      for (const name of imported) { await switchTab(name.trim()); await ready('canvas'); assert.equal((await model()).scene.elements.length, 1); const saved = await save(); assert.equal(saved.request.extension, 'owflow'); assert.equal(saved.request.saveAs, true); }
+      for (const name of imported) {
+        await switchTab(name.trim()); await ready('canvas'); assert.equal((await model()).scene.elements.length, 1);
+        const count = (await saves()).length, saved = await save(), writes = (await saves()).slice(count);
+        assert.equal(saved.request.extension, 'owflow'); assert.equal(writes[0].request.saveAs, true); assert.equal(writes[0].request.documentId, undefined, 'import starts with a new file');
+        assert.ok(writes.slice(1).every(write => write.request.documentId === writes[0].document.id), 'title correction only writes the newly saved copy');
+      }
     });
     await check('invalid-import-leaves-current-document-and-tabs-intact', async () => {
       const before = await model(), count = await page.locator('.document-tab').count();
@@ -285,6 +362,27 @@ async function saveAs(format, name) {
       assert.equal(await page.getByTestId('workflow-editor').count(), count - 1); assert.equal((await active()).key, before.key); assert.deepEqual(await model(), currentModel);
       assert.equal(await page.evaluate(key => document.querySelector('#app').__vue_app__._instance.setupState.workflowHandles.has(key), inactive.key), false);
     });
+    await check('native-smoke-diagram-dom-input-saves-and-reopens', async () => {
+      await page.getByTestId('shell-new').click(); await page.getByTestId('shell-new-diagram').click(); await ready('diagram');
+      await save(); const before = await state();
+      const expected = 'flowchart LR\n  start[原生代码图表] --> done[本地保存与重开]';
+      const inputEvents = await source().evaluate(async (control, text) => {
+        const { inputDiagramSource } = await import('/src/workflow/native-smoke.ts');
+        let inputs = 0; const count = () => inputs++, mounted = control.closest('[data-testid="workflow-editor"]');
+        mounted.addEventListener('input', count);
+        try { inputDiagramSource(control, text); await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); }
+        finally { mounted.removeEventListener('input', count); }
+        return inputs;
+      }, expected);
+      assert.ok(inputEvents >= 1 && inputEvents <= 3, 'two-line contenteditable input may emit text, paragraph, text events');
+      await poll(async () => (await model()).source === expected, 'native smoke DOM edit reaches the document');
+      assert.ok((await state()).revision > before.revision); assert.equal((await active()).dirty, true);
+      assert.match(await editor().getByTestId('diagram-preview').textContent(), /原生代码图表.*本地保存与重开/);
+      const saved = await save(); assert.equal(JSON.parse(Buffer.from(saved.request.base64, 'base64')).source, expected);
+      await closeCurrent(); await openRecord(saved); assert.equal(await sourceValue(), expected);
+      const visible = await editor().evaluate(async mounted => { const { diagramSourceText } = await import('/src/workflow/native-smoke.ts'); return diagramSourceText(mounted); });
+      assert.equal(visible, expected, 'smoke readback reads the visible CodeMirror fixture'); await closeCurrent();
+    });
     await check('global-new-menu-opens-both-editor-types-and-close-cancels-unsaved-documents', async () => {
       for (const kind of ['canvas', 'diagram']) {
         const count = await page.getByTestId('workflow-editor').count(); await page.getByTestId('shell-new').click(); await page.getByTestId('shell-new-' + kind).click(); await ready(kind);
@@ -293,14 +391,14 @@ async function saveAs(format, name) {
         await closeCurrent(); assert.equal(await page.getByTestId('workflow-editor').count(), count);
       }
     });
-    await check('seven-home-cards-keep-long-recent-list-scroll-contained', async () => {
+    await check('nine-home-cards-keep-long-recent-list-scroll-contained', async () => {
       await page.evaluate(async () => { const a = document.querySelector('#app').__vue_app__._instance.setupState; window.__workflowQa.recents = Array.from({ length: 60 }, (_, i) => ({ id: 'recent-' + i, name: '本地画布记录' + i + '.owflow', extension: 'owflow', kind: i % 2 ? 'diagram' : 'canvas', lastOpenedAt: Date.now() })); await a.refreshRecents(); });
-      await goHome(); await page.setViewportSize({ width: 1280, height: 800 }); await frame(); assert.equal(await page.locator('.create-card').count(), 7);
+      await goHome(); await page.setViewportSize({ width: 1280, height: 800 }); await frame(); assert.equal(await page.locator('.create-card').count(), 9);
       const before = await page.evaluate(() => { const list = document.querySelector('.recent-list'); return { document: document.documentElement.scrollTop, windowY: scrollY, height: list.clientHeight, scrollHeight: list.scrollHeight }; });
       assert.ok(before.height > 100); assert.ok(before.scrollHeight > before.height);
       await page.locator('.recent-list').hover(); await page.mouse.wheel(0, 700); await frame();
       const after = await page.evaluate(() => ({ document: document.documentElement.scrollTop, windowY: scrollY, list: document.querySelector('.recent-list').scrollTop }));
-      assert.equal(after.document, before.document); assert.equal(after.windowY, before.windowY); assert.ok(after.list > 0); await capture('home-seven-apps-recent-list');
+      assert.equal(after.document, before.document); assert.equal(after.windowY, before.windowY); assert.ok(after.list > 0); await capture('home-nine-apps-recent-list');
     });
     assert.deepEqual(report.errors, []); assert.deepEqual(report.consoleErrors, []); assert.deepEqual(report.externalRequests, []);
     report.ok = true; report.finishedAt = new Date().toISOString();

@@ -31,6 +31,8 @@ Open Office 包含具有独立版权和许可的第三方软件。根目录 MIT 
 
 Vue 和 Tauri 的原始许可保留在 `public/legal/npm`、`public/legal/rust`。fflate 用于画布图形 XML 的压缩页面解码；pdf-lib 和外部 Python PDF 检查器只用于开发测试。npm、原生 Rust 及四个 WASM 宿主各有依赖索引，精确版本由锁文件确定；清单中的开发或可选项不代表它们都进入每个平台安装包。
 
+代码图表源码编辑器使用 [CodeMirror 6](https://codemirror.net/) 及 Lezer 等 MIT 许可依赖。新增依赖的原始许可、精确 npm 下载地址、完整性校验和许可摘要随应用保留，见[源码编辑器依赖清单](public/legal/diagram-editor-dependencies.json)。
+
 `craft-ui` 等真实共享依赖保持原始包名、固定提交和许可。其 git 来源不是可以随产品改名而伪造的 URL。各编辑器的依赖索引记录这些提交及对应声明。
 
 共用字体来源、逐文件摘要和原始许可在 `assets/fonts/open-office`、`assets/fonts/deck`、`assets/fonts/ui` 及各编辑器法律说明中。全部界面使用 Inter（OFL-1.1）与文泉驿微米黑（选择 Apache-2.0 许可）；文档字体配置保留原样。微米黑由上游 TTC 提取等比例字形面为 TTF，原始作者、发行说明和许可保存在 `public/legal/ui-fonts`。egui 默认字体另有 OFL、Ubuntu Font Licence、MIT/Bitstream Vera 等许可。PDF 技术 CMaps、标准字体及颜色配置保持各自原始许可。原创应用 SVG 图标采用项目 MIT 许可；用户文档中的内容不属于应用图标替换范围。
