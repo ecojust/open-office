@@ -1,0 +1,17 @@
+{
+  "name": "@codemirror/view",
+  "version": "6.43.15",
+  "repository": {
+    "type": "git",
+    "url": "git+https://code.haverbeke.berlin/codemirror/view.git"
+  },
+  "license": "MIT",
+  "resolved": "https://registry.npmjs.org/@codemirror/view/-/view-6.43.15.tgz",
+  "integrity": "sha512-HHsfpqFeHyXLs983pSRe38Xajs0vFWZQ2BuX0m7Ki8w3jZ5iD8cuR3lBz2/5/X53Dhf32SBHKh6rtSTB6tKeGw==",
+  "licenseFiles": [
+    {
+      "file": "LICENSE",
+      "sha256": "05c6130cda97e7600ca91427a41e8a065efcf82365fc0293e7de80faec494c07"
+    }
+  ]
+}

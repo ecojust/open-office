@@ -1608,7 +1608,15 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
     <aside v-show="!focusMode" class="sidebar" aria-label="全局导航" :inert="globalActionsBlocked">
       <button class="primary open-sidebar" @click="openFile" aria-label="打开文件" title="打开文件 · Ctrl / ⌘ O"><Icon name="folder"/><span>打开文件</span><kbd>⌘ / Ctrl O</kbd></button>
       <nav aria-label="工作区"><button :class="{selected:home}" :aria-current="home ? 'page' : undefined" aria-label="工作台" title="工作台" @click="home=true"><Icon name="home"/><span>工作台</span></button></nav>
-      <div v-if="tabs.length" v-show="home" class="sidebar-documents"><div class="sidebar-documents-heading"><span class="eyebrow">正在编辑 · {{tabs.length}}</span><button data-testid="home-close-all" @click="closeAllTabs" title="关闭所有打开的文档">全部关闭</button></div><button v-for="tab in tabs" :key="tab.key" :title="tab.document.name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button></div>
+      <div v-show="home" class="sidebar-files">
+        <div v-if="tabs.length" class="sidebar-documents"><div class="sidebar-documents-heading"><span class="eyebrow">正在编辑 · {{tabs.length}}</span><button data-testid="home-close-all" @click="closeAllTabs" title="关闭所有打开的文档">全部关闭</button></div><button v-for="tab in tabs" :key="tab.key" :title="tab.document.name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button></div>
+        <section class="recent-section sidebar-recents" aria-label="最近打开"><div class="section-heading"><h2>最近打开 <span>{{recents.length}}</span></h2></div><label class="search-box"><Icon name="search" :size="18"/><input v-model="search" placeholder="查找最近的文件" aria-label="查找最近的文件"/></label>
+          <div ref="recentList" class="recent-list" role="region" aria-label="最近打开的文件" tabindex="0">
+            <div v-if="!filteredRecents.length" class="empty-files"><strong>{{search?'没有找到匹配的文件':'还没有最近文件'}}</strong><p>{{native.isTauri()?'打开本机文件后可在这里继续编辑。':'桌面版可在这里保留最近打开的文件。'}}</p><button class="text-button" @click="openFile">打开一份文件 <Icon name="arrow" :size="16"/></button></div>
+            <template v-else><button v-for="item in filteredRecents" :key="item.id" class="recent-row" :title="item.name" @click="openRecent(item)"><span class="file-icon" :class="item.kind"><Icon :name="icons[item.kind]"/></span><span class="recent-name">{{item.name}}<small>{{kindNames[item.kind]}} · {{item.extension.toUpperCase()}}</small></span></button></template>
+          </div>
+        </section>
+      </div>
       <div class="sidebar-bottom" data-testid="global-appearance">
         <button class="brand" @click="home=true" aria-label="返回工作台" title="Open Office · 返回工作台"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
         <span class="sidebar-version" :title="'版本 '+appVersion+' · 构建 '+buildVersion">v{{appVersion}} · {{buildVersion}}</span>
@@ -1661,12 +1669,6 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
           <button class="create-card sheet" @click="newDocument('sheet')"><span class="document-art"><Icon name="sheet" :size="28"/></span><span class="card-bottom"><span><strong>电子表格</strong><small>数据整理与公式计算</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
           <button class="create-card presentation" @click="newDocument('presentation')"><span class="document-art"><Icon name="presentation" :size="28"/></span><span class="card-bottom"><span><strong>演示文稿</strong><small>幻灯片设计与演示</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
           <button class="create-card pdf" @click="newDocument('pdf')"><span class="document-art"><Icon name="pdf" :size="28"/></span><span class="card-bottom"><span><strong>PDF 工作室</strong><small>文字编辑、批注与页面整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
-        </section>
-        <section class="recent-section"><div class="section-heading"><h2>最近打开 <span>{{recents.length}}</span></h2><label class="search-box"><Icon name="search" :size="18"/><input v-model="search" placeholder="查找最近的文件" aria-label="查找最近的文件"/></label></div>
-          <div ref="recentList" class="recent-list" role="region" aria-label="最近打开的文件" tabindex="0">
-            <div v-if="!filteredRecents.length" class="empty-files"><div class="empty-icon"><Icon name="folder" :size="28"/></div><strong>{{search?'没有找到匹配的文件':'你的下一份作品，从这里开始'}}</strong><p>{{native.isTauri()?'打开本机文件后，可以在这里快速找到它。':'浏览器支持本地编辑和导出文件；桌面版还可直接保存到本机文件。'}}</p><button class="text-button" @click="openFile">打开一份文件 <Icon name="arrow" :size="16"/></button></div>
-            <template v-else><button v-for="item in filteredRecents" :key="item.id" class="recent-row" @click="openRecent(item)"><span class="file-icon" :class="item.kind"><Icon :name="icons[item.kind]"/></span><span class="recent-name">{{item.name}}<small>{{kindNames[item.kind]}} · {{item.extension.toUpperCase()}}</small></span><time>{{new Date(item.lastOpenedAt* (item.lastOpenedAt<1e12?1000:1)).toLocaleDateString('zh-CN')}}</time><Icon name="arrow" :size="18"/></button></template>
-          </div>
         </section>
         <footer class="home-footer"><span>笔记本 · 画布 · 代码图表 · 计划排期 · 日历便笺 · 文档 · 表格 · 演示 · PDF</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
       </main>

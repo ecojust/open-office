@@ -58,7 +58,10 @@ function validateDocument(report, kind) {
   const edit = report.editing, persistence = report.persistence, reopened = report.reopened;
   object(edit, `${kind} DOM edit`); object(persistence, `${kind} native persistence`); object(reopened, `${kind} reopen`);
   const text = kind === 'canvas' ? CANVAS_TEXT : DIAGRAM_SOURCE;
-  check(edit.text === text && edit.inputEvents === 1 && edit.doubleClickEvents === (kind === 'canvas' ? 1 : 0), `${kind} DOM edit evidence differs`);
+  // Contenteditable can aggregate the two-line insertText command into one
+  // event or emit text/newline/text separately. Canvas still uses one event.
+  const validInputEvents = kind === 'canvas' ? edit.inputEvents === 1 : Number.isSafeInteger(edit.inputEvents) && edit.inputEvents >= 1 && edit.inputEvents <= 3;
+  check(edit.text === text && validInputEvents && edit.doubleClickEvents === (kind === 'canvas' ? 1 : 0), `${kind} DOM edit evidence differs`);
   visibleText(edit.visibleText, kind);
   snapshot(edit.before, `${kind} blank`, false); snapshot(edit.after, `${kind} edited`, true);
   check(edit.before.revision === 0 && edit.after.documentId === edit.before.documentId && edit.after.revision >= (kind === 'canvas' ? 2 : 1), `${kind} input did not advance the same session`);

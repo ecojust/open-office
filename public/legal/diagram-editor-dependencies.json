@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "auditScope": "CodeMirror source editor dependencies added for Open Office 0.26.0; original npm dependency inventory remains separate.",
+  "packages": [
+    {
+      "name": "@codemirror/commands",
+      "version": "6.11.1",
+      "repository": {
+        "type": "git",
+        "url": "git+https://code.haverbeke.berlin/codemirror/commands.git"
+      },
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/@codemirror/commands/-/commands-6.11.1.tgz",
+      "integrity": "sha512-O/4hG3SC1YwcmQ0d2UVNDs+AsaNWd1iHVxbTeEBuqH+6bExAiPK3iS/BvpY6rZGURALv4ZD3sIgcCmRvw3ehBg==",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "05c6130cda97e7600ca91427a41e8a065efcf82365fc0293e7de80faec494c07"
+        }
+      ],
+      "path": "npm/@codemirror__commands@6.11.1"
+    },
+    {
+      "name": "@codemirror/language",
+      "version": "6.13.1",
+      "repository": {
+        "type": "git",
+        "url": "git+https://code.haverbeke.berlin/codemirror/language.git"
+      },
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/@codemirror/language/-/language-6.13.1.tgz",
+      "integrity": "sha512-zfvU2r3TyylQLMj/te+5CnQ0rSqZi8B1oTCBbQkagcLW4Xc6imab6qN+pEJhsuNOLaJqiRyBXp9UhWA1DhVvDw==",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "05c6130cda97e7600ca91427a41e8a065efcf82365fc0293e7de80faec494c07"
+        }
+      ],
+      "path": "npm/@codemirror__language@6.13.1"
+    },
+    {
+      "name": "@codemirror/state",
+      "version": "6.7.6",
+      "repository": {
+        "type": "git",
+        "url": "git+https://code.haverbeke.berlin/codemirror/state.git"
+      },
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/@codemirror/state/-/state-6.7.6.tgz",
+      "integrity": "sha512-kAz+AncRtKuIknedxT1bq4XwXv4UowhbkHU1myPrtVb/jZtImWuV5BXzv5vK6i3kYACsdiZiQKFQQ5Mq7elW8w==",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "05c6130cda97e7600ca91427a41e8a065efcf82365fc0293e7de80faec494c07"
+        }
+      ],
+      "path": "npm/@codemirror__state@6.7.6"
+    },
+    {
+      "name": "@codemirror/streamparser",
+      "version": "6.0.0",
+      "repository": {
+        "type": "git",
+        "url": "git+https://code.haverbeke.berlin/codemirror/streamparser.git"
+      },
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/@codemirror/streamparser/-/streamparser-6.0.0.tgz",
+      "integrity": "sha512-JTFPF6xrfjt0mnfGPgzcLiMwYmvIyNaoizp8BYzv8FE8KrT6GBGDZ190rtt+O7Wke3gG/MFHyiY9YGNeimof4w==",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "05c6130cda97e7600ca91427a41e8a065efcf82365fc0293e7de80faec494c07"
+        }
+      ],
+      "path": "npm/@codemirror__streamparser@6.0.0"
+    },
+    {
+      "name": "@codemirror/view",
+      "version": "6.43.15",
+      "repository": {
+        "type": "git",
+        "url": "git+https://code.haverbeke.berlin/codemirror/view.git"
+      },
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/@codemirror/view/-/view-6.43.15.tgz",
+      "integrity": "sha512-HHsfpqFeHyXLs983pSRe38Xajs0vFWZQ2BuX0m7Ki8w3jZ5iD8cuR3lBz2/5/X53Dhf32SBHKh6rtSTB6tKeGw==",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "05c6130cda97e7600ca91427a41e8a065efcf82365fc0293e7de80faec494c07"
+        }
+      ],
+      "path": "npm/@codemirror__view@6.43.15"
+    },
+    {
+      "name": "@lezer/common",
+      "version": "1.5.5",
+      "repository": {
+        "type": "git",
+        "url": "git+https://code.haverbeke.berlin/lezer/common.git"
+      },
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/@lezer/common/-/common-1.5.5.tgz",
+      "integrity": "sha512-Pw7PVCndruF1pb3ebCxpSVpkMHSDjwRCLcTRw+RizUKco5QbWylwq2g4lnG/RYN7yTTQDXE9F77MwtkAyphrjg==",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "568902fb66eaf1f11750e966b33fd7b5d7c618e65af09f35ef843635bcf5f1ba"
+        }
+      ],
+      "path": "npm/@lezer__common@1.5.5"
+    },
+    {
+      "name": "@lezer/highlight",
+      "version": "1.2.5",
+      "repository": {
+        "type": "git",
+        "url": "git+https://code.haverbeke.berlin/lezer/highlight.git"
+      },
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/@lezer/highlight/-/highlight-1.2.5.tgz",
+      "integrity": "sha512-O1GMVKgtf5YspFaRzpmqkVgMtIk2HG9uMAbH6wdAIdNh3TVzCsch/+cRi+6l2//UGDKe6NB9BW3cvuR5ezMQ0w==",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "568902fb66eaf1f11750e966b33fd7b5d7c618e65af09f35ef843635bcf5f1ba"
+        }
+      ],
+      "path": "npm/@lezer__highlight@1.2.5"
+    },
+    {
+      "name": "@lezer/lr",
+      "version": "1.4.12",
+      "repository": {
+        "type": "git",
+        "url": "git+https://code.haverbeke.berlin/lezer/lr.git"
+      },
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/@lezer/lr/-/lr-1.4.12.tgz",
+      "integrity": "sha512-On9HU4oMMiHPMkQDgoTnGahjgG5n/MkN38CgG77sMraKLL+3JBbeQNi1FcCXV9QRqwF9/BUXP3caHyJC1fBOTQ==",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "568902fb66eaf1f11750e966b33fd7b5d7c618e65af09f35ef843635bcf5f1ba"
+        }
+      ],
+      "path": "npm/@lezer__lr@1.4.12"
+    },
+    {
+      "name": "@marijn/find-cluster-break",
+      "version": "1.0.4",
+      "repository": {
+        "type": "git",
+        "url": "git+https://code.haverbeke.berlin/marijn/find-cluster-break.git"
+      },
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/@marijn/find-cluster-break/-/find-cluster-break-1.0.4.tgz",
+      "integrity": "sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "9360b00fdd091f05c783b568bdd46c679c41b72415599252de98949462ea1acb"
+        }
+      ],
+      "path": "npm/@marijn__find-cluster-break@1.0.4"
+    },
+    {
+      "name": "crelt",
+      "version": "1.0.7",
+      "repository": {
+        "type": "git",
+        "url": "git+https://code.haverbeke.berlin/marijn/crelt.git"
+      },
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/crelt/-/crelt-1.0.7.tgz",
+      "integrity": "sha512-aK6BbWfhf4U/wCcLHKPJl/xa6VkVstRaPywWtMKGwuOLc/wZTyQYuoxgvZnNsBvv7Kg3YTBQYYBCggcviQczuA==",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "23852ebf6aef7fadffc92514b3c5df163a8651f2c3ed0dbb494cb49d93bd5de5"
+        }
+      ],
+      "path": "npm/crelt@1.0.7"
+    },
+    {
+      "name": "style-mod",
+      "version": "4.1.4",
+      "repository": {
+        "type": "git",
+        "url": "git+https://code.haverbeke.berlin/marijn/style-mod.git"
+      },
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/style-mod/-/style-mod-4.1.4.tgz",
+      "integrity": "sha512-XXWIQt633/EpAFx8aZDOTjBzrCaGmhvEQlQo6MVPfa2OzO2cWo+4hV9h+6UkHYlXGfy+ODXKUdP7Pthmcu5ATw==",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "cb4474e26547397169061d3586c00022cda5330a1b64fa13e872319f3b63aff1"
+        }
+      ],
+      "path": "npm/style-mod@4.1.4"
+    },
+    {
+      "name": "w3c-keyname",
+      "version": "2.2.8",
+      "repository": {
+        "type": "git",
+        "url": "git+https://github.com/marijnh/w3c-keyname.git"
+      },
+      "license": "MIT",
+      "resolved": "https://registry.npmjs.org/w3c-keyname/-/w3c-keyname-2.2.8.tgz",
+      "integrity": "sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ==",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "869c30f368eb08735e779027b9f4bc9fea2f39624351856aebe42741f0bc0884"
+        }
+      ],
+      "path": "npm/w3c-keyname@2.2.8"
+    }
+  ]
+}

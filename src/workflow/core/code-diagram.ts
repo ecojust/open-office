@@ -5,6 +5,7 @@ import { compilePlanningDiagram } from './diagrams/planning.ts'
 import { DEFAULT_STYLE, type EdgeElement, type ElementStyle, type Scene, type SceneElement, type ShapeElement } from './types.ts'
 import { layoutScene } from './layout.ts'
 import { edgePoints } from './geometry.ts'
+import { maskHashComments } from './diagrams/comments.ts'
 
 /** Compile the supported diagram language into our editable scene model. */
 export type CodeDiagramResult = DiagramResult
@@ -574,7 +575,7 @@ function compileNormalized(source: string): CodeDiagramResult {
   if (typeof source !== 'string') throw new DiagramSyntaxError('源码必须是文本。', 1)
   if (source.length > 200_000) throw new DiagramSyntaxError('源码不能超过 200,000 个字符。', 1)
   // Sequence message text may contain punctuation/brackets, so only flowcharts use bracket-aware splitting.
-  const normalized = source
+  const normalized = maskHashComments(source)
   const first = normalized.split('\n').find(line => line.trim() && !/^\s*%%(?!\{)/.test(line))?.trim()
   if (!first) throw new DiagramSyntaxError('请输入图表源码，或从模板库选择一种图表。', 1)
   const extended = compileStructureDiagram(normalized) ?? compileChartDiagram(normalized) ?? compilePlanningDiagram(normalized)

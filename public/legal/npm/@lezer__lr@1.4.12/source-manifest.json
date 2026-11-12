@@ -1,0 +1,17 @@
+{
+  "name": "@lezer/lr",
+  "version": "1.4.12",
+  "repository": {
+    "type": "git",
+    "url": "git+https://code.haverbeke.berlin/lezer/lr.git"
+  },
+  "license": "MIT",
+  "resolved": "https://registry.npmjs.org/@lezer/lr/-/lr-1.4.12.tgz",
+  "integrity": "sha512-On9HU4oMMiHPMkQDgoTnGahjgG5n/MkN38CgG77sMraKLL+3JBbeQNi1FcCXV9QRqwF9/BUXP3caHyJC1fBOTQ==",
+  "licenseFiles": [
+    {
+      "file": "LICENSE",
+      "sha256": "568902fb66eaf1f11750e966b33fd7b5d7c618e65af09f35ef843635bcf5f1ba"
+    }
+  ]
+}

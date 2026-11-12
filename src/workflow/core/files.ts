@@ -20,7 +20,7 @@ function saveableImport(result: ImportResult): ImportResult {
 export function importText(name: string, text: string): ImportResult {
   if (new TextEncoder().encode(text).byteLength > MAX_FILE_BYTES) throw new Error('文件超过 50 MB。')
   const clean = text.replace(/^\uFEFF/, '').trim()
-  if (/\.(mmd|mermaid)$/i.test(name) || /^(?:%%[^\n]*\n\s*)*(?:flowchart|graph|sequenceDiagram)\b/.test(clean)) {
+  if (/\.(mmd|mermaid)$/i.test(name) || /^(?:(?:%%|#)[^\r\n]*(?:\r\n?|\n)\s*)*(?:flowchart|graph|sequenceDiagram)\b/.test(clean)) {
     const doc = createDocument('mermaid')
     doc.title = fileStem(name); doc.source = text
     if (text.length > 500000) throw new Error('图表源码超过 500000 字符。')

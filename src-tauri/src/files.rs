@@ -1483,9 +1483,9 @@ fn valid_graph_header(text: &str) -> bool {
 
 fn valid_code_header(text: &str) -> bool {
     let first = text
-        .lines()
+        .split(['\r', '\n'])
         .map(str::trim)
-        .find(|line| !line.is_empty() && !line.starts_with("%%"))
+        .find(|line| !line.is_empty() && !line.starts_with("%%") && !line.starts_with('#'))
         .unwrap_or("");
     [
         "flowchart",
@@ -2879,6 +2879,15 @@ mod tests {
     fn workflow_text_imports_and_images_have_distinct_open_and_export_contracts() {
         for (extension, bytes) in [
             (DocExt::Mmd, "%% 中文\nflowchart TD\n A-->B".as_bytes()),
+            (
+                DocExt::Mmd,
+                "# 中文注释\r\nflowchart TD # 说明\r\n A-->B".as_bytes(),
+            ),
+            (
+                DocExt::Mermaid,
+                "#注释\n%% 说明\nsequenceDiagram\n A->>B: text".as_bytes(),
+            ),
+            (DocExt::Mmd, "# 注释\rflowchart TD\r A-->B".as_bytes()),
             (DocExt::Mermaid, "sequenceDiagram\n A->>B: text".as_bytes()),
             (
                 DocExt::Drawio,
@@ -2907,6 +2916,9 @@ mod tests {
                 extension
             );
             assert!(validate_document_signature(b"<html>renamed</html>", extension).is_err());
+        }
+        for extension in [DocExt::Mmd, DocExt::Mermaid] {
+            assert!(validate_document_signature(b"# only comment", extension).is_err());
         }
         for extension in [DocExt::Drawio, DocExt::Xml] {
             for bytes in [

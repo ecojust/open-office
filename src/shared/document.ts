@@ -123,7 +123,7 @@ function validGraphHeader(text:string):boolean {
  return !/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(text)&&/^<(?:mxfile|mxGraphModel)(?:\s|\/?>)/.test(textWithoutProlog(text))
 }
 function validCodeHeader(text:string):boolean {
- const first=text.split(/\r?\n/).map(line=>line.trim()).find(line=>line&&!line.startsWith('%%'))??''
+ const first=text.split(/\r\n?|\n/).map(line=>line.trim()).find(line=>line&&!line.startsWith('%%')&&!line.startsWith('#'))??''
  return /^(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|gitGraph|requirementDiagram|C4Context|architecture(?:-beta)?|pie|gantt|xychart(?:-beta)?|quadrantChart|sankey(?:-beta)?|radar(?:-beta)?|treemap(?:-beta)?|mindmap|timeline|journey|kanban|block(?:-beta)?|packet(?:-beta)?)(?:\s|:|;|$)/.test(first)
 }
 /** Header screening only: the active editor validates the full package

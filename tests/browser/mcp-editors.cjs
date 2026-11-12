@@ -298,12 +298,12 @@ editorChecks.canvas = async () => {
   assert.equal(model.scene.elements.at(-1).text, text);
 };
 editorChecks.diagram = async () => {
-  const source = page.getByTestId('diagram-source'), before = await source.inputValue();
+  const source = page.getByTestId('diagram-source'), before = await source.evaluate(element => element.closest('.diagram-source-editor').__vueParentComponent.exposed.value);
   const after = 'sequenceDiagram\n  participant A as MCPClient\n  participant B as Document\n  A->>B: MCP_DIAGRAM_REAL_HTTP\n  B-->>A: Saved';
   await mcp('diagram_set_source', { source: after });
-  assert.equal(await source.inputValue(), after); assert.ok(JSON.stringify(await mcp('diagram_read_source')).includes('MCP_DIAGRAM_REAL_HTTP'));
+  assert.equal(await source.evaluate(element => element.closest('.diagram-source-editor').__vueParentComponent.exposed.value), after); assert.ok(JSON.stringify(await mcp('diagram_read_source')).includes('MCP_DIAGRAM_REAL_HTTP'));
   await poll(() => page.getByTestId('diagram-preview').textContent(), value => value.includes('MCP_DIAGRAM_REAL_HTTP'), 'MCP source update redraws actual SVG diagram');
-  await historyRoundTrip(() => source.inputValue(), before, after);
+  await historyRoundTrip(() => source.evaluate(element => element.closest('.diagram-source-editor').__vueParentComponent.exposed.value), before, after);
   const model = JSON.parse((await exported()).bytes.toString('utf8')); assert.equal(model.source, after);
 };
 
@@ -562,7 +562,7 @@ editingChecks.canvas = async () => {
 editingChecks.diagram = async () => {
   const source = 'sequenceDiagram\n  participant A as MCP\n  participant B as Editor\n  A->>B: MCP_DIAGRAM_UPDATED\n  B-->>A: 实时刷新';
   await mcp('diagram_update', { source, style: 'blueprint', title: 'MCP更新图表' });
-  assert.equal(await page.getByTestId('diagram-source').inputValue(), source);
+  assert.equal(await page.getByTestId('diagram-source').evaluate(element => element.closest('.diagram-source-editor').__vueParentComponent.exposed.value), source);
   await poll(() => page.getByTestId('diagram-preview').textContent(), value => value.includes('MCP_DIAGRAM_UPDATED'), 'MCP diagram settings and source rerender the SVG');
   const model = await call('inspectModel'); assert.equal(model.source, source); assert.equal(model.diagramStyle, 'blueprint'); assert.equal(model.title, 'MCP更新图表');
   const saved = JSON.parse((await exported('diagram-mcp-full-editing')).bytes.toString('utf8'));
