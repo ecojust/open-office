@@ -2,14 +2,16 @@
 import { nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import type { NativeDocument } from '../types'
 import type { Appearance } from '../shared/appearance'
+import { useI18n } from '../shared/i18n'
 import { bytesToBase64, type EditorExport, type Extension } from '../shared/document'
 import { printPdf, type PrintOutcome } from '../shared/printing'
-import { prepareRustPdfDocument, setRustPdfTheme, isPdfPendingDecisionCommand, type PreparedRustPdfDocument, type RustPdfSession } from '../pdf/rust/client'
+import { prepareRustPdfDocument, setRustPdfTheme, setRustPdfLocale, isPdfPendingDecisionCommand, type PreparedRustPdfDocument, type RustPdfSession } from '../pdf/rust/client'
 import type { OfficePdfFileAction, OfficePdfSnapshot } from '../pdf/rust/types'
 import { normalizePdfAuthor, pdfAuthorPreference } from '../pdf/author'
 import { useDialogFocus } from '../shared/dialog-focus'
 import Icon from './Icon.vue'
 
+const { locale, t } = useI18n()
 const props = withDefaults(defineProps<{ document: NativeDocument; prepared?: PreparedRustPdfDocument; active?: boolean; disabled?: boolean; theme?: Appearance; focusMode?: boolean }>(), { active: true, disabled: false, theme: 'system', focusMode: false })
 const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: OfficePdfFileAction] }>()
 const viewport = ref<HTMLElement>(), snapshot = shallowRef<OfficePdfSnapshot>()
@@ -169,6 +171,7 @@ async function load() {
     }
   }
 }
+watch(locale, value => { void setRustPdfLocale(value).catch(report) }, { immediate: true })
 watch(() => props.theme, value => { void setRustPdfTheme(value).catch(report) }, { immediate: true })
 watch(() => props.document.id, () => { opening = load() }, { immediate: true })
 watch(() => props.active, value => {
@@ -217,20 +220,20 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
 <template>
   <section class="rust-pdf-editor" data-testid="rust-pdf-editor" data-engine="office-pdf-wasm" :data-ready="!!snapshot && !loading" :data-session-id="snapshot?.sessionId" :data-revision="snapshot?.revision" :data-pages="snapshot?.pageCount" :data-dirty="snapshot?.dirty" :aria-busy="loading">
     <div v-show="!focusMode" class="pdf-author-bar">
-      <button class="pdf-author-button" type="button" :disabled="loading || disabled || !active" aria-label="设置图章署名" @click="editAuthor"><Icon name="pdf" :size="16" /><span>图章署名</span><strong :title="author || '未设置'">{{ author || '未设置' }}</strong><Icon name="chevron-down" :size="14" /></button>
-      <span class="pdf-author-hint">用于新图章和批注</span>
+      <button class="pdf-author-button" type="button" :disabled="loading || disabled || !active" :aria-label="t('设置图章署名')" @click="editAuthor"><Icon name="pdf" :size="16" /><span>{{ t('图章署名') }}</span><strong :title="author || t('未设置')">{{ author || t('未设置') }}</strong><Icon name="chevron-down" :size="14" /></button>
+      <span class="pdf-author-hint">{{ t('用于新图章和批注') }}</span>
     </div>
     <div ref="viewport" class="pdf-viewport" data-testid="pdf-viewport" />
-    <div v-if="loading" class="pdf-loading" role="status"><span class="pdf-spinner" />正在打开 PDF 文档…</div>
-    <p v-if="problem" class="pdf-error" role="alert">{{ problem }}</p>
+    <div v-if="loading" class="pdf-loading" role="status"><span class="pdf-spinner" />{{ t('正在打开 PDF 文档…') }}</div>
+    <p v-if="problem" class="pdf-error" role="alert">{{ t(problem) }}</p>
     <div v-if="authorDialog" class="pdf-author-backdrop" @keydown.esc.prevent="closeAuthor">
-      <form ref="authorForm" class="pdf-author-dialog" role="dialog" aria-modal="true" aria-label="图章署名" @submit.prevent="saveAuthor">
-        <h2>图章署名</h2>
-        <p>填写显示在动态图章和批注中的姓名。修改仅对之后添加的内容生效。</p>
-        <label>姓名或署名<input ref="authorInput" v-model="authorDraft" :disabled="authorSaving" :aria-invalid="!!authorError" aria-label="姓名或署名" autocomplete="off" placeholder="输入你的姓名，留空则不署名" @input="authorError = ''" /></label>
-        <small>设置保存在本机，所有 PDF 文档共用。</small>
-        <p v-if="authorError" class="pdf-author-error" role="alert">{{ authorError }}</p>
-        <div class="pdf-author-actions"><button type="button" :disabled="authorSaving" @click="closeAuthor">取消</button><button type="submit" :disabled="authorSaving || disabled" class="pdf-author-save">{{ authorSaving ? '正在保存…' : '保存署名' }}</button></div>
+      <form ref="authorForm" class="pdf-author-dialog" role="dialog" aria-modal="true" :aria-label="t('图章署名')" @submit.prevent="saveAuthor">
+        <h2>{{ t('图章署名') }}</h2>
+        <p>{{ t('填写显示在动态图章和批注中的姓名。修改仅对之后添加的内容生效。') }}</p>
+        <label>{{ t('姓名或署名') }}<input ref="authorInput" v-model="authorDraft" :disabled="authorSaving" :aria-invalid="!!authorError" :aria-label="t('姓名或署名')" autocomplete="off" :placeholder="t('输入你的姓名，留空则不署名')" @input="authorError = ''" /></label>
+        <small>{{ t('设置保存在本机，所有 PDF 文档共用。') }}</small>
+        <p v-if="authorError" class="pdf-author-error" role="alert">{{ t(authorError) }}</p>
+        <div class="pdf-author-actions"><button type="button" :disabled="authorSaving" @click="closeAuthor">{{ t('取消') }}</button><button type="submit" :disabled="authorSaving || disabled" class="pdf-author-save">{{ authorSaving ? t('正在保存…') : t('保存署名') }}</button></div>
       </form>
     </div>
   </section>

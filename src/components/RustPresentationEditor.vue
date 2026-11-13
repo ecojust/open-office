@@ -2,12 +2,14 @@
 import { nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import type { NativeDocument } from '../types'
 import type { Appearance } from '../shared/appearance'
+import { useI18n } from '../shared/i18n'
 import { bytesToBase64, type EditorExport, type Extension } from '../shared/document'
 import { printPdf, type PrintOutcome } from '../shared/printing'
-import { prepareRustPresentationDocument, setRustPresentationTheme, type PreparedRustPresentationDocument, type RustPresentationSession } from '../presentation/rust/client'
+import { prepareRustPresentationDocument, setRustPresentationTheme, setRustPresentationLocale, type PreparedRustPresentationDocument, type RustPresentationSession } from '../presentation/rust/client'
 import type { OfficePresentationEvent, OfficePresentationFileAction, OfficePresentationSnapshot } from '../presentation/rust/office-presentation-types'
 import { validatePresentationMedia } from '../presentation/rust/media'
 
+const { locale, t } = useI18n()
 const props = withDefaults(defineProps<{ document: NativeDocument; prepared?: PreparedRustPresentationDocument; active?: boolean; disabled?: boolean; theme?: Appearance; templatesOpen?: boolean }>(), { active: true, disabled: false, theme: 'system', templatesOpen: false })
 const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: OfficePresentationFileAction]; 'toggle-templates': [] }>()
 const viewport = ref<HTMLElement>(), snapshot = shallowRef<OfficePresentationSnapshot>()
@@ -177,6 +179,7 @@ async function load() {
     }
   }
 }
+watch(locale, value => { void setRustPresentationLocale(value).catch(report) }, { immediate: true })
 watch(() => props.theme, value => { void setRustPresentationTheme(value).catch(report) }, { immediate: true })
 watch(() => props.document.id, () => { opening = load() }, { immediate: true })
 watch(() => props.active, value => {
@@ -230,8 +233,8 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
   <section class="rust-presentation-editor" data-testid="rust-presentation-editor" data-engine="office-presentation-wasm" :data-ready="!!snapshot && !loading" :data-session-id="snapshot?.sessionId" :data-revision="snapshot?.revision" :data-slides="snapshot?.slides.length" :data-dirty="snapshot?.dirty" :aria-busy="loading">
     <div ref="viewport" class="office-presentation-viewport" data-testid="office-presentation-viewport" />
     <input ref="mediaInput" data-testid="office-presentation-media-input" type="file" accept=".png,.jpg,.jpeg" hidden @change="insertMedia" @cancel="cancelMedia" />
-    <div v-if="loading" class="office-presentation-loading" role="status"><span class="office-presentation-spinner" />正在打开演示文稿…</div>
-    <p v-if="problem" class="office-presentation-error" role="alert">{{ problem }}</p>
+    <div v-if="loading" class="office-presentation-loading" role="status"><span class="office-presentation-spinner" />{{ t('正在打开演示文稿…') }}</div>
+    <p v-if="problem" class="office-presentation-error" role="alert">{{ t(problem) }}</p>
   </section>
 </template>
 

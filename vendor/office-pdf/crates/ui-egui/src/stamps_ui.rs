@@ -134,7 +134,7 @@ impl OfficePdfApp {
     /// Create ▸ choose a PDF or an image for a new custom stamp.
     pub(crate) fn pick_stamp_file(&mut self) {
         if self.embedded {
-            self.notify("当前版本尚未接入自定义印章文件选择");
+            self.notify(tl!("Custom stamp file selection is not available in this version"));
             return;
         }
         #[cfg(not(target_arch = "wasm32"))]

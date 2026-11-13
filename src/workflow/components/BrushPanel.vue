@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { useI18n } from '../../shared/i18n'
 import AppIcon from './AppIcon.vue'
 import { BRUSH_PRESETS } from '../core/brushes'
 import { DEFAULT_STYLE, type BrushKind, type StrokeElement } from '../core/types'
 import { elementToSvg } from '../core/svg'
+
+const { t } = useI18n()
 
 export interface BrushSettings { kind: BrushKind; color: string; width: number; opacity: number; smoothing: number; pressure: boolean }
 const props = defineProps<{ settings: BrushSettings }>()
@@ -21,18 +24,18 @@ function numeric(event: Event, key: 'width' | 'opacity' | 'smoothing', min: numb
 </script>
 
 <template>
-  <section class="brush-panel" role="region" aria-label="笔触设置" data-testid="brush-settings-panel" @keydown.escape.stop="emit('close')">
-    <div class="brush-heading"><strong>自定义笔触</strong><span>用于接下来绘制的笔迹</span><button aria-label="关闭笔触设置" @click="emit('close')"><AppIcon name="close" :size="16" /></button></div>
-    <div class="brush-presets" role="group" aria-label="笔触类型">
-      <button v-for="preset in BRUSH_PRESETS" :key="preset.id" :aria-pressed="settings.kind === preset.id" :data-testid="`brush-${preset.id}`" @click="emit('choose', preset.id)"><svg viewBox="0 0 64 28" aria-hidden="true" v-html="preview(preset.id, preset.width)" /><span>{{ preset.label }}</span></button>
+  <section class="brush-panel" role="region" :aria-label="t('笔触设置')" data-testid="brush-settings-panel" @keydown.escape.stop="emit('close')">
+    <div class="brush-heading"><strong>{{ t('自定义笔触') }}</strong><span>{{ t('用于接下来绘制的笔迹') }}</span><button :aria-label="t('关闭笔触设置')" @click="emit('close')"><AppIcon name="close" :size="16" /></button></div>
+    <div class="brush-presets" role="group" :aria-label="t('笔触类型')">
+      <button v-for="preset in BRUSH_PRESETS" :key="preset.id" :aria-pressed="settings.kind === preset.id" :data-testid="`brush-${preset.id}`" @click="emit('choose', preset.id)"><svg viewBox="0 0 64 28" aria-hidden="true" v-html="preview(preset.id, preset.width)" /><span>{{ t(preset.label) }}</span></button>
     </div>
-    <div class="brush-colors" role="group" aria-label="画笔颜色"><button v-for="color in colors" :key="color" :style="{ background: color }" :aria-label="`画笔颜色 ${color}`" :aria-pressed="settings.color === color" :disabled="settings.kind === 'rainbow'" :data-testid="`brush-color-${color.slice(1)}`" @click="emit('change', { color })"><AppIcon v-if="settings.color === color" name="check" :size="14" :style="{ color: ['#ffffff', '#f4cb45'].includes(color) ? '#334155' : '#ffffff' }" /></button><input :disabled="settings.kind === 'rainbow'" aria-label="自定义画笔颜色" data-testid="brush-color" type="color" :value="settings.color" @input="emit('change', { color: ($event.target as HTMLInputElement).value })" /></div>
-    <div class="brush-setting"><label for="brush-width">粗细</label><input id="brush-width" data-testid="brush-width" type="number" min="1" max="100" step="0.5" :value="settings.width" @change="numeric($event, 'width', 1, 100)" /><span>px</span></div>
-    <div class="brush-setting"><label for="brush-opacity">不透明度</label><input id="brush-opacity" data-testid="brush-opacity" type="range" min="0.05" max="1" step="0.05" :value="settings.opacity" @input="numeric($event, 'opacity', .05, 1)" /><output for="brush-opacity">{{ Math.round(settings.opacity * 100) }}%</output></div>
-    <div class="brush-setting"><label for="brush-smoothing">平滑</label><input id="brush-smoothing" data-testid="brush-smoothing" type="range" min="0" max="1" step="0.1" :value="settings.smoothing" @input="numeric($event, 'smoothing', 0, 1)" /><output for="brush-smoothing">{{ settings.smoothing ? `${Math.round(settings.smoothing * 100)}%` : '关闭' }}</output></div>
-    <div class="brush-setting"><span id="brush-pressure-label">触笔压感</span><button class="brush-switch" role="switch" aria-labelledby="brush-pressure-label" :aria-checked="settings.pressure" data-testid="brush-pressure" @click="emit('change', { pressure: !settings.pressure })"><svg viewBox="0 0 32 18" width="32" height="18" aria-hidden="true"><rect x="1" y="1" width="30" height="16" rx="8" fill="currentColor" /><circle :cx="settings.pressure ? 23 : 9" cy="9" r="6" fill="white" /></svg></button></div>
-    <p>{{ settings.kind === 'rainbow' ? '彩虹笔沿轨迹变换颜色，支持触笔压感，不使用单色设置。' : '鼠标按稳定力度绘制；支持压感的触笔可随力度变化。' }}</p>
-    <button class="brush-start" data-testid="brush-start" @click="emit('start')"><AppIcon name="pen" :size="16" />开始绘制</button>
+    <div class="brush-colors" role="group" :aria-label="t('画笔颜色')"><button v-for="color in colors" :key="color" :style="{ background: color }" :aria-label="t('画笔颜色 {value0}', { value0: color })" :aria-pressed="settings.color === color" :disabled="settings.kind === 'rainbow'" :data-testid="`brush-color-${color.slice(1)}`" @click="emit('change', { color })"><AppIcon v-if="settings.color === color" name="check" :size="14" :style="{ color: ['#ffffff', '#f4cb45'].includes(color) ? '#334155' : '#ffffff' }" /></button><input :disabled="settings.kind === 'rainbow'" :aria-label="t('自定义画笔颜色')" data-testid="brush-color" type="color" :value="settings.color" @input="emit('change', { color: ($event.target as HTMLInputElement).value })" /></div>
+    <div class="brush-setting"><label for="brush-width">{{ t('粗细') }}</label><input id="brush-width" data-testid="brush-width" type="number" min="1" max="100" step="0.5" :value="settings.width" @change="numeric($event, 'width', 1, 100)" /><span>px</span></div>
+    <div class="brush-setting"><label for="brush-opacity">{{ t('不透明度') }}</label><input id="brush-opacity" data-testid="brush-opacity" type="range" min="0.05" max="1" step="0.05" :value="settings.opacity" @input="numeric($event, 'opacity', .05, 1)" /><output for="brush-opacity">{{ Math.round(settings.opacity * 100) }}%</output></div>
+    <div class="brush-setting"><label for="brush-smoothing">{{ t('平滑') }}</label><input id="brush-smoothing" data-testid="brush-smoothing" type="range" min="0" max="1" step="0.1" :value="settings.smoothing" @input="numeric($event, 'smoothing', 0, 1)" /><output for="brush-smoothing">{{ settings.smoothing ? `${Math.round(settings.smoothing * 100)}%` : t('已关闭') }}</output></div>
+    <div class="brush-setting"><span id="brush-pressure-label">{{ t('触笔压感') }}</span><button class="brush-switch" role="switch" aria-labelledby="brush-pressure-label" :aria-checked="settings.pressure" data-testid="brush-pressure" @click="emit('change', { pressure: !settings.pressure })"><svg viewBox="0 0 32 18" width="32" height="18" aria-hidden="true"><rect x="1" y="1" width="30" height="16" rx="8" fill="currentColor" /><circle :cx="settings.pressure ? 23 : 9" cy="9" r="6" fill="white" /></svg></button></div>
+    <p>{{ settings.kind === 'rainbow' ? t('彩虹笔沿轨迹变换颜色，支持触笔压感，不使用单色设置。') : t('鼠标按稳定力度绘制；支持压感的触笔可随力度变化。') }}</p>
+    <button class="brush-start" data-testid="brush-start" @click="emit('start')"><AppIcon name="pen" :size="16" />{{ t('开始绘制') }}</button>
   </section>
 </template>
 

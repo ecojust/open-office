@@ -41,17 +41,22 @@ fn same_pdf(url: &Url, expected: &Url) -> bool {
     without_fragment == *expected
 }
 
-fn preview_title(title: &str) -> String {
+fn preview_title(title: &str, english: bool) -> String {
     let title: String = title
         .chars()
         .filter(|ch| !ch.is_control())
         .take(120)
         .collect();
     let title = title.trim();
-    if title.is_empty() {
-        "打印预览 · 使用工具栏打印".into()
+    let hint = if english {
+        "Print preview · Use the toolbar to print"
     } else {
-        format!("{title} · 打印预览 · 使用工具栏打印")
+        "打印预览 · 使用工具栏打印"
+    };
+    if title.is_empty() {
+        hint.into()
+    } else {
+        format!("{title} · {hint}")
     }
 }
 
@@ -83,6 +88,7 @@ pub fn print_pdf(
     app: AppHandle,
     bytes: Vec<u8>,
     title: String,
+    english: bool,
 ) -> Result<super::PrintResult, String> {
     if app.get_webview_window("main").is_none() {
         return Err("文档窗口已关闭，打印已取消。".into());
@@ -106,8 +112,13 @@ pub fn print_pdf(
         .get_webview_window("main")
         .ok_or("文档窗口已关闭，打印已取消。")?;
     super::require_origin(&app, &main)?;
+    let print_failed_title = if english {
+        "Print preview · System printing did not open; use the toolbar"
+    } else {
+        "打印预览 · 系统打印未打开，请使用工具栏打印"
+    };
     let window = WebviewWindowBuilder::new(&app, label, WebviewUrl::External(url))
-        .title(preview_title(&title))
+        .title(preview_title(&title, english))
         .inner_size(1040.0, 800.0)
         .min_inner_size(640.0, 480.0)
         .focused(true)
@@ -128,13 +139,12 @@ pub fn print_pdf(
             if window
                 .with_webview(move |platform| {
                     if show_print_ui(platform).is_err() {
-                        let _ =
-                            failed_window.set_title("打印预览 · 系统打印未打开，请使用工具栏打印");
+                        let _ = failed_window.set_title(print_failed_title);
                     }
                 })
                 .is_err()
             {
-                let _ = window.set_title("打印预览 · 系统打印未打开，请使用工具栏打印");
+                let _ = window.set_title(print_failed_title);
             }
         })
         .build()
@@ -183,13 +193,17 @@ mod tests {
 
     #[test]
     fn preview_title_does_not_accept_control_characters_or_unbounded_names() {
-        assert_eq!(preview_title("\n\r\t"), "打印预览 · 使用工具栏打印");
+        assert_eq!(preview_title("\n\r\t", false), "打印预览 · 使用工具栏打印");
         assert_eq!(
-            preview_title(" 报告\n "),
+            preview_title(" 报告\n ", false),
             "报告 · 打印预览 · 使用工具栏打印"
         );
         assert_eq!(
-            preview_title(&"字".repeat(200))
+            preview_title(" 报告\n ", true),
+            "报告 · Print preview · Use the toolbar to print"
+        );
+        assert_eq!(
+            preview_title(&"字".repeat(200), false)
                 .chars()
                 .take_while(|ch| *ch == '字')
                 .count(),

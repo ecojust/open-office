@@ -91,7 +91,20 @@ export function blocksFromHtml(html: string): NoteBlock[] {
  if (html.length > 2 * 1024 * 1024) throw Error('粘贴内容过大，请分段粘贴。')
  return blocksFromDom(new DOMParser().parseFromString(html, 'text/html').body, false)
 }
-export function renderBlocks(document: Document, blocks: NoteBlock[], editable = true): DocumentFragment {
+type NoteTranslate = (source: string, params?: Record<string, string | number>) => string
+const sourceLabel: NoteTranslate = (source, params) => source.replace(/\{(\w+)\}/g, (match, key: string) => String(params?.[key] ?? match))
+
+/** Update only generated controls, preserving editable text, selection and undo history. */
+export function localizeNoteControls(root: ParentNode, translate: NoteTranslate) {
+ for (const checkbox of root.querySelectorAll<HTMLInputElement>('input[data-note-control="todo"]')) checkbox.setAttribute('aria-label', translate('标记待办完成'))
+ for (const button of root.querySelectorAll<HTMLButtonElement>('button[data-note-control="delete-image"]')) {
+  button.textContent = translate('删除图片')
+  const name = button.parentElement?.querySelector('img')?.alt
+  button.setAttribute('aria-label', name ? translate('删除图片：{name}', { name }) : translate('删除图片'))
+ }
+}
+
+export function renderBlocks(document: Document, blocks: NoteBlock[], editable = true, translate: NoteTranslate = sourceLabel): DocumentFragment {
  const fragment = document.createDocumentFragment()
  let list: HTMLElement | undefined, listType = ''
  for (const block of blocks) {
@@ -100,7 +113,7 @@ export function renderBlocks(document: Document, blocks: NoteBlock[], editable =
    const figure = document.createElement('figure'), image = document.createElement('img')
    figure.contentEditable = 'false'; image.src = block.dataUrl; image.alt = block.alt; image.dataset.noteId = block.id
    figure.append(image)
-   if (editable) { const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '删除图片'; remove.dataset.deleteImage = block.id; remove.setAttribute('aria-label', `删除图片${block.alt ? `：${block.alt}` : ''}`); figure.append(remove) }
+   if (editable) { const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = translate('删除图片'); remove.dataset.noteControl = 'delete-image'; remove.dataset.deleteImage = block.id; remove.setAttribute('aria-label', block.alt ? translate('删除图片：{name}', { name: block.alt }) : translate('删除图片')); figure.append(remove) }
    fragment.append(figure); continue
   }
   const listed = block.type === 'bullet' || block.type === 'numbered'
@@ -112,7 +125,7 @@ export function renderBlocks(document: Document, blocks: NoteBlock[], editable =
   } else { list = undefined; fragment.append(element) }
   if (block.type === 'todo') {
    element.dataset.noteType = 'todo'
-   const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = !!block.checked; checkbox.contentEditable = 'false'; checkbox.setAttribute('aria-label','标记待办完成'); checkbox.tabIndex = editable ? 0 : -1
+   const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = !!block.checked; checkbox.contentEditable = 'false'; checkbox.dataset.noteControl = 'todo'; checkbox.setAttribute('aria-label',translate('标记待办完成')); checkbox.tabIndex = editable ? 0 : -1
    element.append(checkbox)
   }
   for (const inline of block.content) {

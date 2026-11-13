@@ -22,6 +22,8 @@ async function screenshot(name) { await page.screenshot({ path: path.join(output
     const { createServer } = await import('vite');
     const harness = `import { createApp, h, ref } from 'vue';
       import Templates from '/src/components/PresentationTemplates.vue';
+      import { locale } from '/src/shared/i18n.ts';
+      window.__locale = locale;
       import { listPresentationTemplates, loadPresentationTemplate, savePresentationTemplate } from '/src/presentation/templates.ts';
       import '/src/style.css';
       const templates = await listPresentationTemplates();
@@ -94,6 +96,30 @@ async function screenshot(name) { await page.screenshot({ path: path.join(output
       await page.evaluate(() => { window.__disabled.value = true; document.documentElement.dataset.theme = 'dark'; }); await frame();
       assert.equal(await cards().first().getByRole('button').isDisabled(), true);
       await screenshot('dark-search');
+    });
+    await check('localized-builtins-search-without-translating-custom-names-or-changing-template-data', async () => {
+      await page.evaluate(() => {
+        window.__disabled.value = false;
+        window.__templates.find(value => value.source === 'custom').name = '蓝图商务';
+      });
+      await search().fill('');
+      const before = await page.evaluate(() => JSON.stringify(window.__templates));
+      await page.evaluate(() => { window.__locale.value = 'en'; }); await frame();
+      assert.equal(await page.getByRole('group', { name: 'Filter presentation templates' }).getByRole('button', { name: 'Built-in templates', exact: true }).isVisible(), true);
+      assert.equal(await page.locator('[data-testid="presentation-template-blueprint"] strong').textContent(), 'Blueprint Business');
+      const custom = page.locator('.presentation-template-details.has-delete');
+      assert.equal(await custom.locator('strong').textContent(), '蓝图商务');
+      assert.equal(await custom.locator('.presentation-template-description').textContent(), 'Saved from the current presentation');
+      const englishSearch = page.getByRole('searchbox', { name: 'Search template names' });
+      await englishSearch.fill('healthcare quality'); await frame();
+      assert.deepEqual(await cards().locator('strong').allTextContents(), ['Healthcare · Quality report']);
+      await cards().first().getByRole('button').click();
+      assert.deepEqual(await page.evaluate(() => window.__actions.at(-1)), ['select', 'health-report']);
+      await englishSearch.fill('医疗'); await frame(); assert.equal(await cards().count(), 5);
+      assert.equal(await page.evaluate(() => JSON.stringify(window.__templates)), before);
+      await page.evaluate(() => { window.__locale.value = 'zh-CN'; }); await frame();
+      assert.equal(await search().inputValue(), '医疗'); assert.equal(await cards().count(), 5);
+      assert.equal(await page.evaluate(() => JSON.stringify(window.__templates)), before);
     });
     assert.deepEqual(report.errors, []); report.ok = true; persist();
     console.log(`Presentation template search: ${report.checks.length} checks passed`);

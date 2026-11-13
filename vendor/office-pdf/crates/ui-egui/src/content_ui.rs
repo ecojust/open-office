@@ -693,7 +693,7 @@ impl crate::OfficePdfApp {
     /// Edit a PDF ▸ Add content ▸ Image: pick a file and place it in the middle of the current page.
     pub fn add_image_dialog(&mut self) {
         if self.embedded {
-            self.notify("当前版本尚未接入图片文件选择");
+            self.notify(tl!("Image file selection is not available in this version"));
             return;
         }
         #[cfg(not(target_arch = "wasm32"))]
@@ -705,7 +705,7 @@ impl crate::OfficePdfApp {
     /// Edit text & images ▸ Replace Image: pick a file to draw in a page image's place.
     pub(crate) fn replace_page_image_dialog(&mut self, page: usize, index: usize) {
         if self.embedded {
-            self.notify("当前版本尚未接入图片文件选择");
+            self.notify(tl!("Image file selection is not available in this version"));
             return;
         }
         #[cfg(not(target_arch = "wasm32"))]
@@ -726,7 +726,7 @@ impl crate::OfficePdfApp {
     /// Edit text & images ▸ Save Image As.
     pub(crate) fn save_page_image(&mut self, page: usize, index: usize) {
         if self.embedded {
-            self.notify("当前版本尚未接入图片导出");
+            self.notify(tl!("Image export is not available in this version"));
             return;
         }
         let Some((_, id)) = self.active_ids() else { return };
@@ -746,7 +746,7 @@ impl crate::OfficePdfApp {
     /// Copy Image: image `index` on `page`, at its own resolution, to the clipboard.
     pub(crate) fn copy_page_image(&mut self, page: usize, index: usize) -> bool {
         if self.embedded {
-            self.notify("当前版本尚未接入图片剪贴板");
+            self.notify(tl!("Image clipboard access is not available in this version"));
             return false;
         }
         let Some((_, id)) = self.active_ids() else { return false };
@@ -822,7 +822,7 @@ impl crate::OfficePdfApp {
     /// Click an image field: pick a picture for it.
     pub fn choose_field_image(&mut self, name: &str) {
         if self.embedded {
-            self.notify("当前版本尚未接入图片文件选择");
+            self.notify(tl!("Image file selection is not available in this version"));
             return;
         }
         #[cfg(not(target_arch = "wasm32"))]
@@ -839,7 +839,7 @@ impl crate::OfficePdfApp {
     /// Edit image ▸ Replace: pick a file for the selected image.
     pub fn replace_image_dialog(&mut self, page: usize, index: usize) {
         if self.embedded {
-            self.notify("当前版本尚未接入图片文件选择");
+            self.notify(tl!("Image file selection is not available in this version"));
             return;
         }
         #[cfg(not(target_arch = "wasm32"))]

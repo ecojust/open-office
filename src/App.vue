@@ -29,6 +29,7 @@ import { smokeAwait, smokeFailure, smokeFeatures, smokeRequested, smokeStage } f
 import type { NativeDocument, RecentDocument, SaveDocumentRequest, SaveResult } from './types'
 import { useDialogFocus } from './shared/dialog-focus'
 import { useAppearance } from './shared/appearance'
+import { useLocalePreference } from './shared/i18n'
 import { createId } from './shared/id'
 import { inspectOfficeWordSession, prepareRustWordDocument, type PreparedRustWordDocument } from './word/rust/client'
 import { inspectOfficeSheetSession, prepareRustSheetDocument, type PreparedRustSheetDocument } from './sheet/rust/client'
@@ -48,6 +49,7 @@ const appVersion = __APP_VERSION__
 const buildVersion = __BUILD_VERSION__
 const brandIcon = new URL('./brand-mark.png', document.baseURI).href
 const { appearance, effectiveAppearance } = useAppearance()
+const { locale, t, setLocale } = useLocalePreference()
 const appearanceOptions = [
   { value: 'light', icon: 'sun', label: '浅色主题' },
   { value: 'dark', icon: 'moon', label: '深色主题' },
@@ -1111,11 +1113,11 @@ const saveStateLabel=computed(()=>{
 })
 const saveStateTitle=computed(()=>{
   const tab=currentDocument.value
-  if(!tab)return '文件保存在本机'
-  if(saveStateLabel.value==='请先保存')return '请先点击保存，选择保存位置或完成格式转换，之后即可自动保存。'
-  if(saveStateLabel.value==='等待完成编辑')return '请确认当前单元格、文本框或弹窗中的编辑；自动保存会在完成后继续，当前输入不会被打断。'
-  if(!tab.dirty&&tab.autoSavedAt)return `${tab.document.name} · ${new Date(tab.autoSavedAt).toLocaleTimeString()} 已自动保存到本机`
-  return `${tab.document.name} · ${saveStateLabel.value}`
+  if(!tab)return t('文件保存在本机')
+  if(saveStateLabel.value==='请先保存')return t('请先点击保存，选择保存位置或完成格式转换，之后即可自动保存。')
+  if(saveStateLabel.value==='等待完成编辑')return t('请确认当前单元格、文本框或弹窗中的编辑；自动保存会在完成后继续，当前输入不会被打断。')
+  if(!tab.dirty&&tab.autoSavedAt)return t('{name} · {time} 已自动保存到本机', { name: tab.document.name, time: new Date(tab.autoSavedAt).toLocaleTimeString(locale.value) })
+  return `${tab.document.name} · ${t(saveStateLabel.value)}`
 })
 const autosave=createAutosaveScheduler({
   readState(){const tab=active.value;return {enabled:autosaveEnabled.value,native:native.isTauri(),key:tab?.key,fileId:tab?.fileId,
@@ -1605,98 +1607,99 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
   <div class="app-shell" :class="{'editing':!home,'focus-mode':focusMode}">
     <input ref="fileInput" data-testid="document-open-input" class="visually-hidden" type="file" accept=".docx,.xlsx,.csv,.tsv,.pptx,.potx,.ppsx,.pdf,.oonote,.ooschedule,.oocalendar,.owflow,.mmd,.mermaid,.drawio,.xml,.excalidraw,.json" @change="browserFile" />
     <input ref="scheduleImportInput" data-testid="schedule-import-input" class="visually-hidden" type="file" accept=".ooschedule,.json" @change="browserScheduleFile" />
-    <aside v-show="!focusMode" class="sidebar" aria-label="全局导航" :inert="globalActionsBlocked">
-      <button class="primary open-sidebar" @click="openFile" aria-label="打开文件" title="打开文件 · Ctrl / ⌘ O"><Icon name="folder"/><span>打开文件</span><kbd>⌘ / Ctrl O</kbd></button>
-      <nav aria-label="工作区"><button :class="{selected:home}" :aria-current="home ? 'page' : undefined" aria-label="工作台" title="工作台" @click="home=true"><Icon name="home"/><span>工作台</span></button></nav>
+    <aside v-show="!focusMode" class="sidebar" :aria-label="t('全局导航')" :inert="globalActionsBlocked">
+      <button class="primary open-sidebar" @click="openFile" :aria-label="t('打开文件')" :title="t('打开文件 · Ctrl / ⌘ O')"><Icon name="folder"/><span>{{t("打开文件")}}</span><kbd>⌘ / Ctrl O</kbd></button>
+      <nav :aria-label="t('工作区')"><button :class="{selected:home}" :aria-current="home ? 'page' : undefined" :aria-label="t('工作台')" :title="t('工作台')" @click="home=true"><Icon name="home"/><span>{{t("工作台")}}</span></button></nav>
       <div v-show="home" class="sidebar-files">
-        <div v-if="tabs.length" class="sidebar-documents"><div class="sidebar-documents-heading"><span class="eyebrow">正在编辑 · {{tabs.length}}</span><button data-testid="home-close-all" @click="closeAllTabs" title="关闭所有打开的文档">全部关闭</button></div><button v-for="tab in tabs" :key="tab.key" :title="tab.document.name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button></div>
-        <section class="recent-section sidebar-recents" aria-label="最近打开"><div class="section-heading"><h2>最近打开 <span>{{recents.length}}</span></h2></div><label class="search-box"><Icon name="search" :size="18"/><input v-model="search" placeholder="查找最近的文件" aria-label="查找最近的文件"/></label>
-          <div ref="recentList" class="recent-list" role="region" aria-label="最近打开的文件" tabindex="0">
-            <div v-if="!filteredRecents.length" class="empty-files"><strong>{{search?'没有找到匹配的文件':'还没有最近文件'}}</strong><p>{{native.isTauri()?'打开本机文件后可在这里继续编辑。':'桌面版可在这里保留最近打开的文件。'}}</p><button class="text-button" @click="openFile">打开一份文件 <Icon name="arrow" :size="16"/></button></div>
-            <template v-else><button v-for="item in filteredRecents" :key="item.id" class="recent-row" :title="item.name" @click="openRecent(item)"><span class="file-icon" :class="item.kind"><Icon :name="icons[item.kind]"/></span><span class="recent-name">{{item.name}}<small>{{kindNames[item.kind]}} · {{item.extension.toUpperCase()}}</small></span></button></template>
+        <div v-if="tabs.length" class="sidebar-documents"><div class="sidebar-documents-heading"><span class="eyebrow">{{t("正在编辑 ·")}} {{tabs.length}}</span><button data-testid="home-close-all" @click="closeAllTabs" :title="t('关闭所有打开的文档')">{{t("全部关闭")}}</button></div><button v-for="tab in tabs" :key="tab.key" :title="tab.document.name" @click="changeTab(tab)"><Icon :name="icons[tab.document.kind]"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button></div>
+        <section class="recent-section sidebar-recents" :aria-label="t('最近打开')"><div class="section-heading"><h2>{{t("最近打开")}} <span>{{recents.length}}</span></h2></div><label class="search-box"><Icon name="search" :size="18"/><input v-model="search" :placeholder="t('查找最近的文件')" :aria-label="t('查找最近的文件')"/></label>
+          <div ref="recentList" class="recent-list" role="region" :aria-label="t('最近打开的文件')" tabindex="0">
+            <div v-if="!filteredRecents.length" class="empty-files"><strong>{{search ? t("没有找到匹配的文件") : t("还没有最近文件")}}</strong><p>{{native.isTauri() ? t("打开本机文件后可在这里继续编辑。") : t("桌面版可在这里保留最近打开的文件。")}}</p><button class="text-button" @click="openFile">{{t("打开一份文件")}} <Icon name="arrow" :size="16"/></button></div>
+            <template v-else><button v-for="item in filteredRecents" :key="item.id" class="recent-row" :title="item.name" @click="openRecent(item)"><span class="file-icon" :class="item.kind"><Icon :name="icons[item.kind]"/></span><span class="recent-name">{{item.name}}<small>{{t(kindNames[item.kind])}} · {{item.extension.toUpperCase()}}</small></span></button></template>
           </div>
         </section>
       </div>
       <div class="sidebar-bottom" data-testid="global-appearance">
-        <button class="brand" @click="home=true" aria-label="返回工作台" title="Open Office · 返回工作台"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
-        <span class="sidebar-version" :title="'版本 '+appVersion+' · 构建 '+buildVersion">v{{appVersion}} · {{buildVersion}}</span>
-        <div class="sidebar-controls" role="group" aria-label="外观与设置">
-          <div class="theme-switch" role="group" aria-label="界面主题">
-            <button v-for="option in appearanceOptions" :key="option.value" :data-testid="'theme-'+option.value" :aria-label="option.label" :title="option.value==='system' && appearance==='system' ? '跟随系统（当前为'+(effectiveAppearance==='dark'?'深色':'浅色')+'）' : option.label" :aria-pressed="appearance===option.value" @click="appearance=option.value"><Icon :name="option.icon" :size="18"/></button>
+        <button class="brand" @click="home=true" :aria-label="t('返回工作台')" :title="t('Open Office · 返回工作台')"><img :src="brandIcon" alt="" /><span>Open <b>Office</b></span></button>
+        <span class="sidebar-version" :title="t('版本 ') + appVersion + t(' · 构建 ') + buildVersion">v{{appVersion}} · {{buildVersion}}</span>
+        <div class="sidebar-controls" role="group" :aria-label="t('外观与设置')">
+          <div class="appearance-controls"><div class="theme-switch" role="group" :aria-label="t('界面主题')">
+            <button v-for="option in appearanceOptions" :key="option.value" :data-testid="'theme-'+option.value" :aria-label="t(option.label)" :title="option.value === 'system' && appearance === 'system' ? t('跟随系统（当前为{theme}）', { theme: effectiveAppearance === 'dark' ? t('深色') : t('浅色') }) : t(option.label)" :aria-pressed="appearance===option.value" @click="appearance=option.value"><Icon :name="option.icon" :size="18"/></button>
           </div>
-          <button class="icon-button" data-testid="mcp-settings" @click="openMcpSettings" aria-label="MCP 设置" title="全局 MCP 设置" aria-haspopup="dialog" :aria-expanded="mcpSettingsOpen"><Icon name="link" :size="18"/></button>
-          <button class="icon-button" @click="help=true" aria-label="使用说明" :title="'使用说明 · '+buildVersion" aria-haspopup="dialog" :aria-expanded="help"><Icon name="info" :size="18"/></button>
+          <button class="language-toggle" data-testid="language-toggle" type="button" :aria-label="locale === 'zh-CN' ? 'Switch to English' : '切换到中文'" :title="locale === 'zh-CN' ? 'Switch to English' : '切换到中文'" @click="setLocale(locale === 'zh-CN' ? 'en' : 'zh-CN')"><span :class="{selected:locale === 'zh-CN'}" lang="zh-CN">中</span><span class="language-divider" aria-hidden="true">/</span><span :class="{selected:locale === 'en'}" lang="en">EN</span></button></div>
+          <button class="icon-button" data-testid="mcp-settings" @click="openMcpSettings" :aria-label="t('MCP 设置')" :title="t('全局 MCP 设置')" aria-haspopup="dialog" :aria-expanded="mcpSettingsOpen"><Icon name="link" :size="18"/></button>
+          <button class="icon-button" @click="help=true" :aria-label="t('使用说明')" :title="t('使用说明 · ') + buildVersion" aria-haspopup="dialog" :aria-expanded="help"><Icon name="info" :size="18"/></button>
         </div>
       </div>
     </aside>
     <header v-show="!focusMode" class="titlebar" data-testid="global-toolbar" :inert="globalActionsBlocked">
-      <nav class="global-file-toolbar" aria-label="全局文件操作">
+      <nav class="global-file-toolbar" :aria-label="t('全局文件操作')">
         <details ref="newMenu" class="new-document-menu" @keydown.esc.stop.prevent="closeNewMenu(true)">
-          <summary data-testid="shell-new" aria-label="新建文档" title="新建文档 · Ctrl / ⌘ N"><Icon name="plus" :size="18"/><span class="file-action-label">新建</span><Icon name="chevron-down" :size="12"/></summary>
-          <div class="new-document-options" role="group" aria-label="选择新建文档类型">
-            <button v-for="kind in (['note','canvas','diagram','schedule','calendar','word','sheet','presentation','pdf'] as const)" :key="kind" :data-testid="'shell-new-'+kind" @click="globalNewDocument(kind)"><Icon :name="icons[kind]" :size="18"/><span>{{kindNames[kind]}}</span></button>
+          <summary data-testid="shell-new" :aria-label="t('新建文档')" :title="t('新建文档 · Ctrl / ⌘ N')"><Icon name="plus" :size="18"/><span class="file-action-label">{{t("新建")}}</span><Icon name="chevron-down" :size="12"/></summary>
+          <div class="new-document-options" role="group" :aria-label="t('选择新建文档类型')">
+            <button v-for="kind in (['note','canvas','diagram','schedule','calendar','word','sheet','presentation','pdf'] as const)" :key="kind" :data-testid="'shell-new-'+kind" @click="globalNewDocument(kind)"><Icon :name="icons[kind]" :size="18"/><span>{{t(kindNames[kind])}}</span></button>
           </div>
         </details>
         <div class="global-file-actions">
-          <button data-testid="shell-open" @click="globalFileAction('open')" title="打开文件 · Ctrl / ⌘ O" aria-label="打开文件"><Icon name="folder" :size="18"/><span class="file-action-label">打开</span></button>
+          <button data-testid="shell-open" @click="globalFileAction('open')" :title="t('打开文件 · Ctrl / ⌘ O')" :aria-label="t('打开文件')"><Icon name="folder" :size="18"/><span class="file-action-label">{{t("打开")}}</span></button>
           <span class="separator"/>
-          <button data-testid="shell-save" :disabled="documentActionsDisabled" @click="globalFileAction('save')" title="保存当前文档 · Ctrl / ⌘ S" aria-label="保存当前文档"><Icon name="save" :size="18"/><span class="file-action-label">保存</span></button>
-          <button data-testid="shell-autosave" class="autosave-toggle" role="switch" :aria-checked="native.isTauri()&&autosaveEnabled" :disabled="!native.isTauri()" :title="autosaveTitle" aria-label="自动保存" :aria-describedby="autosaveCountdown ? 'autosave-timing' : undefined" @click="autosaveEnabled=!autosaveEnabled"><span class="autosave-track" :class="{enabled:native.isTauri()&&autosaveEnabled}"><i/></span><span class="autosave-label">自动保存</span><span v-if="autosaveCountdown" id="autosave-timing" data-testid="autosave-countdown" class="autosave-countdown" role="timer" aria-live="off">{{autosaveCountdown}}</span></button>
-          <button data-testid="shell-save-as" :disabled="documentActionsDisabled" @click="globalFileAction('saveAs')" title="当前文档另存为 · Ctrl / ⌘ Shift S" aria-label="当前文档另存为"><Icon name="save-as" :size="18"/><span class="file-action-label">另存为</span></button>
-          <button data-testid="shell-export-pdf" :disabled="documentActionsDisabled||currentDocument?.document.kind==='pdf'||!formatsFor(currentDocument).some(option=>option.extension==='pdf')" @click="globalFileAction('exportPdf')" title="导出当前文档为 PDF" aria-label="导出当前文档为 PDF"><Icon name="download" :size="18"/><span class="file-action-label">导出 PDF</span></button>
-          <button data-testid="shell-print" :disabled="printDisabled" @click="globalFileAction('print')" :title="printDisabled ? '请等待可打印的文档就绪' : '打印当前文档 · Ctrl / ⌘ P'" aria-label="打印当前文档"><Icon name="print" :size="18"/><span class="file-action-label">打印</span></button>
+          <button data-testid="shell-save" :disabled="documentActionsDisabled" @click="globalFileAction('save')" :title="t('保存当前文档 · Ctrl / ⌘ S')" :aria-label="t('保存当前文档')"><Icon name="save" :size="18"/><span class="file-action-label">{{t("保存")}}</span></button>
+          <button data-testid="shell-autosave" class="autosave-toggle" role="switch" :aria-checked="native.isTauri()&&autosaveEnabled" :disabled="!native.isTauri()" :title="t(autosaveTitle)" :aria-label="t('自动保存')" :aria-describedby="autosaveCountdown ? 'autosave-timing' : undefined" @click="autosaveEnabled=!autosaveEnabled"><span class="autosave-track" :class="{enabled:native.isTauri()&&autosaveEnabled}"><i/></span><span class="autosave-label">{{t("自动保存")}}</span><span v-if="autosaveCountdown" id="autosave-timing" data-testid="autosave-countdown" class="autosave-countdown" role="timer" aria-live="off">{{t(autosaveCountdown)}}</span></button>
+          <button data-testid="shell-save-as" :disabled="documentActionsDisabled" @click="globalFileAction('saveAs')" :title="t('当前文档另存为 · Ctrl / ⌘ Shift S')" :aria-label="t('当前文档另存为')"><Icon name="save-as" :size="18"/><span class="file-action-label">{{t("另存为")}}</span></button>
+          <button data-testid="shell-export-pdf" :disabled="documentActionsDisabled||currentDocument?.document.kind==='pdf'||!formatsFor(currentDocument).some(option=>option.extension==='pdf')" @click="globalFileAction('exportPdf')" :title="t('导出当前文档为 PDF')" :aria-label="t('导出当前文档为 PDF')"><Icon name="download" :size="18"/><span class="file-action-label">{{t("导出 PDF")}}</span></button>
+          <button data-testid="shell-print" :disabled="printDisabled" @click="globalFileAction('print')" :title="printDisabled ? t('请等待可打印的文档就绪') : t('打印当前文档 · Ctrl / ⌘ P')" :aria-label="t('打印当前文档')"><Icon name="print" :size="18"/><span class="file-action-label">{{t("打印")}}</span></button>
           <span class="separator"/>
-          <button :disabled="documentActionsDisabled" @click="globalFileAction('undo')" title="撤销" aria-label="撤销"><Icon name="undo" :size="18"/></button>
-          <button :disabled="documentActionsDisabled" @click="globalFileAction('redo')" title="重做" aria-label="重做"><Icon name="redo" :size="18"/></button>
+          <button :disabled="documentActionsDisabled" @click="globalFileAction('undo')" :title="t('撤销')" :aria-label="t('撤销')"><Icon name="undo" :size="18"/></button>
+          <button :disabled="documentActionsDisabled" @click="globalFileAction('redo')" :title="t('重做')" :aria-label="t('重做')"><Icon name="redo" :size="18"/></button>
         </div>
       </nav>
-      <span class="titlebar-context" :title="currentDocument?.document.name">{{currentDocument?.document.name || '工作台'}}</span>
+      <span class="titlebar-context" :title="currentDocument?.document.name">{{currentDocument?.document.name || t("工作台")}}</span>
       <div class="titlebar-right">
-        <span class="save-state" data-testid="global-save-state" role="status" aria-live="polite" :title="saveStateTitle"><i v-if="currentDocument?.dirty" class="dirty-dot"/>{{saveStateLabel}}</span>
-        <button v-if="currentDocument" ref="focusEnterButton" class="focus-mode-button" data-testid="shell-focus-enter" :disabled="documentActionsDisabled" title="全屏编辑 · 隐藏导航与全局设置，扩大操作空间" @click="setFocusMode(true)"><Icon name="expand" :size="17"/><span>全屏编辑</span></button>
+        <span class="save-state" data-testid="global-save-state" role="status" aria-live="polite" :title="saveStateTitle"><i v-if="currentDocument?.dirty" class="dirty-dot"/>{{t(saveStateLabel)}}</span>
+        <button v-if="currentDocument" ref="focusEnterButton" class="focus-mode-button" data-testid="shell-focus-enter" :disabled="documentActionsDisabled" :title="t('全屏编辑 · 隐藏导航与全局设置，扩大操作空间')" @click="setFocusMode(true)"><Icon name="expand" :size="17"/><span>{{t("全屏编辑")}}</span></button>
       </div>
     </header>
     <div v-show="home" class="workspace" :inert="globalActionsBlocked">
       <main class="home-main">
-        <div class="home-heading"><div><span class="eyebrow">本地工作空间</span><h1>工作台</h1><p>新建一份文档，或继续编辑本机文件。</p></div></div>
-        <section class="create-grid" aria-label="新建文件">
-          <button class="create-card note" data-testid="home-new-note" @click="newDocument('note')"><span class="document-art"><Icon name="notebook" :size="28"/></span><span class="card-bottom"><span><strong>笔记本</strong><small>分区与页面、灵感记录和待办</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
-          <button class="create-card canvas" data-testid="home-new-canvas" @click="newDocument('canvas')"><span class="document-art"><Icon name="canvas" :size="28"/></span><span class="card-bottom"><span><strong>画布</strong><small>流程连线、自由绘制与灵感整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
-          <button class="create-card diagram" data-testid="home-new-diagram" @click="newDocument('diagram')"><span class="document-art"><Icon name="code-diagram" :size="28"/></span><span class="card-bottom"><span><strong>代码图表</strong><small>代码绘图、实时预览与图表模板</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
-          <button class="create-card schedule" data-testid="home-new-schedule" @click="newDocument('schedule')"><span class="document-art"><Icon name="schedule" :size="28"/></span><span class="card-bottom"><span><strong>计划排期</strong><small>项目日历、角色分工与事件安排</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
-          <button class="create-card calendar" data-testid="home-new-calendar" @click="newDocument('calendar')"><span class="document-art"><Icon name="schedule" :size="28"/></span><span class="card-bottom"><span><strong>日历便笺</strong><small>农历节假日、事项与历史复用</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
-          <button class="create-card word" @click="newDocument('word')"><span class="document-art"><Icon name="file" :size="28"/></span><span class="card-bottom"><span><strong>文字文档</strong><small>文字排版、表格与图片编辑</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
-          <button class="create-card sheet" @click="newDocument('sheet')"><span class="document-art"><Icon name="sheet" :size="28"/></span><span class="card-bottom"><span><strong>电子表格</strong><small>数据整理与公式计算</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
-          <button class="create-card presentation" @click="newDocument('presentation')"><span class="document-art"><Icon name="presentation" :size="28"/></span><span class="card-bottom"><span><strong>演示文稿</strong><small>幻灯片设计与演示</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
-          <button class="create-card pdf" @click="newDocument('pdf')"><span class="document-art"><Icon name="pdf" :size="28"/></span><span class="card-bottom"><span><strong>PDF 工作室</strong><small>文字编辑、批注与页面整理</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+        <div class="home-heading"><div><span class="eyebrow">{{t("本地工作空间")}}</span><h1>{{t("工作台")}}</h1><p>{{t("新建一份文档，或继续编辑本机文件。")}}</p></div></div>
+        <section class="create-grid" :aria-label="t('新建文件')">
+          <button class="create-card note" data-testid="home-new-note" @click="newDocument('note')"><span class="document-art"><Icon name="notebook" :size="28"/></span><span class="card-bottom"><span><strong>{{t("笔记本")}}</strong><small>{{t("分区与页面、灵感记录和待办")}}</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card canvas" data-testid="home-new-canvas" @click="newDocument('canvas')"><span class="document-art"><Icon name="canvas" :size="28"/></span><span class="card-bottom"><span><strong>{{t("画布")}}</strong><small>{{t("流程连线、自由绘制与灵感整理")}}</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card diagram" data-testid="home-new-diagram" @click="newDocument('diagram')"><span class="document-art"><Icon name="code-diagram" :size="28"/></span><span class="card-bottom"><span><strong>{{t("代码图表")}}</strong><small>{{t("代码绘图、实时预览与图表模板")}}</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card schedule" data-testid="home-new-schedule" @click="newDocument('schedule')"><span class="document-art"><Icon name="schedule" :size="28"/></span><span class="card-bottom"><span><strong>{{t("计划排期")}}</strong><small>{{t("项目日历、角色分工与事件安排")}}</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card calendar" data-testid="home-new-calendar" @click="newDocument('calendar')"><span class="document-art"><Icon name="schedule" :size="28"/></span><span class="card-bottom"><span><strong>{{t("日历便笺")}}</strong><small>{{t("农历节假日、事项与历史复用")}}</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card word" @click="newDocument('word')"><span class="document-art"><Icon name="file" :size="28"/></span><span class="card-bottom"><span><strong>{{t("文字文档")}}</strong><small>{{t("文字排版、表格与图片编辑")}}</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card sheet" @click="newDocument('sheet')"><span class="document-art"><Icon name="sheet" :size="28"/></span><span class="card-bottom"><span><strong>{{t("电子表格")}}</strong><small>{{t("数据整理与公式计算")}}</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card presentation" @click="newDocument('presentation')"><span class="document-art"><Icon name="presentation" :size="28"/></span><span class="card-bottom"><span><strong>{{t("演示文稿")}}</strong><small>{{t("幻灯片设计与演示")}}</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
+          <button class="create-card pdf" @click="newDocument('pdf')"><span class="document-art"><Icon name="pdf" :size="28"/></span><span class="card-bottom"><span><strong>{{t("PDF 工作室")}}</strong><small>{{t("文字编辑、批注与页面整理")}}</small></span><span class="card-plus"><Icon name="plus" :size="18"/></span></span></button>
         </section>
-        <footer class="home-footer"><span>笔记本 · 画布 · 代码图表 · 计划排期 · 日历便笺 · 文档 · 表格 · 演示 · PDF</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
+        <footer class="home-footer"><span>{{t("笔记本 · 画布 · 代码图表 · 计划排期 · 日历便笺 · 文档 · 表格 · 演示 · PDF")}}</span><span>OPEN OFFICE · {{new Date().getFullYear()}}</span></footer>
       </main>
     </div>
     <section v-show="!home" class="editor-workspace" :inert="editorInputBlocked">
       <div v-if="focusMode" class="editor-focus-bar" data-testid="editor-focus-bar" :inert="globalActionsBlocked">
         <span class="focus-document-name" :title="currentDocument?.document.name">{{currentDocument?.document.name}}</span>
-        <span class="save-state" role="status" aria-live="polite" :title="saveStateTitle"><i v-if="currentDocument?.dirty" class="dirty-dot"/>{{saveStateLabel}}</span>
-        <button ref="focusExitButton" class="focus-mode-button" data-testid="shell-focus-exit" :disabled="globalActionsBlocked" title="退出全屏编辑，恢复导航与设置" @click="setFocusMode(false)"><Icon name="collapse" :size="16"/><span>退出全屏</span></button>
+        <span class="save-state" role="status" aria-live="polite" :title="saveStateTitle"><i v-if="currentDocument?.dirty" class="dirty-dot"/>{{t(saveStateLabel)}}</span>
+        <button ref="focusExitButton" class="focus-mode-button" data-testid="shell-focus-exit" :disabled="globalActionsBlocked" :title="t('退出全屏编辑，恢复导航与设置')" @click="setFocusMode(false)"><Icon name="collapse" :size="16"/><span>{{t("退出全屏")}}</span></button>
       </div>
       <div v-show="!focusMode" class="tab-strip" :inert="globalActionsBlocked">
-        <button class="home-tab" @click="home=true" aria-label="工作台" title="工作台"><Icon name="home" :size="18"/></button>
+        <button class="home-tab" @click="home=true" :aria-label="t('工作台')" :title="t('工作台')"><Icon name="home" :size="18"/></button>
         <div ref="tabBar" class="tab-bar">
-          <div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" :title="tab.document.name+' · 双击修改名称'" @click="changeTab(tab)" @dblclick.stop.prevent="openRename(tab)" @keydown.f2.stop.prevent="openRename(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="`关闭 ${tab.document.name}`"><Icon name="close" :size="14"/></button></div>
+          <div v-for="tab in tabs" :key="tab.key" class="document-tab" :class="{active:activeKey===tab.key}" role="tab" :aria-selected="activeKey===tab.key"><button class="tab-name" :title="tab.document.name + t(' · 双击修改名称')" @click="changeTab(tab)" @dblclick.stop.prevent="openRename(tab)" @keydown.f2.stop.prevent="openRename(tab)"><Icon :name="icons[tab.document.kind]" :size="16"/><span>{{tab.document.name}}</span><i v-if="tab.dirty" class="dirty-dot"/></button><button class="tab-close" @click="closeTab(tab)" :aria-label="t('关闭 {p0}', { p0: tab.document.name })"><Icon name="close" :size="14"/></button></div>
         </div>
-        <button class="new-tab" @click="home=true" aria-label="新建文档" title="新建文档"><Icon name="plus" :size="18"/></button>
-        <button class="close-all-tabs" data-testid="tabs-close-all" :disabled="globalActionsBlocked||!tabs.length" @click="closeAllTabs" title="批量关闭所有文档"><Icon name="close" :size="15"/><span>全部关闭</span></button>
+        <button class="new-tab" @click="home=true" :aria-label="t('新建文档')" :title="t('新建文档')"><Icon name="plus" :size="18"/></button>
+        <button class="close-all-tabs" data-testid="tabs-close-all" :disabled="globalActionsBlocked||!tabs.length" @click="closeAllTabs" :title="t('批量关闭所有文档')"><Icon name="close" :size="15"/><span>{{t("全部关闭")}}</span></button>
       </div>
-      <div v-if="currentDocument" v-show="!focusMode" class="document-mcp-bar" role="toolbar" :aria-label="kindNames[currentDocument.document.kind]+' MCP 服务'">
-        <span class="document-mcp-kind"><Icon :name="icons[currentDocument.document.kind]" :size="14"/>{{kindNames[currentDocument.document.kind]}}<small>当前文档</small></span>
-        <span v-if="mcpState.phase==='running'" class="document-mcp-detail" role="status">{{mcpWorking?'正在处理…':'修改实时显示 · 切换文档后关闭'}}</span>
-        <button v-if="mcpConfigReady" class="document-mcp-permission" data-testid="document-mcp-permission" :disabled="globalActionsBlocked" aria-label="MCP 读写权限设置" :title="mcpConfig.allowEdits?'已开放当前文档编辑，点击调整权限':'当前仅提供读取工具；点击设置中开启编辑权限'" @click="openMcpSettings">{{mcpConfig.allowEdits?'允许编辑':'只读'}}<Icon name="chevron-down" :size="12"/></button>
-        <button data-testid="document-mcp-toggle" class="document-mcp-toggle" :class="{running:mcpState.phase==='running'}" :aria-pressed="mcpState.phase==='running'" :aria-label="mcpState.phase==='running'?'停止当前文档 MCP 服务':'开启当前文档 MCP 服务'" :disabled="mcpState.phase==='stopping'||documentActionsDisabled" :title="!native.isTauri()?'请在桌面版开启本机 MCP 服务':mcpState.error||mcpState.endpoint||'根据全局设置开启当前文档的 MCP 服务；切换文档后自动关闭'" @click="toggleMcp">
+      <div v-if="currentDocument" v-show="!focusMode" class="document-mcp-bar" role="toolbar" :aria-label="t('{kind} MCP 服务', { kind: t(kindNames[currentDocument.document.kind]) })">
+        <span class="document-mcp-kind"><Icon :name="icons[currentDocument.document.kind]" :size="14"/>{{t(kindNames[currentDocument.document.kind])}}<small>{{t("当前文档")}}</small></span>
+        <span v-if="mcpState.phase==='running'" class="document-mcp-detail" role="status">{{mcpWorking ? t("正在处理…") : t("修改实时显示 · 切换文档后关闭")}}</span>
+        <button v-if="mcpConfigReady" class="document-mcp-permission" data-testid="document-mcp-permission" :disabled="globalActionsBlocked" :aria-label="t('MCP 读写权限设置')" :title="mcpConfig.allowEdits ? t('已开放当前文档编辑，点击调整权限') : t('当前仅提供读取工具；点击设置中开启编辑权限')" @click="openMcpSettings">{{mcpConfig.allowEdits ? t("允许编辑") : t("只读")}}<Icon name="chevron-down" :size="12"/></button>
+        <button data-testid="document-mcp-toggle" class="document-mcp-toggle" :class="{running:mcpState.phase==='running'}" :aria-pressed="mcpState.phase==='running'" :aria-label="mcpState.phase === 'running' ? t('停止当前文档 MCP 服务') : t('开启当前文档 MCP 服务')" :disabled="mcpState.phase==='stopping'||documentActionsDisabled" :title="!native.isTauri() ? t('请在桌面版开启本机 MCP 服务') : (mcpState.error && t(mcpState.error)) || mcpState.endpoint || t('根据全局设置开启当前文档的 MCP 服务；切换文档后自动关闭')" @click="toggleMcp">
           <i v-if="mcpState.phase==='running'" class="mcp-running-dot"/><Icon v-else name="link" :size="15"/>
-          <span>MCP</span><strong v-if="mcpState.phase==='running'">Running</strong><span v-else-if="mcpState.phase==='starting'">启动中…</span><span v-else-if="mcpState.phase==='stopping'">停止中…</span><span v-else-if="mcpState.phase==='error'">重试</span>
+          <span>MCP</span><strong v-if="mcpState.phase==='running'">{{t("运行中")}}</strong><span v-else-if="mcpState.phase==='starting'">{{t("启动中…")}}</span><span v-else-if="mcpState.phase==='stopping'">{{t("停止中…")}}</span><span v-else-if="mcpState.phase==='error'">{{t("重试")}}</span>
         </button>
       </div>
-      <div v-if="active?.importWarnings?.length" class="import-review-notice" role="note" data-testid="import-review-notice"><Icon name="info" :size="16"/><div><p v-for="warning in active.importWarnings" :key="warning">{{warning}}</p><strong>请核对文档内容与排版。</strong></div></div>
+      <div v-if="active?.importWarnings?.length" class="import-review-notice" role="note" data-testid="import-review-notice"><Icon name="info" :size="16"/><div><p v-for="warning in active.importWarnings" :key="warning">{{t(warning)}}</p><strong>{{t("请核对文档内容与排版。")}}</strong></div></div>
       <div class="editor-stage">
       <div ref="editorContent" class="editor-content" :inert="editorInputBlocked">
         <RustWordEditor :theme="appearance" v-for="entry in rustWordEntries" :key="entry.document.id" v-show="activeRustWord&&activeKey===entry.document.id" :ref="handle=>setRustWordHandle(entry.document.id,handle)" :document="entry.document" :prepared="entry.prepared" :active="!home&&activeRustWord&&activeKey===entry.document.id" :disabled="editorInputBlocked" @dirty="dirtyFor(entry.document.id,$event)" @ready="readyFor(entry.document.id)" @error="editorError(entry.document.id,$event)" @status="activeKey===entry.document.id&&(status=$event)" @file-action="activeKey===entry.document.id&&rustEditorFileAction($event)"/>
@@ -1710,76 +1713,76 @@ onBeforeUnmount(()=>{unlisten?.();window.removeEventListener('keydown',keydown);
       </div>
       <PresentationTemplates v-if="!home&&activeRustPresentation&&templatePanelOpen" class="template-panel" :templates="presentationTemplates" :loading="templateListLoading" :error="templateListError" :disabled="documentActionsDisabled" @select="openPresentationTemplateDialog('apply',$event)" @save="openPresentationTemplateDialog('save')" @delete="openPresentationTemplateDialog('delete',$event)" @retry="refreshPresentationTemplates" @close="templatePanelOpen=false"/>
       </div>
-      <footer v-show="!focusMode" class="editor-status"><span>{{status}}</span><span>{{active?.document.extension.toUpperCase()}} · {{activeRustWord?'文字编辑':activeRustSheet?'表格编辑':activeRustPresentation?'演示编辑':activeRustPdf?'PDF 编辑':activeNote?'笔记编辑':activeSchedule?'计划排期':activeCalendar?'日历便笺':active?.document.kind==='canvas'?'画布编辑':'代码图表'}}</span></footer>
+      <footer v-show="!focusMode" class="editor-status"><span>{{t(status)}}</span><span>{{active?.document.extension.toUpperCase()}} · {{activeRustWord ? t("文字编辑") : activeRustSheet ? t("表格编辑") : activeRustPresentation ? t("演示编辑") : activeRustPdf ? t("PDF 编辑") : activeNote ? t("笔记编辑") : activeSchedule ? t("计划排期") : activeCalendar ? t("日历便笺") : active?.document.kind === 'canvas' ? t("画布编辑") : t("代码图表")}}</span></footer>
     </section>
     <McpSettingsDialog v-if="mcpSettingsOpen" :config="mcpConfig" :running="mcpState.phase==='running'" :native-available="native.isTauri()" :saving="mcpSettingsBusy" :error="mcpSettingsError" @save="saveMcpSettings" @close="!mcpSettingsBusy&&(mcpSettingsOpen=false)"/>
-    <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{error}}</span><button @click="error=''" aria-label="关闭错误提示"><Icon name="close" :size="16"/></button></div>
-    <div v-if="busy&&!backgroundSaving" class="busy-overlay" role="status"><span class="busy-pill"><i/>{{busy}}</span></div>
+    <div v-if="error" class="error-banner" role="alert"><Icon name="info"/><span>{{t(error)}}</span><button @click="error=''" :aria-label="t('关闭错误提示')"><Icon name="close" :size="16"/></button></div>
+    <div v-if="busy&&!backgroundSaving" class="busy-overlay" role="status"><span class="busy-pill"><i/>{{t(busy)}}</span></div>
     <div v-if="renameDraft" class="modal-backdrop" @click.self="cancelRename" @keydown="renameKeydown">
       <form ref="renameDialog" class="modal save-format-dialog" role="dialog" aria-modal="true" aria-labelledby="document-rename-title" data-testid="document-rename-dialog" @submit.prevent="confirmRename">
-        <h2 id="document-rename-title">修改名称</h2>
-        <label class="save-name-label">名称<span class="save-name-input"><input v-model="renameDraft.name" :disabled="!!busy" maxlength="240" data-testid="document-rename-input" aria-label="名称，不含扩展名" autocomplete="off" spellcheck="false" @compositionstart="renameComposing=true" @compositionend="renameComposing=false"/><span>.{{renameDraft.extension}}</span></span></label>
-        <p class="save-format-note">名称同步用于标签和项目；保存时更新文件名，扩展名保持不变。</p>
-        <p v-if="renameDraft.error" role="alert" class="save-format-error">{{renameDraft.error}}</p>
-        <div class="modal-actions"><button type="button" :disabled="!!busy" data-testid="document-rename-cancel" @click="cancelRename">取消</button><button type="submit" :disabled="!!busy" class="primary" data-testid="document-rename-confirm">确定</button></div>
+        <h2 id="document-rename-title">{{t("修改名称")}}</h2>
+        <label class="save-name-label">{{t("名称")}}<span class="save-name-input"><input v-model="renameDraft.name" :disabled="!!busy" maxlength="240" data-testid="document-rename-input" :aria-label="t('名称，不含扩展名')" autocomplete="off" spellcheck="false" @compositionstart="renameComposing=true" @compositionend="renameComposing=false"/><span>.{{renameDraft.extension}}</span></span></label>
+        <p class="save-format-note">{{t("名称同步用于标签和项目；保存时更新文件名，扩展名保持不变。")}}</p>
+        <p v-if="renameDraft.error" role="alert" class="save-format-error">{{t(renameDraft.error)}}</p>
+        <div class="modal-actions"><button type="button" :disabled="!!busy" data-testid="document-rename-cancel" @click="cancelRename">{{t("取消")}}</button><button type="submit" :disabled="!!busy" class="primary" data-testid="document-rename-confirm">{{t("确定")}}</button></div>
       </form>
     </div>
     <div v-if="saveAsDraft" class="modal-backdrop" @click.self="cancelSaveAs" @keydown.esc.stop.prevent="cancelSaveAs">
       <form ref="saveAsDialog" class="modal save-format-dialog" role="dialog" aria-modal="true" aria-labelledby="save-format-title" data-testid="save-format-dialog" @submit.prevent="confirmSaveAs">
-        <h2 id="save-format-title">另存为</h2>
-        <label class="save-name-label">文件名<span class="save-name-input"><input v-model="saveAsDraft.name" :disabled="!!busy" data-testid="save-format-name" aria-label="文件名，不含扩展名" autocomplete="off" spellcheck="false" /><span>.{{saveAsDraft.format}}</span></span></label>
-        <fieldset :disabled="!!busy" class="save-format-options"><legend>文件格式</legend>
+        <h2 id="save-format-title">{{t("另存为")}}</h2>
+        <label class="save-name-label">{{t("文件名")}}<span class="save-name-input"><input v-model="saveAsDraft.name" :disabled="!!busy" data-testid="save-format-name" :aria-label="t('文件名，不含扩展名')" autocomplete="off" spellcheck="false" /><span>.{{saveAsDraft.format}}</span></span></label>
+        <fieldset :disabled="!!busy" class="save-format-options"><legend>{{t("文件格式")}}</legend>
           <label v-for="option in saveAsOptions" :key="option.extension" class="save-format-option" :class="{selected:saveAsDraft.format===option.extension}">
             <input v-model="saveAsDraft.format" type="radio" name="save-format" :value="option.extension" :data-testid="'save-format-'+option.extension" />
-            <span><strong>{{option.title}}</strong><small>{{option.description}}</small></span>
+            <span><strong>{{t(option.title)}}</strong><small>{{t(option.description)}}</small></span>
           </label>
         </fieldset>
-        <p v-if="saveAsCopy" class="save-format-note">转换后生成副本，你可以继续编辑当前文稿。请检查转换后的排版与内容。</p>
-        <p v-else class="save-format-note">{{native.isTauri()?'下一步选择保存位置。':'文件将下载到浏览器设置的下载位置。'}}</p>
-        <p v-if="saveAsDraft.error" role="alert" class="save-format-error">{{saveAsDraft.error}}</p>
-        <div class="modal-actions"><button type="button" :disabled="!!busy" data-testid="save-format-cancel" @click="cancelSaveAs">取消</button><button type="submit" :disabled="!!busy" class="primary" data-testid="save-format-confirm">{{native.isTauri()?'选择保存位置':'下载文件'}}</button></div>
+        <p v-if="saveAsCopy" class="save-format-note">{{t("转换后生成副本，你可以继续编辑当前文稿。请检查转换后的排版与内容。")}}</p>
+        <p v-else class="save-format-note">{{native.isTauri() ? t("下一步选择保存位置。") : t("文件将下载到浏览器设置的下载位置。")}}</p>
+        <p v-if="saveAsDraft.error" role="alert" class="save-format-error">{{t(saveAsDraft.error)}}</p>
+        <div class="modal-actions"><button type="button" :disabled="!!busy" data-testid="save-format-cancel" @click="cancelSaveAs">{{t("取消")}}</button><button type="submit" :disabled="!!busy" class="primary" data-testid="save-format-confirm">{{native.isTauri() ? t("选择保存位置") : t("下载文件")}}</button></div>
       </form>
     </div>
     <div v-if="templateDraft" class="modal-backdrop" @click.self="cancelPresentationTemplateDialog" @keydown.esc.stop.prevent="cancelPresentationTemplateDialog">
       <form ref="templateDialog" class="modal template-dialog" role="dialog" aria-modal="true" aria-labelledby="presentation-template-title" data-testid="presentation-template-dialog" @submit.prevent="confirmPresentationTemplate">
-        <h2 id="presentation-template-title">{{templateDraft.kind==='save'?'存为模板':templateDraft.kind==='apply'?'切换为此模板？':'删除此模板？'}}</h2>
+        <h2 id="presentation-template-title">{{templateDraft.kind === 'save' ? t("存为模板") : templateDraft.kind === 'apply' ? t("切换为此模板？") : t("删除此模板？")}}</h2>
         <template v-if="templateDraft.kind==='save'">
-          <p>保存当前全部幻灯片及内容，之后可在“我的模板”中重复使用。模板保存在本机。</p>
-          <label class="save-name-label">模板名称<span class="save-name-input"><input v-model="templateDraft.name" :disabled="!!busy" data-testid="presentation-template-name" aria-label="模板名称" autocomplete="off" spellcheck="false" /></span></label>
+          <p>{{t("保存当前全部幻灯片及内容，之后可在“我的模板”中重复使用。模板保存在本机。")}}</p>
+          <label class="save-name-label">{{t("模板名称")}}<span class="save-name-input"><input v-model="templateDraft.name" :disabled="!!busy" data-testid="presentation-template-name" :aria-label="t('模板名称')" autocomplete="off" spellcheck="false" /></span></label>
         </template>
         <template v-else>
-          <div class="template-dialog-summary"><img v-if="templateDraft.template.preview" :src="templateDraft.template.preview" alt=""/><div><strong>{{templateDraft.template.name}}</strong><span>{{templateDraft.template.slideCount}} 页 · {{templateDraft.template.source==='builtin'?'内置模板':'我的模板'}}</span></div></div>
+          <div class="template-dialog-summary"><img v-if="templateDraft.template.preview" :src="templateDraft.template.preview" alt=""/><div><strong>{{templateDraft.template.source === 'builtin' ? t(templateDraft.template.name) : templateDraft.template.name}}</strong><span>{{templateDraft.template.slideCount}} {{t("页 ·")}} {{templateDraft.template.source === 'builtin' ? t("内置模板") : t("我的模板")}}</span></div></div>
           <template v-if="templateDraft.kind==='apply'">
-            <p>将替换当前演示的全部幻灯片、布局和内容，文件名保持不变。可通过撤销恢复。</p>
-            <p v-if="active?.dirty" class="template-dialog-notice">当前未保存的修改也会被替换。</p>
-            <p v-if="native.isTauri()&&autosaveEnabled&&active?.fileId&&!active.requiresSaveAs" class="template-dialog-notice">自动保存已开启，切换后的内容将自动保存回当前文件。</p>
+            <p>{{t("将替换当前演示的全部幻灯片、布局和内容，文件名保持不变。可通过撤销恢复。")}}</p>
+            <p v-if="active?.dirty" class="template-dialog-notice">{{t("当前未保存的修改也会被替换。")}}</p>
+            <p v-if="native.isTauri()&&autosaveEnabled&&active?.fileId&&!active.requiresSaveAs" class="template-dialog-notice">{{t("自动保存已开启，切换后的内容将自动保存回当前文件。")}}</p>
           </template>
-          <p v-else>此操作将从模板库中永久删除该模板，不影响已打开的演示文稿。</p>
+          <p v-else>{{t("此操作将从模板库中永久删除该模板，不影响已打开的演示文稿。")}}</p>
         </template>
-        <p v-if="templateDraft.error" role="alert" class="template-dialog-error">{{templateDraft.error}}</p>
-        <div class="modal-actions"><button type="button" :disabled="!!busy" data-testid="presentation-template-cancel" @click="cancelPresentationTemplateDialog">取消</button><button type="submit" :disabled="!!busy" class="primary" data-testid="presentation-template-confirm">{{templateDraft.kind==='save'?'保存模板':templateDraft.kind==='apply'?'确认切换':'确认删除'}}</button></div>
+        <p v-if="templateDraft.error" role="alert" class="template-dialog-error">{{t(templateDraft.error)}}</p>
+        <div class="modal-actions"><button type="button" :disabled="!!busy" data-testid="presentation-template-cancel" @click="cancelPresentationTemplateDialog">{{t("取消")}}</button><button type="submit" :disabled="!!busy" class="primary" data-testid="presentation-template-confirm">{{templateDraft.kind === 'save' ? t("保存模板") : templateDraft.kind === 'apply' ? t("确认切换") : t("确认删除")}}</button></div>
       </form>
     </div>
     <div v-if="closeTarget" class="modal-backdrop" @keydown.esc.stop.prevent="!busy&&(closeTarget=null)">
       <section ref="closeDialog" class="modal close-documents-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="close-heading" data-testid="close-documents-dialog">
-        <span class="modal-icon"><Icon name="save" :size="28"/></span><h2 id="close-heading">{{closeBatch?'保存这些文档的修改？':'保存你的修改？'}}</h2>
-        <p>{{closeBatch?`${closeDocuments.length} 份文档尚未保存。可以一次性保存，或放弃这些修改${closeTarget==='window'?'并退出':'并关闭全部文档'}。`:`“${closeDocuments[0]?.document.name}”有尚未保存的修改。`}}</p>
-        <ul v-if="closeBatch" class="close-document-list"><li v-for="tab in closeDocuments" :key="tab.key"><Icon :name="icons[tab.document.kind]" :size="18"/><span :title="tab.document.name">{{tab.document.name}}</span><span class="close-document-state">未保存</span></li></ul>
-        <div class="modal-actions"><button data-testid="close-cancel" :disabled="!!busy" @click="closeTarget=null">取消</button><button data-testid="close-discard" :disabled="!!busy" @click="resolveClose('discard')">{{closeTarget==='window'?'全部不保存并退出':closeTarget==='all'?'全部不保存并关闭':'不保存并关闭'}}</button><button class="primary" data-testid="close-save" :disabled="!!busy" @click="resolveClose('save')">{{closeTarget==='window'?'全部保存并退出':closeTarget==='all'?'全部保存并关闭':'保存并关闭'}}</button></div>
+        <span class="modal-icon"><Icon name="save" :size="28"/></span><h2 id="close-heading">{{closeBatch ? t("保存这些文档的修改？") : t("保存你的修改？")}}</h2>
+        <p>{{closeBatch ? t("{p0} 份文档尚未保存。可以一次性保存，或放弃这些修改{p1}。", { p0: closeDocuments.length, p1: closeTarget === 'window' ? t("并退出") : t("并关闭全部文档") }) : t("“{p0}”有尚未保存的修改。", { p0: closeDocuments[0]?.document.name })}}</p>
+        <ul v-if="closeBatch" class="close-document-list"><li v-for="tab in closeDocuments" :key="tab.key"><Icon :name="icons[tab.document.kind]" :size="18"/><span :title="tab.document.name">{{tab.document.name}}</span><span class="close-document-state">{{t("未保存")}}</span></li></ul>
+        <div class="modal-actions"><button data-testid="close-cancel" :disabled="!!busy" @click="closeTarget=null">{{t("取消")}}</button><button data-testid="close-discard" :disabled="!!busy" @click="resolveClose('discard')">{{closeTarget === 'window' ? t("全部不保存并退出") : closeTarget === 'all' ? t("全部不保存并关闭") : t("不保存并关闭")}}</button><button class="primary" data-testid="close-save" :disabled="!!busy" @click="resolveClose('save')">{{closeTarget === 'window' ? t("全部保存并退出") : closeTarget === 'all' ? t("全部保存并关闭") : t("保存并关闭")}}</button></div>
       </section>
     </div>
     <div v-if="help" class="modal-backdrop help-backdrop" @click.self="help=false" @keydown.esc.stop.prevent="help=false">
       <section ref="helpDialog" class="modal help-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="help-heading">
-        <button class="modal-close icon-button" @click="help=false" aria-label="关闭说明"><Icon name="close"/></button>
+        <button class="modal-close icon-button" @click="help=false" :aria-label="t('关闭说明')"><Icon name="close"/></button>
         <span class="eyebrow">OPEN OFFICE</span>
-        <h2 id="help-heading">九种工具，随需使用</h2>
+        <h2 id="help-heading">{{t("九种工具，随需使用")}}</h2>
         <div class="help-grid">
           <article v-for="tool in helpTools" :key="tool.kind">
             <span class="help-tool-icon"><Icon :name="icons[tool.kind]" :size="21"/></span>
-            <div><h3>{{tool.name}}</h3><p>{{tool.description}}</p></div>
+            <div><h3>{{t(tool.name)}}</h3><p>{{t(tool.description)}}</p></div>
           </article>
         </div>
-        <footer class="help-footer"><small>版本 {{appVersion}} · 构建 {{buildVersion}}</small><button class="primary" @click="help=false">开始工作</button></footer>
+        <footer class="help-footer"><small>{{t("版本")}} {{appVersion}} {{t("· 构建")}} {{buildVersion}}</small><button class="primary" @click="help=false">{{t("开始工作")}}</button></footer>
       </section>
     </div>
   </div>

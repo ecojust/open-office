@@ -209,7 +209,7 @@ a { color: var(--ui-accent); }
 .sidebar-bottom .brand { min-height: 32px; border-radius: 4px; }
 .sidebar-bottom .brand:hover { color: var(--ui-accent); }
 .sidebar-version { display: block; margin-top: 5px; color: var(--ui-muted); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.sidebar-controls { display: flex; align-items: center; gap: 4px; margin-top: 12px; }
+.sidebar-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 12px; }
 .sidebar-controls > .icon-button { flex: none; }
 .document-mcp-bar { display: flex; align-items: center; gap: 12px; min-height: 35px; flex: none; padding: 3px 12px; border-bottom: 1px solid var(--ui-line); background: var(--ui-surface); color: var(--ui-muted); font-size: var(--ui-font-small); }
 .document-mcp-kind { display: flex; align-items: center; gap: 6px; margin-right: auto; white-space: nowrap; }
@@ -375,7 +375,7 @@ a { color: var(--ui-accent); }
   .document-art { flex: none; width: 32px; height: 32px; }
   .document-art svg { width: 24px; height: 24px; }
   .card-bottom { flex: 1; min-width: 0; margin-top: 0; }
-  .card-bottom strong { font-size: 14px; margin-bottom: 0; }
+  .card-bottom strong { font-size: 14px; margin-bottom: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
   .card-bottom small { display: none; }
   .recent-section { margin-top: 20px; }
   .home-footer { margin-top: 16px; }
@@ -453,3 +453,12 @@ a { color: var(--ui-accent); }
 @media (prefers-reduced-motion: reduce) {
   .create-card, .busy-pill i { transition: none; animation: none; }
 }
+
+/* Language stays beside the theme control, including the compact editor rail. */
+.appearance-controls { display:flex; align-items:center; gap:5px; }
+.language-toggle { display:inline-flex; align-items:center; justify-content:center; gap:3px; flex:none; min-width:53px; height:34px; padding:0 6px; border:1px solid var(--ui-line); border-radius:7px; background:var(--ui-surface-muted); color:var(--ui-muted); font-size:11px; }
+.language-toggle .selected { color:var(--ui-accent); font-weight:700; }
+.language-divider { opacity:.5; }
+.editing .appearance-controls { flex-direction:column; }
+.editing .language-toggle { min-width:40px; padding:0 3px; font-size:10px; }
+@media(max-width:900px) { .editing .language-toggle { min-width:34px; padding:0 2px; gap:2px; } }

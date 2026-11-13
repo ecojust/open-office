@@ -366,7 +366,7 @@ fn photo_album_dialog(app: &mut SlideApp, ui: &mut Ui, d: &mut Dialog) -> bool {
         ui.horizontal(|ui| {
             if ui
                 .add_enabled(app.services.pick_open.is_some(), egui::Button::new(tr("Add Pictures…")))
-                .on_disabled_hover_text("当前版本暂不支持从文件向相册添加图片；现有相册仍可编辑。")
+                .on_disabled_hover_text(tr("Pictures cannot be added to albums from files yet; existing albums can still be edited."))
                 .clicked()
                 && let Some(item) = pick_album_picture(app)
             {

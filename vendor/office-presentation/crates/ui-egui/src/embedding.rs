@@ -6,10 +6,11 @@ impl SlideApp {
     /// Reflect a shell-owned panel without committing input, changing the active ribbon tab,
     /// or creating a document revision. The shell remains the source of truth on close/switch.
     pub(crate) fn set_host_template_panel_open(&mut self, params: &Value) -> Result<Value, String> {
+        let _language = crate::i18n::scope(self.interface_chinese);
         if !self.services.embedded_editor {
-            return Err("演示模板面板由 Open Office 工作区管理。".into());
+            return Err(crate::i18n::tr("The presentation template panel is managed by the Open Office workspace.").into());
         }
-        let open = params.get("open").and_then(Value::as_bool).ok_or("模板面板状态必须为 true 或 false。")?;
+        let open = params.get("open").and_then(Value::as_bool).ok_or(crate::i18n::tr("Template panel state must be true or false."))?;
         self.template_panel_open = open;
         Ok(json!({"open": open}))
     }
@@ -38,8 +39,9 @@ impl SlideApp {
     /// Commit the old deck's notes only after its replacement has been parsed successfully.
     /// The registered engine command retains one undo step for the entire template switch.
     pub fn apply_host_template(&mut self, params: Value) -> Result<Value, String> {
+        let _language = crate::i18n::scope(self.interface_chinese);
         if self.has_pending_input() || self.session.active().is_some_and(|doc| doc.interaction.is_some()) {
-            return Err("请先完成当前输入或拖动，再切换模板。".into());
+            return Err(crate::i18n::tr("Finish the current text input or drag before switching templates.").into());
         }
         // Preflight is intentionally separate: an invalid template must not consume a notes draft.
         office_presentation_engine::cmd::template::parse(&params).map_err(|error| error.to_string())?;
@@ -72,12 +74,13 @@ impl SlideApp {
     }
 
     pub fn commit_pending(&mut self) -> Result<(), String> {
+        let _language = crate::i18n::scope(self.interface_chinese);
         if self.has_pending_input() {
-            return Err("请完成当前输入法输入后再保存。".into());
+            return Err(crate::i18n::tr("Finish the current IME composition before saving.").into());
         }
         if self.notes_buf.2.edited {
             if !self.session.active().is_some_and(|d| d.uid == self.notes_buf.0) {
-                return Err("演讲者备注的文档已改变，请先完成编辑。".into());
+                return Err(crate::i18n::tr("The speaker notes document has changed. Finish editing first.").into());
             }
             self.run("slide.notes", json!({"body": self.notes_buf.2.body, "index": self.notes_buf.1}))?;
             self.notes_buf.2.edited = false;
@@ -86,10 +89,12 @@ impl SlideApp {
     }
 
     pub fn validate_host_file(&self, request: u64, name: &str, bytes: &[u8]) -> Result<(), String> {
-        let pending = self.pending_files.iter().find(|pending| pending.id == request).ok_or("文件选择请求已结束。")?;
+        let _language = crate::i18n::scope(self.interface_chinese);
+        let pending =
+            self.pending_files.iter().find(|pending| pending.id == request).ok_or(crate::i18n::tr("The file selection request has ended."))?;
         let command = crate::command_for(pending.purpose, name, bytes)?;
         if command == "file.openBytes" {
-            return Err("请使用 Open Office 打开演示文稿。".into());
+            return Err(crate::i18n::tr("Use Open Office to open presentations.").into());
         }
         let content_type = office_presentation_engine::cmd::insert::content_type(name, bytes);
         match command {
@@ -97,19 +102,19 @@ impl SlideApp {
                 if !content_type.starts_with("image/")
                     || (content_type != "image/svg+xml" && office_presentation_render::decode_image(bytes).is_none())
                 {
-                    return Err("无法读取此图片，请选择有效的图片文件。".into());
+                    return Err(crate::i18n::tr("This picture could not be read. Choose a valid image file.").into());
                 }
             }
             "insert.audio" if !content_type.starts_with("audio/") => {
-                return Err("请选择有效的音频文件。".into());
+                return Err(crate::i18n::tr("Choose a valid audio file.").into());
             }
             "insert.video" if !content_type.starts_with("video/") => {
-                return Err("请选择有效的视频文件。".into());
+                return Err(crate::i18n::tr("Choose a valid video file.").into());
             }
             _ => {}
         }
         if !self.viewing_target(&pending.target) {
-            return Err("插入目标已改变，请重新选择文件。".into());
+            return Err(crate::i18n::tr("The insertion target has changed. Select the file again.").into());
         }
         Ok(())
     }
@@ -126,6 +131,17 @@ impl SlideApp {
         {
             inbox.clear();
         }
+    }
+
+    /// Change interface text without committing composition, notes, or document history.
+    /// The shell applies this to every session, including parked editor tabs.
+    pub fn set_host_locale(&mut self, locale: &str) -> Result<(), String> {
+        self.interface_chinese = match locale {
+            "zh-CN" => true,
+            "en" => false,
+            _ => return Err("locale must be zh-CN or en".into()),
+        };
+        Ok(())
     }
 
     pub fn set_host_theme(&mut self, mode: &str, ctx: Option<&egui::Context>) -> Result<(), String> {
@@ -192,6 +208,30 @@ mod template_tests {
         draft.edited = true;
         app.notes_buf = (uid, 0, draft);
         app
+    }
+
+    #[test]
+    fn host_locale_translates_feedback_without_consuming_notes_drafts() {
+        let mut app = app_with_notes_draft();
+        app.services.embedded_editor = true;
+        let document = app.session.doc().unwrap().doc.clone();
+        let draft = app.embedding_draft();
+        let dirty = app.session.doc().unwrap().is_dirty();
+        for (locale, saved) in [("en", "Saved"), ("zh-CN", "已保存"), ("en", "Saved")] {
+            app.set_host_locale(locale).unwrap();
+            app.set_status("Saved");
+            assert_eq!(app.fresh_status().as_deref(), Some(saved));
+            assert!(app.services.embedded_editor);
+            assert_eq!(app.embedding_draft(), draft);
+            let doc = app.session.doc().unwrap();
+            assert!(Arc::ptr_eq(&doc.doc, &document));
+            assert_eq!(doc.is_dirty(), dirty);
+            assert!(doc.history.undo.is_empty() && doc.history.redo.is_empty());
+        }
+        assert!(app.set_host_locale("unknown").is_err());
+        app.set_status("Saved");
+        assert_eq!(app.fresh_status().as_deref(), Some("Saved"));
+        assert_eq!(app.embedding_draft(), draft);
     }
 
     #[test]

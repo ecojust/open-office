@@ -1,6 +1,6 @@
 # Localization parity with PowerPoint
 
-> **Last reviewed:** 2026-10-15 · **Last updated:** 2026-10-15 · **Change:** minor (Open Office embedded Simplified Chinese interface catalog; WASM/browser validation recorded; standalone language coverage and parity scores not re-measured) · **Target:** Microsoft PowerPoint for Mac 16.113 (Microsoft 365)
+> **Last reviewed:** 2026-11-13 · **Last updated:** 2026-11-13 · **Change:** minor (Open Office host switches the embedded interface between Chinese and English without changing document or draft state; parity scores unchanged) · **Target:** Microsoft PowerPoint for Mac 16.113 (Microsoft 365)
 
 Standalone OfficePresentation's interface remains English, with no language switch. This vendored copy
 adds a Simplified Chinese display catalog for the Open Office embedded editor, described below;
@@ -13,8 +13,15 @@ review. The embedded work has not been used to increase these scores or reduce t
 
 The local integration implements Simplified Chinese labels at the `ui-egui` display boundary,
 using the catalogs under `crates/ui-egui/src/i18n/`. The embedded host enables the language for
-an editor frame or command, and the previous language is restored afterwards. Standalone
-OfficePresentation retains English; system-language detection and a general language setting remain open.
+an editor frame or command, and the previous language is restored afterwards. The host's
+`setLocale("zh-CN" | "en")` switches all open sessions and the default for future sessions.
+Language is separate from embedded-editor behavior and never commits input, updates document
+content, or records an undo step. Standalone OfficePresentation retains English; system-language
+detection and a general standalone language setting remain open.
+
+Regression tests cover changing the existing ribbon language, retaining uncommitted speaker
+notes and IME composition, and preserving save receipts, selection, document identity, revision,
+and history. Embedded file-service hints also use English source keys and the Chinese catalog.
 
 Implemented coverage includes ribbon tabs and controls, menus and tooltips, editing dialogs,
 format and navigation panes, workspace status and operation messages, slide-show controls and
@@ -27,7 +34,7 @@ IDs and serialized values retain their original values; unknown display strings 
 their original text. This is a local Open Office implementation, not a claim that upstream has
 shipped a Chinese interface or that every display string has been verified.
 
-The release WASM build, browser navigation and editing/export checks pass for this local change.
+The earlier Chinese-catalog integration passed release WASM, browser navigation and editing/export checks.
 Screenshots cover all ten main ribbons, one contextual ribbon, eight panes and seventeen dialogs.
 Renderer regressions keep translated empty prompts out of exports and preserve custom prompts.
 Native desktop verification, native-speaker review and a fresh UI-string coverage measurement
@@ -90,6 +97,7 @@ common misspellings (`crates/engine/src/cmd/review.rs`); see [gaps.md](gaps.md#p
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-13 | minor | Added host-owned Chinese/English switching for active, parked and future embedded sessions; regression tests cover ribbon labels, uncommitted notes and IME composition, save receipts and history; parity scores unchanged |
 | 2026-10-15 | minor | Open Office embedded Simplified Chinese display catalogs cover editor controls, dialogs, panes, galleries and presentation controls; standalone remains English; WASM/browser validation recorded; native desktop verification and coverage measurement remain open, scores unchanged |
 | 2026-10-14 | minor | IME composition in a table cell is underlined in place; the candidate window sits on that cell's caret |
 | 2026-10-12 | minor | IME composition for Chinese, Japanese and Korean, and interface text in any installed script (#101) |

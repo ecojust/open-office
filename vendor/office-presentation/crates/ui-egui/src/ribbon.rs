@@ -492,7 +492,7 @@ fn slides_group(app: &mut SlideApp, ui: &mut Ui) {
                     if r.clicked() {
                         run(app, "app.reuseSlidesDialog", json!({"keepFormatting": keep}));
                     }
-                    r.on_disabled_hover_text(tr("当前版本暂不支持从其他文件复用幻灯片。"));
+                    r.on_disabled_hover_text(tr("Reusing slides from other files is not available yet."));
                 }
             });
         }
@@ -1556,7 +1556,7 @@ fn design(app: &mut SlideApp, ui: &mut Ui, available_width: f32) {
             .on_hover_text(if can_pick {
                 tr("Browse for Themes")
             } else {
-                "当前版本暂不支持从文件导入主题，请使用内置主题。"
+                tr("Importing themes from files is not available yet. Use a built-in theme.")
             })
             .clicked()
         {
@@ -1821,7 +1821,7 @@ fn transitions(app: &mut SlideApp, ui: &mut Ui) {
                     if r.clicked() {
                         app.pick_transition_sound();
                     }
-                    r.on_disabled_hover_text(tr("当前版本暂不支持从文件添加切换音效，请使用内置音效。"));
+                    r.on_disabled_hover_text(tr("Adding transition sounds from files is not available yet. Use a built-in sound."));
                     ui.separator();
                     let has = cur.as_ref().is_some_and(|t| t.sound.is_some());
                     let mut lp = cur.as_ref().is_some_and(|t| t.sound_loop);
@@ -2262,7 +2262,7 @@ fn review(app: &mut SlideApp, ui: &mut Ui) {
     group(ui, |ui| {
         let can_pick = app.services.pick_open.is_some();
         if big_button(ui, Icon::Compare, "Compare", can_pick)
-            .on_hover_text(if can_pick { tr("Compare presentations") } else { "当前版本暂不支持选择文件进行演示文稿比较。" })
+            .on_hover_text(if can_pick { tr("Compare presentations") } else { tr("Comparing presentations from files is not available yet.") })
             .clicked()
         {
             run(app, "app.compareDialog", json!({}));
@@ -3222,7 +3222,7 @@ fn smartart_design(app: &mut SlideApp, ui: &mut Ui) {
             .on_hover_text(if can_pick {
                 tr("Put a picture in the selected node's picture placeholder")
             } else {
-                "当前版本暂不支持从文件添加 SmartArt 图片，可使用“插入图片”添加独立图片。"
+                tr("Adding SmartArt pictures from files is not available yet. Use Insert Picture to add a separate picture.")
             })
             .clicked()
         {
@@ -3388,7 +3388,7 @@ fn slide_master(app: &mut SlideApp, ui: &mut Ui) {
             ui.separator();
             if ui
                 .add_enabled(app.services.pick_open.is_some(), egui::Button::new(tr("Browse for Themes…")))
-                .on_disabled_hover_text(tr("当前版本暂不支持从文件导入主题，请使用内置主题。"))
+                .on_disabled_hover_text(tr("Importing themes from files is not available yet. Use a built-in theme."))
                 .clicked()
             {
                 run(app, "app.browseThemeDialog", json!({}));

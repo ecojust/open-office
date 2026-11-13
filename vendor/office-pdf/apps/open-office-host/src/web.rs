@@ -25,6 +25,7 @@ struct State {
     active: Option<String>,
     enabled: bool,
     theme: String,
+    locale: String,
     drain_input: bool,
     discard_input: InputDiscardBarrier,
     destroyed: bool,
@@ -75,6 +76,7 @@ pub fn create_host(callback: Function) -> OfficePdfHost {
             active: None,
             enabled: true,
             theme: "system".into(),
+            locale: "zh-CN".into(),
             drain_input: false,
             discard_input: InputDiscardBarrier::default(),
             destroyed: false,
@@ -113,6 +115,7 @@ impl OfficePdfHost {
         let next = document_id.checked_add(1).ok_or_else(|| js_error("文档编号已达到上限。"))?;
         let mut entry = Entry::new(name, bytes, document_id).map_err(js_error)?;
         entry.app.set_option("theme", &state.theme).map_err(js_error)?;
+        entry.set_locale(Entry::language(&state.locale).map_err(js_error)?).map_err(js_error)?;
         let actions = state.actions.clone();
         let session_id = id.to_owned();
         entry.app.host_action = Some(Box::new(move |action| {
@@ -326,6 +329,22 @@ impl OfficePdfHost {
             return Err(js_error("PDF 输入尚未清理完成，请重试关闭操作。"));
         }
         Ok(Promise::resolve(&JsValue::UNDEFINED))
+    }
+
+    /// Apply UI text to every session without committing drafts or altering save receipts.
+    #[wasm_bindgen(js_name = setLocale)]
+    pub fn set_locale(&self, locale: &str) -> Result<(), JsValue> {
+        let language = Entry::language(locale).map_err(js_error)?;
+        let mut state = self.state.try_borrow_mut().map_err(js_error)?;
+        if state.destroyed {
+            return Err(js_error("PDF editor host is destroyed"));
+        }
+        for entry in state.entries.values_mut() {
+            entry.set_locale(language).map_err(js_error)?;
+        }
+        state.locale = locale.to_owned();
+        state.repaint();
+        Ok(())
     }
 
     #[wasm_bindgen(js_name = setTheme)]

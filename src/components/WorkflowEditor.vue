@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from '../shared/i18n'
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import Icon from './Icon.vue'
 import SceneEditor from '../workflow/components/SceneEditor.vue'
@@ -17,6 +18,8 @@ import type { DiagramStyleId } from '../workflow/core/diagram-appearance'
 import type { NativeDocument } from '../types'
 import { base64ToBytes, bytesToBase64, saveFileName, type EditorExport, type Extension } from '../shared/document'
 import { printHtml, type PrintOutcome } from '../shared/printing'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{ document: NativeDocument; active?: boolean; disabled?: boolean; theme?: 'light' | 'dark' }>(), { active: true, disabled: false, theme: 'light' })
 const emit = defineEmits<{
@@ -241,14 +244,14 @@ defineExpose({ mcpExecute, setDocumentTitle, prepareDeactivate, exportFile, mark
 
 <template>
  <section class="workflow-editor" data-testid="workflow-editor" :data-kind="document.kind" :data-document-id="document.id" @keydown="keydown">
-  <div v-if="loading" class="workflow-loading" role="status">正在打开文档…</div>
-  <div v-if="problem" class="workflow-problem" role="alert"><span>{{ problem }}</span><button aria-label="关闭提示" @click="problem = ''"><Icon name="close" :size="16" /></button></div>
+  <div v-if="loading" class="workflow-loading" role="status">{{ t('正在打开文档…') }}</div>
+  <div v-if="problem" class="workflow-problem" role="alert"><span>{{ t(problem) }}</span><button :aria-label="t('关闭提示')" @click="problem = ''"><Icon name="close" :size="16" /></button></div>
   <template v-if="model && !loading">
-   <div class="workflow-history" aria-label="编辑历史">
-    <button aria-label="撤销" title="撤销 (Ctrl/⌘ Z)" :disabled="!interactive || !canUndo && !pending" @mousedown.prevent @click="undo().catch(report)"><Icon name="undo" :size="17" /></button>
-    <button aria-label="重做" title="重做 (Ctrl/⌘ Shift Z)" :disabled="!interactive || !canRedo" @mousedown.prevent @click="redo().catch(report)"><Icon name="redo" :size="17" /></button>
-    <span>{{ diagram ? '修改源码，实时生成图表' : '自由排版 · 图形、连线与手绘' }}</span>
-    <button v-if="!diagram" :disabled="!interactive" aria-label="适应画布" @click="sceneEditor?.fitCanvas()"><Icon name="search" :size="16" /><span>适应画布</span></button>
+   <div class="workflow-history" :aria-label="t('编辑历史')">
+    <button :aria-label="t('撤销')" :title="t('撤销 (Ctrl/⌘ Z)')" :disabled="!interactive || !canUndo && !pending" @mousedown.prevent @click="undo().catch(report)"><Icon name="undo" :size="17" /></button>
+    <button :aria-label="t('重做')" :title="t('重做 (Ctrl/⌘ Shift Z)')" :disabled="!interactive || !canRedo" @mousedown.prevent @click="redo().catch(report)"><Icon name="redo" :size="17" /></button>
+    <span>{{ diagram ? t('修改源码，实时生成图表') : t('自由排版 · 图形、连线与手绘') }}</span>
+    <button v-if="!diagram" :disabled="!interactive" :aria-label="t('适应画布')" @click="sceneEditor?.fitCanvas()"><Icon name="search" :size="16" /><span>{{ t('适应画布') }}</span></button>
    </div>
    <CodeDiagramEditor v-if="diagram" ref="codeEditor" :source="model.source" :diagram-style="model.diagramStyle" :theme="theme" :active="active" :disabled="disabled" @change="changeSource" @change-style="changeStyle" @pending="setPending" @status="emit('status', $event)" @create-flow="createCanvas" @export="exportImage" />
    <SceneEditor v-else ref="sceneEditor" :scene="model.scene" :mode="model.kind === 'flow' ? 'flow' : 'board'" :theme="theme" :active="active" :disabled="disabled" @change="changeScene" @pending="setPending" @status="emit('status', $event)" @export="exportImage" />

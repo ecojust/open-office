@@ -23,6 +23,19 @@ pub(crate) fn clean_error(error: impl std::fmt::Display) -> String {
 }
 
 impl Entry {
+    pub fn language(locale: &str) -> Result<office_sheet_ui_egui::i18n::Language, String> {
+        match locale {
+            "zh-CN" => Ok(office_sheet_ui_egui::i18n::Language::Zh),
+            "en" => Ok(office_sheet_ui_egui::i18n::Language::En),
+            _ => Err("locale must be zh-CN or en".into()),
+        }
+    }
+
+    /// Both supported UI languages use the same formula syntax. Pending edits stay open.
+    pub fn set_locale(&mut self, language: office_sheet_ui_egui::i18n::Language) {
+        self.app.ui.language = language;
+    }
+
     pub fn new(name: &str, bytes: &[u8], document_id: u32, services: Services) -> Result<Self, String> {
         // Reject unsupported imports by content as well as suffix, so an ODS renamed
         // .xlsx cannot silently lose formulas or formatting.
@@ -264,6 +277,27 @@ mod tests {
 
     fn blank() -> Entry {
         Entry::new("Book.xlsx", &[], 1, Services::default()).unwrap()
+    }
+
+    #[test]
+    fn interface_switch_preserves_workbook_draft_revision_and_history() {
+        let mut entry = blank();
+        entry.app.run("cell.set", json!({"cell":"A1","input":"保留中文 and English"})).unwrap();
+        entry.app.begin_edit(Some("=SUM(1,2)".into()), false);
+        let before = entry.snapshot("one", None).unwrap();
+        let draft = entry.pending_draft();
+        let workbook = entry.app.session.doc().unwrap().wb.clone();
+        let formula_locale = entry.app.editor.as_ref().unwrap().locale;
+        for locale in ["en", "zh-CN", "en"] {
+            entry.set_locale(Entry::language(locale).unwrap());
+            assert_eq!(entry.snapshot("one", None).unwrap(), before);
+            assert_eq!(entry.pending_draft(), draft);
+            assert!(Arc::ptr_eq(&workbook, &entry.app.session.doc().unwrap().wb));
+            assert_eq!(entry.app.editor.as_ref().unwrap().locale, formula_locale);
+            assert_eq!(entry.app.ui.language.formula_locale(), formula_locale);
+        }
+        assert!(Entry::language("xx").is_err());
+        assert_eq!(entry.app.ui.language, office_sheet_ui_egui::i18n::Language::En);
     }
 
     #[test]

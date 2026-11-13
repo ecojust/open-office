@@ -159,6 +159,41 @@ mod tests {
         assert!(entry.export("pptx").is_err(), "panel state updates cannot silently finish composition");
     }
     #[test]
+    fn host_locale_preserves_save_receipts_and_composing_document() {
+        let mut entry = Entry::new("Presentation.pptx", &[], 1, Services { embedded_editor: true, ..Services::default() }).unwrap();
+        let clean = entry.snapshot("one", None).unwrap();
+        for locale in ["en", "zh-CN", "en"] {
+            entry.app.set_host_locale(locale).unwrap();
+            assert_eq!(entry.snapshot("one", None).unwrap(), clean);
+        }
+        assert!(entry.mark_saved(1.0, clean["revision"].as_f64().unwrap()).unwrap());
+        let id = entry.app.run("insert.textBox", json!({"text":""})).unwrap()["id"].clone();
+        entry.app.run("text.edit", json!({"id":id})).unwrap();
+        entry.app.run("text.compose", json!({"text":"演"})).unwrap();
+        let composing = entry.snapshot("one", None).unwrap();
+        let draft = entry.app.embedding_draft();
+        let document = entry.app.session.doc().unwrap().doc.clone();
+        let undo = entry.app.session.doc().unwrap().history.undo.len();
+        let redo = entry.app.session.doc().unwrap().history.redo.len();
+        let journal = entry.app.session.journal.len();
+        for locale in ["zh-CN", "en", "zh-CN"] {
+            entry.app.set_host_locale(locale).unwrap();
+            assert_eq!(entry.snapshot("one", None).unwrap(), composing);
+            assert_eq!(entry.app.embedding_draft(), draft);
+            assert!(entry.app.has_pending_input());
+            assert!(entry.app.services.embedded_editor);
+            let doc = entry.app.session.doc().unwrap();
+            assert!(Arc::ptr_eq(&document, &doc.doc));
+            assert_eq!(doc.history.undo.len(), undo);
+            assert_eq!(doc.history.redo.len(), redo);
+            assert_eq!(entry.app.session.journal.len(), journal);
+        }
+        assert!(entry.app.set_host_locale("fr").is_err());
+        assert_eq!(entry.snapshot("one", None).unwrap(), composing);
+        assert!(entry.export("pptx").is_err(), "changing language cannot silently finish composition");
+    }
+
+    #[test]
     fn every_new_document_starts_with_the_clean_three_slide_template() {
         for name in ["演示文稿.pptx", "演示文稿.potx", "演示文稿.ppsx"] {
             let mut entry = Entry::new(name, &[], 1, Services::default()).unwrap();

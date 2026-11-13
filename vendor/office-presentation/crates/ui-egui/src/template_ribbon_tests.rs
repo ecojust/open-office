@@ -19,7 +19,7 @@ fn ribbon(app: SlideApp) -> Harness<'static, SlideApp> {
             if !app.fonts_ready {
                 return;
             }
-            let _language = crate::i18n::scope(app.services.embedded_editor);
+            let _language = crate::i18n::scope(app.interface_chinese);
             super::show(app, ui);
         },
         app,
@@ -100,4 +100,27 @@ fn standalone_and_embedded_without_a_host_have_no_template_ribbon_control() {
     let mut app = SlideApp::new(Session::with_new(), Services::default());
     assert!(app.run("host.setTemplatePanelOpen", json!({"open":true})).is_err());
     assert!(!app.template_panel_open);
+}
+
+#[test]
+fn host_locale_switches_existing_ribbon_without_changing_its_document() {
+    let app =
+        SlideApp::new(Session::with_new(), Services { embedded_editor: true, host_command: Some(Box::new(|_, _| None)), ..Services::default() });
+    let original = app.session.doc().unwrap().doc.clone();
+    let dirty = app.session.doc().unwrap().is_dirty();
+    let mut h = ribbon(app);
+    h.run_steps(2);
+    for (locale, home, templates) in
+        [("en", "Home", "Presentation templates"), ("zh-CN", "开始", "演示模板"), ("en", "Home", "Presentation templates")]
+    {
+        h.state_mut().set_host_locale(locale).unwrap();
+        h.run_steps(2);
+        let _ = h.get_by_label(templates);
+        assert_eq!(h.state().ribbon_tabs.iter().find(|tab| tab.name == "Home").unwrap().label, home);
+        assert!(h.state().services.embedded_editor);
+        let doc = h.state().session.doc().unwrap();
+        assert!(Arc::ptr_eq(&original, &doc.doc));
+        assert_eq!(doc.is_dirty(), dirty);
+        assert!(doc.history.undo.is_empty() && doc.history.redo.is_empty());
+    }
 }

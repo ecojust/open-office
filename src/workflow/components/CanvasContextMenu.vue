@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from '../../shared/i18n'
 import AppIcon from './AppIcon.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type CSSProperties } from 'vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   x: number
@@ -192,12 +195,12 @@ onBeforeUnmount(() => {
 <template>
   <span ref="themeSource" hidden aria-hidden="true" />
   <Teleport to="body">
-    <div ref="menu" class="canvas-context-menu" :style="menuStyle" role="menu" aria-label="画布菜单" data-testid="canvas-context-menu" @keydown="keydown" @pointerdown.stop @contextmenu.prevent.stop>
+    <div ref="menu" class="canvas-context-menu" :style="menuStyle" role="menu" :aria-label="t('画布菜单')" data-testid="canvas-context-menu" @keydown="keydown" @pointerdown.stop @contextmenu.prevent.stop>
       <template v-for="(group, index) in groups" :key="index">
         <div v-if="index" class="context-separator" role="separator" />
         <button v-for="item in group" :key="item.action" type="button" role="menuitem" :data-action="item.action" :disabled="item.disabled" :aria-disabled="item.disabled || undefined" :tabindex="activeAction === item.action ? 0 : -1" :class="{ 'is-danger': item.danger }" @focus="activeAction = item.action" @click="activate(item)">
           <AppIcon :name="item.icon === 'delete' ? 'trash' : item.icon" :size="16" />
-          <span>{{ item.label }}</span>
+          <span>{{ t(item.label) }}</span>
           <kbd v-if="item.shortcut" aria-hidden="true">{{ item.shortcut }}</kbd>
         </button>
       </template>

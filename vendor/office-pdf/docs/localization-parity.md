@@ -1,10 +1,23 @@
 # Localization parity
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-13 · **Change:** minor (Vietnamese 100% of current key union; native-speaker community review; twelve-language mean ≈68%) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-14 · **Change:** minor (Italian count after completing its catalog) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-11-13 · **Change:** minor (Open Office embedded Chinese/English switching and translated document controls; standalone coverage not re-measured) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 
 Per-language status of OfficePdf's interface against Acrobat Pro's. How translations work and how to
 add a language: [localization.md](localization.md). Summary in [ROADMAP.md](../ROADMAP.md).
+
+## Open Office embedded interface
+
+The local `open-office-pdf-host` exposes `setLocale("zh-CN"|"en")` for every current and
+future session. Activating a parked tab retains the chosen display language. Embedded toolbar
+menus, stamp and signature controls, pending-comment and deletion dialogs, and integration
+notices now use the catalog instead of fixed Chinese labels. Contextual rows retain the
+embedded controls' existing Chinese wording where it differs from standalone terminology.
+
+Changing the interface does not commit drafts, modify document content, change undo history,
+or invalidate save receipts. Date insertion retains the session's previous effective date
+language, including an explicitly chosen language. Pending deletion labels remain stable in
+draft state and are translated when drawn. The Chinese catalog passes the catalog parser's
+validation; the historical standalone coverage percentages below have not been re-measured.
 
 ## How this was measured
 
@@ -82,6 +95,7 @@ Acrobat languages OfficePdf lacks: Danish, Dutch, Finnish, Norwegian, Swedish, H
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-11-13 | minor | Added embedded host Chinese/English switching and catalog-backed document controls, comment drafts, deletion prompts, and integration notices; preserves date insertion language and document state |
 | 2026-10-13 | minor | Vietnamese (`vi`) catalog: 2,591 entries (100% of current key union + `theme`/`Appearance`); twelve-language mean ≈ 68%; native-speaker community review; registered with `plural_none` |
 | 2026-10-14 | minor | Italian: 2,528 entries after adding the 201 keys the other catalogs had and the code looks up |
 | 2026-10-12 | minor | Added current counts for Kazakh, Polish, Slovenian, Greek, Turkish and Lithuanian; retained existing language assessments and the original percentage snapshot |

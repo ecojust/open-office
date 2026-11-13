@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from '../../shared/i18n'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Compartment, EditorSelection, EditorState, StateField } from '@codemirror/state'
 import { drawSelection, EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
@@ -7,6 +8,8 @@ import { codeFolding, foldGutter, foldKeymap, foldService, foldedRanges, Highlig
 import { tags } from '@lezer/highlight'
 import { createDiagramLexState, diagramFoldRanges, sourceCoordinates, tokenizeDiagramLine, type DiagramToken } from '../core/diagram-source-language.ts'
 
+const { locale, t } = useI18n()
+
 const props = withDefaults(defineProps<{ modelValue: string; theme: 'light' | 'dark'; disabled?: boolean; error?: string; errorId?: string }>(), { disabled: false, error: '' })
 const emit = defineEmits<{
   'update:modelValue': [value: string]; input: []; blur: []; selection: [selection: { start: number; end: number; head: number }]; compositionstart: []; compositionend: []
@@ -14,7 +17,7 @@ const emit = defineEmits<{
 const container = ref<HTMLDivElement>()
 let editor: EditorView | undefined, rawSource = props.modelValue, coordinates = sourceCoordinates(rawSource), applyingSource = false
 let compositionTimer: ReturnType<typeof setTimeout> | undefined
-const appearance = new Compartment(), editable = new Compartment(), attributes = new Compartment()
+const appearance = new Compartment(), editable = new Compartment(), attributes = new Compartment(), phrases = new Compartment()
 const syntax = StreamLanguage.define({
   startState: () => ({ protectedMembers: false, tokens: [] as DiagramToken[], tokenIndex: 0, lexical: createDiagramLexState() }),
   copyState: state => ({ ...state, lexical: { ...state.lexical } }),
@@ -69,8 +72,19 @@ function editorTheme() {
     '.cm-typeName, .cm-attributeName': { color: dark ? '#67e8f9' : '#0e7490' },
   }, { dark })
 }
+function editorPhrases() {
+  return EditorState.phrases.of({ 'Fold line': t('折叠此行'), 'Unfold line': t('展开此行'), 'Folded lines': t('已折叠行'), 'Unfolded lines': t('已展开行'), to: t('至'), 'folded code': t('已折叠代码'), unfold: t('展开代码块') })
+}
+function updateFoldingLabels() {
+  editor?.dom.querySelectorAll<HTMLElement>('.cm-foldPlaceholder').forEach(button => {
+    button.setAttribute('aria-label', t('展开代码块')); button.title = t('展开代码块')
+  })
+  editor?.dom.querySelectorAll<HTMLElement>('.cm-foldGutter span').forEach(marker => {
+    marker.title = t(marker.textContent === '⌄' ? '折叠此行' : '展开此行')
+  })
+}
 function contentAttributes() {
-  return EditorView.contentAttributes.of({ 'aria-label': '代码图表源码', 'data-testid': 'diagram-source', 'aria-invalid': String(Boolean(props.error)), ...(props.error && props.errorId ? { 'aria-describedby': props.errorId } : {}), spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off' })
+  return EditorView.contentAttributes.of({ 'aria-label': t('代码图表源码'), 'data-testid': 'diagram-source', 'aria-invalid': String(Boolean(props.error)), ...(props.error && props.errorId ? { 'aria-describedby': props.errorId } : {}), spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off' })
 }
 function syncSelection() {
   if (!editor) return
@@ -94,11 +108,11 @@ onMounted(() => {
   editor = new EditorView({ parent: container.value!, state: EditorState.create({
     doc: coordinates.normalized,
     extensions: [
-      appearance.of(editorTheme()), editable.of([EditorView.editable.of(!props.disabled), EditorState.readOnly.of(props.disabled)]), attributes.of(contentAttributes()),
+      appearance.of(editorTheme()), editable.of([EditorView.editable.of(!props.disabled), EditorState.readOnly.of(props.disabled)]), attributes.of(contentAttributes()), phrases.of(editorPhrases()),
       lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(), drawSelection(), indentUnit.of('  '),
       syntax, syntaxHighlighting(highlighting), folding, foldService.of((state, from) => state.field(folding).get(from) ?? null),
       codeFolding({ placeholderDOM: (_view, onclick) => {
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'cm-foldPlaceholder'; button.textContent = '…'; button.setAttribute('aria-label', '展开代码块'); button.title = '展开代码块'; button.onclick = onclick; return button
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'cm-foldPlaceholder'; button.textContent = '…'; button.setAttribute('aria-label', t('展开代码块')); button.title = t('展开代码块'); button.onclick = onclick; return button
       } }),
       foldGutter({ openText: '⌄', closedText: '›' }),
       // History belongs to WorkflowSession, so source edits, styles and templates share undo.
@@ -135,6 +149,10 @@ watch(() => props.modelValue, value => {
 watch(() => props.theme, () => editor?.dispatch({ effects: appearance.reconfigure(editorTheme()) }))
 watch(() => props.disabled, disabled => editor?.dispatch({ effects: editable.reconfigure([EditorView.editable.of(!disabled), EditorState.readOnly.of(disabled)]) }))
 watch(() => [props.error, props.errorId], () => editor?.dispatch({ effects: attributes.reconfigure(contentAttributes()) }))
+watch(locale, () => {
+  editor?.dispatch({ effects: [attributes.reconfigure(contentAttributes()), phrases.reconfigure(editorPhrases())] })
+  updateFoldingLabels()
+})
 onBeforeUnmount(() => { clearTimeout(compositionTimer); editor?.destroy(); editor = undefined })
 defineExpose({ focus, setSelectionRange, scrollToStart, syncSelection, get value() { return rawSource }, get selectionStart() { return coordinates.toRaw(editor?.state.selection.main.from ?? 0) }, get selectionEnd() { return coordinates.toRaw(editor?.state.selection.main.to ?? 0) }, get selectionDirection() { const selection = editor?.state.selection.main; return selection && selection.head < selection.anchor ? 'backward' : 'forward' } })
 </script>

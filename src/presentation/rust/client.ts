@@ -1,5 +1,6 @@
 import type { NativeDocument } from '../../types'
 import type { Appearance } from '../../shared/appearance'
+import { locale, t, translate, type Locale } from '../../shared/i18n'
 import { base64ToBytes, bytesToBase64 } from '../../shared/document'
 import { createId } from '../../shared/id'
 import documentFontUrl from '../../../assets/fonts/ui/WenQuanYiMicroHei-Regular.ttf?url'
@@ -18,6 +19,7 @@ interface OfficePresentationHost {
   close(id: string, documentId: number, revision: number, force: boolean): boolean
   setActive(active: boolean): void
   setTheme(theme: Appearance): void
+  setLocale(locale: Locale): void
   destroy(): void
 }
 type Bindings = { default(options: { module_or_path: URL }): Promise<unknown>; createHost(callback: (event: string) => void): OfficePresentationHost }
@@ -65,6 +67,7 @@ async function loadHost(): Promise<OfficePresentationHost> {
   await bindings.default({ module_or_path: new URL('office-presentation/office-presentation_bg.wasm', document.baseURI) })
   host = bindings.createHost(receive)
   host.setTheme(interfaceTheme)
+  host.setLocale(locale.value)
   return host
 }
 function getHost() { return runtime ??= loadHost().catch(cause => { runtime = undefined; throw cause }) }
@@ -93,6 +96,13 @@ function registerDocumentFont(api: OfficePresentationHost, id: string, data: str
 export function setRustPresentationTheme(theme: Appearance): Promise<void> {
   interfaceTheme = theme
   return serialize(() => { host?.setTheme(interfaceTheme) })
+}
+/** Change interface labels without flushing drafts, switching tabs or creating document edits. */
+export function setRustPresentationLocale(value: Locale): Promise<void> {
+  return serialize(() => {
+    host?.setLocale(value)
+    canvas?.setAttribute('aria-label', translate(value, '演示文稿与功能区'))
+  })
 }
 function parkingElement() {
   if (!parking) {
@@ -123,7 +133,7 @@ function newCanvas() {
   const element = document.createElement('canvas')
   element.id = 'open-office-office-presentation-canvas'
   element.dataset.testid = 'office-presentation-canvas'
-  element.setAttribute('aria-label', '演示文稿与功能区')
+  element.setAttribute('aria-label', t('演示文稿与功能区'))
   element.tabIndex = 0
   Object.assign(element.style, { display: 'block', width: '100%', height: '100%', outline: 'none' })
   return element

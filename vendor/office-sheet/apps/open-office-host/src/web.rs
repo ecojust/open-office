@@ -26,6 +26,7 @@ struct State {
     active: Option<String>,
     enabled: bool,
     theme: String,
+    locale: String,
     drain_input: bool,
     destroyed: bool,
     started: bool,
@@ -135,6 +136,7 @@ pub fn create_host(callback: Function) -> OfficeSheetHost {
             active: None,
             enabled: true,
             theme: "system".into(),
+            locale: "zh-CN".into(),
             drain_input: false,
             destroyed: false,
             started: false,
@@ -170,6 +172,7 @@ impl OfficeSheetHost {
         let next_document_id = document_id.checked_add(1).ok_or_else(|| js_error("document identifiers exhausted"))?;
         let mut entry = Entry::new(name, bytes, document_id, services(id, state.actions.clone(), picture.clone())).map_err(js_error)?;
         entry.app.ui.set_theme(&state.theme).map_err(js_error)?;
+        entry.set_locale(Entry::language(&state.locale).map_err(js_error)?);
         let snapshot = entry.snapshot(id, None).map_err(js_error)?;
         state.next_document_id = next_document_id;
         state.entries.insert(id.to_owned(), entry);
@@ -257,6 +260,22 @@ impl OfficeSheetHost {
             state.repaint();
         }
         json_string(&json!({"handled":handled,"snapshot":state.snapshot(id)?}))
+    }
+
+    /// The display language applies to parked sessions too and never commits a cell draft.
+    #[wasm_bindgen(js_name = setLocale)]
+    pub fn set_locale(&self, locale: &str) -> Result<(), JsValue> {
+        let language = Entry::language(locale).map_err(js_error)?;
+        let mut state = self.state.try_borrow_mut().map_err(js_error)?;
+        if state.destroyed {
+            return Err(js_error("editor host is destroyed"));
+        }
+        state.locale = locale.to_owned();
+        for entry in state.entries.values_mut() {
+            entry.set_locale(language);
+        }
+        state.repaint();
+        Ok(())
     }
 
     /// Appearance belongs to the shell, including sessions that are not currently mounted.

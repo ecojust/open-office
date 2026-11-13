@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { useI18n } from '../../shared/i18n'
 import { nextTick, onMounted, ref } from 'vue'
 import AppIcon from './AppIcon.vue'
 import { BOARD_TEMPLATES } from '../core/board-templates.ts'
+
+const { t } = useI18n()
 
 const templates = [
   { id: 'flow', title: '流程图', description: '用节点、分支和连线表达处理步骤。', icon: 'flow' },
@@ -29,11 +32,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section ref="panel" class="board-template-panel" role="region" aria-label="画布模板" data-testid="board-template-panel" @keydown="keydown" @pointerdown.stop>
-    <header><div><AppIcon name="templates" :size="17"/><strong>画布模板</strong></div><button type="button" class="board-template-close" title="关闭画布模板" aria-label="关闭画布模板" @click="close"><AppIcon name="close" :size="16"/></button></header>
-    <p>插入一份可编辑的模板，继续在当前画布创作。</p>
-    <div class="board-template-cards"><button v-for="template in templates" :key="template.id" type="button" :data-board-template="template.id" :aria-label="`插入${template.title}模板`" @click="insert(template.id)"><span class="board-template-icon"><AppIcon :name="template.icon" :size="22"/></span><span class="board-template-copy"><strong>{{ template.title }}</strong><small>{{ template.description }}</small></span><AppIcon name="plus" :size="15"/></button></div>
-    <footer><AppIcon name="frame" :size="13"/><span>便签、标题和连线都可以单独修改。</span></footer>
+  <section ref="panel" class="board-template-panel" role="region" :aria-label="t('画布模板')" data-testid="board-template-panel" @keydown="keydown" @pointerdown.stop>
+    <header><div><AppIcon name="templates" :size="17"/><strong>{{ t('画布模板') }}</strong></div><button type="button" class="board-template-close" :title="t('关闭画布模板')" :aria-label="t('关闭画布模板')" @click="close"><AppIcon name="close" :size="16"/></button></header>
+    <p>{{ t('插入一份可编辑的模板，继续在当前画布创作。') }}</p>
+    <div class="board-template-cards"><button v-for="template in templates" :key="template.id" type="button" :data-board-template="template.id" :aria-label="t('插入{value0}模板', { value0: t(template.title) })" @click="insert(template.id)"><span class="board-template-icon"><AppIcon :name="template.icon" :size="22"/></span><span class="board-template-copy"><strong>{{ t(template.title) }}</strong><small>{{ t(template.description) }}</small></span><AppIcon name="plus" :size="15"/></button></div>
+    <footer><AppIcon name="frame" :size="13"/><span>{{ t('便签、标题和连线都可以单独修改。') }}</span></footer>
   </section>
 </template>
 

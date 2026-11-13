@@ -172,7 +172,7 @@ impl OfficePdfApp {
     /// as stored in the PDF, otherwise PNG).
     pub(crate) fn copy_page_image_file(&mut self, page: usize, index: usize) {
         if self.embedded {
-            self.notify("当前版本尚未接入图片剪贴板");
+            self.notify(tl!("Image clipboard access is not available in this version"));
             return;
         }
         let Some((_, id)) = self.active_ids() else { return };

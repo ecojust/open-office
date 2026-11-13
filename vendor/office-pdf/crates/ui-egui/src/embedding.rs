@@ -30,7 +30,6 @@ impl OfficePdfApp {
     pub fn activate_host_context(&mut self, ctx: &egui::Context) {
         self.embedded = true;
         ctx.data_mut(|data| data.insert_temp(egui::Id::new("open-office-embedded"), true));
-        self.language = "zh-hans".into();
         self.ctx = Some(ctx.clone());
         self.styled = false;
         self.fonts_ready = false;
@@ -204,18 +203,22 @@ impl OfficePdfApp {
     /// Flush the live document editors before exporting. Rejected text stays available to fix.
     pub fn commit_pending(&mut self) -> Result<(), String> {
         if self.pending_removal.is_some() {
-            return Err("请先确认或取消删除，再保存文稿".into());
+            return Err(tl!("Confirm or cancel deletion before saving the document").into());
         }
         if self.embedding_composing {
-            return Err("请先确认输入法候选文字，再保存文稿".into());
+            return Err(tl!("Confirm the current input method text before saving the document").into());
         }
         let Some((index, id)) = self.active_ids() else { return Ok(()) };
         if self.unfinished_comment().is_some() {
             self.open_comment_drafts();
-            return Err("还有未提交的批注，已打开草稿处理窗口；提交或确认放弃后即可保存文稿".into());
+            return Err(tl!("There are unsubmitted comments. Submit or discard them in the draft window before saving").into());
         }
         if !self.process_pending_edits() || !self.commit_typing_in(id) {
-            return Err(self.toast.as_ref().map(|notice| notice.0.clone()).unwrap_or_else(|| "当前输入未通过验证，请修正后再保存".into()));
+            return Err(self
+                .toast
+                .as_ref()
+                .map(|notice| notice.0.clone())
+                .unwrap_or_else(|| tl!("The current input is invalid. Correct it before saving").into()));
         }
         let line = self.views.get_mut(index).and_then(|view| view.line_editor.take());
         if let Some(line) = line
@@ -225,7 +228,7 @@ impl OfficePdfApp {
             if let Some(view) = self.views.get_mut(index) {
                 view.line_editor = Some(line);
             }
-            return Err(self.toast.as_ref().map(|notice| notice.0.clone()).unwrap_or_else(|| "无法提交正文修改".into()));
+            return Err(self.toast.as_ref().map(|notice| notice.0.clone()).unwrap_or_else(|| tl!("The text changes could not be committed").into()));
         }
         let draft = self.views.get(index).and_then(|view| view.content.draft.clone());
         let added = self.session.get(id).map(|doc| doc.added().to_vec()).unwrap_or_default();
@@ -236,7 +239,7 @@ impl OfficePdfApp {
             if let Some(view) = self.views.get_mut(index) {
                 view.content.draft = draft;
             }
-            return Err(self.toast.as_ref().map(|notice| notice.0.clone()).unwrap_or_else(|| "无法提交新增文字".into()));
+            return Err(self.toast.as_ref().map(|notice| notice.0.clone()).unwrap_or_else(|| tl!("The added text could not be committed").into()));
         }
         Ok(())
     }

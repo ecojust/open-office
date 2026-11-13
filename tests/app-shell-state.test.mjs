@@ -13,6 +13,7 @@ import * as scheduleModel from '../src/schedule/model.ts'
 import * as calendarModel from '../src/calendar/model.ts'
 import * as scheduleLayout from '../src/schedule/layout.ts'
 import * as schedulePng from '../src/schedule/png-export.ts'
+import * as localeCatalog from '../src/i18n/catalog.ts'
 
 // Run the real App.vue setup logic with Vue's real reactivity. Editors and native
 // file dialogs are controlled doubles: these are shell-state regressions, not
@@ -22,11 +23,12 @@ const app = appSource.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
 const utilities = await readFile(new URL('../src/shared/document.ts', import.meta.url), 'utf8')
 const dialogFocus = await readFile(new URL('../src/shared/dialog-focus.ts', import.meta.url), 'utf8')
 const appearanceSource = await readFile(new URL('../src/shared/appearance.ts', import.meta.url), 'utf8')
+const localeSource = await readFile(new URL('../src/shared/i18n.ts', import.meta.url), 'utf8')
 const autosaveSource = await readFile(new URL('../src/shared/autosave.ts', import.meta.url), 'utf8')
 const mcpSources = Object.fromEntries(await Promise.all(['config', 'service', 'document-tools', 'tool-schema', 'word-tools', 'sheet-tools', 'presentation-tools', 'pdf-tools', 'notes-workflow-tools', 'schedule-tools', 'calendar-tools'].map(async name =>
   [`./mcp/${name}`, await readFile(new URL(`../src/mcp/${name}.ts`, import.meta.url), 'utf8')]
 )))
-const names = 'tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,rustPdfEntries,rustPdfHandles,setRustPdfHandle,rustWordEntries,rustWordHandles,setRustWordHandle,rustSheetEntries,rustSheetHandles,setRustSheetHandle,rustPresentationEntries,rustPresentationHandles,setRustPresentationHandle,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,browserFile,saveActive,closeTab,closeAllTabs,closeWindow,resolveClose,removeTab,removeTabs,task,editorTransaction,nativeTransactionalEditor,appearance,currentDocument,globalActionsBlocked,documentActionsDisabled,globalFileAction,globalNewDocument,keydown,rustEditorFileAction,previewSlides'
+const names = 'locale,t,setLocale,tabs,activeKey,active,home,tabBar,help,helpDialog,closeDialog,saveAsDraft,saveAsOptions,saveAsCopy,openSaveAs,confirmSaveAs,cancelSaveAs,rustPdfEntries,rustPdfHandles,setRustPdfHandle,rustWordEntries,rustWordHandles,setRustWordHandle,rustSheetEntries,rustSheetHandles,setRustSheetHandle,rustPresentationEntries,rustPresentationHandles,setRustPresentationHandle,busy,error,closeTarget,readyFor,dirtyFor,editorError,stash,activate,addDocument,newDocument,openFile,openRecent,browserFile,saveActive,closeTab,closeAllTabs,closeWindow,resolveClose,removeTab,removeTabs,task,editorTransaction,nativeTransactionalEditor,appearance,currentDocument,globalActionsBlocked,documentActionsDisabled,globalFileAction,globalNewDocument,keydown,rustEditorFileAction,previewSlides'
   + ',autosaveEnabled,autosave,autosaveWaiting,saveStateLabel,saveStateTitle,backgroundSaving,editorInputBlocked,noteEntries,noteHandles,setNoteHandle,activeNote'
   + ',printDisabled,status,scheduleEntries,scheduleHandles,setScheduleHandle,activeSchedule,calendarEntries,calendarHandles,setCalendarHandle,activeCalendar'
   + ',mcpConfig,mcpSettingsOpen,mcpSettingsBusy,mcpSettingsError,mcpState,mcpWorking,mcpMutating,mcpService,toggleMcp,saveMcpSettings,openMcpSettings,workflowEntries,workflowHandles,setWorkflowHandle,composing'
@@ -50,7 +52,7 @@ function compile(source, require, extra = {}) {
 }
 
 
-function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], deckPrepareError, deckPrepare, deckWarnings = [], presentationSmokeError, presentationSmokeReport, presentationSmokeRun, sheetSmokeError, sheetSmokeReport, sheetSmokeRun, pdfPrepareError, pdfPrepare, pdfWarnings = [], pdfSmokeError, pdfSmokeReport, notebookSmokeError, notebookSmokeReport, notebookSmokeRun, workflowSmokeError, workflowSmokeReport, workflowSmokeRun, workspaceSmokeError, workspaceSmokeReport, calendarSmokeError, calendarSmokeReport, calendarSmokeRun, storedAppearance, storedAutosave, systemDark = false, storageUnavailable = false, browserUrl = 'http://127.0.0.1/', browserFetch, notebookDecodeError, mcpSmokeError, mcpSmokeReport, mcpSmokeRun} = {}) {
+function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepare, wordSmokeError, wordSmokeReport, wordSmokeRun, sheetPrepareError, sheetPrepare, sheetWarnings = [], deckPrepareError, deckPrepare, deckWarnings = [], presentationSmokeError, presentationSmokeReport, presentationSmokeRun, sheetSmokeError, sheetSmokeReport, sheetSmokeRun, pdfPrepareError, pdfPrepare, pdfWarnings = [], pdfSmokeError, pdfSmokeReport, notebookSmokeError, notebookSmokeReport, notebookSmokeRun, workflowSmokeError, workflowSmokeReport, workflowSmokeRun, workspaceSmokeError, workspaceSmokeReport, calendarSmokeError, calendarSmokeReport, calendarSmokeRun, storedAppearance, storedAutosave, storedLocale, systemDark = false, storageUnavailable = false, browserUrl = 'http://127.0.0.1/', browserFetch, notebookDecodeError, mcpSmokeError, mcpSmokeReport, mcpSmokeRun} = {}) {
   const rustPreparations = [], sheetPreparations = [], deckPreparations = [], pdfPreparations = []
   const calls = [], mounted = [], beforeUnmount = [], observers = [], native = {
     isTauri: () => nativeEnabled,
@@ -67,6 +69,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
   }
   const lifecycle = { ...vue, onMounted(callback) { mounted.push(callback) }, onBeforeUnmount(callback) { beforeUnmount.push(callback) } }
   const storage = new Map(storedAppearance === undefined ? [] : [['open-office.appearance', storedAppearance]])
+  if (storedLocale !== undefined) storage.set('open-office.locale', storedLocale)
   if (storedAutosave !== undefined) storage.set('open-office-autosave', storedAutosave)
   const windowListeners = new Map(), documentListeners = new Map(), mediaListeners = new Set()
   const timers = new Map(), intervals = new Map()
@@ -130,6 +133,11 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
   const appearance = compile(appearanceSource, name => {
     if (name === 'vue') return lifecycle
     throw Error(`Unexpected appearance helper import ${name}`)
+  }, browser)
+  const i18n = compile(localeSource, name => {
+    if (name === 'vue') return lifecycle
+    if (name === '../i18n/catalog.ts') return localeCatalog
+    throw Error(`Unexpected locale helper import ${name}`)
   }, browser)
   const helpers = compile(utilities, () => { throw Error('Unexpected helper import') })
   const modules = new Map()
@@ -199,6 +207,7 @@ function shell({nativeEnabled = true, smoke = false, rustPrepareError, rustPrepa
     if (name === './shared/id') return { createId }
     if (name === './shared/dialog-focus') return focus
     if (name === './shared/appearance') return appearance
+    if (name === './shared/i18n') return i18n
     if (name === './shared/autosave') return sharedModule(name)
     if (name === './presentation/templates') return {
       listPresentationTemplates: async () => [],
@@ -2757,4 +2766,33 @@ for(const mode of ['report','throw','cleanup','missing'])test(`failed calendar $
   assert.equal(h.calls.some(call=>call[0]==='workspace-native-smoke'),false)
   assert.equal(Object.hasOwn(report,'workspace'),false)
   h.unmount()
+})
+
+
+test('language preference changes UI without changing any live document, session or dirty state', async () => {
+  const h = shell({ storedLocale: 'en' })
+  try {
+    assert.equal(h.state.locale.value, 'en')
+    assert.equal(h.browser.document.documentElement.lang, 'en')
+    assert.equal(h.state.t('工作台'), 'Home')
+    for (const kind of ['word','sheet','presentation','pdf','note','canvas','diagram','schedule','calendar']) {
+      const tab = h.tab('保存-' + kind, { kind, dirty: true })
+      h.active(tab)
+    }
+    h.state.home.value = false
+    const documents = JSON.stringify(h.state.tabs.value)
+    const handles = [...h.state.rustWordHandles.values(), ...h.state.rustSheetHandles.values(), ...h.state.rustPresentationHandles.values(), ...h.state.rustPdfHandles.values(), ...h.state.noteHandles.values(), ...h.state.workflowHandles.values(), ...h.state.scheduleHandles.values(), ...h.state.calendarHandles.values()]
+    const calls = h.calls.length
+    h.state.setLocale('zh-CN')
+    await vue.nextTick()
+    assert.equal(h.state.t('工作台'), '工作台')
+    assert.equal(h.storage.get('open-office.locale'), 'zh-CN')
+    assert.equal(h.browser.document.documentElement.lang, 'zh-CN')
+    assert.equal(JSON.stringify(h.state.tabs.value), documents)
+    assert.deepEqual([...h.state.rustWordHandles.values(), ...h.state.rustSheetHandles.values(), ...h.state.rustPresentationHandles.values(), ...h.state.rustPdfHandles.values(), ...h.state.noteHandles.values(), ...h.state.workflowHandles.values(), ...h.state.scheduleHandles.values(), ...h.state.calendarHandles.values()], handles)
+    assert.equal(h.calls.length, calls)
+    h.dispatchWindow('storage', { key: 'open-office.locale', newValue: 'en' })
+    assert.equal(h.state.locale.value, 'en')
+    assert.equal(JSON.stringify(h.state.tabs.value), documents)
+  } finally { h.unmount() }
 })

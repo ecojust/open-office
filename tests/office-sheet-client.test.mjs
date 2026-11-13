@@ -50,6 +50,7 @@ function harness() {
     close(id) { calls.push(['close', id]); state.delete(id); return true },
     setActive(value) { calls.push(['active', value]) },
     setTheme() {},
+    setLocale() {},
     destroy() { calls.push(['destroy']) },
   }
   const module = { exports: {} }
@@ -58,6 +59,7 @@ function harness() {
     Event: class { constructor(type) { this.type = type } }, FocusEvent: class { constructor(type) { this.type = type } },
     require(name) {
       if (name === '../../shared/document') return { base64ToBytes: () => new Uint8Array() }
+      if (name === '../../shared/i18n') return { locale: { value: 'zh-CN' }, t: source => source, translate: (_, source) => source }
       if (name === '../../shared/id') return { createId: () => String(++nextId) }
       if (name === 'http://localhost/office-sheet/office-sheet.js') return { default: async () => {}, createHost: () => host }
       throw Error(`Unexpected import ${name}`)

@@ -816,7 +816,13 @@ pub(crate) fn signature_pad(
         )
         .labelled_by(l.id);
         if let Some(character) = office_pdf_fonts::script_missing(&d.text) {
-            ui.label(egui::RichText::new(format!("签名字体无法显示“{character}”，请改用手绘或图片，避免遗漏姓名。")).color(t.text_muted));
+            ui.label(
+                egui::RichText::new(crate::i18n::fmt(
+                    tl!("The signature font cannot display “{character}”. Draw or import an image to keep your full name."),
+                    &[("character", &character.to_string())],
+                ))
+                .color(t.text_muted),
+            );
         }
         let (rect, _) = ui.allocate_exact_size(vec2(pad_width, 150.0), Sense::hover());
         let painter = ui.painter_at(rect);

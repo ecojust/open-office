@@ -5,6 +5,7 @@ import vm from 'node:vm'
 import { randomUUID } from 'node:crypto'
 import ts from 'typescript'
 import * as vue from 'vue'
+import nativeMessages from '../src/i18n/en/native.ts'
 import { base64ToBytes, bytesToBase64 } from '../src/shared/document.ts'
 import { createId } from '../src/shared/id.ts'
 import { createPdfAuthorPreference, normalizePdfAuthor } from '../src/pdf/author.ts'
@@ -24,13 +25,17 @@ function evaluate(source, require, globals = {}) {
 function harness(kind = 'pdf') {
   const sheet = kind === 'sheet', format = sheet ? 'xlsx' : 'pdf'
   const state = new Map(), calls = [], document = { baseURI: 'http://localhost/', activeElement: null }
+  const language = vue.ref('zh-CN')
+  const translate = (locale, source) => locale === 'en' ? nativeMessages[source] ?? source : source
+  const i18n = { locale: language, t: source => translate(language.value, source), translate, useI18n: () => i18n }
   const authorStore = new Map(), author = { normalizePdfAuthor, pdfAuthorPreference: createPdfAuthorPreference(() => ({ getItem: key => authorStore.get(key) ?? null, setItem: (key, value) => authorStore.set(key, value) })) }
   let receive, flushGate, documentId = 0, pendingText, startGate, drainGate, flushError, authorError, discardPending = false, activeHostId
   class Element {
     children = []; parentElement; style = {}; dataset = {}; isConnected = true; listeners = new Map()
     append(child) { child.remove(); this.children.push(child); child.parentElement = this }
     remove() { if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(child => child !== this); this.parentElement = undefined }
-    setAttribute() {}
+    attributes = new Map()
+    setAttribute(name, value) { this.attributes.set(name, value) }
     addEventListener(type, callback) { this.listeners.set(type, callback) }
     removeEventListener(type) { this.listeners.delete(type) }
     dispatchEvent(event) { this.listeners.get(event.type)?.({ ...event, target: this }); return true }
@@ -71,12 +76,14 @@ function harness(kind = 'pdf') {
     async drainDiscardedInput() { calls.push(['drain', discardPending]); if (discardPending) { if (drainGate) await drainGate; discardPending = false } },
     setActive(value) { calls.push(['active', value]) },
     setTheme(value) { calls.push(['theme', value]) },
+    setLocale(value) { calls.push(['locale', value]) },
     destroy() { calls.push(['destroy']) },
   }
   const globals = { document, window: { dispatchEvent() {} }, HTMLElement: Element, HTMLInputElement: Input, Event: class { constructor(type) { this.type = type } }, FocusEvent: class { constructor(type) { this.type = type } }, InputEvent: class { constructor(type, options) { this.type = type; Object.assign(this, options) } } }
   const client = evaluate(sheet ? sheetClientSource : clientSource, name => {
     if (name === '../../shared/document') return { base64ToBytes }
     if (name === '../../shared/id') return { createId }
+    if (name === '../../shared/i18n') return i18n
     if (name === '../author') return author
     if (name === (sheet ? 'http://localhost/office-sheet/office-sheet.js' : 'http://localhost/office-pdf/office_pdf.js')) return { default: async () => {}, createHost(callback) { receive = callback; return host } }
     throw Error(`Unexpected import ${name}`)
@@ -90,6 +97,7 @@ function harness(kind = 'pdf') {
     scope.run(() => evaluate(sheet ? sheetEditorSource : editorSource, name => {
       if (name === 'vue') return { ...vue, onBeforeUnmount(callback) { unmount.push(callback) } }
       if (name === '../shared/document') return { bytesToBase64 }
+      if (name === '../shared/i18n') return i18n
       if (name === '../shared/printing') return { printPdf: () => assert.fail('Unexpected printing in a non-printing PDF component test') }
       if (name === '../pdf/author') return author
       if (name === '../shared/dialog-focus') return { useDialogFocus() {} }
@@ -98,7 +106,7 @@ function harness(kind = 'pdf') {
     }, { ...globals, defineProps: () => props, withDefaults: value => value, defineEmits: () => (...event) => events.push(event), defineExpose(value) { exposed = value } }))
     return { props, events, editor: exposed, dispose() { unmount.forEach(callback => callback()); scope.stop() } }
   }
-  return { client, open, source, state, calls, document, Element, component, setFlushGate(value) { flushGate = value }, authorStore, author: author.pdfAuthorPreference, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value }, setDrainGate(value) { drainGate = value }, setFlushError(value) { flushError = value }, setAuthorError(value) { authorError = value } }
+  return { client, open, source, state, calls, document, Element, component, language, setFlushGate(value) { flushGate = value }, authorStore, author: author.pdfAuthorPreference, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value }, setDrainGate(value) { drainGate = value }, setFlushError(value) { flushError = value }, setAuthorError(value) { authorError = value } }
 }
 
 test('PDF identity applies before editing and follows open tabs without changing document receipts or drafts', async () => {
@@ -520,4 +528,35 @@ for (const kind of ['sheet', 'pdf']) {
   assert.equal(h.state.get(current.id).dirty, true)
   await current.close(true)
  })
+}
+
+for (const [kind, name] of [['pdf', 'Pdf'], ['sheet', 'Sheet']]) {
+  test(`${name} initializes language before preparation and changes labels without flushing drafts`, async () => {
+    const h = harness(kind)
+    h.language.value = 'en'
+    const first = await h.open(), second = await h.open()
+    const initialLocale = h.calls.findIndex(call => call[0] === 'locale')
+    assert.equal(h.calls[initialLocale][1], 'en')
+    assert.ok(initialLocale < h.calls.findIndex(call => call[0] === 'prepare'))
+    const container = new h.Element()
+    await first.attach(container, true)
+    const canvas = container.children[0]
+    assert.ok(!/[\u3400-\u9fff]/.test(canvas.attributes.get('aria-label')))
+    h.pending(first.id, '未提交的 draft')
+    const before = structuredClone([...h.state])
+    const firstReceipt = JSON.stringify(first.snapshot), secondReceipt = JSON.stringify(second.snapshot)
+    const calls = h.calls.length
+    h.language.value = 'zh-CN'
+    await h.client[`setRust${name}Locale`]('zh-CN')
+    assert.match(canvas.attributes.get('aria-label'), /[\u3400-\u9fff]/)
+    h.language.value = 'en'
+    await h.client[`setRust${name}Locale`]('en')
+    assert.ok(!/[\u3400-\u9fff]/.test(canvas.attributes.get('aria-label')))
+    assert.deepEqual(h.calls.slice(calls), [['locale', 'zh-CN'], ['locale', 'en']])
+    assert.deepEqual([...h.state], before)
+    assert.equal(JSON.stringify(first.snapshot), firstReceipt)
+    assert.equal(JSON.stringify(second.snapshot), secondReceipt)
+    await first.settled()
+    assert.equal(h.state.get(first.id).text, '未提交的 draft', 'The draft is preserved until an explicit flush')
+  })
 }

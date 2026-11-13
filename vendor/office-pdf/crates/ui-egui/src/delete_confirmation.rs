@@ -61,14 +61,14 @@ impl OfficePdfApp {
             return false;
         }
         let label = edit.label();
-        self.request_removal(Removal::Edit(Box::new(edit.clone())), label.said(crate::i18n::tr(crate::i18n::current(), label.wording)));
+        self.request_removal(Removal::Edit(Box::new(edit.clone())), label.said(label.wording));
         true
     }
 
     pub(crate) fn remove_selected_content(&mut self, page: usize, index: usize) {
         let edit = Edit::DeleteContent { page, index };
         if self.embedded {
-            self.request_removal(Removal::Edit(Box::new(edit)), "删除选中的内容".into());
+            self.request_removal(Removal::Edit(Box::new(edit)), "Delete the selected content".into());
         } else {
             self.apply_edit(edit);
         }
@@ -84,7 +84,10 @@ impl OfficePdfApp {
             return;
         }
         if let Some(saved) = if initials { self.initials.clone() } else { self.signature.clone() } {
-            self.request_removal(Removal::Signature { initials, saved }, if initials { "删除保存的首字母签名" } else { "删除保存的签名" }.into());
+            self.request_removal(
+                Removal::Signature { initials, saved },
+                if initials { "Delete the saved initials" } else { "Delete the saved signature" }.into(),
+            );
         }
     }
 
@@ -95,7 +98,7 @@ impl OfficePdfApp {
             self.quick_tool = crate::QuickTool::Select;
             return;
         }
-        self.request_removal(Removal::Stamp { index, saved }, "删除保存的图章".into());
+        self.request_removal(Removal::Stamp { index, saved }, "Delete the saved stamp".into());
     }
 
     pub(crate) fn resolve_removal(&mut self, confirmed: bool) -> Result<(), String> {
@@ -105,25 +108,25 @@ impl OfficePdfApp {
         }
         let current = self.active_ids().and_then(|(_, id)| self.session.get(id).map(|doc| (id, doc.edit_generation())));
         if current != pending.document {
-            return Err("文稿已变化，请重新选择要删除的内容".into());
+            return Err(tl!("The document has changed. Select the content to delete again").into());
         }
         match pending.action {
             Removal::Edit(edit) => {
                 if !self.apply_edit_confirmed(*edit) {
-                    return Err("删除未完成，原内容已保留".into());
+                    return Err(tl!("Deletion was not completed. The original content is preserved").into());
                 }
             }
             Removal::Signature { initials, saved } => {
                 let target = if initials { &mut self.initials } else { &mut self.signature };
                 if target.as_ref() != Some(&saved) {
-                    return Err("保存的签名已变化，请重新选择".into());
+                    return Err(tl!("The saved signature has changed. Select it again").into());
                 }
                 *target = None;
                 self.quick_tool = crate::QuickTool::Select;
             }
             Removal::Stamp { index, saved } => {
                 if self.custom_stamps.get(index) != Some(&saved) {
-                    return Err("图章列表已变化，请重新选择".into());
+                    return Err(tl!("The stamp list has changed. Select a stamp again").into());
                 }
                 self.custom_stamps.remove(index);
                 self.quick_tool = crate::QuickTool::Select;
@@ -135,19 +138,25 @@ impl OfficePdfApp {
 
 pub(crate) fn show(app: &mut OfficePdfApp, ctx: &egui::Context) {
     let Some(pending) = &app.pending_removal else { return };
-    let label = pending.label.clone();
+    let label = match &pending.action {
+        Removal::Edit(edit) => {
+            let label = edit.label();
+            label.said(crate::i18n::t(label.wording))
+        }
+        _ => crate::i18n::t(&pending.label).to_owned(),
+    };
     let mut choice = None;
     let modal = widgets::show_modal(ctx, "pdf-delete-confirmation", |ui| {
         ui.set_width((ctx.content_rect().width() - 64.0).clamp(200.0, 360.0));
-        ui.heading("确认删除");
-        ui.label(format!("确定要{label}吗？"));
-        ui.label(egui::RichText::new("取消会保留当前内容。").small());
+        ui.heading(tl!("Confirm deletion"));
+        ui.label(crate::i18n::fmt(tl!("Continue with {action}?"), &[("action", &label)]));
+        ui.label(egui::RichText::new(tl!("Cancel to keep the current content.")).small());
         ui.add_space(12.0);
         ui.horizontal(|ui| {
-            if widgets::pill_button(ui, "取消", false).clicked() {
+            if widgets::pill_button(ui, tl!("Cancel"), false).clicked() {
                 choice = Some(false);
             }
-            if widgets::pill_button(ui, "确认删除", true).clicked() {
+            if widgets::pill_button(ui, tl!("Confirm deletion"), true).clicked() {
                 choice = Some(true);
             }
         });

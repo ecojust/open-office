@@ -99,7 +99,7 @@ impl OfficePdfApp {
 
     fn open_created_bytes(&mut self, name: &str, created: Result<Arc<Vec<u8>>, String>) -> Result<(), String> {
         if self.embedded && !self.views.is_empty() {
-            return Err("请使用顶部“新建”按钮创建 PDF 文稿".into());
+            return Err(tl!("Use New in the top toolbar to create a PDF").into());
         }
         let bytes = created?;
         let id = self.session.open_new(name, bytes).map_err(|e| e.to_string())?;
