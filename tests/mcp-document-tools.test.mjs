@@ -121,3 +121,23 @@ test('explicit schedule PNG export preserves only a bounded generated PNG; ordin
  h.handle.mcpExecute = async () => { h.stop(); return png }
  await assert.rejects(executeDocumentTool('schedule',h.handle,'schedule_export',{format:'png'},h.guard), /stopped/)
 })
+
+
+test('schedule PNG export validates near-7-MiB payloads without a payload-sized regexp stack', async () => {
+ const h=harness(), limit=7*1024*1024
+ const png={format:'png',mimeType:'image/png',encoding:'base64',base64:'',width:1,height:1,scale:2}
+ const prefix='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC'
+ const length=Math.floor((limit-Buffer.byteLength(JSON.stringify(png)))/4)*4
+ const body=prefix+'A'.repeat(length-prefix.length-4)
+ for (const ending of ['AAAA','AAA=','AA==']) {
+  const value={...png,base64:body+ending}
+  h.handle.mcpExecute=async()=>value
+  assert.deepEqual(await executeDocumentTool('schedule',h.handle,'schedule_export',{format:'png'},h.guard),value)
+ }
+ h.handle.mcpExecute=async()=>({...png,base64:body+'A'.repeat(8)})
+ await assert.rejects(executeDocumentTool('schedule',h.handle,'schedule_export',{format:'png'},h.guard), /7 MiB/)
+ for (const ending of ['A===','AA=A','AA_A','AA-A','AAA\n','AAB=']) {
+  h.handle.mcpExecute=async()=>({...png,base64:body+ending})
+  await assert.rejects(executeDocumentTool('schedule',h.handle,'schedule_export',{format:'png'},h.guard), /PNG 导出结果无效/)
+ }
+})

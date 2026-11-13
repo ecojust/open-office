@@ -45,6 +45,33 @@ test('notebook raster whitelist rejects remote, SVG, mislabeled, malformed and o
  const result=model.validateNotebook(source); assert.equal(result.onclick,undefined); assert.equal(result.sections[0].style,undefined); assert.deepEqual(result.sections[0].pages[0].regions[0].blocks[0].content,[{text:'safe'}])
 })
 
+test('notebook image validation stays stack-safe at the 4 MiB decoded boundary with every padding length', () => {
+ const bytes=Buffer.alloc(model.NOTE_IMAGE_MAX_BYTES+3)
+ for (const [mime, signature] of [['png', Buffer.from(png.split(',')[1], 'base64')], ['jpeg', Buffer.from([255,216,255])]]) {
+  bytes.fill(0);signature.copy(bytes)
+  for (const size of [model.NOTE_IMAGE_MAX_BYTES-2,model.NOTE_IMAGE_MAX_BYTES-1,model.NOTE_IMAGE_MAX_BYTES]) {
+   const dataUrl=`data:image/${mime};base64,${bytes.subarray(0,size).toString('base64')}`
+   assert.equal(model.validateImage(dataUrl),dataUrl)
+  }
+  for (const size of [model.NOTE_IMAGE_MAX_BYTES+1,model.NOTE_IMAGE_MAX_BYTES+3]) {
+   assert.throws(()=>model.validateImage(`data:image/${mime};base64,${bytes.subarray(0,size).toString('base64')}`), /图片内容与格式不符|不超过 4 MB/)
+  }
+ }
+})
+
+test('notebook image validation preserves strict MIME, alphabet and padding rules without normalizing data', () => {
+ const body=png.split(',')[1]
+ for (const dataUrl of [
+  png.replace('image/png','image/PNG'),png.replace('image/png','image/jpg'),png.replace(';base64,',';BASE64,'),
+  ...['', '====', body.slice(0,-1), body+'=', body.slice(0,-4)+'A===', body.slice(0,-4)+'AA=A',
+   body.slice(0,32)+'-'+body.slice(33),body.slice(0,32)+'_'+body.slice(33),
+   body+'\n',body+'\r\n',body.slice(0,32)+'\r\n'+body.slice(32)].map(value=>'data:image/png;base64,'+value),
+ ]) assert.throws(()=>model.validateImage(dataUrl), /不超过 4 MB/)
+ // This validator checks the image signature, but never canonicalizes payload bits.
+ const nonCanonical=png.slice(0,-2)+'J='
+ assert.equal(model.validateImage(nonCanonical),nonCanonical)
+})
+
 test('save receipts protect newer edits and never mutate history or acknowledge different bytes', () => {
  const session=new NotebookSession(); assert.equal(session.inspect().dirty,false)
  text(session,'first'); const first=session.export()

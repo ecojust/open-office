@@ -2,7 +2,7 @@ import { Inflate, strFromU8 } from 'fflate'
 import { DEFAULT_STYLE, type ElementStyle, type Endpoint, type ImportedScene, type Scene, type SceneElement, type ShapeElement, type Point } from '../core/types.ts'
 import { edgePoints, isBraceShape, shapeOutline, braceTextBounds, rectangleCornerRadius, normalizedRotation, rotatePoint, elementBounds } from '../core/geometry.ts'
 import { resolveStrokePattern, sceneDefaultStyle } from '../core/appearance.ts'
-import { validateElementStyle } from '../core/documents.ts'
+import { safeImage as validImage, validateElementStyle } from '../core/documents.ts'
 import { readBrushData } from '../core/brushes.ts'
 
 const MAX_TEXT = 20 * 1024 * 1024
@@ -109,10 +109,7 @@ function plainLabel(value: string, warnings: Set<string>, html: boolean): string
 
 function safeImage(value: string | undefined): string | undefined {
   const normalized = value?.replace(/^data:image\/(png|jpeg|webp),/i, 'data:image/$1;base64,').replace(/[\r\n]/g, '')
-  if (!normalized || normalized.length > 14 * 1024 * 1024 || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z\d+/]+={0,2}$/i.test(normalized)) return undefined
-  const body = normalized.slice(normalized.indexOf(',') + 1)
-  const bytes = Math.floor(body.length * 3 / 4) - (body.endsWith('==') ? 2 : body.endsWith('=') ? 1 : 0)
-  return body.length % 4 === 0 && bytes <= 10 * 1024 * 1024 ? normalized : undefined
+  return validImage(normalized) ? normalized : undefined
 }
 
 function importModel(model: Element, title: string): ImportedScene {

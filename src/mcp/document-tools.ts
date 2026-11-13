@@ -91,10 +91,12 @@ function schedulePngResult(value: unknown): Record<string, unknown> {
  const { format, mimeType, encoding, base64, width, height, scale } = value as Record<string, unknown>
  if (typeof base64 === 'string' && base64.length > MAX_RESULT_BYTES) throw Error('排期 PNG 超过 MCP 的 7 MiB 返回上限，请降低日宽或通过界面导出。')
  if (format !== 'png' || mimeType !== 'image/png' || encoding !== 'base64' || typeof base64 !== 'string' || base64.length < 44 || base64.length % 4 !== 0 ||
-     !/^[A-Za-z0-9+/]+={0,2}$/.test(base64) ||
      typeof width !== 'number' || !Number.isInteger(width) || width < 1 || width > SCHEDULE_PNG_MAX_SIDE ||
      typeof height !== 'number' || !Number.isInteger(height) || height < 1 || height > SCHEDULE_PNG_MAX_SIDE || width * height > SCHEDULE_PNG_MAX_PIXELS ||
      typeof scale !== 'number' || !Number.isFinite(scale) || scale <= 0 || scale > 2) throw invalid()
+ // Keep the payload scan stack-safe at the MCP result limit.
+ const padding = /={1,2}$/.exec(base64), content = padding ? base64.slice(0, padding.index) : base64
+ if (!content || /[^A-Za-z0-9+/]/.test(content)) throw invalid()
  const header = Uint8Array.from(atob(base64.slice(0, 44)), character => character.charCodeAt(0))
  const data = new DataView(header.buffer)
  if (data.getUint32(0) !== 0x89504e47 || data.getUint32(4) !== 0x0d0a1a0a || data.getUint32(8) !== 13 ||

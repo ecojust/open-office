@@ -27,13 +27,17 @@ export function noteTitle(value: string): string { const title = text(value.trim
 export function notebookTitle(value: string): string { const title = text(value.trim(), 240); if (!title) throw Error('名称不能为空。'); return title }
 export function validateImage(dataUrl: unknown): string {
  if (typeof dataUrl !== 'string') throw Error('图片数据无效。')
- const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl)
- if (!match || match[2].length % 4 !== 0 || match[2].length > Math.ceil(NOTE_IMAGE_MAX_BYTES / 3) * 4) throw Error('仅支持不超过 4 MB 的 PNG 或 JPEG 图片。')
+ const match = /^data:image\/(png|jpeg);base64,/.exec(dataUrl)
+ const encoded = match ? dataUrl.slice(match[0].length) : ''
+ if (!match || encoded.length % 4 !== 0 || encoded.length > Math.ceil(NOTE_IMAGE_MAX_BYTES / 3) * 4) throw Error('仅支持不超过 4 MB 的 PNG 或 JPEG 图片。')
+ // Scan invalid characters without backtracking across a multi-megabyte payload.
+ const padding = /={1,2}$/.exec(encoded), content = padding ? encoded.slice(0, padding.index) : encoded
+ if (!content || /[^A-Za-z0-9+/]/.test(content)) throw Error('仅支持不超过 4 MB 的 PNG 或 JPEG 图片。')
  let header: string
- try { header = atob(match[2].slice(0, 32)) } catch { throw Error('图片编码无效。') }
+ try { header = atob(encoded.slice(0, 32)) } catch { throw Error('图片编码无效。') }
  const png = [137,80,78,71,13,10,26,10].every((v,i) => header.charCodeAt(i) === v)
  const jpeg = header.charCodeAt(0) === 255 && header.charCodeAt(1) === 216 && header.charCodeAt(2) === 255
- const decodedSize = match[2].length / 4 * 3 - (match[2].endsWith('==') ? 2 : match[2].endsWith('=') ? 1 : 0)
+ const decodedSize = encoded.length / 4 * 3 - (encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0)
  if (decodedSize > NOTE_IMAGE_MAX_BYTES || (match[1] === 'png' ? !png : !jpeg)) throw Error('图片内容与格式不符。')
  return dataUrl
 }

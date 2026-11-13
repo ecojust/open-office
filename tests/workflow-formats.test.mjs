@@ -6,6 +6,8 @@ import { importGraphXml, exportGraphXml } from '../src/workflow/formats/graph-xm
 import { importBoardJson, exportBoardJson } from '../src/workflow/formats/board-json.ts'
 import { DEFAULT_STYLE } from '../src/workflow/core/types.ts'
 import { applyGlobalLineStyle } from '../src/workflow/core/appearance.ts'
+import { safeImage } from '../src/workflow/core/documents.ts'
+import { safeImageData } from '../src/workflow/core/svg.ts'
 
 globalThis.DOMParser = class {
   parseFromString(value, mime) {
@@ -206,9 +208,53 @@ test('both formats retain a single-point pencil mark rather than silently droppi
 test('image size limits include base64 overhead and graph XML never silently drops an invalid image', () => {
   const image = { ...shape('large-image', 'image', 0, 0), imageData: `data:image/png;base64,${'A'.repeat(11 * 1024 * 1024)}` }
   const value = { background: '#ffffff', grid: false, elements: [image] }
+  assert.equal(safeImage(image.imageData), true)
+  assert.equal(safeImageData(image.imageData), true)
   assert.ok(exportGraphXml(value, '大图片').includes('image=data:image/png,'))
   assert.ok(exportBoardJson(value).includes('data:image/png;base64,'))
   image.imageData = 'https://example.invalid/image.png'
   assert.throws(() => exportGraphXml(value, '拒绝外部图片'), /导出图片/)
   assert.throws(() => exportBoardJson(value), /导出图片/)
+})
+
+test('image validators retain MIME, alphabet, padding and graph XML normalization rules', () => {
+  for (const data of ['data:image/png;base64,AAAA', 'data:image/jpeg;base64,AA==', 'data:image/webp;base64,AAA=', 'data:image/png;base64,A\r\nAAA', 'data:image/png;base64,AA\r\n==']) {
+    assert.equal(safeImage(data), true, data)
+    assert.equal(safeImageData(data), true, data)
+    const value = { background: '#ffffff', grid: false, elements: [{ ...shape('image', 'image', 0, 0), imageData: data }] }
+    assert.equal(importBoardJson(exportBoardJson(value)).scene.elements[0].imageData, data)
+    assert.equal(importGraphXml(exportGraphXml(value))[0].scene.elements[0].imageData, data.replace(/[\r\n]/g, ''))
+  }
+  for (const data of ['data:image/gif;base64,AAAA', 'data:image/svg+xml;base64,AAAA', 'data:image/png;base64,', 'data:image/png;base64,=', 'data:image/png;base64,==\n', 'data:image/png;base64,A===', 'data:image/png;base64,AA=A', 'data:image/png;base64,AAAA====', 'data:image/png;base64,AA-A', 'data:image/png;base64,AA_A', 'data:image/png;base64,AA A', 'data:image/png;base64,AA\tA']) {
+    assert.equal(safeImage(data), false, data)
+    assert.equal(safeImageData(data), false, data)
+    const value = { background: '#ffffff', grid: false, elements: [{ ...shape('image', 'image', 0, 0), imageData: data }] }
+    assert.throws(() => exportGraphXml(value), /导出图片/, data)
+    assert.throws(() => exportBoardJson(value), /导出图片/, data)
+  }
+  // The SVG renderer retains its existing syntax-only, case-sensitive policy.
+  assert.equal(safeImage('DATA:IMAGE/PNG;BASE64,AAAA'), true)
+  assert.equal(safeImageData('DATA:IMAGE/PNG;BASE64,AAAA'), false)
+  assert.equal(safeImage('data:image/png;base64,AAA'), false)
+  assert.equal(safeImageData('data:image/png;base64,AAA'), true)
+  assert.equal(safeImage('data:image/png;base64,AA==\n'), false)
+  assert.equal(safeImageData('data:image/png;base64,AA==\n'), false)
+  const graph = model('<mxCell id="image" vertex="1" parent="1" style="shape=image;image=data:image/png,AA==;"><mxGeometry width="20" height="20" as="geometry"/></mxCell>')
+  assert.equal(importGraphXml(graph)[0].scene.elements[0].imageData, 'data:image/png;base64,AA==')
+})
+
+test('image validators retain exact decoded-byte and encoded-length limits', () => {
+  const prefix = 'data:image/png;base64,'
+  const limit = 10 * 1024 * 1024
+  const atLimit = prefix + Buffer.alloc(limit).toString('base64')
+  const overLimit = prefix + Buffer.alloc(limit + 1).toString('base64')
+  assert.equal(safeImage(atLimit), true)
+  assert.equal(safeImage(overLimit), false)
+  assert.equal(safeImageData(overLimit), true)
+  const encodedLimit = prefix + 'AAAA' + '\n'.repeat(14 * 1024 * 1024 - prefix.length - 4)
+  assert.equal(safeImage(encodedLimit), true)
+  assert.equal(safeImage(encodedLimit + '\n'), false)
+  const svgLimit = prefix + 'A'.repeat(16_000_000 - prefix.length)
+  assert.equal(safeImageData(svgLimit), true)
+  assert.equal(safeImageData(svgLimit + 'A'), false)
 })

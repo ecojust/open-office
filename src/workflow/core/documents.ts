@@ -29,8 +29,13 @@ export function safeColor(value: unknown, fallback = '#ffffff'): string {
   return /^(?:#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})|transparent|none|black|white|red|blue|green|yellow|orange|purple|gray|grey|pink|cyan|magenta|navy|teal|lime|maroon|olive|silver|aqua|fuchsia|rebeccapurple|rgba?\([\d.% ,/]+\)|hsla?\([\d.% ,/]+\))$/i.test(value) ? value : fallback
 }
 export function safeImage(value: unknown): value is string {
-  if (typeof value !== 'string' || value.length > 14 * 1024 * 1024 || !/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/\r\n]+={0,2}$/i.test(value)) return false
-  const body = value.slice(value.indexOf(',') + 1).replace(/[\r\n]/g, '')
+  if (typeof value !== 'string' || value.length > 14 * 1024 * 1024 || !/^data:image\/(?:png|jpeg|webp);base64,/i.test(value)) return false
+  const encoded = value.slice(value.indexOf(',') + 1)
+  // Keep payload scans stack-safe even when V8 interprets the regexp for a large image.
+  const padding = /={1,2}$/.exec(encoded)
+  const content = padding ? encoded.slice(0, padding.index) : encoded
+  if (!content || /[^A-Za-z0-9+/\r\n]/.test(content)) return false
+  const body = encoded.replace(/[\r\n]/g, '')
   const bytes = Math.floor(body.length * 3 / 4) - (body.endsWith('==') ? 2 : body.endsWith('=') ? 1 : 0)
   return body.length % 4 === 0 && bytes <= 10 * 1024 * 1024
 }
