@@ -112,8 +112,11 @@ async function prepareDraft(kind, key, context) {
     const state = await call(key, 'inspect');
     const selected = state.selection.shapes?.[0]; assert.ok(selected, 'New text box is selected');
     await call(key, 'command', 'text.edit', { id: selected });
-    await call(key, 'command', 'text.compose', { text: '未提交输入' }); await frames();
-    return async () => ({ background: await call(key, 'canBackgroundExport'), content: await content(kind, key) });
+    await call(key, 'focus');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'office-presentation-input');
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Input.imeSetComposition', { text: '未提交输入', selectionStart: 5, selectionEnd: 5 }); await frames();
+    return async () => ({ input: await page.getByTestId('office-presentation-input').inputValue(), focused: await page.evaluate(() => document.activeElement?.getAttribute('data-testid')), background: await call(key, 'canBackgroundExport'), content: await content(kind, key) });
   }
   await call(key, 'command', 'ui.set', { key: 'panel', value: 'comments' }); await frames(6);
   const ui = await call(key, 'query', 'ui.state'), box = await page.getByTestId('pdf-canvas').boundingBox();
@@ -169,12 +172,15 @@ async function run(kind) {
     const draft = await readDraft(), draftReceipt = receipt(await call(first, 'inspect'));
     assert.equal(draft.background, false, 'An unfinished edit must remain pending');
     for (const value of ['zh-CN', 'en']) {
-      // Change the preference without introducing the browser's normal focus-loss commit.
-      await locale(value); await expectLanguage(kind, first, value);
+      // The real shell button must preserve focus, including active browser composition.
+      await locale(value, true); await expectLanguage(kind, first, value);
       assert.deepEqual(await readDraft(), draft);
       assert.deepEqual(receipt(await call(first, 'inspect')), draftReceipt);
     }
     pass(kind + ': changing language retains unfinished text and does not flush input');
+  } catch (error) {
+    if (page && !page.isClosed()) await page.screenshot({ path: path.join(output, `${kind}-failure.png`) }).catch(() => {});
+    throw error;
   } finally { await browser.close(); browser = undefined; }
 }
 (async () => {

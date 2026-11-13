@@ -60,6 +60,26 @@ fs.mkdirSync(output, { recursive: true });
    await toggle().click();assert.match(await page.locator('.editor-status').textContent(),/所有文件，仅在你的设备上处理/);assert.match(await page.locator('.error-banner').textContent(),/名称不能超过 240 字/);assert.deepEqual(await state(),before);
    const raw=await page.evaluate(()=>{const app=document.querySelector('#app').__vue_app__._instance.setupState;return{status:app.status,error:app.error}});assert.equal(raw.status,'所有文件，仅在你的设备上处理');assert.equal(raw.error,'名称不能超过 240 字。');
   });
+  await check('Mouse language toggles retain source focus, selection and an active composition draft',async()=>{
+   await page.evaluate(()=>{document.querySelector('#app').__vue_app__._instance.setupState.error=''});
+   await page.getByTestId('shell-new').click();await page.getByTestId('shell-new-diagram').click();
+   const source=page.locator('[data-testid=workflow-editor]:visible [data-testid=diagram-source]');await source.waitFor();
+   await source.fill('flowchart LR\n  A[用户内容] --> B[Keep content]');await page.waitForTimeout(300);
+   await source.focus();await page.keyboard.press('Control+End');
+   // Synthetic composition keeps the draft pending so a normal debounce cannot
+   // masquerade as a locale-induced commit. Physical IME behavior is not claimed.
+   await source.dispatchEvent('compositionstart',{data:''});await page.keyboard.insertText('\n# 未提交草稿');
+   await source.evaluate(element=>{const api=element.closest('.diagram-source-editor').__vueParentComponent.exposed;api.setSelectionRange(api.value.indexOf('未提交'),api.value.length)});
+   const snapshot=()=>source.evaluate(element=>{const api=element.closest('.diagram-source-editor').__vueParentComponent.exposed,selection=window.getSelection();return{focused:document.activeElement===element,value:api.value,start:api.selectionStart,end:api.selectionEnd,direction:api.selectionDirection,domText:selection?.toString(),anchorOffset:selection?.anchorOffset,focusOffset:selection?.focusOffset}});
+   const draftBefore=await snapshot(),sessionBefore=await state();assert.equal(draftBefore.focused,true);assert.equal(draftBefore.domText,'未提交草稿');
+   for(const language of ['en','zh-CN']){
+    await toggle().click();await frame();assert.equal(await page.locator('html').getAttribute('lang'),language);
+    assert.deepEqual(await snapshot(),draftBefore,'Actual pointer click keeps CodeMirror focus, raw/DOM selection and pending source');
+    assert.deepEqual(await state(),sessionBefore,'Language toggle does not commit the active composition draft');
+    assert.equal(await source.getAttribute('aria-label'),language==='en'?'Code diagram source':'代码图表源码');
+   }
+   await source.dispatchEvent('compositionend',{data:'未提交草稿'});
+  });
   await page.reload({waitUntil:'domcontentloaded',timeout:60000});await toggle().waitFor();assert.equal(await page.locator('html').getAttribute('lang'),'zh-CN');assert.equal(await page.locator('.home-heading h1').textContent(),'工作台');
   assert.deepEqual(report.errors,[]);report.ok=true;console.log(JSON.stringify({ok:true,checks:report.checks.length,layouts:report.layouts}));
  } finally {fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2));await browser?.close();await server?.close();}
