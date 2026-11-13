@@ -6,6 +6,7 @@ This locally compiled WASM module embeds the real `WordApp` on one egui canvas. 
 
 - `prepare(id, name, bytes)` parses a new session without activating it; empty bytes create a blank document. Duplicate IDs and imports larger than 64 MiB are rejected.
 - `start(canvas)` starts one shared WebRunner. `activate(id)` selects an existing session.
+- `setLocale("zh-CN"|"en")` changes interface text in every existing and future session without flushing input, changing proofing language, or touching document history. `setTheme("system"|"light"|"dark")` applies the shell's appearance preference with the same document isolation.
 - `inspect(id)` returns JSON including content revision, dirty/undo/redo state, selection, formatting, text, page count and the upstream UI geometry.
 - `command(id, commandId, paramsJson)` runs an upstream command and returns JSON `{ok,result?,error?,snapshot}`. File lifecycle commands are delegated to Vue. Filesystem-path parameters, macros and Repeat are unavailable through this bridge. Paragraph path arrays remain valid.
 - `host.deliverPicture` / `host.cancelPicture` are picker-completion adapters for WordApp's existing insert-or-change-picture flow. They do not implement a replacement image engine.

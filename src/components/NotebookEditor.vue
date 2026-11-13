@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import Icon from './Icon.vue'
+import { useI18n } from '../shared/i18n'
 import NotebookCanvas from './NotebookCanvas.vue'
 import type { NativeDocument } from '../types'
 import type { Appearance } from '../shared/appearance'
@@ -13,6 +14,7 @@ import { editNotebook, findNotePage, type NoteEditOperation } from '../notes/mcp
 import { renderBlocks } from '../notes/dom'
 import { noteSearchMatches, searchSegments } from '../notes/search'
 
+const { t } = useI18n()
 const props = withDefaults(defineProps<{ document: NativeDocument; active?: boolean; disabled?: boolean; theme?: Appearance }>(), { active: true, disabled: false, theme: 'system' })
 const emit = defineEmits<{ ready: []; dirty: [value: boolean]; 'title-change': [title: string]; error: [message: string]; status: [message: string]; 'file-action': [action: 'new'|'open'|'save'|'saveAs'|'print'|'close'] }>()
 const canvas = ref<InstanceType<typeof NotebookCanvas>>(), titleInput = ref<HTMLInputElement>(), searchInput = ref<HTMLInputElement>(), dialogInput = ref<HTMLInputElement>()
@@ -25,7 +27,8 @@ const undoAvailable = ref(false), redoAvailable = ref(false), dirty = ref(false)
 const smartAlignment = ref(true), snapToGrid = ref(true)
 // Invalid titles remain editable drafts when shell barriers cause a rerender.
 const titleDraft = ref<string>()
-const dialog = ref<{ title: string; message?: string; value: string; destructive: boolean; documentName: boolean; apply: (value: string) => void }>()
+const dialog = ref<{ title: string; message?: string | (() => string); value: string; destructive: boolean; documentName: boolean; apply: (value: string) => void }>()
+const dialogMessage = computed(() => { const message = dialog.value?.message; return typeof message === 'function' ? message() : message ? t(message) : '' })
 const pageMenu = ref<{ sectionId: string; pageId: string; x: number; y: number }>()
 let menuTrigger: HTMLElement | undefined
 let session: NotebookSession | undefined, disposed = false, token = 0
@@ -95,7 +98,7 @@ async function selectPage(sectionId: string, pageId: string) {
  await nextTick(); render()
  if (query.value.trim() && !noteSearchMatches(page.value?.title ?? '',query.value).length) canvas.value?.revealMatch()
 }
-function openDialog(title: string, value: string, apply: (value: string) => void, message?: string, documentName = false) {
+function openDialog(title: string, value: string, apply: (value: string) => void, message?: string | (() => string), documentName = false) {
  if (!controlsReady.value || !commitBody()) return
  closePageMenu(); dialog.value = { title, value, apply, destructive: !!message, message, documentName }
  nextTick(() => { dialogInput.value?.focus(); dialogInput.value?.select() })
@@ -153,7 +156,7 @@ function deleteSection() {
  openDialog('删除分区', '', () => {
   change(copy => { copy.sections = copy.sections.filter(item => item.id !== target.id); if (!copy.sections.length) copy.sections.push({ id: noteId(), title: '日常笔记', pages: [blankPage()] }) })
   currentSection.value = model.value!.sections[0].id; currentPage.value = model.value!.sections[0].pages[0].id
- }, `删除“${target.title}”及其中 ${target.pages.length} 个页面？可以使用撤销恢复。`)
+ }, () => t('删除“{title}”及其中 {count} 个页面？可以使用撤销恢复。', { title: target.title, count: target.pages.length }))
 }
 function deletePage() {
  const target = page.value, owner = section.value; if (!target || !owner) return
@@ -161,7 +164,9 @@ function deletePage() {
  openDialog('删除页面', '', () => {
   change(copy => { const targetSection = copy.sections.find(item => item.id === owner.id)!; targetSection.pages = targetSection.pages.filter(item => !ids.has(item.id)); if (!targetSection.pages.length) targetSection.pages.push(blankPage()) })
   currentPage.value = section.value!.pages.find(item=>item.id===target.parentId)?.id ?? section.value!.pages[0].id
- }, `删除“${target.title || '无标题页面'}”${ids.size>1 ? `及其 ${ids.size-1} 个子页面` : ''}的全部内容？可以使用撤销恢复。`)
+ }, () => ids.size > 1
+  ? t('删除“{title}”及其 {count} 个子页面的全部内容？可以使用撤销恢复。', { title: target.title || t('无标题页面'), count: ids.size - 1 })
+  : t('删除“{title}”的全部内容？可以使用撤销恢复。', { title: target.title || t('无标题页面') }))
 }
 function removeRegion(id: string) {
  const target = page.value?.regions.find(region=>region.id===id), pageId = currentPage.value
@@ -232,15 +237,15 @@ async function print(): Promise<PrintOutcome> {
  const current = structuredClone(page.value), owner = token
  const width = Math.max(720,...current.regions.map(region=>region.x+region.width+24))
  return await printHtml({
-  title: current.title || '无标题页面',
+  title: current.title || t('无标题页面'),
   css: '@media print{@page{size:A4 portrait;margin:12mm}}#office-print-root{font:15px/1.85 system-ui,sans-serif;color:#111;box-sizing:border-box;padding:24px}#office-print-root .note-print-page{position:relative;transform-origin:top left}#office-print-root section{position:absolute;box-sizing:border-box;white-space:pre-wrap;overflow-wrap:anywhere;padding:8px 12px}#office-print-root img{display:block;width:100%;height:100%;object-fit:contain}#office-print-root figure{margin:0;width:100%;height:100%}#office-print-root h1{font-size:27px;line-height:1.4}#office-print-root h2{font-size:22px}#office-print-root h3{font-size:18px}#office-print-root input{margin-right:10px}#office-print-root code{background:#eee;padding:2px 5px}',
   render(output, container) {
-   const heading = output.createElement('h1'); heading.textContent = current.title || '无标题页面'
+   const heading = output.createElement('h1'); heading.textContent = current.title || t('无标题页面')
    const content = output.createElement('main'); content.className = 'note-print-page'; content.style.width = `${width}px`
    for(const region of current.regions) {
     const element = output.createElement('section'); element.style.cssText = `left:${region.x}px;top:${region.y}px;width:${region.width}px;${region.height ? `height:${region.height}px;` : ''}`
     if(region.blocks[0]?.type==='image') element.style.padding='0'
-    element.append(renderBlocks(output,region.blocks,false)); content.append(element)
+    element.append(renderBlocks(output,region.blocks,false,t)); content.append(element)
    }
    container.append(heading,content)
   },
@@ -326,65 +331,65 @@ defineExpose({ mcpExecute, setDocumentTitle, prepareDeactivate, exportFile, mark
 
 <template>
  <section class="notebook-editor" :data-theme="theme" :data-document-id="document.id" data-testid="notebook-editor" @keydown="keydown" @pointerdown.capture="dismissMenu">
-  <header class="note-toolbar" aria-label="笔记格式工具栏">
-   <button class="note-navigation-toggle" title="分区与页面" aria-label="分区与页面" @click="navigation = !navigation"><Icon name="menu" :size="18" /></button>
-   <button title="撤销 (Ctrl/⌘ Z)" aria-label="撤销" :disabled="!controlsReady || !undoAvailable" @mousedown.prevent @click="undo().catch(report)"><Icon name="undo" :size="18" /></button>
-   <button title="重做" aria-label="重做" :disabled="!controlsReady || !redoAvailable" @mousedown.prevent @click="redo().catch(report)"><Icon name="redo" :size="18" /></button>
+  <header class="note-toolbar" :aria-label="t('笔记格式工具栏')">
+   <button class="note-navigation-toggle" :title="t('分区与页面')" :aria-label="t('分区与页面')" @click="navigation = !navigation"><Icon name="menu" :size="18" /></button>
+   <button :title="t('撤销 (Ctrl/⌘ Z)')" :aria-label="t('撤销')" :disabled="!controlsReady || !undoAvailable" @mousedown.prevent @click="undo().catch(report)"><Icon name="undo" :size="18" /></button>
+   <button :title="t('重做')" :aria-label="t('重做')" :disabled="!controlsReady || !redoAvailable" @mousedown.prevent @click="redo().catch(report)"><Icon name="redo" :size="18" /></button>
    <span class="note-separator" />
-   <select aria-label="段落样式" :disabled="!controlsReady" @mousedown="rememberSelection" @change="format('formatBlock', ($event.target as HTMLSelectElement).value)">
-    <option value="div">正文</option><option value="h1">大标题</option><option value="h2">小标题</option><option value="h3">三级标题</option>
+   <select :aria-label="t('段落样式')" :disabled="!controlsReady" @mousedown="rememberSelection" @change="format('formatBlock', ($event.target as HTMLSelectElement).value)">
+    <option value="div">{{ t('正文') }}</option><option value="h1">{{ t('大标题') }}</option><option value="h2">{{ t('小标题') }}</option><option value="h3">{{ t('三级标题') }}</option>
    </select>
-   <button title="加粗" aria-label="加粗" :disabled="!controlsReady" @mousedown.prevent @click="format('bold')"><Icon name="bold" :size="18" /></button>
-   <button title="斜体" aria-label="斜体" :disabled="!controlsReady" @mousedown.prevent @click="format('italic')"><Icon name="italic" :size="18" /></button>
-   <button title="下划线" aria-label="下划线" :disabled="!controlsReady" @mousedown.prevent @click="format('underline')"><Icon name="underline" :size="18" /></button>
-   <button title="删除线" aria-label="删除线" :disabled="!controlsReady" @mousedown.prevent @click="format('strikeThrough')"><Icon name="strike" :size="18" /></button>
+   <button :title="t('加粗')" :aria-label="t('加粗')" :disabled="!controlsReady" @mousedown.prevent @click="format('bold')"><Icon name="bold" :size="18" /></button>
+   <button :title="t('斜体')" :aria-label="t('斜体')" :disabled="!controlsReady" @mousedown.prevent @click="format('italic')"><Icon name="italic" :size="18" /></button>
+   <button :title="t('下划线')" :aria-label="t('下划线')" :disabled="!controlsReady" @mousedown.prevent @click="format('underline')"><Icon name="underline" :size="18" /></button>
+   <button :title="t('删除线')" :aria-label="t('删除线')" :disabled="!controlsReady" @mousedown.prevent @click="format('strikeThrough')"><Icon name="strike" :size="18" /></button>
    <span class="note-separator" />
-   <button title="项目列表" :disabled="!controlsReady" @mousedown.prevent @click="format('insertUnorderedList')"><Icon name="bullets" :size="18" /> 列表</button>
-   <button title="编号列表" :disabled="!controlsReady" @mousedown.prevent @click="format('insertOrderedList')"><Icon name="numbering" :size="18" /> 编号</button>
-   <button title="插入待办" :disabled="!controlsReady" @mousedown.prevent @click="todo"><Icon name="todo" :size="18" /> 待办</button>
-   <button title="插入 PNG / JPEG 图片" :disabled="!controlsReady" @mousedown.prevent @click="chooseImage"><Icon name="image" :size="18" /> 图片</button>
-   <button title="添加独立文本区域" aria-label="添加文本区域" :disabled="!controlsReady" @mousedown.prevent @click="addText"><Icon name="plus" :size="18" /> 文本区域</button>
+   <button :title="t('项目列表')" :disabled="!controlsReady" @mousedown.prevent @click="format('insertUnorderedList')"><Icon name="bullets" :size="18" /> {{ t('列表') }}</button>
+   <button :title="t('编号列表')" :disabled="!controlsReady" @mousedown.prevent @click="format('insertOrderedList')"><Icon name="numbering" :size="18" /> {{ t('编号') }}</button>
+   <button :title="t('插入待办')" :disabled="!controlsReady" @mousedown.prevent @click="todo"><Icon name="todo" :size="18" /> {{ t('待办') }}</button>
+   <button :title="t('插入 PNG / JPEG 图片')" :disabled="!controlsReady" @mousedown.prevent @click="chooseImage"><Icon name="image" :size="18" /> {{ t('图片') }}</button>
+   <button :title="t('添加独立文本区域')" :aria-label="t('添加文本区域')" :disabled="!controlsReady" @mousedown.prevent @click="addText"><Icon name="plus" :size="18" /> {{ t('文本区域') }}</button>
    <span class="note-separator" />
-   <button aria-label="智能对齐" :aria-pressed="smartAlignment" title="拖动时对齐其他区域的边缘与中心；按住 Alt / Option 暂时关闭" :disabled="!controlsReady" @mousedown.prevent @click="smartAlignment = !smartAlignment"><svg class="ui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M4 5h5v5H4zM15 14h5v5h-5zM9 7.5h6M9 16.5h6" /></svg> 智能对齐</button>
-   <button aria-label="网格吸附" :aria-pressed="snapToGrid" title="拖动时吸附到 10 像素网格；按住 Alt / Option 暂时关闭" :disabled="!controlsReady" @mousedown.prevent @click="snapToGrid = !snapToGrid"><svg class="ui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4zM9.3 4v16M14.7 4v16M4 9.3h16M4 14.7h16" /></svg> 网格吸附</button>
+   <button :aria-label="t('智能对齐')" :aria-pressed="smartAlignment" :title="t('拖动时对齐其他区域的边缘与中心；按住 Alt / Option 暂时关闭')" :disabled="!controlsReady" @mousedown.prevent @click="smartAlignment = !smartAlignment"><svg class="ui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M4 5h5v5H4zM15 14h5v5h-5zM9 7.5h6M9 16.5h6" /></svg> {{ t('智能对齐') }}</button>
+   <button :aria-label="t('网格吸附')" :aria-pressed="snapToGrid" :title="t('拖动时吸附到 10 像素网格；按住 Alt / Option 暂时关闭')" :disabled="!controlsReady" @mousedown.prevent @click="snapToGrid = !snapToGrid"><svg class="ui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4zM9.3 4v16M14.7 4v16M4 9.3h16M4 14.7h16" /></svg> {{ t('网格吸附') }}</button>
   </header>
-  <div v-if="problem" class="note-problem" role="alert">{{ problem }}<button aria-label="关闭提示" @click="problem = ''"><Icon name="close" :size="14" /></button></div>
+  <div v-if="problem" class="note-problem" role="alert">{{ t(problem) }}<button :aria-label="t('关闭提示')" @click="problem = ''"><Icon name="close" :size="14" /></button></div>
   <div class="note-workspace" :class="{ 'show-navigation': navigation }">
-   <aside class="note-sidebar" aria-label="笔记本导航">
-    <div class="note-notebook-title"><Icon name="folder" :size="20" /><button :disabled="!controlsReady" title="重命名笔记本" @click="openDialog('重命名笔记本', model?.title ?? '', value => change(copy => { copy.title = value }), undefined, true)">{{ model?.title || '笔记本' }}</button></div>
-    <label class="note-search"><Icon name="search" :size="16" /><input ref="searchInput" v-model="query" placeholder="搜索整个笔记本" aria-label="搜索整个笔记本" /></label>
-    <div v-if="query.trim()" class="note-search-results" aria-label="搜索结果">
-     <p>{{ results.length }} 个匹配页面</p>
-     <button v-for="result in results" :key="result.page.id" :title="result.page.title || '无标题页面'" :disabled="!controlsReady" @click="selectPage(result.section.id, result.page.id)"><strong>{{ result.page.title || '无标题页面' }}</strong><small>{{ result.section.title }}</small></button>
+   <aside class="note-sidebar" :aria-label="t('笔记本导航')">
+    <div class="note-notebook-title"><Icon name="folder" :size="20" /><button :disabled="!controlsReady" :title="t('重命名笔记本')" @click="openDialog('重命名笔记本', model?.title ?? '', value => change(copy => { copy.title = value }), undefined, true)">{{ model?.title || t('笔记本') }}</button></div>
+    <label class="note-search"><Icon name="search" :size="16" /><input ref="searchInput" v-model="query" :placeholder="t('搜索整个笔记本')" :aria-label="t('搜索整个笔记本')" /></label>
+    <div v-if="query.trim()" class="note-search-results" :aria-label="t('搜索结果')">
+     <p>{{ t('{count} 个匹配页面', { count: results.length }) }}</p>
+     <button v-for="result in results" :key="result.page.id" :title="result.page.title || t('无标题页面')" :disabled="!controlsReady" @click="selectPage(result.section.id, result.page.id)"><strong>{{ result.page.title || t('无标题页面') }}</strong><small>{{ result.section.title }}</small></button>
     </div>
     <template v-else>
-     <div class="note-list-heading"><span>分区</span><button title="新建分区" aria-label="新建分区" :disabled="!controlsReady" @click="addSection"><Icon name="plus" :size="16" /></button></div>
+     <div class="note-list-heading"><span>{{ t('分区') }}</span><button :title="t('新建分区')" :aria-label="t('新建分区')" :disabled="!controlsReady" @click="addSection"><Icon name="plus" :size="16" /></button></div>
      <nav class="note-sections"><button v-for="item in model?.sections" :key="item.id" :class="{ selected: item.id === currentSection }" :disabled="!controlsReady" @click="selectPage(item.id, item.pages[0].id)"><span class="note-section-dot" />{{ item.title }}<small>{{ item.pages.length }}</small></button></nav>
-     <div class="note-section-actions"><button :disabled="!controlsReady" @click="renameSection">重命名分区</button><button :disabled="!controlsReady" @click="deleteSection">删除分区</button></div>
-     <div class="note-list-heading"><span>页面</span><button title="新建页面" aria-label="新建页面" :disabled="!controlsReady" @click="addPage()"><Icon name="plus" :size="16" /></button></div>
-     <nav class="note-pages" aria-label="分区页面"><button v-for="item in orderedPages" :key="item.page.id" :data-page-id="item.page.id" :data-depth="item.depth" :title="item.page.title || '无标题页面'" :style="{paddingLeft:`${12+item.depth*16}px`}" :class="{ selected: item.page.id === currentPage, 'note-child-page': item.depth>0 }" :disabled="!controlsReady" aria-haspopup="menu" @click="selectPage(currentSection, item.page.id)" @contextmenu="openPageMenu($event,item.page.id)" @keydown.shift.f10="openPageMenu($event,item.page.id)" @keydown="($event.key==='ContextMenu') && openPageMenu($event,item.page.id)"><strong>{{ item.page.title || '无标题页面' }}</strong></button></nav>
+     <div class="note-section-actions"><button :disabled="!controlsReady" @click="renameSection">{{ t('重命名分区') }}</button><button :disabled="!controlsReady" @click="deleteSection">{{ t('删除分区') }}</button></div>
+     <div class="note-list-heading"><span>{{ t('页面') }}</span><button :title="t('新建页面')" :aria-label="t('新建页面')" :disabled="!controlsReady" @click="addPage()"><Icon name="plus" :size="16" /></button></div>
+     <nav class="note-pages" :aria-label="t('分区页面')"><button v-for="item in orderedPages" :key="item.page.id" :data-page-id="item.page.id" :data-depth="item.depth" :title="item.page.title || t('无标题页面')" :style="{paddingLeft:`${12+item.depth*16}px`}" :class="{ selected: item.page.id === currentPage, 'note-child-page': item.depth>0 }" :disabled="!controlsReady" aria-haspopup="menu" @click="selectPage(currentSection, item.page.id)" @contextmenu="openPageMenu($event,item.page.id)" @keydown.shift.f10="openPageMenu($event,item.page.id)" @keydown="($event.key==='ContextMenu') && openPageMenu($event,item.page.id)"><strong>{{ item.page.title || t('无标题页面') }}</strong></button></nav>
     </template>
    </aside>
    <main class="note-main">
-    <div class="note-page-meta"><span>{{ section?.title }} <span aria-hidden="true">/</span> {{ page?.title || '无标题页面' }}</span><button :disabled="!controlsReady" title="删除当前页面" @click="deletePage"><Icon name="trash" :size="16" /> 删除页面</button></div>
+    <div class="note-page-meta"><span>{{ section?.title }} <span aria-hidden="true">/</span> {{ page?.title || t('无标题页面') }}</span><button :disabled="!controlsReady" :title="t('删除当前页面')" @click="deletePage"><Icon name="trash" :size="16" /> {{ t('删除页面') }}</button></div>
     <div class="note-paper">
      <div class="note-title-wrap">
       <div v-if="query.trim()" class="note-title-highlights" aria-hidden="true"><div :style="{transform:`translateX(${-titleScroll}px)`}"><template v-for="(part,index) in titleParts" :key="index"><mark v-if="part.match" class="note-search-mark">{{part.text}}</mark><span v-else>{{part.text}}</span></template></div></div>
-      <input ref="titleInput" :value="titleDraft ?? page?.title" class="note-page-title" placeholder="无标题页面" aria-label="页面标题" :disabled="!editable || canvasBusy" @input="titleChanged" @scroll="titleScroll=($event.target as HTMLInputElement).scrollLeft" @compositionstart="titleComposing = true; accept()" @compositionend="titleComposing = false; titleChanged($event); accept()" />
+      <input ref="titleInput" :value="titleDraft ?? page?.title" class="note-page-title" :placeholder="t('无标题页面')" :aria-label="t('页面标题')" :disabled="!editable || canvasBusy" @input="titleChanged" @scroll="titleScroll=($event.target as HTMLInputElement).scrollLeft" @compositionstart="titleComposing = true; accept()" @compositionend="titleComposing = false; titleChanged($event); accept()" />
      </div>
      <NotebookCanvas v-if="page" :key="page.id" ref="canvas" :page="page" :editable="editable" :query="query" :smart-alignment="smartAlignment" :snap-to-grid="snapToGrid" :commit="commitRegions" @error="report" @status="emit('status',$event)" @busy="canvasBusy=$event; accept()" @composing="bodyComposing=$event; accept()" @pending="pending=$event; accept()" @request-delete="removeRegion" @history="($event==='undo'?undo():redo()).catch(report)" />
     </div>
-    <footer class="note-footer"><span>{{ page ? Array.from(pageText(page).split('\n').slice(1).join('')).length : 0 }} 字</span><span>{{ canvasBusy ? '正在编辑区域…' : composing ? '正在输入…' : dirty ? '有未保存的修改' : '已保存' }}</span><span>.oonote 笔记本</span></footer>
+    <footer class="note-footer"><span>{{ t('{count} 字', { count: page ? Array.from(pageText(page).split('\n').slice(1).join('')).length : 0 }) }}</span><span>{{ t(canvasBusy ? '正在编辑区域…' : composing ? '正在输入…' : dirty ? '有未保存的修改' : '已保存') }}</span><span>{{ t('.oonote 笔记本') }}</span></footer>
    </main>
   </div>
-  <div v-if="pageMenu" ref="pageMenuElement" class="note-page-menu" role="menu" aria-label="页面操作" :style="{left:`${pageMenu.x}px`,top:`${pageMenu.y}px`}" @keydown.stop="pageMenuKeyboard" @contextmenu.prevent>
-   <button role="menuitem" @click="addPage(pageMenu.pageId,pageMenu.sectionId)"><Icon name="plus" :size="18" /> 添加子页面</button>
+  <div v-if="pageMenu" ref="pageMenuElement" class="note-page-menu" role="menu" :aria-label="t('页面操作')" :style="{left:`${pageMenu.x}px`,top:`${pageMenu.y}px`}" @keydown.stop="pageMenuKeyboard" @contextmenu.prevent>
+   <button role="menuitem" @click="addPage(pageMenu.pageId,pageMenu.sectionId)"><Icon name="plus" :size="18" /> {{ t('添加子页面') }}</button>
   </div>
   <div v-if="dialog" class="note-modal-backdrop" @keydown.esc.prevent="dialog = undefined">
-   <form ref="dialogElement" class="note-dialog" role="dialog" aria-modal="true" :aria-label="dialog.title" @submit.prevent="confirmDialog">
-    <h2>{{ dialog.title }}</h2><p v-if="dialog.message">{{ dialog.message }}</p>
-    <input v-else ref="dialogInput" v-model="dialog.value" :aria-label="dialog.title" :maxlength="dialog.documentName ? 240 : 200" autocomplete="off" />
-    <div><button type="button" @click="dialog = undefined">取消</button><button type="submit" :class="{ danger: dialog.destructive }">{{ dialog.destructive ? '确认删除' : '确定' }}</button></div>
+   <form ref="dialogElement" class="note-dialog" role="dialog" aria-modal="true" :aria-label="t(dialog.title)" @submit.prevent="confirmDialog">
+    <h2>{{ t(dialog.title) }}</h2><p v-if="dialog.message">{{ dialogMessage }}</p>
+    <input v-else ref="dialogInput" v-model="dialog.value" :aria-label="t(dialog.title)" :maxlength="dialog.documentName ? 240 : 200" autocomplete="off" />
+    <div><button type="button" @click="dialog = undefined">{{ t('取消') }}</button><button type="submit" :class="{ danger: dialog.destructive }">{{ t(dialog.destructive ? '确认删除' : '确定') }}</button></div>
    </form>
   </div>
  </section>

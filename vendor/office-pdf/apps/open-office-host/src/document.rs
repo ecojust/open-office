@@ -29,6 +29,23 @@ pub(crate) struct Entry {
 }
 
 impl Entry {
+    pub fn language(locale: &str) -> Result<&'static str, String> {
+        match locale {
+            "zh-CN" => Ok("zh-hans"),
+            "en" => Ok("en"),
+            _ => Err("locale must be zh-CN or en".into()),
+        }
+    }
+
+    /// A shell language change affects controls, never date text inserted into a PDF.
+    pub fn set_locale(&mut self, language: &str) -> Result<(), String> {
+        if self.app.language != language && self.app.session.date_language().is_none() {
+            let previous = office_pdf_ui_egui::i18n::Lang::from_pref(&self.app.language).code();
+            self.app.session.set_date_language(Some(previous))?;
+        }
+        self.app.set_option("language", language)
+    }
+
     pub fn new(name: &str, input: &[u8], document_id: u32) -> Result<Self, String> {
         guarded(|| {
             if input.len() > MAX_INPUT_BYTES || !name.to_ascii_lowercase().ends_with(".pdf") {
@@ -402,6 +419,38 @@ mod tests {
     fn blank() -> Entry {
         Entry::new("Test.pdf", &[], 1).unwrap()
     }
+
+    #[test]
+    fn interface_switch_preserves_document_drafts_history_and_date_language() {
+        let mut entry = blank();
+        entry.command("pdf.addText", &json!({"text":"Keep this document text"})).unwrap();
+        let (index, _) = entry.app.active_ids().unwrap();
+        entry.app.views[index].comments.add_box = "批注 draft".into();
+        let mut before = entry.snapshot("one").unwrap();
+        before.as_object_mut().unwrap().remove("ui");
+        let draft = entry.app.embedding_draft();
+        let content = entry.inspect_document().unwrap();
+        let generation = entry.app.session.get(entry.id().unwrap()).unwrap().edit_generation();
+        let date_format = entry.app.session.date_format().to_owned();
+        for locale in ["en", "zh-CN", "en"] {
+            entry.set_locale(Entry::language(locale).unwrap()).unwrap();
+            entry.app.activate_host_context(&egui::Context::default());
+            assert_eq!(entry.app.language, Entry::language(locale).unwrap());
+            let mut after = entry.snapshot("one").unwrap();
+            after.as_object_mut().unwrap().remove("ui");
+            assert_eq!(after, before);
+            assert_eq!(entry.app.embedding_draft(), draft);
+            assert_eq!(entry.inspect_document().unwrap(), content);
+            assert_eq!(entry.app.session.get(entry.id().unwrap()).unwrap().edit_generation(), generation);
+            assert_eq!(entry.app.session.date_language(), Some("zh-hans"));
+            assert_eq!(entry.app.session.date_format(), date_format);
+        }
+        entry.app.session.set_date_language(Some("fr")).unwrap();
+        entry.set_locale(Entry::language("zh-CN").unwrap()).unwrap();
+        assert_eq!(entry.app.session.date_language(), Some("fr"));
+        assert!(Entry::language("xx").is_err());
+    }
+
     #[test]
     fn mcp_edits_live_objects_annotations_and_pages_with_undo_and_export() {
         let mut entry = blank();

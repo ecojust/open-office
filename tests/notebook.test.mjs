@@ -8,6 +8,7 @@ import * as model from '../src/notes/model.ts'
 import * as noteMcp from '../src/notes/mcp.ts'
 import * as dom from '../src/notes/dom.ts'
 import * as searchHelpers from '../src/notes/search.ts'
+import noteTranslations from '../src/i18n/en/notes.ts'
 import { NotebookSession } from '../src/notes/session.ts'
 import * as documentHelpers from '../src/shared/document.ts'
 
@@ -42,6 +43,33 @@ test('notebook raster whitelist rejects remote, SVG, mislabeled, malformed and o
  for (const image of ['https://example.com/image.png','data:image/svg+xml;base64,PHN2Zz4=',png.replace('image/png','image/jpeg'),'data:image/png;base64,YmFk','data:image/png;base64,'+'A'.repeat(6*1024*1024)]) assert.throws(()=>model.validateImage(image))
  const source=JSON.parse(JSON.stringify(model.createNotebook())); source.onclick='evil'; source.sections[0].style='url(evil)'; source.sections[0].pages[0].regions[0].blocks[0].content=[{text:'safe',onclick:'evil'}]
  const result=model.validateNotebook(source); assert.equal(result.onclick,undefined); assert.equal(result.sections[0].style,undefined); assert.deepEqual(result.sections[0].pages[0].regions[0].blocks[0].content,[{text:'safe'}])
+})
+
+test('notebook image validation stays stack-safe at the 4 MiB decoded boundary with every padding length', () => {
+ const bytes=Buffer.alloc(model.NOTE_IMAGE_MAX_BYTES+3)
+ for (const [mime, signature] of [['png', Buffer.from(png.split(',')[1], 'base64')], ['jpeg', Buffer.from([255,216,255])]]) {
+  bytes.fill(0);signature.copy(bytes)
+  for (const size of [model.NOTE_IMAGE_MAX_BYTES-2,model.NOTE_IMAGE_MAX_BYTES-1,model.NOTE_IMAGE_MAX_BYTES]) {
+   const dataUrl=`data:image/${mime};base64,${bytes.subarray(0,size).toString('base64')}`
+   assert.equal(model.validateImage(dataUrl),dataUrl)
+  }
+  for (const size of [model.NOTE_IMAGE_MAX_BYTES+1,model.NOTE_IMAGE_MAX_BYTES+3]) {
+   assert.throws(()=>model.validateImage(`data:image/${mime};base64,${bytes.subarray(0,size).toString('base64')}`), /图片内容与格式不符|不超过 4 MB/)
+  }
+ }
+})
+
+test('notebook image validation preserves strict MIME, alphabet and padding rules without normalizing data', () => {
+ const body=png.split(',')[1]
+ for (const dataUrl of [
+  png.replace('image/png','image/PNG'),png.replace('image/png','image/jpg'),png.replace(';base64,',';BASE64,'),
+  ...['', '====', body.slice(0,-1), body+'=', body.slice(0,-4)+'A===', body.slice(0,-4)+'AA=A',
+   body.slice(0,32)+'-'+body.slice(33),body.slice(0,32)+'_'+body.slice(33),
+   body+'\n',body+'\r\n',body.slice(0,32)+'\r\n'+body.slice(32)].map(value=>'data:image/png;base64,'+value),
+ ]) assert.throws(()=>model.validateImage(dataUrl), /不超过 4 MB/)
+ // This validator checks the image signature, but never canonicalizes payload bits.
+ const nonCanonical=png.slice(0,-2)+'J='
+ assert.equal(model.validateImage(nonCanonical),nonCanonical)
 })
 
 test('save receipts protect newer edits and never mutate history or acknowledge different bytes', () => {
@@ -192,19 +220,20 @@ test('rich paste reader keeps readable formatting and drops executable markup, a
 
 const componentSource=(await readFile(new URL('../src/components/NotebookEditor.vue',import.meta.url),'utf8')).match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1]
 async function component() {
- const emitted=[], unmount=[], exposed={}
+ const emitted=[], unmount=[], exposed={}, locale=vue.ref('zh-CN')
+ const t=(source, params)=> (locale.value==='en' ? noteTranslations[source] ?? source : source).replace(/\{(\w+)\}/g,(match,key)=>String(params?.[key] ?? match))
  const props=vue.reactive({document:{id:'test-note',name:'测试.oonote',base64:'',extension:'oonote',kind:'note'},active:true,disabled:false,theme:'light'})
- const source=componentSource+'\nexports.controls={bodyComposing,titleComposing,pending,titlePending,titleDraft,titleChanged,canvasBusy,dialog,session:()=>session,change,confirmDialog,deletePage,deleteSection,currentSection,currentPage,model};'
+ const source=componentSource+'\nexports.controls={bodyComposing,titleComposing,pending,titlePending,titleDraft,titleChanged,canvasBusy,dialog,dialogMessage,session:()=>session,change,confirmDialog,deletePage,deleteSection,currentSection,currentPage,model};'
  const module={exports:{}}
  const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
  vm.runInNewContext(output,{
   module,exports:module.exports,structuredClone,TextEncoder,TextDecoder,Uint8Array,console,
-  require(id){if(id==='vue')return {...vue,onBeforeUnmount:fn=>unmount.push(fn)};if(id==='./Icon.vue'||id==='./NotebookCanvas.vue')return {};if(id.includes('shared/document'))return documentHelpers;if(id==='../shared/printing')return {printHtml:()=>assert.fail('Unexpected printing in a non-printing notebook component test')};if(id.includes('shared/dialog-focus'))return {useDialogFocus:()=>{}};if(id.includes('notes/model'))return model;if(id.includes('notes/session'))return {NotebookSession};if(id.includes('notes/mcp'))return noteMcp;if(id.includes('notes/dom'))return dom;if(id.includes('notes/search'))return searchHelpers;throw Error(id)},
+  require(id){if(id==='../shared/i18n')return {useI18n:()=>({locale,t})};if(id==='vue')return {...vue,onBeforeUnmount:fn=>unmount.push(fn)};if(id==='./Icon.vue'||id==='./NotebookCanvas.vue')return {};if(id.includes('shared/document'))return documentHelpers;if(id==='../shared/printing')return {printHtml:()=>assert.fail('Unexpected printing in a non-printing notebook component test')};if(id.includes('shared/dialog-focus'))return {useDialogFocus:()=>{}};if(id.includes('notes/model'))return model;if(id.includes('notes/session'))return {NotebookSession};if(id.includes('notes/mcp'))return noteMcp;if(id.includes('notes/dom'))return dom;if(id.includes('notes/search'))return searchHelpers;throw Error(id)},
   defineProps:()=>props,withDefaults:value=>value,defineEmits:()=> (...args)=>emitted.push(args),defineExpose:value=>Object.assign(exposed,value),
   document:{get activeElement(){throw Error('Background operations must not inspect/move focus')},createElement(){throw Error('Background operations must not rebuild DOM')}},
  })
  await vue.nextTick(); await Promise.resolve()
- return {props,emitted,exposed,controls:module.exports.controls,dispose:()=>unmount.forEach(fn=>fn())}
+ return {props,emitted,exposed,locale,controls:module.exports.controls,dispose:()=>unmount.forEach(fn=>fn())}
 }
 test('actual note component background export/save stays read-only on DOM and fails closed for IME, modal, image and invalid draft',async()=>{
  const editor=await component(); const {controls,exposed}=editor
@@ -292,4 +321,33 @@ test('note switching preserves live content and undo while only an exact save re
    controls[key].value=key==='dialog'?undefined:false
   }
  } finally {mounted.dispose()}
+})
+
+
+test('notebook locale changes preserve stored names, history, dialogs and composing drafts', async () => {
+ const editor=await component(), {controls,exposed,locale}=editor
+ try {
+  controls.change(copy=>{copy.title='笔记本';copy.sections[0].title='取消';copy.sections[0].pages[0].title='页面';copy.sections[0].pages[0].regions[0].blocks[0].content=[{text:'正文 加粗 English 😀'}]})
+  const original=JSON.stringify(controls.model.value), before=await exposed.inspect()
+  controls.deleteSection()
+  const dialog=controls.dialog.value
+  assert.match(controls.dialogMessage.value,/删除“取消”/)
+  locale.value='en';await vue.nextTick()
+  assert.match(controls.dialogMessage.value,/Delete “取消” and its 1 pages/)
+  assert.equal(controls.dialog.value,dialog)
+  assert.equal(JSON.stringify(controls.model.value),original)
+  assert.deepEqual(await exposed.inspect(),before)
+  controls.dialog.value=undefined
+  controls.titleChanged({target:{value:'字'.repeat(201)}})
+  controls.titleComposing.value=true
+  const composing=await exposed.inspect(), emitted=editor.emitted.length
+  locale.value='zh-CN';await vue.nextTick()
+  assert.equal(controls.titleDraft.value,'字'.repeat(201));assert.equal(controls.titleComposing.value,true)
+  assert.equal(controls.titlePending.value,true);assert.equal(await exposed.canBackgroundExport(),false)
+  assert.deepEqual(await exposed.inspect(),composing);assert.equal(editor.emitted.length,emitted)
+  assert.equal(JSON.stringify(controls.model.value),original)
+  controls.titleComposing.value=false;controls.titleChanged({target:{value:'页面'}})
+  await exposed.undo();assert.notEqual(JSON.stringify(controls.model.value),original)
+  await exposed.redo();assert.equal(JSON.stringify(controls.model.value),original)
+ } finally { editor.dispose() }
 })

@@ -2397,4 +2397,108 @@ animation effects	Off	关
 	Make properties default	将属性设为默认
 	Pages selected	选定的页面
 	Page properties	页面属性
-Encryption algorithm	加密算法
+	Encryption algorithm	加密算法
+
+# Embedded Open Office controls and draft dialogs.
+	Use Open in the top toolbar to open a PDF in a new tab	请使用顶部“打开”按钮在新标签页打开 PDF 文稿
+	Open or create a PDF from the top toolbar	请在顶部打开或新建 PDF 文稿
+	There is no unfinished comment draft	没有待完成的批注草稿
+	Confirm whether to discard this comment draft first	请先确认是否放弃这段批注草稿
+	The document is closed	文稿已关闭
+	The page view is closed	页面视图已关闭
+	There is no page available for this comment. Your draft is preserved	文稿没有可添加批注的页面，草稿已保留
+	The comment could not be submitted. Your draft is preserved	无法提交该批注，草稿已保留
+	Comment editing has ended	批注编辑已结束
+	The original comment no longer exists. Your draft is preserved	原批注已不存在，草稿已保留
+	The comment draft has changed. Please try again	批注草稿状态已变化，请重试
+	The comment could not be submitted. Your draft is intact; check whether the document allows comments	提交批注失败，草稿仍完整保留，请检查文稿是否允许批注
+	Discard this comment draft?	确认放弃批注草稿？
+	Finish the pending comment	完成待保存的批注
+	This unsubmitted text will be cleared. Saved comments will stay unchanged.	这段尚未提交的文字将被清除，已保存的批注不会受影响。
+	The original comment or page was removed. Your text is preserved and can be restored as a new comment.	原批注或页面已移除，输入的文字仍然保留。可以将它恢复为新批注。
+	The text below has not been submitted. Finish this comment to continue saving the document.	以下文字尚未提交。完成此批注后，即可继续保存文稿。
+	(Clear the existing comment text)	（清空此批注的原有文字）
+	Keep draft	保留草稿
+	Confirm discard	确认放弃
+	Decide later	稍后处理
+	Return to editing	返回编辑
+	Discard draft	放弃草稿
+	Restore as new comment	恢复为新批注
+	Submit comment	提交批注
+	File attachment comments are not available in this version	当前版本尚未接入文件附件批注
+	Use New in the top toolbar to create a PDF	请使用顶部“新建”按钮创建 PDF 文稿
+	The document has changed. Select the content to delete again	文稿已变化，请重新选择要删除的内容
+	Deletion was not completed. The original content is preserved	删除未完成，原内容已保留
+	The saved signature has changed. Select it again	保存的签名已变化，请重新选择
+	The stamp list has changed. Select a stamp again	图章列表已变化，请重新选择
+	Confirm deletion	确认删除
+	Cancel to keep the current content.	取消会保留当前内容。
+	Image clipboard access is not available in this version	当前版本尚未接入图片剪贴板
+	Manage pages	页面管理
+	Page content and decoration	页面内容与装饰
+	Fill and forms	填写与表单
+	Security and signature validation	安全与签名验证
+	Inspect and measure	检查与测量
+	Optimize and scripts	优化与脚本
+	Approved	已批准
+	Confidential	保密
+	Draft	草稿
+	Final	定稿
+	For Comment	征求意见
+	For Public Release	可公开发布
+	Information Only	仅供参考
+	Not Approved	未批准
+	Not For Public Release	禁止公开
+	Preliminary Results	初步结果
+	Void	作废
+	Initial Here	在此简签
+	Witness	见证人
+	Received	已收到
+	Reviewed	已审阅
+	Revised	已修订
+	Choose a stamp, then click the page to place it	选好图章后，在页面上单击放置
+	Signing prompts	签署提示
+	Common	常用
+	Visual signature	可视签名
+	Draw, type, or import an image, then click the page to place it.	手绘、输入或导入图片，再单击页面放置。
+	Visual signatures do not contain digital certificates. Existing certificate signatures can be viewed and validated.	可视签名不含数字证书。当前支持查看、验证已有证书签名。
+	Fit page	适合整页
+	Fit width	适合宽度
+	Fit height	适合高度
+	Sidebar	侧栏
+	Existing signatures	已有签名
+	Select	选择
+	Hand	拖动
+	Annotate	标注
+	Text formatting	文字格式
+	Pending comments	待完成批注
+	Find	查找
+	Collapse tool settings	收起工具设置
+	Confirm or cancel deletion before saving the document	请先确认或取消删除，再保存文稿
+	Confirm the current input method text before saving the document	请先确认输入法候选文字，再保存文稿
+	There are unsubmitted comments. Submit or discard them in the draft window before saving	还有未提交的批注，已打开草稿处理窗口；提交或确认放弃后即可保存文稿
+	The current input is invalid. Correct it before saving	当前输入未通过验证，请修正后再保存
+	The text changes could not be committed	无法提交正文修改
+	The added text could not be committed	无法提交新增文字
+	Image file selection is not available in this version	当前版本尚未接入图片文件选择
+	Image export is not available in this version	当前版本尚未接入图片导出
+	Custom stamp file selection is not available in this version	当前版本尚未接入自定义印章文件选择
+	This PDF workspace does not support signing with digital certificates yet. Existing signatures can be viewed and validated.	当前 PDF 工作区暂不支持数字证书签署。可查看和验证已有签名。
+	Opening signature history in a new tab is not available yet. The original document is preserved	当前版本尚不支持在新标签页查看签名历史版本，原文稿已保留
+	Opening a signed copy in a new tab is not available yet. The original document is preserved	当前版本尚不支持在新标签页查看签名副本，原文稿已保留
+	Saving extracted pages is not available yet. The original document is preserved	当前版本尚未接入提取页面的文件保存，原文稿已保留
+	Opening a generated PDF report in a new tab is not available yet. The original document is preserved	当前版本尚不支持将生成的 PDF 报告打开为新标签页，原文稿已保留
+	Delete the selected content	删除选中的内容
+	Delete the saved initials	删除保存的首字母签名
+	Delete the saved signature	删除保存的签名
+	Delete the saved stamp	删除保存的图章
+	Continue with {action}?	确定要{action}吗？
+	Page {page} of {count}	{page} / {count} 页
+	The signature font cannot display “{character}”. Draw or import an image to keep your full name.	签名字体无法显示“{character}”，请改用手绘或图片，避免遗漏姓名。
+
+embedded	Sign Here	在此签名
+embedded	Comments	批注
+embedded	Form fields	表单字段
+embedded	Edit text	编辑文字
+embedded	Add text	添加文字
+embedded	Highlight	高亮

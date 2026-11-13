@@ -26,6 +26,7 @@ struct State {
     active: Option<String>,
     enabled: bool,
     theme: String,
+    locale: String,
     drain_input: bool,
     destroyed: bool,
     started: bool,
@@ -151,6 +152,7 @@ pub fn create_host(callback: Function) -> OfficePresentationHost {
             active: None,
             enabled: true,
             theme: "system".into(),
+            locale: "zh-CN".into(),
             drain_input: false,
             destroyed: false,
             started: false,
@@ -186,6 +188,7 @@ impl OfficePresentationHost {
         let next_document_id = document_id.checked_add(1).ok_or_else(|| js_error("document identifiers exhausted"))?;
         let mut entry = Entry::new(name, bytes, document_id, services(id, state.actions.clone(), picture.clone())).map_err(js_error)?;
         entry.app.set_host_theme(&state.theme, state.ctx.as_ref()).map_err(js_error)?;
+        entry.app.set_host_locale(&state.locale).map_err(js_error)?;
         let snapshot = entry.snapshot(id, None).map_err(js_error)?;
         state.next_document_id = next_document_id;
         state.entries.insert(id.to_owned(), entry);
@@ -281,6 +284,24 @@ impl OfficePresentationHost {
                 _ => egui::ThemePreference::System,
             });
         }
+        state.repaint();
+        Ok(())
+    }
+
+    /// Language is a display preference: changing it never flushes or edits a session.
+    #[wasm_bindgen(js_name = setLocale)]
+    pub fn set_locale(&self, locale: &str) -> Result<(), JsValue> {
+        if !matches!(locale, "zh-CN" | "en") {
+            return Err(js_error("locale must be zh-CN or en"));
+        }
+        let mut state = self.state.try_borrow_mut().map_err(js_error)?;
+        if state.destroyed {
+            return Err(js_error("editor host is destroyed"));
+        }
+        for entry in state.entries.values_mut() {
+            entry.app.set_host_locale(locale).map_err(js_error)?;
+        }
+        state.locale = locale.into();
         state.repaint();
         Ok(())
     }

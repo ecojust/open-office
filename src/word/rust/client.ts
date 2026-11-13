@@ -1,5 +1,6 @@
 import type { NativeDocument } from '../../types'
 import type { Appearance } from '../../shared/appearance'
+import { locale, t, translate, type Locale } from '../../shared/i18n'
 import { base64ToBytes } from '../../shared/document'
 import { createId } from '../../shared/id'
 import type { OfficeWordEvent, OfficeWordFileAction, OfficeWordSnapshot } from './office-word-types'
@@ -17,6 +18,7 @@ interface OfficeWordHost {
   close(id: string, documentId: number, revision: number, force: boolean): boolean
   setActive(active: boolean): void
   setTheme(theme: Appearance): void
+  setLocale(locale: Locale): void
   destroy(): void
 }
 type Bindings = { default(options: { module_or_path: URL }): Promise<unknown>; createHost(callback: (event: string) => void): OfficeWordHost }
@@ -60,6 +62,7 @@ async function loadHost(): Promise<OfficeWordHost> {
   await bindings.default({ module_or_path: new URL('office-word/office-word_bg.wasm', document.baseURI) })
   host = bindings.createHost(receive)
   host.setTheme(interfaceTheme)
+  host.setLocale(locale.value)
   return host
 }
 function getHost() { return runtime ??= loadHost().catch(cause => { runtime = undefined; throw cause }) }
@@ -68,6 +71,13 @@ function getHost() { return runtime ??= loadHost().catch(cause => { runtime = un
 export function setRustWordTheme(theme: Appearance): Promise<void> {
   interfaceTheme = theme
   return serialize(() => { host?.setTheme(interfaceTheme) })
+}
+/** Change interface labels without flushing drafts, switching tabs or creating document edits. */
+export function setRustWordLocale(value: Locale): Promise<void> {
+  return serialize(() => {
+    host?.setLocale(value)
+    canvas?.setAttribute('aria-label', translate(value, '文字文稿与功能区'))
+  })
 }
 function parkingElement() {
   if (!parking) {
@@ -90,7 +100,7 @@ function newCanvas() {
   const element = document.createElement('canvas')
   element.id = 'open-office-office-word-canvas'
   element.dataset.testid = 'office-word-canvas'
-  element.setAttribute('aria-label', '文字文稿与功能区')
+  element.setAttribute('aria-label', t('文字文稿与功能区'))
   element.tabIndex = 0
   Object.assign(element.style, { display: 'block', width: '100%', height: '100%', outline: 'none' })
   return element

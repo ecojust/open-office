@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch, type ComponentPublicInstance } from 'vue'
 import Icon from './Icon.vue'
+import { useI18n } from '../shared/i18n'
 import { blankRegion, noteId, validateImage, type NoteBlock, type NotePage, type NoteRegion } from '../notes/model'
-import { blocksFromDom, blocksFromHtml, renderBlocks } from '../notes/dom'
+import { blocksFromDom, blocksFromHtml, localizeNoteControls, renderBlocks } from '../notes/dom'
 import { moveRegion, nextRegionPosition, resizeRegion } from '../notes/layout'
 import { canvasPoint, NOTE_GRID_SIZE, snapRegionPosition, type SnapGuide, type SnapRect, type SnapState } from '../notes/snapping'
 import { createNoteSearchHighlighter, noteSearchMatches, noteSearchRanges, searchSegments } from '../notes/search'
 import { clipboardImageFiles, imageFilesToBlocks } from '../notes/clipboard'
 import * as native from '../native'
 
+const { t, locale } = useI18n()
 const props = withDefaults(defineProps<{ page: NotePage; editable: boolean; query: string; smartAlignment?: boolean; snapToGrid?: boolean; commit: (regions: NoteRegion[]) => boolean }>(), { smartAlignment: true, snapToGrid: true })
 const emit = defineEmits<{ error: [message: string]; status: [message: string]; busy: [value: boolean]; composing: [value: boolean]; pending: [value: boolean]; 'request-delete': [regionId: string]; history: [action: 'undo' | 'redo'] }>()
 const surface = ref<HTMLElement>(), imageInput = ref<HTMLInputElement>()
@@ -69,7 +71,7 @@ function renderBody(region: NoteRegion, force = false) {
  const body = bodies.get(region.id), signature = blockSignature(region.blocks)
  if (!body || (!force && rendered.get(region.id) === signature) || dirtyBodies.has(region.id)) return
  if (savedRange && body.contains(savedRange.commonAncestorContainer)) savedRange = undefined
- body.replaceChildren(renderBlocks(document, region.blocks)); rendered.set(region.id, signature)
+ body.replaceChildren(renderBlocks(document, region.blocks, true, t)); rendered.set(region.id, signature)
 }
 function sync() {
  regions.value = structuredClone(props.page.regions)
@@ -163,7 +165,7 @@ function insertFragment(fragment: DocumentFragment) {
 function todo() {
  if (!props.editable || busy.value || composing.value) return
  if (!bodies.has(selected.value)) { if (addText()) nextTick(todo); return }
- insertFragment(renderBlocks(document, [{ id: noteId(), type: 'todo', checked: false, content: [{ text: '待办事项' }] }]))
+ insertFragment(renderBlocks(document, [{ id: noteId(), type: 'todo', checked: false, content: [{ text: '待办事项' }] }], true, t))
 }
 function beforeInput(event: InputEvent) {
  if (!props.editable || busy.value) { event.preventDefault(); return }
@@ -213,7 +215,7 @@ async function paste(event?: ClipboardEvent) {
   selected.value = targetId; savedRange = targetRange
   if ((!html || textBlocks.length) && !bodies.has(selected.value)) { if (!addText()) return; await nextTick(); if (!current()) return }
   if (!html) { restoreSelection(); document.execCommand('insertText', false, text); input(selected.value); rememberSelection(); return }
-  if (textBlocks.length) insertFragment(renderBlocks(document, textBlocks))
+  if (textBlocks.length) insertFragment(renderBlocks(document, textBlocks, true, t))
   if (inlineImages.length) { setBusy(true); await appendImages(inlineImages, owner, current) }
  } catch (cause) { if (current()) report(cause) }
  finally { if (pendingPaste?.id === request) { pendingPaste = undefined; setBusy(false) } }
@@ -357,6 +359,7 @@ watch(() => props.page.id, () => {
 }, { immediate: true })
 watch(() => props.page.regions, () => { if (!gesture && !dirtyBodies.size) refresh() })
 watch(() => props.query, highlight)
+watch(locale, () => { for (const body of bodies.values()) localizeNoteControls(body, t) })
 watch(() => props.editable, value => {
  if (value) return
  cancelPasteTimer()
@@ -369,20 +372,20 @@ defineExpose({ format, todo, chooseImage, addText, rememberSelection, focus, flu
 
 <template>
  <div class="note-canvas-container" @keydown="globalKey" @click="clickCanvas" @scroll="updateGesture" @paste="paste">
-  <p class="note-canvas-hint"><Icon name="info" :size="16" />双击添加文字 · 拖动时按住 Alt / Option 自由移动 · 点击空白取消选择</p>
-  <div ref="surface" class="note-canvas" tabindex="0" aria-label="笔记画布" :class="{ 'grid-enabled': snapToGrid && draggingMove }" data-testid="notebook-canvas" :style="{ minWidth: `${extent.width}px`, minHeight: `${extent.height}px`, '--note-grid-size': `${NOTE_GRID_SIZE}px` }" @dblclick="doubleClick" @pointermove="pointerMove" @pointerup="pointerEnd($event)" @pointercancel="pointerEnd($event, true)" @lostpointercapture="pointerEnd($event, true)">
+  <p class="note-canvas-hint"><Icon name="info" :size="16" />{{ t('双击添加文字 · 拖动时按住 Alt / Option 自由移动 · 点击空白取消选择') }}</p>
+  <div ref="surface" class="note-canvas" tabindex="0" :aria-label="t('笔记画布')" :class="{ 'grid-enabled': snapToGrid && draggingMove }" data-testid="notebook-canvas" :style="{ minWidth: `${extent.width}px`, minHeight: `${extent.height}px`, '--note-grid-size': `${NOTE_GRID_SIZE}px` }" @dblclick="doubleClick" @pointermove="pointerMove" @pointerup="pointerEnd($event)" @pointercancel="pointerEnd($event, true)" @lostpointercapture="pointerEnd($event, true)">
    <section v-for="(region, index) in regions" :key="region.id" :ref="element => bindRegion(region.id, element)" class="note-region" :class="{ selected: selected === region.id, 'image-region': !!imageOf(region) }" :style="{ left: `${region.x}px`, top: `${region.y}px`, width: `${region.width}px`, minHeight: region.height ? `${region.height}px` : '40px' }" :data-region-id="region.id" :data-region-kind="imageOf(region) ? 'image' : 'text'" :tabindex="imageOf(region) ? 0 : undefined" @pointerdown="selected = region.id" @click="selected = region.id" @focusin="selected = region.id">
     <div class="note-region-controls">
-     <button type="button" class="note-region-move" :aria-label="`移动${imageOf(region) ? '图片' : '文字'}区域 ${index + 1}`" title="拖动对齐和吸附；Alt / Option 自由移动；方向键微调，Shift 加速" :disabled="!editable" @pointerdown="startGesture($event, region, 'move')" @keydown="controlKey($event, region, 'move')"><svg class="ui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01" /></svg><span>{{ imageOf(region) ? '图片' : '文字区域' }}</span></button>
-     <button type="button" class="note-region-delete" :aria-label="imageOf(region) ? `删除图片${imageOf(region)!.alt ? `：${imageOf(region)!.alt}` : ''}` : `删除文字区域 ${index + 1}`" title="删除区域" :disabled="!editable || busy" @click="removeRegion(region)"><Icon name="trash" :size="16" /></button>
+     <button type="button" class="note-region-move" :aria-label="t(imageOf(region) ? '移动图片区域 {index}' : '移动文字区域 {index}', { index: index + 1 })" :title="t('拖动对齐和吸附；Alt / Option 自由移动；方向键微调，Shift 加速')" :disabled="!editable" @pointerdown="startGesture($event, region, 'move')" @keydown="controlKey($event, region, 'move')"><svg class="ui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01" /></svg><span>{{ t(imageOf(region) ? '图片' : '文字区域') }}</span></button>
+     <button type="button" class="note-region-delete" :aria-label="imageOf(region) ? (imageOf(region)!.alt ? t('删除图片：{name}', { name: imageOf(region)!.alt }) : t('删除图片')) : t('删除文字区域 {index}', { index: index + 1 })" :title="t('删除区域')" :disabled="!editable || busy" @click="removeRegion(region)"><Icon name="trash" :size="16" /></button>
     </div>
     <template v-if="imageOf(region)"><img class="note-region-image" :src="imageOf(region)!.dataUrl" :alt="imageOf(region)!.alt" :style="{ height: `${region.height ?? region.width}px` }" draggable="false" /><div v-if="query.trim() && searchSegments(imageOf(region)!.alt, query).some(part => part.match)" class="note-image-caption"><template v-for="(part, partIndex) in searchSegments(imageOf(region)!.alt, query)" :key="partIndex"><mark v-if="part.match">{{ part.text }}</mark><span v-else>{{ part.text }}</span></template></div></template>
-    <div v-else :ref="element => bindBody(region.id, element)" class="note-region-body" data-testid="notebook-content" role="textbox" :aria-label="`文字区域 ${index + 1}`" aria-multiline="true" :contenteditable="editable && !busy" spellcheck="true" @input="input(region.id)" @beforeinput="beforeInput" @compositionstart="composition(region.id, true)" @compositionend="composition(region.id, false)" @drop.prevent @dragover.prevent @click="clickBody(region.id, $event)" @focus="selected = region.id" @keyup="rememberSelection" @mouseup="rememberSelection" @blur="rememberSelection" />
-    <button type="button" class="note-region-resize" :aria-label="imageOf(region) ? `调整图片大小 ${index + 1}` : `调整文字区域宽度 ${index + 1}`" :title="imageOf(region) ? '拖动等比缩放；方向键微调，Shift 加速' : '拖动调整宽度；方向键微调，Shift 加速'" :disabled="!editable" @pointerdown="startGesture($event, region, 'resize')" @keydown="controlKey($event, region, 'resize')"><svg class="ui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M12 17h5v-5" /></svg></button>
+    <div v-else :ref="element => bindBody(region.id, element)" class="note-region-body" data-testid="notebook-content" role="textbox" :aria-label="t('文字区域 {index}', { index: index + 1 })" aria-multiline="true" :contenteditable="editable && !busy" spellcheck="true" @input="input(region.id)" @beforeinput="beforeInput" @compositionstart="composition(region.id, true)" @compositionend="composition(region.id, false)" @drop.prevent @dragover.prevent @click="clickBody(region.id, $event)" @focus="selected = region.id" @keyup="rememberSelection" @mouseup="rememberSelection" @blur="rememberSelection" />
+    <button type="button" class="note-region-resize" :aria-label="t(imageOf(region) ? '调整图片大小 {index}' : '调整文字区域宽度 {index}', { index: index + 1 })" :title="t(imageOf(region) ? '拖动等比缩放；方向键微调，Shift 加速' : '拖动调整宽度；方向键微调，Shift 加速')" :disabled="!editable" @pointerdown="startGesture($event, region, 'resize')" @keydown="controlKey($event, region, 'resize')"><svg class="ui-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M12 17h5v-5" /></svg></button>
    </section>
    <div v-for="guide in alignmentGuides" :key="guide.axis" class="note-alignment-guide" :class="`guide-${guide.axis}`" :data-axis="guide.axis" :data-position="guide.position" aria-hidden="true" :style="guide.axis === 'x' ? { left: `${guide.position}px`, top: `${guide.start}px`, height: `${guide.end - guide.start}px` } : { top: `${guide.position}px`, left: `${guide.start}px`, width: `${guide.end - guide.start}px` }" />
   </div>
-  <input ref="imageInput" class="note-image-input" type="file" accept="image/png,image/jpeg" aria-label="插入图片文件" @change="imageChosen" @cancel="cancelImage" />
+  <input ref="imageInput" class="note-image-input" type="file" accept="image/png,image/jpeg" :aria-label="t('插入图片文件')" @change="imageChosen" @cancel="cancelImage" />
  </div>
 </template>
 

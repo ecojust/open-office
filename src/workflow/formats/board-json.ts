@@ -1,17 +1,11 @@
 import { DEFAULT_STYLE, type ElementStyle, type Endpoint, type ImportedScene, type Scene, type SceneElement, type ShapeElement } from '../core/types.ts'
 import { edgePoints, elementBounds, isBraceShape, shapeOutline, braceTextBounds, rectangleCornerRadius, normalizedRotation, rotatePoint } from '../core/geometry.ts'
 import { resolveStrokePattern, sceneDefaultStyle } from '../core/appearance.ts'
-import { validateElementStyle } from '../core/documents.ts'
+import { safeImage, validateElementStyle } from '../core/documents.ts'
 import { readBrushData } from '../core/brushes.ts'
 
 type Json = Record<string, unknown>
 const isObject = (value: unknown): value is Json => Boolean(value && typeof value === 'object' && !Array.isArray(value))
-function safeImage(value: unknown): value is string {
-  if (typeof value !== 'string' || value.length > 14 * 1024 * 1024 || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z\d+/\r\n]+={0,2}$/i.test(value)) return false
-  const body = value.slice(value.indexOf(',') + 1).replace(/[\r\n]/g, '')
-  const bytes = Math.floor(body.length * 3 / 4) - (body.endsWith('==') ? 2 : body.endsWith('=') ? 1 : 0)
-  return body.length % 4 === 0 && bytes <= 10 * 1024 * 1024
-}
 const safeText = (value: unknown): string => typeof value === 'string' ? value.slice(0, 100000) : ''
 
 function finite(value: unknown, fallback = 0): number {

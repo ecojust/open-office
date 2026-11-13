@@ -1,4 +1,4 @@
-//! Chinese interface text for the embedded Open Office editor.
+//! Chinese and English interface text for the embedded Open Office editor.
 //!
 //! Translation is scoped to an editor frame/command. Standalone windows keep their
 //! original language, and command ids, serialized values and document text are never
@@ -8,6 +8,7 @@ use std::cell::Cell;
 
 mod dialogs;
 mod errors;
+mod host;
 mod panes;
 mod presets;
 mod ribbon;
@@ -43,6 +44,7 @@ pub fn tr(text: &str) -> &str {
         .or_else(|| show::lookup(text))
         .or_else(|| presets::lookup(text))
         .or_else(|| errors::lookup(text))
+        .or_else(|| host::lookup(text))
         .unwrap_or(text)
 }
 

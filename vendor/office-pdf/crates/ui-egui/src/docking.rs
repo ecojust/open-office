@@ -410,7 +410,7 @@ pub fn show(app: &mut crate::OfficePdfApp, ui: &mut egui::Ui) {
                     None if app.combine_showing() => crate::combine_ui::page(app, ui),
                     None if app.embedded => {
                         ui.centered_and_justified(|ui| {
-                            ui.label("请在顶部打开或新建 PDF 文稿");
+                            ui.label(tl!("Open or create a PDF from the top toolbar"));
                         });
                     }
                     None => crate::home::show(app, ui),

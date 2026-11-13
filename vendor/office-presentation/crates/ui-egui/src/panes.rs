@@ -464,7 +464,7 @@ fn format_shape(app: &mut SlideApp, ui: &mut Ui) {
                 let can_pick = app.services.pick_open.is_some() && app.services.read.is_some();
                 if ui
                     .add_enabled(k != "picture" || can_pick || kind == "picture", egui::RadioButton::new(kind == k, tr(l)))
-                    .on_disabled_hover_text("当前版本暂不支持从文件添加图片填充；现有图片填充仍可编辑。")
+                    .on_disabled_hover_text(tr("Picture fills cannot be added from files yet; existing picture fills can still be edited."))
                     .clicked()
                     && (k != "picture" || kind != "picture")
                 {
@@ -676,7 +676,7 @@ fn picture_fill_options(app: &mut SlideApp, ui: &mut Ui, id: u32, pf: &office_pr
         ui.label(tr("Picture source"));
         if ui
             .add_enabled(app.services.pick_open.is_some() && app.services.read.is_some(), egui::Button::new(tr("Insert…")))
-            .on_disabled_hover_text("当前版本暂不支持从文件添加图片填充；现有图片填充仍可编辑。")
+            .on_disabled_hover_text(tr("Picture fills cannot be added from files yet; existing picture fills can still be edited."))
             .clicked()
         {
             pick_fill_picture(app);
@@ -839,7 +839,7 @@ fn background(app: &mut SlideApp, ui: &mut Ui) {
         let can_pick = app.services.pick_open.is_some() && app.services.read.is_some();
         if ui
             .add_enabled(k != "picture" || can_pick || kind == "picture", egui::RadioButton::new(kind == k, tr(l)))
-            .on_disabled_hover_text("当前版本暂不支持从文件添加背景图片；现有背景图片仍可编辑。")
+            .on_disabled_hover_text(tr("Background pictures cannot be added from files yet; existing background pictures can still be edited."))
             .clicked()
             && kind != k
         {
@@ -915,7 +915,7 @@ fn background(app: &mut SlideApp, ui: &mut Ui) {
         Some(Fill::Picture(pf)) => {
             if ui
                 .add_enabled(app.services.pick_open.is_some() && app.services.read.is_some(), egui::Button::new(tr("Insert picture from file…")))
-                .on_disabled_hover_text("当前版本暂不支持从文件添加背景图片；现有背景图片仍可编辑。")
+                .on_disabled_hover_text(tr("Background pictures cannot be added from files yet; existing background pictures can still be edited."))
                 .clicked()
                 && let Some(pick) = app.services.pick_open.as_mut()
                 && let Some(path) = pick("picture")

@@ -2,11 +2,13 @@
 import { nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import type { NativeDocument } from '../types'
 import type { Appearance } from '../shared/appearance'
+import { useI18n } from '../shared/i18n'
 import { bytesToBase64, type EditorExport, type Extension } from '../shared/document'
 import { printPdf, type PrintOutcome } from '../shared/printing'
-import { prepareRustSheetDocument, setRustSheetTheme, type PreparedRustSheetDocument, type RustSheetSession } from '../sheet/rust/client'
+import { prepareRustSheetDocument, setRustSheetTheme, setRustSheetLocale, type PreparedRustSheetDocument, type RustSheetSession } from '../sheet/rust/client'
 import type { OfficeSheetEvent, OfficeSheetFileAction, OfficeSheetSnapshot } from '../sheet/rust/office-sheet-types'
 
+const { locale, t } = useI18n()
 const props = withDefaults(defineProps<{ document: NativeDocument; prepared?: PreparedRustSheetDocument; active?: boolean; disabled?: boolean; theme?: Appearance }>(), { active: true, disabled: false, theme: 'system' })
 const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: OfficeSheetFileAction] }>()
 const viewport = ref<HTMLElement>(), snapshot = shallowRef<OfficeSheetSnapshot>()
@@ -141,6 +143,7 @@ async function load() {
     loading.value = false; emit('ready'); emit('status', '工作簿已就绪')
   } catch (cause) { prepared?.discard(); if (token === generation) { loading.value = false; report(cause) } }
 }
+watch(locale, value => { void setRustSheetLocale(value).catch(report) }, { immediate: true })
 watch(() => props.theme, value => { void setRustSheetTheme(value).catch(report) }, { immediate: true })
 watch(() => props.document.id, () => { opening = load() }, { immediate: true })
 watch(() => props.active, value => {
@@ -176,8 +179,8 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
   <section class="rust-sheet-editor" data-testid="rust-sheet-editor" data-engine="office-sheet-wasm" :data-ready="!!snapshot && !loading" :data-session-id="snapshot?.sessionId" :data-revision="snapshot?.revision" :data-sheets="snapshot?.sheets.length" :data-dirty="snapshot?.dirty" :aria-busy="loading">
     <div ref="viewport" class="office-sheet-viewport" data-testid="office-sheet-viewport" />
     <input ref="pictureInput" data-testid="office-sheet-picture-input" type="file" accept=".png,.jpg,.jpeg" hidden @change="insertPicture" @cancel="cancelPicture" />
-    <div v-if="loading" class="office-sheet-loading" role="status"><span class="office-sheet-spinner" />正在打开工作簿…</div>
-    <p v-if="problem" class="office-sheet-error" role="alert">{{ problem }}</p>
+    <div v-if="loading" class="office-sheet-loading" role="status"><span class="office-sheet-spinner" />{{ t('正在打开工作簿…') }}</div>
+    <p v-if="problem" class="office-sheet-error" role="alert">{{ t(problem) }}</p>
   </section>
 </template>
 

@@ -201,27 +201,27 @@ impl OfficePdfApp {
     }
 
     pub(crate) fn discard_comment_draft(&mut self, confirmed: bool) -> Result<(), String> {
-        let draft = self.unfinished_comment().ok_or("没有待完成的批注草稿")?;
+        let draft = self.unfinished_comment().ok_or(tl!("There is no unfinished comment draft"))?;
         if !confirmed {
             self.comment_draft_dialog = Some(DraftDialog { confirm_discard: true, error: String::new() });
             return Ok(());
         }
         if !self.comment_draft_dialog.as_ref().is_some_and(|dialog| dialog.confirm_discard) {
-            return Err("请先确认是否放弃这段批注草稿".into());
+            return Err(tl!("Confirm whether to discard this comment draft first").into());
         }
         self.clear_comment_draft(draft.kind);
         Ok(())
     }
 
     pub(crate) fn submit_comment_draft(&mut self) -> Result<(), String> {
-        let draft = self.unfinished_comment().ok_or("没有待完成的批注草稿")?;
-        let (index, id) = self.active_ids().ok_or("文稿已关闭")?;
-        let view = self.views.get(index).ok_or("页面视图已关闭")?;
-        let info = &self.session.get(id).ok_or("文稿已关闭")?.info;
+        let draft = self.unfinished_comment().ok_or(tl!("There is no unfinished comment draft"))?;
+        let (index, id) = self.active_ids().ok_or(tl!("The document is closed"))?;
+        let view = self.views.get(index).ok_or(tl!("The page view is closed"))?;
+        let info = &self.session.get(id).ok_or(tl!("The document is closed"))?.info;
         let edit = if draft.orphaned || draft.kind == DraftKind::Add {
             // Recover typed text as an explicitly requested new note if its old target vanished.
             let page = draft.page.min(info.pages.len().saturating_sub(1));
-            let geometry = info.pages.get(page).ok_or("文稿没有可添加批注的页面，草稿已保留")?;
+            let geometry = info.pages.get(page).ok_or(tl!("There is no page available for this comment. Your draft is preserved"))?;
             let point = geometry.view_to_user(geometry.width - 44.0, 24.0);
             Edit::AddAnnotation(NewAnnotation {
                 page,
@@ -232,22 +232,21 @@ impl OfficePdfApp {
             })
         } else {
             match draft.kind {
-                DraftKind::Composer => {
-                    crate::comments::composer_edit(&view.comments, info, &self.comment_prefs).ok_or("无法提交该批注，草稿已保留")?
-                }
+                DraftKind::Composer => crate::comments::composer_edit(&view.comments, info, &self.comment_prefs)
+                    .ok_or(tl!("The comment could not be submitted. Your draft is preserved"))?,
                 DraftKind::Editing => {
-                    let (page, index, text) = view.comments.editing.as_ref().ok_or("批注编辑已结束")?;
+                    let (page, index, text) = view.comments.editing.as_ref().ok_or(tl!("Comment editing has ended"))?;
                     Edit::SetAnnotationContents { page: *page, index: *index, text: text.clone() }
                 }
                 DraftKind::Reply => {
-                    let (page, index) = view.comments.selected.ok_or("原批注已不存在，草稿已保留")?;
+                    let (page, index) = view.comments.selected.ok_or(tl!("The original comment no longer exists. Your draft is preserved"))?;
                     Edit::ReplyToAnnotation { page, index, text: draft.text.clone(), author: self.comment_prefs.author.clone() }
                 }
-                DraftKind::Add => return Err("批注草稿状态已变化，请重试".into()),
+                DraftKind::Add => return Err(tl!("The comment draft has changed. Please try again").into()),
             }
         };
         if !self.apply_edit(edit) {
-            return Err("提交批注失败，草稿仍完整保留，请检查文稿是否允许批注".into());
+            return Err(tl!("The comment could not be submitted. Your draft is intact; check whether the document allows comments").into());
         }
         self.clear_comment_draft(draft.kind);
         Ok(())
@@ -303,17 +302,19 @@ pub(crate) fn show(app: &mut OfficePdfApp, ctx: &egui::Context) {
     let mut action = None;
     let modal = widgets::show_modal(ctx, "pdf-comment-draft", |ui| {
         ui.set_width((ctx.content_rect().width() - 64.0).clamp(200.0, 420.0));
-        ui.heading(if confirm_discard { "确认放弃批注草稿？" } else { "完成待保存的批注" });
+        ui.heading(if confirm_discard { tl!("Discard this comment draft?") } else { tl!("Finish the pending comment") });
         ui.label(if confirm_discard {
-            "这段尚未提交的文字将被清除，已保存的批注不会受影响。"
+            tl!("This unsubmitted text will be cleared. Saved comments will stay unchanged.")
         } else if draft.orphaned {
-            "原批注或页面已移除，输入的文字仍然保留。可以将它恢复为新批注。"
+            tl!("The original comment or page was removed. Your text is preserved and can be restored as a new comment.")
         } else {
-            "以下文字尚未提交。完成此批注后，即可继续保存文稿。"
+            tl!("The text below has not been submitted. Finish this comment to continue saving the document.")
         });
         ui.add_space(8.0);
         egui::ScrollArea::vertical().max_height((ctx.content_rect().height() - 300.0).clamp(70.0, 180.0)).show(ui, |ui| {
-            ui.add(egui::Label::new(if draft.text.is_empty() { "（清空此批注的原有文字）" } else { &draft.text }).wrap().selectable(true));
+            ui.add(
+                egui::Label::new(if draft.text.is_empty() { tl!("(Clear the existing comment text)") } else { &draft.text }).wrap().selectable(true),
+            );
         });
         if !error.is_empty() {
             ui.colored_label(egui::Color32::from_rgb(180, 55, 55), &error);
@@ -321,23 +322,25 @@ pub(crate) fn show(app: &mut OfficePdfApp, ctx: &egui::Context) {
         ui.add_space(12.0);
         ui.horizontal_wrapped(|ui| {
             if confirm_discard {
-                if button(ui, "comment-draft-keep", "保留草稿", false).clicked() {
+                if button(ui, "comment-draft-keep", tl!("Keep draft"), false).clicked() {
                     action = Some("keep");
                 }
-                if button(ui, "comment-draft-confirm-discard", "确认放弃", true).clicked() {
+                if button(ui, "comment-draft-confirm-discard", tl!("Confirm discard"), true).clicked() {
                     action = Some("discard");
                 }
             } else {
-                if button(ui, "comment-draft-close", "稍后处理", false).clicked() {
+                if button(ui, "comment-draft-close", tl!("Decide later"), false).clicked() {
                     action = Some("close");
                 }
-                if !draft.orphaned && button(ui, "comment-draft-edit", "返回编辑", false).clicked() {
+                if !draft.orphaned && button(ui, "comment-draft-edit", tl!("Return to editing"), false).clicked() {
                     action = Some("edit");
                 }
-                if button(ui, "comment-draft-discard", "放弃草稿", false).clicked() {
+                if button(ui, "comment-draft-discard", tl!("Discard draft"), false).clicked() {
                     action = Some("ask-discard");
                 }
-                if button(ui, "comment-draft-submit", if draft.orphaned { "恢复为新批注" } else { "提交批注" }, true).clicked() {
+                if button(ui, "comment-draft-submit", if draft.orphaned { tl!("Restore as new comment") } else { tl!("Submit comment") }, true)
+                    .clicked()
+                {
                     action = Some("submit");
                 }
             }

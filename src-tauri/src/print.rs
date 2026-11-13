@@ -127,7 +127,10 @@ pub async fn print_pdf(
     window: tauri::WebviewWindow,
     base64: String,
     title: String,
+    locale: Option<String>,
 ) -> Result<PrintResult, String> {
+    #[cfg(not(target_os = "windows"))]
+    let _ = locale;
     require_origin(&app, &window)?;
     let guard = PrintGuard::acquire()?;
     let bytes = pdf_bytes(&base64)?;
@@ -159,7 +162,7 @@ pub async fn print_pdf(
         tauri::async_runtime::spawn_blocking(move || {
             let _guard = guard;
             require_origin(&app, &window)?;
-            windows::print_pdf(app, bytes, title)
+            windows::print_pdf(app, bytes, title, locale.as_deref() == Some("en"))
         })
         .await
         .map_err(|_| "无法完成打印预览准备。".to_owned())?

@@ -1838,8 +1838,21 @@ fn replace_if_unchanged(
     Ok(())
 }
 
+fn dialog_label(
+    locale: Option<&str>,
+    chinese: &'static str,
+    english: &'static str,
+) -> &'static str {
+    if locale == Some("en") {
+        english
+    } else {
+        chinese
+    }
+}
+
 #[tauri::command]
 pub async fn open_document(
+    locale: Option<String>,
     app: AppHandle,
     store: State<'_, DocumentStore>,
 ) -> Result<Option<NativeDocument>, String> {
@@ -1849,7 +1862,10 @@ pub async fn open_document(
         let selected = app
             .dialog()
             .file()
-            .add_filter("办公文档", EXTENSIONS)
+            .add_filter(
+                dialog_label(locale.as_deref(), "办公文档", "Office documents"),
+                EXTENSIONS,
+            )
             .blocking_pick_file();
         let Some(selected) = selected else {
             return Ok(None);
@@ -1896,6 +1912,7 @@ pub(crate) fn image_mime_type(path: &Path, bytes: &[u8]) -> Result<&'static str,
 
 #[tauri::command]
 pub async fn pick_image(
+    locale: Option<String>,
     app: AppHandle,
     store: State<'_, DocumentStore>,
 ) -> Result<Option<NativeImage>, String> {
@@ -1905,7 +1922,10 @@ pub async fn pick_image(
         let Some(selected) = app
             .dialog()
             .file()
-            .add_filter("图片", &["png", "jpg", "jpeg"])
+            .add_filter(
+                dialog_label(locale.as_deref(), "图片", "Images"),
+                &["png", "jpg", "jpeg"],
+            )
             .blocking_pick_file()
         else {
             return Ok(None);
@@ -1975,6 +1995,7 @@ pub async fn rename_document(
 #[tauri::command]
 pub async fn save_document(
     request: SaveDocumentRequest,
+    locale: Option<String>,
     app: AppHandle,
     store: State<'_, DocumentStore>,
 ) -> Result<SaveResult, String> {
@@ -2000,11 +2021,10 @@ pub async fn save_document(
             );
         }
         let target = {
-            let mut dialog = app
-                .dialog()
-                .file()
-                .set_file_name(&request.name)
-                .add_filter("办公文档", &[request.extension.as_str()]);
+            let mut dialog = app.dialog().file().set_file_name(&request.name).add_filter(
+                dialog_label(locale.as_deref(), "办公文档", "Office documents"),
+                &[request.extension.as_str()],
+            );
             if let Some(parent) = existing.as_ref().and_then(|record| record.path.parent()) {
                 dialog = dialog.set_directory(parent);
             }

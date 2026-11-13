@@ -586,7 +586,7 @@ impl OfficePdfApp {
     /// Show Extract pages, its file name filled in with the active document's (#737).
     pub fn open_extract_dialog(&mut self) {
         if self.embedded {
-            self.notify("当前版本尚未接入提取页面的文件保存，原文稿已保留");
+            self.notify(tl!("Saving extracted pages is not available yet. The original document is preserved"));
             return;
         }
         self.extract_draft.name =
@@ -599,7 +599,7 @@ impl OfficePdfApp {
         // The containing window cannot yet adopt/save a generated PDF. In particular,
         // do not continue to DeletePages after open_created declines the new document.
         if self.embedded {
-            self.notify("当前版本尚未接入提取页面的文件保存，原文稿已保留");
+            self.notify(tl!("Saving extracted pages is not available yet. The original document is preserved"));
             return;
         }
         // What's typed in a form field is part of the document (#166).
@@ -796,7 +796,7 @@ impl OfficePdfApp {
 
     pub(crate) fn open_created(&mut self, name: &str, bytes: Arc<Vec<u8>>, message: &str) {
         if self.embedded {
-            self.notify("当前版本尚不支持将生成的 PDF 报告打开为新标签页，原文稿已保留");
+            self.notify(tl!("Opening a generated PDF report in a new tab is not available yet. The original document is preserved"));
             return;
         }
         match self.session.open_new(name, bytes) {

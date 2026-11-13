@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import Icon from '../../components/Icon.vue'
+import { useI18n } from '../../shared/i18n'
 import { dayAllocations, resizeAllocationBoundary } from '../allocation'
 import type { CalendarBook, CalendarNote } from '../model'
 
+const { locale, t } = useI18n()
 const props = withDefaults(defineProps<{
  notes: CalendarNote[]; date: string; workdayHours: number; display: 'percent'|'hours'
  disabled?: boolean; dragEnabled?: boolean; selectedNoteId?: string|null; search?: string; expanded?: boolean; cancelToken?: number
@@ -25,10 +27,10 @@ function bookFor(notes = props.notes): CalendarBook {
 const allocations = computed(() => preview.value ?? dayAllocations(bookFor(), props.date))
 const noteById = computed(() => new Map(props.notes.map(note => [note.id, note])))
 const entries = computed(() => allocations.value.map(item => ({ ...item, note: noteById.value.get(item.noteId)! })))
-const number = (value: number, digits = 2) => Number(value.toFixed(digits)).toLocaleString('zh-CN')
+const number = (value: number, digits = 2) => Number(value.toFixed(digits)).toLocaleString(locale.value)
 function hoursText(hours: number) {
  const seconds = Math.round(hours * 3600), wholeHours = Math.floor(seconds / 3600), minutes = Math.floor(seconds % 3600 / 60), rest = seconds % 60
- return [wholeHours ? `${wholeHours} 小时` : '', minutes ? `${minutes} 分钟` : '', rest ? `${rest} 秒` : ''].filter(Boolean).join(' ') || '0 小时'
+ return [wholeHours ? t('{count} 小时', { count: wholeHours }) : '', minutes ? t('{count} 分钟', { count: minutes }) : '', rest ? t('{count} 秒', { count: rest }) : ''].filter(Boolean).join(' ') || t('{count} 小时', { count: 0 })
 }
 function matches(note: CalendarNote) { return !props.search.trim() || `${note.title}\n${note.content}\n${note.type}`.toLocaleLowerCase().includes(props.search.trim().toLocaleLowerCase()) }
 function title(item: typeof entries.value[number]) { return `${item.title} · ${number(item.percent)}% · ${hoursText(item.hours)}${item.note.content ? '\n' + item.note.content : ''}` }
@@ -89,14 +91,14 @@ defineExpose({ cancel })
 
 <template>
  <div class="calendar-work-scroll" :class="{'calendar-work-expanded':expanded,'calendar-work-static':!dragEnabled}">
-  <div ref="capsule" class="calendar-work-capsule" :data-testid="`calendar-work-capsule-${date}`" :style="{'--capsule-min-width':`${Math.max(1,notes.length)*64}px`}" :aria-label="`${date} 工作分配，全天 ${workdayHours} 小时`">
+  <div ref="capsule" class="calendar-work-capsule" :data-testid="`calendar-work-capsule-${date}`" :style="{'--capsule-min-width':`${Math.max(1,notes.length)*64}px`}" :aria-label="t('{date} 工作分配，全天 {hours} 小时', { date, hours: workdayHours })">
    <div v-for="(item,index) in entries" :key="item.noteId" class="calendar-work-segment" :class="{'calendar-work-selected':selectedNoteId===item.noteId,'calendar-work-dimmed':!matches(item.note),'calendar-work-zero':item.weight===0}" :style="{'--note-color':item.color,flexGrow:item.weight,flexBasis:'0px'}" :data-testid="`calendar-note-${item.noteId}`" :data-note-id="item.noteId" :data-allocation-percent="item.percent" :data-allocation-hours="item.hours" :draggable="dragEnabled && !disabled && !activeBoundary" @dragstart="emit('dragstart',$event,item.note)" @dragend="emit('dragend')" @contextmenu.stop="emit('contextmenu',$event,item.note)" @dblclick.stop="emit('edit',item.note)">
     <div class="calendar-note-main">
      <button type="button" class="calendar-note-title" :data-testid="`calendar-note-title-${item.noteId}`" :title="title(item)" :disabled="disabled" @click.stop="emit('select',item.note)" @keydown.enter.stop.prevent="emit('edit',item.note)"><span>{{item.title}}</span></button>
-     <button type="button" class="calendar-work-value" :data-testid="`calendar-note-value-${item.noteId}`" :title="`${title(item)}\n双击数字修改工时分配`" :aria-label="`修改 ${item.title} 的工时分配：${display==='percent'?`${number(item.percent)}%`:`${number(item.hours)} 小时`}`" :disabled="disabled || !!activeBoundary" @click.stop="emit('select',item.note)" @dblclick.stop.prevent="emit('edit-allocation',item.note)" @keydown.enter.stop.prevent="emit('edit-allocation',item.note)" @keydown.space.stop.prevent="emit('edit-allocation',item.note)"><strong>{{display==='percent'?`${number(item.percent)}%`:`${number(item.hours)}h`}}</strong></button>
+     <button type="button" class="calendar-work-value" :data-testid="`calendar-note-value-${item.noteId}`" :title="`${title(item)}\n${t('双击数字修改工时分配')}`" :aria-label="t('修改 {title} 的工时分配：{value}', { title: item.title, value: display==='percent'?`${number(item.percent)}%`:t('{count} 小时', { count: number(item.hours) }) })" :disabled="disabled || !!activeBoundary" @click.stop="emit('select',item.note)" @dblclick.stop.prevent="emit('edit-allocation',item.note)" @keydown.enter.stop.prevent="emit('edit-allocation',item.note)" @keydown.space.stop.prevent="emit('edit-allocation',item.note)"><strong>{{display==='percent'?`${number(item.percent)}%`:`${number(item.hours)}h`}}</strong></button>
     </div>
-    <button type="button" class="calendar-work-delete" :data-testid="`calendar-note-delete-${item.noteId}`" :aria-label="`删除 ${item.title}`" :disabled="disabled || !!activeBoundary" @click.stop="emit('delete',item.note)" @dblclick.stop><Icon name="close" :size="11"/></button>
-    <span v-if="index<entries.length-1" class="calendar-work-divider" :class="{'calendar-work-divider-active':activeBoundary===item.noteId}" :data-testid="`calendar-work-divider-${item.noteId}-${entries[index+1]!.noteId}`" role="slider" :tabindex="disabled?-1:0" aria-orientation="horizontal" :aria-label="`调整 ${item.title} 与 ${entries[index+1]!.title} 的工时分配`" :aria-valuemin="item.start*(display==='percent'?100:workdayHours)" :aria-valuemax="entries[index+1]!.end*(display==='percent'?100:workdayHours)" :aria-valuenow="item.end*(display==='percent'?100:workdayHours)" :aria-valuetext="`${item.title} ${number(item.percent)}%，${hoursText(item.hours)}；方向键每次${display==='percent'?'10%':'0.5 小时'}`" :aria-disabled="disabled" :title="`拖动分隔线调整工时；方向键每次${display==='percent'?'10%':'0.5 小时'}`" @pointerdown="start($event,item.noteId)" @pointermove="move" @pointerup="end" @pointercancel="cancel" @lostpointercapture="cancel" @keydown="keyboard($event,item.noteId)" @click.stop.prevent @dblclick.stop.prevent @dragstart.stop.prevent/>
+    <button type="button" class="calendar-work-delete" :data-testid="`calendar-note-delete-${item.noteId}`" :aria-label="t('删除 {title}', { title: item.title })" :disabled="disabled || !!activeBoundary" @click.stop="emit('delete',item.note)" @dblclick.stop><Icon name="close" :size="11"/></button>
+    <span v-if="index<entries.length-1" class="calendar-work-divider" :class="{'calendar-work-divider-active':activeBoundary===item.noteId}" :data-testid="`calendar-work-divider-${item.noteId}-${entries[index+1]!.noteId}`" role="slider" :tabindex="disabled?-1:0" aria-orientation="horizontal" :aria-label="t('调整 {left} 与 {right} 的工时分配', { left: item.title, right: entries[index+1]!.title })" :aria-valuemin="item.start*(display==='percent'?100:workdayHours)" :aria-valuemax="entries[index+1]!.end*(display==='percent'?100:workdayHours)" :aria-valuenow="item.end*(display==='percent'?100:workdayHours)" :aria-valuetext="t('{title} {percent}%，{hours}；方向键每次{step}', { title: item.title, percent: number(item.percent), hours: hoursText(item.hours), step: display==='percent'?'10%':t('0.5 小时') })" :aria-disabled="disabled" :title="t('拖动分隔线调整工时；方向键每次{step}', { step: display==='percent'?'10%':t('0.5 小时') })" @pointerdown="start($event,item.noteId)" @pointermove="move" @pointerup="end" @pointercancel="cancel" @lostpointercapture="cancel" @keydown="keyboard($event,item.noteId)" @click.stop.prevent @dblclick.stop.prevent @dragstart.stop.prevent/>
    </div>
   </div>
  </div>

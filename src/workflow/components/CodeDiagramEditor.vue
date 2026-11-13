@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from '../../shared/i18n'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { compileCodeDiagram, DiagramSyntaxError, lookupDiagramSource, type CodeDiagramResult } from '../core/code-diagram.ts'
 import { sceneToSvg } from '../core/svg.ts'
@@ -11,11 +12,18 @@ import AppIcon from './AppIcon.vue'
 import DiagramSourceEditor from './DiagramSourceEditor.vue'
 import { tokenizeDiagramSource } from '../core/diagram-source-language.ts'
 
+const { t } = useI18n()
+
 const props = withDefaults(defineProps<{ source: string; theme: 'light' | 'dark'; diagramStyle?: DiagramStyleId; active?: boolean; disabled?: boolean }>(), { active: true, disabled: false })
 const emit = defineEmits<{ change: [source: string]; changeStyle: [id: DiagramStyleId]; createFlow: [scene: Scene]; export: [format: 'png' | 'svg']; status: [message: string]; pending: [value: boolean] }>()
 const composing = ref(false)
 const interactive = computed(() => props.active && !props.disabled)
 const draft = ref(props.source), sourceInput = ref<InstanceType<typeof DiagramSourceEditor>>(), error = ref(''), errorLine = ref(0)
+// Parser diagnostics are translated only at this UI boundary; quoted source stays intact.
+const localizedError = computed(() => {
+  const parts = error.value.match(/^第 (\d+) 行(?:，第 (\d+) 列)?：(.*)$/s)
+  return parts ? t(parts[2] ? '第 {line} 行，第 {column} 列：{message}' : '第 {line} 行：{message}', { line: parts[1]!, column: parts[2] || '', message: t(parts[3]!) }) : t(error.value)
+})
 const compiled = ref<CodeDiagramResult | null>(null), parsing = ref(false), zoom = ref(1)
 const compiledSource = ref(''), selection = ref({ start: 0, end: 0, head: 0 })
 const previewScroll = ref<HTMLElement>(), previewPage = ref<HTMLElement>(), sourceOverlay = ref<SVGSVGElement>()
@@ -65,16 +73,16 @@ const sourceHighlights = computed(() => {
     return { id: element.id, bounds, path: points ? pointsPath(points) + (element.type === 'stroke' && element.closed ? ' Z' : '') : '' }
   })
 })
-const sourceLocation = computed(() => `第 ${cursorLine.value} 行 · ${parsing.value ? '等待预览更新' : sourceHighlights.value.length ? `已定位 ${sourceHighlights.value.length} 个图形` : '此处无对应图形'}`)
-const kindLabel = computed(() => compiled.value ? DIAGRAM_KIND_LABELS[compiled.value.kind] : '图表')
+const sourceLocation = computed(() => `${t('第 {line} 行', { line: cursorLine.value })} · ${parsing.value ? t('等待预览更新') : sourceHighlights.value.length ? t('已定位 {count} 个图形', { count: sourceHighlights.value.length }) : t('此处无对应图形')}`)
+const kindLabel = computed(() => compiled.value ? t(DIAGRAM_KIND_LABELS[compiled.value.kind]) : t('图表'))
 const elementCount = computed(() => compiled.value?.scene.elements.length ?? 0)
 const categories = computed(() => [...new Set(DIAGRAM_TEMPLATES.map(template => template.category))])
 const kindsCount = computed(() => new Set(DIAGRAM_TEMPLATES.map(template => template.kind)).size)
-const kindsList = computed(() => [...new Set(DIAGRAM_TEMPLATES.map(template => DIAGRAM_KIND_LABELS[template.kind]))].join('、'))
+const kindsList = computed(() => [...new Set(DIAGRAM_TEMPLATES.map(template => t(DIAGRAM_KIND_LABELS[template.kind])))].join(t('、')))
 const visibleTemplates = computed(() => {
   const search = templateSearch.value.trim().toLocaleLowerCase()
   return DIAGRAM_TEMPLATES.filter(template => (templateCategory.value === 'all' || template.category === templateCategory.value)
-    && (!search || `${template.title} ${template.description} ${DIAGRAM_KIND_LABELS[template.kind]} ${template.kind} ${template.source}`.toLocaleLowerCase().includes(search)))
+    && (!search || `${template.title} ${t(template.title)} ${template.description} ${t(template.description)} ${DIAGRAM_KIND_LABELS[template.kind]} ${t(DIAGRAM_KIND_LABELS[template.kind])} ${template.kind} ${template.source}`.toLocaleLowerCase().includes(search)))
 })
 const syntaxTemplate = computed(() => DIAGRAM_TEMPLATES.find(template => template.kind === (compiled.value?.kind || 'flowchart')))
 const syntaxExample = computed(() => syntaxTemplate.value?.source || '')
@@ -92,7 +100,11 @@ const styleExample: Scene = {
     { id: 'style-second', type: 'edge', from: { x: 0, y: 0, nodeId: 'style-choice' }, to: { x: 0, y: 0, nodeId: 'style-end' }, label: '', arrow: 'end', route: 'orthogonal', style: { ...DEFAULT_STYLE }, locked: false },
   ],
 }
-const stylePreviews = DIAGRAM_STYLES.map(style => ({ ...style, svg: sceneToSvg(applyDiagramStyle(styleExample, style.id), { background: true }) }))
+const stylePreviews = computed(() => {
+  const example = clone(styleExample)
+  for (const element of example.elements) if (element.type === 'shape') element.text = t(element.text)
+  return DIAGRAM_STYLES.map(style => ({ ...style, svg: sceneToSvg(applyDiagramStyle(example, style.id), { background: true }) }))
+})
 
 async function openStyles() {
   if (!interactive.value || !flush()) return
@@ -224,7 +236,7 @@ function parse() {
   try {
     compiled.value = compileCodeDiagram(draft.value); error.value = ''; errorLine.value = 0
     compiledSource.value = draft.value
-    emit('status', `${kindLabel.value} · ${elementCount.value} 个图元`)
+    emit('status', `${compiled.value ? DIAGRAM_KIND_LABELS[compiled.value.kind] : '图表'} · ${elementCount.value} 个图元`)
   } catch (cause) {
     compiledSource.value = ''
     compiled.value = null; error.value = cause instanceof Error ? cause.message : '无法解析此源码。'
@@ -375,38 +387,38 @@ parse()
 </script>
 
 <template>
-  <section class="diagram-editor" :class="{ 'is-dark': theme === 'dark' }" aria-label="代码图表编辑器" :inert="!interactive">
+  <section class="diagram-editor" :class="{ 'is-dark': theme === 'dark' }" :aria-label="t('代码图表编辑器')" :inert="!interactive">
     <div class="diagram-toolbar" :inert="modalOpen">
-      <div class="diagram-toolbar-start"><div class="diagram-title"><AppIcon name="code" :size="18"/><strong>代码图表</strong><span class="diagram-badge">{{ kindsCount }} 类图表</span></div></div>
-      <div class="diagram-toolbar-actions"><button ref="styleButton" type="button" class="diagram-style-toggle" :aria-label="`图表风格，当前${currentStyle.label}`" :title="`图表风格 · ${currentStyle.label}`" :aria-expanded="stylesOpen" aria-haspopup="dialog" data-testid="diagram-style-toggle" @click="openStyles"><AppIcon name="palette" :size="18"/><span>图表风格<small>{{ currentStyle.label }}</small></span><AppIcon name="chevron" :size="12"/></button>
-      <button ref="templateButton" type="button" class="diagram-template-toggle" aria-label="图表类型与模板" :aria-expanded="templatesOpen" aria-haspopup="dialog" data-testid="diagram-template-toggle" @click="openTemplates"><AppIcon name="templates" :size="16"/><span>图表模板</span><AppIcon name="chevron" :size="12"/></button>
-      <button type="button" class="diagram-convert" aria-label="创建独立画布" data-testid="diagram-create-copy" :disabled="!compiled || parsing" @click="createFlow"><AppIcon name="duplicate" :size="16"/><span>创建独立画布</span></button>
-      <div ref="exportControl" class="diagram-image-export"><button ref="exportButton" type="button" class="diagram-export-toggle" aria-label="导出图片" :title="parsing ? '正在更新预览，完成后可导出图片' : error ? '请先修正源码后再导出图片' : '导出 PNG 图片或 SVG 矢量图'" :disabled="!canExport" :aria-expanded="exportOpen" :aria-controls="exportMenuId" aria-haspopup="menu" data-testid="diagram-export-image" @click="toggleExportMenu" @keydown.down.prevent.stop="openExportMenu()" @keydown.up.prevent.stop="openExportMenu(true)" @keydown.escape.prevent.stop="closeExportMenu(true)"><AppIcon name="image" :size="17"/><span>导出图片</span><AppIcon name="chevron" :size="12"/></button>
-        <div v-if="exportOpen" :id="exportMenuId" ref="exportMenu" class="diagram-export-menu" role="menu" aria-label="导出图片格式" data-testid="diagram-export-menu" @keydown="exportMenuKeydown"><button type="button" role="menuitem" tabindex="-1" data-testid="diagram-export-png" @click="chooseImageExport('png')"><AppIcon name="image" :size="17"/><span>PNG 图片<small>适合文档和演示</small></span></button><button type="button" role="menuitem" tabindex="-1" data-testid="diagram-export-svg" @click="chooseImageExport('svg')"><AppIcon name="shapes" :size="17"/><span>SVG 矢量图<small>放大后保持清晰</small></span></button></div>
+      <div class="diagram-toolbar-start"><div class="diagram-title"><AppIcon name="code" :size="18"/><strong>{{ t('代码图表') }}</strong><span class="diagram-badge">{{ t('{count} 类图表', { count: kindsCount }) }}</span></div></div>
+      <div class="diagram-toolbar-actions"><button ref="styleButton" type="button" class="diagram-style-toggle" :aria-label="t('图表风格，当前{value0}', { value0: t(currentStyle.label) })" :title="t('图表风格 · {value0}', { value0: t(currentStyle.label) })" :aria-expanded="stylesOpen" aria-haspopup="dialog" data-testid="diagram-style-toggle" @click="openStyles"><AppIcon name="palette" :size="18"/><span>{{ t('图表风格') }}<small>{{ t(currentStyle.label) }}</small></span><AppIcon name="chevron" :size="12"/></button>
+      <button ref="templateButton" type="button" class="diagram-template-toggle" :aria-label="t('图表类型与模板')" :aria-expanded="templatesOpen" aria-haspopup="dialog" data-testid="diagram-template-toggle" @click="openTemplates"><AppIcon name="templates" :size="16"/><span>{{ t('图表模板') }}</span><AppIcon name="chevron" :size="12"/></button>
+      <button type="button" class="diagram-convert" :aria-label="t('创建独立画布')" data-testid="diagram-create-copy" :disabled="!compiled || parsing" @click="createFlow"><AppIcon name="duplicate" :size="16"/><span>{{ t('创建独立画布') }}</span></button>
+      <div ref="exportControl" class="diagram-image-export"><button ref="exportButton" type="button" class="diagram-export-toggle" :aria-label="t('导出图片')" :title="parsing ? t('正在更新预览，完成后可导出图片') : error ? t('请先修正源码后再导出图片') : t('导出 PNG 图片或 SVG 矢量图')" :disabled="!canExport" :aria-expanded="exportOpen" :aria-controls="exportMenuId" aria-haspopup="menu" data-testid="diagram-export-image" @click="toggleExportMenu" @keydown.down.prevent.stop="openExportMenu()" @keydown.up.prevent.stop="openExportMenu(true)" @keydown.escape.prevent.stop="closeExportMenu(true)"><AppIcon name="image" :size="17"/><span>{{ t('导出图片') }}</span><AppIcon name="chevron" :size="12"/></button>
+        <div v-if="exportOpen" :id="exportMenuId" ref="exportMenu" class="diagram-export-menu" role="menu" :aria-label="t('导出图片格式')" data-testid="diagram-export-menu" @keydown="exportMenuKeydown"><button type="button" role="menuitem" tabindex="-1" data-testid="diagram-export-png" @click="chooseImageExport('png')"><AppIcon name="image" :size="17"/><span>{{ t('PNG 图片') }}<small>{{ t('适合文档和演示') }}</small></span></button><button type="button" role="menuitem" tabindex="-1" data-testid="diagram-export-svg" @click="chooseImageExport('svg')"><AppIcon name="shapes" :size="17"/><span>{{ t('SVG 矢量图') }}<small>{{ t('放大后保持清晰') }}</small></span></button></div>
       </div></div>
     </div>
     <div ref="workspace" class="diagram-workspace" :class="{ 'is-resizing': resizing }" :style="workspaceStyle" :inert="modalOpen">
       <div class="diagram-source-panel">
-        <div class="diagram-panel-title"><span>源码</span><span>修改后自动预览</span></div>
+        <div class="diagram-panel-title"><span>{{ t('源码') }}</span><span>{{ t('修改后自动预览') }}</span></div>
         <DiagramSourceEditor ref="sourceInput" v-model="draft" :theme="theme" :disabled="!interactive" :error="error" :error-id="errorId" @input="onInput" @blur="flush" @compositionstart="compositionStart" @compositionend="compositionEnd" @selection="selection = $event" />
-        <div class="diagram-source-location" data-testid="diagram-source-location"><AppIcon name="cursor" :size="13"/><span>{{ sourceLocation }}</span><button type="button" aria-label="定位当前图形" title="将当前图形移到预览中央" data-testid="diagram-locate-current" :disabled="!sourceHighlights.length" @click="locateCurrent"><AppIcon name="fit" :size="14"/><span>定位图形</span></button></div>
+        <div class="diagram-source-location" data-testid="diagram-source-location"><AppIcon name="cursor" :size="13"/><span>{{ sourceLocation }}</span><button type="button" :aria-label="t('定位当前图形')" :title="t('将当前图形移到预览中央')" data-testid="diagram-locate-current" :disabled="!sourceHighlights.length" @click="locateCurrent"><AppIcon name="fit" :size="14"/><span>{{ t('定位图形') }}</span></button></div>
         <details class="diagram-help">
-          <summary><AppIcon name="chevron-right" :size="13"/><AppIcon name="help" :size="14"/><span>语法示例与支持范围</span></summary>
-          <p><strong>{{ syntaxTemplate ? DIAGRAM_KIND_LABELS[syntaxTemplate.kind] : '图表' }}</strong> · {{ syntaxTemplate?.description }}</p>
+          <summary><AppIcon name="chevron-right" :size="13"/><AppIcon name="help" :size="14"/><span>{{ t('语法示例与支持范围') }}</span></summary>
+          <p><strong>{{ syntaxTemplate ? t(DIAGRAM_KIND_LABELS[syntaxTemplate.kind]) : t('图表') }}</strong> · {{ syntaxTemplate ? t(syntaxTemplate.description) : '' }}</p>
           <pre class="diagram-syntax-example"><span v-for="(token, index) in syntaxTokens" :key="index" :class="token.kind ? `diagram-token-${token.kind}` : undefined">{{ token.text }}</span></pre>
-          <p>模板包含{{ kindsList }}。示例源码可直接编辑。点击行号旁的箭头可折叠或展开代码块。</p>
-          <p>支持 <code># 注释</code>，可独占一行或放在语句后；行内 <code>#</code> 两侧需留空格。</p>
-          <p>支持这些类型的常用语法子集；未实现的指令会提示具体行号。源码独立保存，创建独立画布后可调整图元；副本的修改不会反写源码。</p>
+          <p>{{ t('模板包含{kinds}。示例源码可直接编辑。点击行号旁的箭头可折叠或展开代码块。', { kinds: kindsList }) }}</p>
+          <p>{{ t('支持 # 注释，可独占一行或放在语句后；行内 # 两侧需留空格。') }}</p>
+          <p>{{ t('支持这些类型的常用语法子集；未实现的指令会提示具体行号。源码独立保存，创建独立画布后可调整图元；副本的修改不会反写源码。') }}</p>
         </details>
       </div>
-      <div class="diagram-splitter" data-testid="diagram-splitter" role="separator" tabindex="0" aria-label="调整源码与预览大小" :aria-orientation="stacked ? 'horizontal' : 'vertical'" :aria-valuenow="Math.round(splitRatio)" :aria-valuemin="20" :aria-valuemax="80" :aria-valuetext="`源码占 ${Math.round(splitRatio)}%`" title="拖动调整大小，双击恢复；方向键微调" @pointerdown="startResize" @pointermove="resizeMove" @pointerup="endResize" @pointercancel="endResize" @lostpointercapture="endResize" @keydown="splitKeydown" @dblclick="setSplitRatio(stacked ? 43 : 38)" />
+      <div class="diagram-splitter" data-testid="diagram-splitter" role="separator" tabindex="0" :aria-label="t('调整源码与预览大小')" :aria-orientation="stacked ? 'horizontal' : 'vertical'" :aria-valuenow="Math.round(splitRatio)" :aria-valuemin="20" :aria-valuemax="80" :aria-valuetext="t('源码占 {value0}%', { value0: Math.round(splitRatio) })" :title="t('拖动调整大小，双击恢复；方向键微调')" @pointerdown="startResize" @pointermove="resizeMove" @pointerup="endResize" @pointercancel="endResize" @lostpointercapture="endResize" @keydown="splitKeydown" @dblclick="setSplitRatio(stacked ? 43 : 38)" />
       <div class="diagram-preview-panel">
-        <div class="diagram-panel-title"><span>预览 <span v-if="compiled" class="diagram-preview-kind"><AppIcon :name="compiled.kind" :size="12"/>{{ kindLabel }}</span></span><div class="diagram-zoom"><span class="diagram-zoom-hint">滚轮滚动 · Ctrl + 滚轮缩放</span><button type="button" aria-label="缩小预览" :disabled="zoom <= minPreviewZoom" @click="zoomPreview(zoom - .2)"><AppIcon name="minus" :size="13"/></button><button type="button" aria-label="重置预览缩放" title="重置为 100% · Ctrl + 滚轮或捏合缩放" @click="zoomPreview(1)">{{ Math.round(zoom * 100) }}%</button><button type="button" aria-label="放大预览" :disabled="zoom >= maxPreviewZoom" @click="zoomPreview(zoom + .2)"><AppIcon name="plus" :size="13"/></button></div></div>
-        <div v-if="parsing" class="diagram-parsing" role="status"><span class="diagram-spinner" />正在解析…</div>
+        <div class="diagram-panel-title"><span>{{ t('预览') }} <span v-if="compiled" class="diagram-preview-kind"><AppIcon :name="compiled.kind" :size="12"/>{{ kindLabel }}</span></span><div class="diagram-zoom"><span class="diagram-zoom-hint">{{ t('滚轮滚动 · Ctrl + 滚轮缩放') }}</span><button type="button" :aria-label="t('缩小预览')" :disabled="zoom <= minPreviewZoom" @click="zoomPreview(zoom - .2)"><AppIcon name="minus" :size="13"/></button><button type="button" :aria-label="t('重置预览缩放')" :title="t('重置为 100% · Ctrl + 滚轮或捏合缩放')" @click="zoomPreview(1)">{{ Math.round(zoom * 100) }}%</button><button type="button" :aria-label="t('放大预览')" :disabled="zoom >= maxPreviewZoom" @click="zoomPreview(zoom + .2)"><AppIcon name="plus" :size="13"/></button></div></div>
+        <div v-if="parsing" class="diagram-parsing" role="status"><span class="diagram-spinner" />{{ t('正在解析…') }}</div>
         <div v-if="error && !parsing" :id="errorId" class="diagram-error" role="alert" data-testid="diagram-error">
-          <strong><AppIcon name="alert" :size="16"/>源码需要修正</strong><p>{{ error }}</p><button v-if="errorLine" type="button" @click="locateError"><AppIcon name="search" :size="14"/>定位到第 {{ errorLine }} 行</button>
+          <strong><AppIcon name="alert" :size="16"/>{{ t('源码需要修正') }}</strong><p>{{ localizedError }}</p><button v-if="errorLine" type="button" @click="locateError"><AppIcon name="search" :size="14"/>{{ t('定位到第 {line} 行', { line: errorLine }) }}</button>
         </div>
-        <div v-if="compiled" ref="previewScroll" class="diagram-preview-scroll" :aria-busy="parsing" aria-label="图表预览，滚轮滚动，Ctrl 加滚轮或捏合缩放" data-testid="diagram-preview-viewport">
+        <div v-if="compiled" ref="previewScroll" class="diagram-preview-scroll" :aria-busy="parsing" :aria-label="t('图表预览，滚轮滚动，Ctrl 加滚轮或捏合缩放')" data-testid="diagram-preview-viewport">
           <div class="diagram-preview" :style="{ width: `${zoom * 100}%`, minWidth: `${zoom * 100}%` }">
             <div ref="previewPage" class="diagram-preview-page">
               <div class="diagram-preview-art" data-testid="diagram-preview" v-html="svg"/>
@@ -419,35 +431,35 @@ parse()
             </div>
           </div>
         </div>
-        <div v-if="compiled?.warnings.length" class="diagram-warnings" role="status"><p v-for="warning in compiled.warnings" :key="warning">{{ warning }}</p></div>
-        <div v-if="!compiled && !error && !parsing" class="diagram-empty">在左侧输入源码，即可绘制图表。</div>
+        <div v-if="compiled?.warnings.length" class="diagram-warnings" role="status"><p v-for="warning in compiled.warnings" :key="warning">{{ t(warning) }}</p></div>
+        <div v-if="!compiled && !error && !parsing" class="diagram-empty">{{ t('在左侧输入源码，即可绘制图表。') }}</div>
       </div>
     </div>
     <div v-if="stylesOpen" class="diagram-library-backdrop diagram-style-backdrop" @click.self="closeStyles" @keydown="styleDialogKeydown">
       <section ref="styleDialog" class="diagram-library diagram-style-library" role="dialog" aria-modal="true" :aria-labelledby="styleTitleId" :aria-describedby="styleDescriptionId" data-testid="diagram-style-panel">
-        <header><div><AppIcon name="palette" :size="20"/><h2 :id="styleTitleId">图表风格</h2></div><button type="button" class="diagram-library-close" aria-label="关闭图表风格" @click="closeStyles"><AppIcon name="close" :size="17"/></button></header>
-        <p :id="styleDescriptionId" class="diagram-style-description">选择代码图表的配色与线条外观，源码保持不变。修改后可随时撤销。</p>
-        <div class="diagram-style-grid" role="group" aria-label="代码图表风格">
-          <button v-for="style in stylePreviews" :key="style.id" type="button" class="diagram-style-card" :data-diagram-style="style.id" :aria-label="`${style.label}风格，${style.description}`" :aria-pressed="currentStyleId === style.id" data-testid="diagram-style-card" @click="chooseStyle(style.id)">
+        <header><div><AppIcon name="palette" :size="20"/><h2 :id="styleTitleId">{{ t('图表风格') }}</h2></div><button type="button" class="diagram-library-close" :aria-label="t('关闭图表风格')" @click="closeStyles"><AppIcon name="close" :size="17"/></button></header>
+        <p :id="styleDescriptionId" class="diagram-style-description">{{ t('选择代码图表的配色与线条外观，源码保持不变。修改后可随时撤销。') }}</p>
+        <div class="diagram-style-grid" role="group" :aria-label="t('代码图表风格')">
+          <button v-for="style in stylePreviews" :key="style.id" type="button" class="diagram-style-card" :data-diagram-style="style.id" :aria-label="t('{value0}风格，{value1}', { value0: t(style.label), value1: t(style.description) })" :aria-pressed="currentStyleId === style.id" data-testid="diagram-style-card" @click="chooseStyle(style.id)">
             <span class="diagram-style-preview" aria-hidden="true" v-html="style.svg"/>
-            <span class="diagram-style-card-heading"><strong>{{ style.label }}</strong><AppIcon v-if="currentStyleId === style.id" name="check" :size="15"/><span v-else class="diagram-style-swatches" aria-hidden="true"><i v-for="color in style.palette.slice(0, 3)" :key="color" :style="{ background: color }"/></span></span>
-            <small>{{ style.description }}</small>
+            <span class="diagram-style-card-heading"><strong>{{ t(style.label) }}</strong><AppIcon v-if="currentStyleId === style.id" name="check" :size="15"/><span v-else class="diagram-style-swatches" aria-hidden="true"><i v-for="color in style.palette.slice(0, 3)" :key="color" :style="{ background: color }"/></span></span>
+            <small>{{ t(style.description) }}</small>
           </button>
         </div>
-        <footer><span aria-live="polite">当前风格：{{ currentStyle.label }}</span><button type="button" @click="closeStyles"><AppIcon name="check" :size="15"/>完成</button></footer>
+        <footer><span aria-live="polite">{{ t('当前风格：{style}', { style: t(currentStyle.label) }) }}</span><button type="button" @click="closeStyles"><AppIcon name="check" :size="15"/>{{ t('完成') }}</button></footer>
       </section>
     </div>
     <div v-if="templatesOpen" class="diagram-library-backdrop" @click.self="closeTemplates()" @keydown="dialogKeydown">
       <section ref="templateDialog" class="diagram-library" role="dialog" aria-modal="true" :aria-labelledby="pendingTemplate ? replaceTitleId : templateTitleId" data-testid="diagram-template-library">
-        <header><div><AppIcon :name="pendingTemplate ? 'refresh' : 'templates'" :size="19"/><h2 :id="pendingTemplate ? replaceTitleId : templateTitleId">{{ pendingTemplate ? '替换当前源码？' : '选择图表模板' }}</h2></div><button type="button" class="diagram-library-close" aria-label="关闭图表模板" @click="closeTemplates()"><AppIcon name="close" :size="17"/></button></header>
+        <header><div><AppIcon :name="pendingTemplate ? 'refresh' : 'templates'" :size="19"/><h2 :id="pendingTemplate ? replaceTitleId : templateTitleId">{{ pendingTemplate ? t('替换当前源码？') : t('选择图表模板') }}</h2></div><button type="button" class="diagram-library-close" :aria-label="t('关闭图表模板')" @click="closeTemplates()"><AppIcon name="close" :size="17"/></button></header>
         <template v-if="pendingTemplate">
-          <div class="diagram-replace-content"><div class="diagram-replace-template"><AppIcon :name="pendingTemplate.kind" :size="25"/><div><strong>{{ pendingTemplate.title }}</strong><small>{{ DIAGRAM_KIND_LABELS[pendingTemplate.kind] }}</small></div></div><p>将使用此模板替换当前源码。替换后可以通过工具栏“撤销”恢复原来的内容。</p><pre><span v-for="(token, index) in replacementTokens" :key="index" :class="token.kind ? `diagram-token-${token.kind}` : undefined">{{ token.text }}</span></pre></div>
-          <footer><button type="button" data-template-cancel @click="backToTemplates">返回模板</button><button type="button" class="diagram-primary" data-testid="diagram-confirm-template" @click="applyTemplate(pendingTemplate)"><AppIcon name="check" :size="15"/>替换源码</button></footer>
+          <div class="diagram-replace-content"><div class="diagram-replace-template"><AppIcon :name="pendingTemplate.kind" :size="25"/><div><strong>{{ t(pendingTemplate.title) }}</strong><small>{{ t(DIAGRAM_KIND_LABELS[pendingTemplate.kind]) }}</small></div></div><p>{{ t('将使用此模板替换当前源码。替换后可以通过工具栏“撤销”恢复原来的内容。') }}</p><pre><span v-for="(token, index) in replacementTokens" :key="index" :class="token.kind ? `diagram-token-${token.kind}` : undefined">{{ token.text }}</span></pre></div>
+          <footer><button type="button" data-template-cancel @click="backToTemplates">{{ t('返回模板') }}</button><button type="button" class="diagram-primary" data-testid="diagram-confirm-template" @click="applyTemplate(pendingTemplate)"><AppIcon name="check" :size="15"/>{{ t('替换源码') }}</button></footer>
         </template>
         <template v-else>
-          <div class="diagram-library-tools"><label class="diagram-template-search"><AppIcon name="search" :size="15"/><input ref="templateSearchInput" v-model="templateSearch" type="search" placeholder="搜索类型、用途或语法关键词" aria-label="搜索图表模板"/></label><div class="diagram-categories" role="group" aria-label="图表分类"><button type="button" :aria-pressed="templateCategory === 'all'" @click="templateCategory = 'all'">全部 <small>{{ DIAGRAM_TEMPLATES.length }}</small></button><button v-for="category in categories" :key="category" type="button" :aria-pressed="templateCategory === category" @click="templateCategory = category">{{ category }}</button></div></div>
-          <div class="diagram-template-grid"><button v-for="template in visibleTemplates" :key="template.id" type="button" class="diagram-template-card" :data-template-id="template.id" :data-diagram-kind="template.kind" :aria-label="`使用模板：${template.title}`" @click="chooseTemplate(template)"><span class="diagram-template-icon"><AppIcon :name="template.kind" :size="21"/></span><span class="diagram-template-copy"><strong>{{ template.title }}</strong><small>{{ template.description }}</small><span>{{ DIAGRAM_KIND_LABELS[template.kind] }} · {{ template.source.split('\n').length }} 行示例</span></span><AppIcon name="chevron-right" :size="14"/></button><p v-if="!visibleTemplates.length" class="diagram-no-templates">没有匹配的模板，试试其他关键词或分类。</p></div>
-          <footer><span>{{ kindsCount }} 类图表 · {{ visibleTemplates.length }} 个示例 · 注释说明语法用法</span><button type="button" @click="closeTemplates()">取消</button></footer>
+          <div class="diagram-library-tools"><label class="diagram-template-search"><AppIcon name="search" :size="15"/><input ref="templateSearchInput" v-model="templateSearch" type="search" :placeholder="t('搜索类型、用途或语法关键词')" :aria-label="t('搜索图表模板')"/></label><div class="diagram-categories" role="group" :aria-label="t('图表分类')"><button type="button" :aria-pressed="templateCategory === 'all'" @click="templateCategory = 'all'">{{ t('全部') }} <small>{{ DIAGRAM_TEMPLATES.length }}</small></button><button v-for="category in categories" :key="t(category)" type="button" :aria-pressed="templateCategory === category" @click="templateCategory = category">{{ t(category) }}</button></div></div>
+          <div class="diagram-template-grid"><button v-for="template in visibleTemplates" :key="template.id" type="button" class="diagram-template-card" :data-template-id="template.id" :data-diagram-kind="template.kind" :aria-label="t('使用模板：{value0}', { value0: t(template.title) })" @click="chooseTemplate(template)"><span class="diagram-template-icon"><AppIcon :name="template.kind" :size="21"/></span><span class="diagram-template-copy"><strong>{{ t(template.title) }}</strong><small>{{ t(template.description) }}</small><span>{{ t('{kind} · {count} 行示例', { kind: t(DIAGRAM_KIND_LABELS[template.kind]), count: template.source.split('\n').length }) }}</span></span><AppIcon name="chevron-right" :size="14"/></button><p v-if="!visibleTemplates.length" class="diagram-no-templates">{{ t('没有匹配的模板，试试其他关键词或分类。') }}</p></div>
+          <footer><span>{{ t('{kinds} 类图表 · {examples} 个示例 · 注释说明语法用法', { kinds: kindsCount, examples: visibleTemplates.length }) }}</span><button type="button" @click="closeTemplates()">{{ t('取消') }}</button></footer>
         </template>
       </section>
     </div>

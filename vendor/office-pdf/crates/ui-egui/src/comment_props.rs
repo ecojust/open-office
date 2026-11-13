@@ -51,7 +51,7 @@ impl OfficePdfApp {
     /// Attach file: ask for a file (or take `attach_override`) and attach it at `at`.
     pub fn attach_file_comment(&mut self, page: usize, at: [f64; 2]) {
         if self.embedded {
-            self.notify("当前版本尚未接入文件附件批注");
+            self.notify(tl!("File attachment comments are not available in this version"));
             return;
         }
         match self.attach_override.take() {

@@ -85,6 +85,7 @@ struct FlushWaiter {
 struct State {
     entries: BTreeMap<String, Entry>,
     theme: Appearance,
+    locale: String,
     active: Option<String>,
     enabled: bool,
     drain_input: bool,
@@ -250,6 +251,7 @@ pub fn create_host(callback: Function) -> OfficeWordHost {
         state: Rc::new(RefCell::new(State {
             entries: BTreeMap::new(),
             theme: Appearance::System,
+            locale: "zh-CN".into(),
             active: None,
             enabled: true,
             drain_input: false,
@@ -309,7 +311,7 @@ impl OfficeWordHost {
             app.mark_host_saved();
         }
         app.autosave = false;
-        app.ui.language = "zh-hans".into();
+        crate::locale::apply(&mut app, crate::locale::language(&state.locale).map_err(js_error)?);
         app.set_host_theme(state.theme);
         let mut entry = Entry {
             app,
@@ -554,6 +556,22 @@ impl OfficeWordHost {
         }
         state.repaint();
         Ok(true)
+    }
+
+    /// Change all current and future interfaces without flushing input or editing documents.
+    #[wasm_bindgen(js_name = setLocale)]
+    pub fn set_locale(&self, locale: &str) -> Result<(), JsValue> {
+        let language = crate::locale::language(locale).map_err(js_error)?;
+        let mut state = self.state.try_borrow_mut().map_err(js_error)?;
+        if state.destroyed {
+            return Err(js_error("editor host is destroyed"));
+        }
+        state.locale = locale.to_owned();
+        for entry in state.entries.values_mut() {
+            crate::locale::apply(&mut entry.app, language);
+        }
+        state.repaint();
+        Ok(())
     }
 
     /// The shell owns interface appearance; this never changes document/page styling.

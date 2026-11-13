@@ -1150,7 +1150,7 @@ impl OfficePdfApp {
 
     fn open_bytes_with_focus(&mut self, name: &str, path: Option<String>, bytes: Vec<u8>, activate: bool) -> Result<(), String> {
         if self.embedded && !self.views.is_empty() {
-            return Err("请使用顶部“打开”按钮在新标签页打开 PDF 文稿".into());
+            return Err(tl!("Use Open in the top toolbar to open a PDF in a new tab").into());
         }
         // Images and text files become new, unsaved PDFs (Create a PDF).
         let active = self.active;
@@ -1297,7 +1297,7 @@ impl OfficePdfApp {
     ) -> Result<(), String> {
         use office_pdf_render::OpenError;
         if self.embedded && !self.views.is_empty() {
-            return Err("请使用顶部“打开”按钮在新标签页打开 PDF 文稿".into());
+            return Err(tl!("Use Open in the top toolbar to open a PDF in a new tab").into());
         }
         let prepared = match self.session.prepare_open(name, path.clone(), bytes.clone(), password) {
             Ok(prepared) => prepared,
@@ -3185,7 +3185,7 @@ impl eframe::App for OfficePdfApp {
                     None if self.combine_showing() => combine_ui::page(self, ui),
                     None if self.embedded => {
                         ui.centered_and_justified(|ui| {
-                            ui.label("请在顶部打开或新建 PDF 文稿");
+                            ui.label(tl!("Open or create a PDF from the top toolbar"));
                         });
                     }
                     None => home::show(self, ui),

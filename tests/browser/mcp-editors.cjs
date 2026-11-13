@@ -786,7 +786,8 @@ async function startMcp(allowEdits = true) {
   assert.ok(list.result.tools.some(tool => tool.name === 'document_inspect'));
   report.operations.push({ kind, operation: 'initialize-and-list', protocolVersion: response.result.protocolVersion, tools: list.result.tools.map(tool => tool.name) });
   const toggle = page.getByTestId('document-mcp-toggle');
-  assert.equal(await toggle.getAttribute('aria-pressed'), 'true'); assert.match(await toggle.textContent(), /Running/);
+  assert.equal(await toggle.getAttribute('aria-pressed'), 'true');
+  assert.equal(await toggle.locator('strong').textContent(), await page.locator('html').getAttribute('lang') === 'en' ? 'Running' : '运行中');
   return list.result.tools;
 }
 

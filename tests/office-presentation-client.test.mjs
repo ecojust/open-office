@@ -5,6 +5,7 @@ import vm from 'node:vm'
 import { randomUUID } from 'node:crypto'
 import ts from 'typescript'
 import * as vue from 'vue'
+import nativeMessages from '../src/i18n/en/native.ts'
 import { base64ToBytes, bytesToBase64 } from '../src/shared/document.ts'
 import { createId } from '../src/shared/id.ts'
 import * as mediaValidation from '../src/presentation/rust/media.ts'
@@ -25,6 +26,9 @@ function evaluate(source, require, globals = {}) {
 function harness(kind = 'presentation') {
   const word = kind === 'word', format = word ? 'docx' : 'pptx'
   const state = new Map(), calls = [], document = { baseURI: 'http://localhost/', activeElement: null }
+  const language = vue.ref('zh-CN')
+  const translate = (locale, source) => locale === 'en' ? nativeMessages[source] ?? source : source
+  const i18n = { locale: language, t: source => translate(language.value, source), translate, useI18n: () => i18n }
   const font = { loadFailures: 0, registrationFailures: 0, alreadyAdded: false, chinese: true, htmlResponse: false, data: undefined }
   const fontHeader = new Uint8Array(28)
   fontHeader[1] = 1; fontHeader[5] = 1
@@ -33,7 +37,8 @@ function harness(kind = 'presentation') {
     children = []; parentElement; style = {}; dataset = {}; isConnected = true; listeners = new Map()
     append(child) { child.remove(); this.children.push(child); child.parentElement = this }
     remove() { if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(child => child !== this); this.parentElement = undefined }
-    setAttribute() {}
+    attributes = new Map()
+    setAttribute(name, value) { this.attributes.set(name, value) }
     addEventListener(type, callback) { this.listeners.set(type, callback) }
     removeEventListener(type) { this.listeners.delete(type) }
     dispatchEvent(event) { this.listeners.get(event.type)?.({ ...event, target: this }); return true }
@@ -77,6 +82,7 @@ function harness(kind = 'presentation') {
     close(id, expectedDocument, revision, force) { calls.push(['close', id]); const doc = state.get(id); if (!force && (doc.documentId !== expectedDocument || doc.revision !== revision || doc.dirty)) return false; state.delete(id); return true },
     setActive(value) { calls.push(['active', value]) },
     setTheme(value) { calls.push(['theme', value]) },
+    setLocale(value) { calls.push(['locale', value]) },
     destroy() { calls.push(['destroy']) },
   }
   const globals = {
@@ -89,6 +95,7 @@ function harness(kind = 'presentation') {
   const client = evaluate(word ? wordClientSource : clientSource, name => {
     if (name === '../../shared/document') return { base64ToBytes, bytesToBase64 }
     if (name === '../../shared/id') return { createId }
+    if (name === '../../shared/i18n') return i18n
     if (name === '../../../assets/fonts/ui/WenQuanYiMicroHei-Regular.ttf?url') return { default: '/assets/document-font.ttf' }
     if (name === `http://localhost/office-${kind}/office-${kind}.js`) return { default: async () => {}, createHost(callback) { receive = callback; return host } }
     throw Error(`Unexpected import ${name}`)
@@ -102,6 +109,7 @@ function harness(kind = 'presentation') {
     scope.run(() => evaluate(word ? wordEditorSource : editorSource, name => {
       if (name === 'vue') return { ...vue, onBeforeUnmount(callback) { unmount.push(callback) } }
       if (name === '../shared/document') return { bytesToBase64 }
+      if (name === '../shared/i18n') return i18n
       if (name === '../shared/printing') return { printPdf: () => assert.fail('Unexpected printing in a non-printing presentation component test') }
       if (name === `../${kind}/rust/client`) return client
       if (name === '../presentation/rust/media') return mediaValidation
@@ -110,7 +118,7 @@ function harness(kind = 'presentation') {
     }, { ...globals, defineProps: () => props, withDefaults: value => value, defineEmits: () => (...event) => events.push(event), defineExpose(value) { exposed = value } }))
     return { props, events, editor: exposed, dispose() { unmount.forEach(callback => callback()); scope.stop() } }
   }
-  return { client, open, source, state, calls, document, Element, component, setFlushGate(value) { flushGate = value }, font, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value } }
+  return { client, open, source, state, calls, document, Element, component, language, setFlushGate(value) { flushGate = value }, font, notify(event) { receive(JSON.stringify(event)) }, pending(id, text) { pendingText = { id, text } }, setStartGate(value) { startGate = value } }
 }
 
 test('presentation MCP publishes the actual edit and waits for its render receipt without saving', async () => {
@@ -557,4 +565,35 @@ for (const kind of ['word', 'presentation']) {
   assert.equal(h.state.get(current.id).dirty, true)
   await current.close(true)
  })
+}
+
+for (const [kind, name] of [['presentation', 'Presentation'], ['word', 'Word']]) {
+  test(`${name} initializes language before preparation and changes labels without flushing drafts`, async () => {
+    const h = harness(kind)
+    h.language.value = 'en'
+    const first = await h.open(), second = await h.open()
+    const initialLocale = h.calls.findIndex(call => call[0] === 'locale')
+    assert.equal(h.calls[initialLocale][1], 'en')
+    assert.ok(initialLocale < h.calls.findIndex(call => call[0] === 'prepare'))
+    const container = new h.Element()
+    await first.attach(container, true)
+    const canvas = container.children[0]
+    assert.ok(!/[\u3400-\u9fff]/.test(canvas.attributes.get('aria-label')))
+    h.pending(first.id, '未提交的 draft')
+    const before = structuredClone([...h.state])
+    const firstReceipt = JSON.stringify(first.snapshot), secondReceipt = JSON.stringify(second.snapshot)
+    const calls = h.calls.length
+    h.language.value = 'zh-CN'
+    await h.client[`setRust${name}Locale`]('zh-CN')
+    assert.match(canvas.attributes.get('aria-label'), /[\u3400-\u9fff]/)
+    h.language.value = 'en'
+    await h.client[`setRust${name}Locale`]('en')
+    assert.ok(!/[\u3400-\u9fff]/.test(canvas.attributes.get('aria-label')))
+    assert.deepEqual(h.calls.slice(calls), [['locale', 'zh-CN'], ['locale', 'en']])
+    assert.deepEqual([...h.state], before)
+    assert.equal(JSON.stringify(first.snapshot), firstReceipt)
+    assert.equal(JSON.stringify(second.snapshot), secondReceipt)
+    await first.settled()
+    assert.equal(h.state.get(first.id).text, '未提交的 draft', 'The draft is preserved until an explicit flush')
+  })
 }

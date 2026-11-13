@@ -6,7 +6,12 @@ import { brushOutlinePath, brushPaintPasses, brushPolyline, brushRadiusAt, rainb
 
 export function escapeXml(value: unknown): string { return String(value).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff\ufffe\uffff]/gu, '\uFFFD').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]!) }
 export function safeImageData(value: unknown): value is string {
-  return typeof value === 'string' && value.length <= 16_000_000 && /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/\r\n]+={0,2}$/.test(value)
+  if (typeof value !== 'string' || value.length > 16_000_000 || !/^data:image\/(?:png|jpeg|webp);base64,/.test(value)) return false
+  const encoded = value.slice(value.indexOf(',') + 1)
+  // Do not repeat a positive character class over a multi-megabyte payload.
+  const padding = /={1,2}$/.exec(encoded)
+  const content = padding ? encoded.slice(0, padding.index) : encoded
+  return Boolean(content) && !/[^A-Za-z0-9+/\r\n]/.test(content)
 }
 function color(value: string): string { return /^(?:#[\da-f]{3,8}|[a-z]{1,24}|(?:rgba?|hsla?)\([\d.,%\s/]+\))$/i.test(value) ? escapeXml(value) : '#334155' }
 function isSketch(style: ElementStyle): boolean { return style.roughness === 'sketch' && style.strokeWidth > 0 && !['none', 'transparent'].includes(style.stroke.toLowerCase()) }

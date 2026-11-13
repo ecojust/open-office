@@ -2,12 +2,14 @@
 import { nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import type { NativeDocument } from '../types'
 import type { Appearance } from '../shared/appearance'
+import { useI18n } from '../shared/i18n'
 import { bytesToBase64, type EditorExport, type Extension } from '../shared/document'
 import { printPdf, type PrintOutcome } from '../shared/printing'
-import { prepareRustWordDocument, setRustWordTheme, type PreparedRustWordDocument, type RustWordSession } from '../word/rust/client'
+import { prepareRustWordDocument, setRustWordTheme, setRustWordLocale, type PreparedRustWordDocument, type RustWordSession } from '../word/rust/client'
 import type { OfficeWordEvent, OfficeWordFileAction, OfficeWordSnapshot } from '../word/rust/office-word-types'
 import { describeWordCommands } from '../mcp/word-tools'
 
+const { locale, t } = useI18n()
 const props = withDefaults(defineProps<{ document: NativeDocument; prepared?: PreparedRustWordDocument; active?: boolean; disabled?: boolean; theme?: Appearance }>(), { active: true, disabled: false, theme: 'system' })
 const emit = defineEmits<{ ready: []; dirty: [value: boolean]; error: [message: string]; status: [message: string]; 'file-action': [action: OfficeWordFileAction] }>()
 const viewport = ref<HTMLElement>(), snapshot = shallowRef<OfficeWordSnapshot>()
@@ -142,6 +144,7 @@ async function load() {
     loading.value = false; emit('ready'); emit('status', '文字文稿已就绪')
   } catch (cause) { prepared?.discard(); if (token === generation) { loading.value = false; report(cause) } }
 }
+watch(locale, value => { void setRustWordLocale(value).catch(report) }, { immediate: true })
 watch(() => props.theme, value => { void setRustWordTheme(value).catch(report) }, { immediate: true })
 watch(() => props.document.id, () => { opening = load() }, { immediate: true })
 watch(() => props.active, value => {
@@ -179,8 +182,8 @@ defineExpose({ mcpExecute, prepareDeactivate, exportFile, markSaved, discardChan
   <section class="rust-word-editor" data-testid="rust-word-editor" data-engine="office-word-wasm" :data-ready="!!snapshot && !loading" :data-session-id="snapshot?.sessionId" :data-revision="snapshot?.revision" :data-pages="snapshot?.pages" :data-dirty="snapshot?.dirty" :aria-busy="loading">
     <div ref="viewport" class="office-word-viewport" data-testid="office-word-viewport" />
     <input ref="pictureInput" data-testid="office-word-picture-input" type="file" accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,.wmf,.emf" hidden @change="insertPicture" @cancel="cancelPicture" />
-    <div v-if="loading" class="office-word-loading" role="status"><span class="office-word-spinner" />正在打开文字文稿…</div>
-    <p v-if="problem" class="office-word-error" role="alert">{{ problem }}</p>
+    <div v-if="loading" class="office-word-loading" role="status"><span class="office-word-spinner" />{{ t('正在打开文字文稿…') }}</div>
+    <p v-if="problem" class="office-word-error" role="alert">{{ t(problem) }}</p>
   </section>
 </template>
 

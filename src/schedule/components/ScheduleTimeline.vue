@@ -5,9 +5,13 @@ import type { HolidayYears } from '../holidays.ts'
 import { buildCalendar, moveScheduledEvent, projectedSpan, resizeScheduledEvent } from '../calendar.ts'
 import { clampDayWidth, wheelDayWidth, zoomAnchorScroll } from '../zoom.ts'
 import { eventPointerAction, eventResizeInsets, type EventPointerAction } from '../interaction.ts'
-import { buildWorkloadDates, eventWorkloadDays, formatWorkloadPercentage as workloadPercent, workloadProgress, workloadTotalTitle, type MonthlyWorkload, type MonthlyWorkloadCell } from '../workload.ts'
+import { buildWorkloadDates, eventWorkloadDays, formatWorkloadPercentage as workloadPercent, workloadProgress, type MonthlyWorkload, type MonthlyWorkloadCell } from '../workload.ts'
 import { buildTimelineRows, getTrackHeight, getEventVerticalLayout, snapTrackHeight, SCHEDULE_LABEL_WIDTH as LABEL_WIDTH, SCHEDULE_HEADER_HEIGHT as HEADER_HEIGHT, SCHEDULE_EVENT_PADDING as PADDING, SCHEDULE_TRACK_HEIGHT as TRACK_HEIGHT, SCHEDULE_TRACK_STEP as TRACK_STEP, SCHEDULE_TRACK_MIN_HEIGHT as MIN_TRACK_HEIGHT, SCHEDULE_TRACK_MAX_HEIGHT as MAX_TRACK_HEIGHT, type DisplayEvent, type TimelineRow } from '../layout.ts'
 
+import { useI18n } from '../../shared/i18n'
+import { scheduleDate, scheduleMonth, scheduleWeekday, scheduleError, workloadTotalTitle } from '../ui-format'
+
+const { t } = useI18n()
 const props = withDefaults(defineProps<{
  project: ScheduleProject
  workload: MonthlyWorkload
@@ -38,7 +42,6 @@ const preview = shallowRef<ScheduleEvent>(), previewPixels = ref<number>(), ghos
 const dragKind = ref<GestureKind>(), dragEventId = ref(''), copyMode = ref(false), announcement = ref('')
 const hoverHit = shallowRef<{ id: string; kind: GestureKind; copy: boolean }>()
 const lanes = new Map<string, HTMLElement>()
-const daysOfWeek = ['日', '一', '二', '三', '四', '五', '六']
 const calendar = computed(() => buildCalendar(props.project, props.holidayYears))
 const weekNumbering = computed(() => props.project.calendar.weekNumbering ?? 'year')
 const columnWidth = computed(() => clampDayWidth(zoomWidth.value ?? props.dayWidth))
@@ -50,6 +53,15 @@ const visibleDays = computed(() => calendar.value.days.slice(firstVisible.value,
 const visibleWeeks = computed(() => calendar.value.weeks.filter(week => week.startIndex < lastVisible.value && week.startIndex + week.count > firstVisible.value))
 const roleById = computed(() => new Map(props.project.roles.map(role => [role.id, role])))
 const rows = computed(() => buildTimelineRows(props.project, props.mode, calendar.value.days))
+function rowName(row: TimelineRow): string { return row.key === 'overall' ? t('整体计划') : row.name }
+function rowSubtitle(row: TimelineRow): string {
+ if (row.key === 'overall') return t('项目阶段与关键节点')
+ const role = row.roleId ? roleById.value.get(row.roleId) : undefined
+ return props.mode === 'people' ? role?.role || t('项目成员') : role ? `${role.name}${role.role ? ` · ${role.role}` : ''}` : t('项目成员')
+}
+function rowTitle(row: TimelineRow): string {
+ return `${rowName(row)} · ${t('{count} 个事件', { count: row.total })}${row.total > row.events.length ? ` · ${t('{count} 个已隐藏', { count: row.total - row.events.length })}` : ''}`
+}
 const workloadDates = computed(() => buildWorkloadDates(props.project, props.holidayYears))
 type WorkloadItem = MonthlyWorkloadCell & { month: string }
 const workloadByRole = computed(() => {
@@ -60,7 +72,7 @@ const workloadByRole = computed(() => {
 })
 const personTotalDays = (roleId: string) => workloadByRole.value.get(roleId)?.totalDays ?? 0
 function workloadTitle(item: WorkloadItem): string {
- return `${item.month} 月度工时 ${workloadPercent(item.percentage)}\n已排 ${item.scheduledDays} 天 / 可排 ${item.availableDays} 天\n按当月项目范围内的工作日计算；全天 1 天，半天 0.5 天；不计周末和假日。${item.percentage === null ? '\n本月无可排工作日。' : ''}`
+ return t('{month} 月度工时 {percent}\n已排 {scheduled} 天 / 可排 {available} 天\n按当月项目范围内的工作日计算；全天 1 天，半天 0.5 天；不计周末和假日。', { month: scheduleMonth(item.month), percent: workloadPercent(item.percentage), scheduled: item.scheduledDays, available: item.availableDays }) + (item.percentage === null ? '\n' + t('本月无可排工作日。') : '')
 }
 const trackPreview = shallowRef<{ key: string; height: number }>()
 // Keep at least one minimum-height personnel row reachable below the fixed plan.
@@ -68,7 +80,7 @@ const trackPreview = shallowRef<{ key: string; height: number }>()
 const overallSticky = computed(() => viewportHeight.value >= HEADER_HEIGHT + rowHeight('overall') + MIN_TRACK_HEIGHT)
 const hiddenEvents = computed(() => props.project.events.filter(event => !projectedSpan(event, calendar.value.days)).length)
 const previewColor = computed(() => preview.value?.roleId ? roleById.value.get(preview.value.roleId)?.color ?? 'var(--ui-accent)' : 'var(--ui-accent)')
-const previewOwner = computed(() => preview.value?.roleId ? roleById.value.get(preview.value.roleId)?.name : '整体计划')
+const previewOwner = computed(() => preview.value?.roleId ? roleById.value.get(preview.value.roleId)?.name : t('整体计划'))
 const today = (() => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` })()
 type GestureKind = EventPointerAction
 type PointerGesture = {
@@ -108,8 +120,8 @@ function hoverEvent(event: PointerEvent, item: ScheduleEvent) {
 }
 function leaveEvent(id: string) { if (!gesture && hoverHit.value?.id === id) hoverHit.value = undefined }
 function eventTitle(event: ScheduleEvent): string {
- const name = event.roleId ? roleById.value.get(event.roleId)?.name ?? '' : '整体计划'
- return `${event.title}\n${name} · ${event.startDate} 至 ${event.endDate}\n${event.height === 1 ? '全天' : event.slot === 1 ? '下午 · 半高' : '上午 · 半高'}\n工时：${eventWorkloadDays(event, workloadDates.value)} 天${event.notes ? `\n${event.notes}` : ''}`
+ const name = event.roleId ? roleById.value.get(event.roleId)?.name ?? '' : t('整体计划')
+ return `${event.title}\n${name} · ${t('{start} 至 {end}', { start: scheduleDate(event.startDate), end: scheduleDate(event.endDate) })}\n${t(event.height === 1 ? '全天' : event.slot === 1 ? '下午 · 半高' : '上午 · 半高')}\n${t('工时：{days} 天', { days: eventWorkloadDays(event, workloadDates.value) })}${event.notes ? `\n${event.notes}` : ''}`
 }
 function sameEvent(a: ScheduleEvent, b: ScheduleEvent): boolean {
  return a.roleId === b.roleId && a.startDate === b.startDate && a.endDate === b.endDate && a.height === b.height && a.slot === b.slot
@@ -453,54 +465,54 @@ defineExpose({ cancelGesture, zoomTo })
 </script>
 
 <template>
- <section ref="root" class="schedule-timeline" :class="{ 'is-dragging': preview || trackPreview, 'is-copying': copyMode && dragKind === 'move', 'is-disabled': disabled }" :data-day-width="columnWidth" :data-track-height="TRACK_HEIGHT" :data-track-step="TRACK_STEP" :data-copy="copyMode" :data-gesture="dragKind" :data-overall-sticky="overallSticky" :data-viewport-height="viewportHeight" data-testid="schedule-timeline" :style="{ '--schedule-label-width': `${LABEL_WIDTH}px`, '--schedule-day-width': `${columnWidth}px` }" aria-label="项目排期时间线">
+ <section ref="root" class="schedule-timeline" :class="{ 'is-dragging': preview || trackPreview, 'is-copying': copyMode && dragKind === 'move', 'is-disabled': disabled }" :data-day-width="columnWidth" :data-track-height="TRACK_HEIGHT" :data-track-step="TRACK_STEP" :data-copy="copyMode" :data-gesture="dragKind" :data-overall-sticky="overallSticky" :data-viewport-height="viewportHeight" data-testid="schedule-timeline" :style="{ '--schedule-label-width': `${LABEL_WIDTH}px`, '--schedule-day-width': `${columnWidth}px` }" :aria-label="t('项目排期时间线')">
   <div ref="viewport" class="schedule-timeline-scroll" data-testid="schedule-timeline-scroll" tabindex="0" @scroll="onScroll">
    <div class="schedule-timeline-content" :style="{ width: `${contentWidth}px` }">
     <div class="schedule-calendar-header">
-     <div class="schedule-calendar-corner"><strong>{{ mode === 'people' ? '人员 / 角色' : '事件' }}</strong><span>{{ calendar.days.length }} 个显示日<span v-if="calendar.hiddenCount"> · 隐藏 {{ calendar.hiddenCount }} 天</span></span></div>
+     <div class="schedule-calendar-corner"><strong>{{ mode === 'people' ? t('人员 / 角色') : t('事件') }}</strong><span>{{ t('{count} 个显示日', {count: calendar.days.length}) }}<span v-if="calendar.hiddenCount"> · {{ t('隐藏 {count} 天', {count: calendar.hiddenCount}) }}</span></span></div>
      <div class="schedule-date-header" :style="{ width: `${calendarWidth}px` }">
       <div class="schedule-week-header" :data-week-numbering="weekNumbering">
-       <div v-for="week in visibleWeeks" :key="week.key" class="schedule-week" :style="{ left: `${week.startIndex * columnWidth}px`, width: `${week.count * columnWidth}px` }" :class="{ 'schedule-week-compact': week.count * columnWidth < 96 }" :data-week="week.label" :data-week-year="weekNumbering === 'year' ? week.weekYear : undefined" :title="weekNumbering === 'year' ? `${week.weekYear} · ${week.label}（ISO 周历，周一开周）` : `项目 ${week.label}（开始日期所在周为 W1，周一开周）`" :aria-label="weekNumbering === 'year' ? `${week.weekYear} 年 ${week.label}` : `项目 ${week.label}`">
-        <strong>{{ week.label }}</strong><span v-if="weekNumbering === 'year'">{{ week.count * columnWidth < 96 ? week.weekYear : `${week.weekYear} · ${calendar.days[week.startIndex]?.date.slice(5).replace('-', '/')}` }}</span><span v-else>{{ week.count * columnWidth < 96 ? '项目' : `项目 · ${calendar.days[week.startIndex]?.date.slice(5).replace('-', '/')}` }}</span>
+       <div v-for="week in visibleWeeks" :key="week.key" class="schedule-week" :style="{ left: `${week.startIndex * columnWidth}px`, width: `${week.count * columnWidth}px` }" :class="{ 'schedule-week-compact': week.count * columnWidth < 96 }" :data-week="week.label" :data-week-year="weekNumbering === 'year' ? week.weekYear : undefined" :title="weekNumbering === 'year' ? t('{year} · {week}（ISO 周历，周一开周）', {year: week.weekYear, week: week.label}) : t('项目 {week}（开始日期所在周为 W1，周一开周）', {week: week.label})" :aria-label="weekNumbering === 'year' ? t('{year} 年 {week}', {year: week.weekYear, week: week.label}) : t('项目 {week}', {week: week.label})">
+        <strong>{{ week.label }}</strong><span v-if="weekNumbering === 'year'">{{ week.count * columnWidth < 96 ? week.weekYear : `${week.weekYear} · ${scheduleDate(calendar.days[week.startIndex]!.date, true)}` }}</span><span v-else>{{ week.count * columnWidth < 96 ? t('项目') : t('项目 · {date}', {date: scheduleDate(calendar.days[week.startIndex]!.date, true)}) }}</span>
        </div>
       </div>
-      <div class="schedule-day-header"><div v-for="day in visibleDays" :key="day.date" class="schedule-day" :class="{ weekend: day.weekday === 0 || day.weekday === 6, holiday: day.holiday, today: day.date === today }" :style="{ left: `${day.index * columnWidth}px`, width: `${columnWidth}px` }" :data-date="day.date" :title="`${day.date} 周${daysOfWeek[day.weekday]}${day.holiday ? ` · ${day.holiday}` : ''}`"><span>{{ day.date.slice(5).replace('-', '/') }}</span><small>周{{ daysOfWeek[day.weekday] }}</small></div></div>
+      <div class="schedule-day-header"><div v-for="day in visibleDays" :key="day.date" class="schedule-day" :class="{ weekend: day.weekday === 0 || day.weekday === 6, holiday: day.holiday, today: day.date === today }" :style="{ left: `${day.index * columnWidth}px`, width: `${columnWidth}px` }" :data-date="day.date" :title="`${scheduleDate(day.date)} ${scheduleWeekday(day.weekday)}${day.holiday ? ` · ${project.calendar.extraHolidays.includes(day.date) ? t('自定义假日') : day.holiday}` : ''}`"><span>{{ scheduleDate(day.date, true) }}</span><small>{{ scheduleWeekday(day.weekday) }}</small></div></div>
      </div>
     </div>
     <div v-for="row in rows" :key="row.key" class="schedule-track" :class="{ 'schedule-overall-track': row.key === 'overall', 'schedule-overall-pinned': row.key === 'overall' && overallSticky, 'track-resizing': trackPreview?.key === row.key }" :style="{ '--schedule-track-height': `${rowHeight(row.key)}px` }" :data-track-height="rowHeight(row.key)" :data-sticky="row.key === 'overall' && overallSticky" :data-testid="`schedule-track-${rowTestKey(row)}`" :data-role-id="row.roleId ?? 'overall'" :data-track-key="row.key">
      <div class="schedule-track-label" :class="{ 'has-workload': mode === 'people' && row.roleId !== null }" :data-testid="`schedule-label-${rowTestKey(row)}`" :style="{ '--role-color': row.color }"><span class="schedule-role-dot" /><div>
-      <div class="schedule-label-heading"><strong :title="`${row.name} · ${row.total} 个事件${row.total > row.events.length ? ` · ${row.total - row.events.length} 个已隐藏` : ''}`">{{ row.name }}</strong><span :title="row.subtitle">{{ row.subtitle }}</span></div>
+      <div class="schedule-label-heading"><strong :title="rowTitle(row)">{{ rowName(row) }}</strong><span :title="rowSubtitle(row)">{{ rowSubtitle(row) }}</span></div>
       <template v-if="mode === 'people' && row.roleId !== null">
-       <span class="schedule-workload-total" :data-testid="`schedule-workload-total-${row.roleId}`" tabindex="0" :title="workloadTotalTitle(personTotalDays(row.roleId), project.dailyRate)" :aria-label="workloadTotalTitle(personTotalDays(row.roleId), project.dailyRate)">总工时 <strong>{{personTotalDays(row.roleId)}}</strong> 天</span>
-       <ul v-if="workloadByRole.get(row.roleId)?.months.length" class="schedule-workload-list" :data-testid="`schedule-workload-${row.roleId}`" :aria-label="`${row.name}的月度工时占比`" title="月度工时：已排工作天数 / 当月项目范围内的工作日；仅显示有工时的月份，月份较多时可滚动查看" tabindex="0">
-        <li v-for="item in workloadByRole.get(row.roleId)?.months" :key="item.month" class="schedule-workload-tag" :style="{ '--workload-progress': `${workloadProgress(item.percentage)}%` }" :data-month="item.month" :data-scheduled-days="item.scheduledDays" :data-available-days="item.availableDays" :data-percentage="item.percentage" :title="workloadTitle(item)" :aria-label="workloadTitle(item)"><span>{{ item.month.slice(2).replace('-', '.') }}-</span><strong>{{ workloadPercent(item.percentage) }}</strong></li>
+       <span class="schedule-workload-total" :data-testid="`schedule-workload-total-${row.roleId}`" tabindex="0" :title="workloadTotalTitle(personTotalDays(row.roleId), project.dailyRate)" :aria-label="workloadTotalTitle(personTotalDays(row.roleId), project.dailyRate)">{{t('总工时')}} <strong>{{personTotalDays(row.roleId)}}</strong> {{t('天')}}</span>
+       <ul v-if="workloadByRole.get(row.roleId)?.months.length" class="schedule-workload-list" :data-testid="`schedule-workload-${row.roleId}`" :aria-label="t('{name}的月度工时占比', {name: rowName(row)})" :title="t('月度工时：已排工作天数 / 当月项目范围内的工作日；仅显示有工时的月份，月份较多时可滚动查看')" tabindex="0">
+        <li v-for="item in workloadByRole.get(row.roleId)?.months" :key="item.month" class="schedule-workload-tag" :style="{ '--workload-progress': `${workloadProgress(item.percentage)}%` }" :data-month="item.month" :data-scheduled-days="item.scheduledDays" :data-available-days="item.availableDays" :data-percentage="item.percentage" :title="workloadTitle(item)" :aria-label="workloadTitle(item)"><span>{{ scheduleMonth(item.month, true) }}-</span><strong>{{ workloadPercent(item.percentage) }}</strong></li>
        </ul>
       </template>
-      <small v-else-if="row.key === 'overall'">{{ row.total }} 个事件<span v-if="row.total > row.events.length"> · {{ row.total - row.events.length }} 个已隐藏</span></small>
+      <small v-else-if="row.key === 'overall'">{{ t('{count} 个事件', {count: row.total}) }}<span v-if="row.total > row.events.length"> · {{ t('{count} 个已隐藏', {count: row.total - row.events.length}) }}</span></small>
      </div><div class="schedule-track-ruler" aria-hidden="true"><span v-for="tick in (trackPreview?.key === row.key ? rowHeight(row.key) / TRACK_STEP - 1 : 0)" :key="tick" :style="{ top: `${tick * TRACK_STEP}px` }">{{ tick }}</span></div><span class="schedule-track-height-label" aria-hidden="true">{{ rowHeight(row.key) / TRACK_STEP }} × {{ TRACK_STEP }} px</span></div>
      <div :ref="element => setLane(row.key, element)" class="schedule-track-lane" :style="{ width: `${calendarWidth}px` }" :data-testid="`schedule-lane-${rowTestKey(row)}`" :data-role-id="row.roleId ?? 'overall'" @dblclick="createEvent($event, row)">
-      <span class="schedule-lane-midline" aria-hidden="true"/><span class="schedule-period-hint period-morning" aria-hidden="true">上午</span><span class="schedule-period-hint period-afternoon" aria-hidden="true">下午</span>
-      <span v-if="!row.total && calendar.days.length" class="schedule-lane-hint">双击日期空白处添加{{ row.key === 'overall' ? '整体计划' : '事件' }}</span>
-      <span v-else-if="row.total && !row.events.length" class="schedule-lane-hint">事件日期已隐藏，可在事件列表中编辑</span>
+      <span class="schedule-lane-midline" aria-hidden="true"/><span class="schedule-period-hint period-morning" aria-hidden="true">{{ t("上午") }}</span><span class="schedule-period-hint period-afternoon" aria-hidden="true">{{ t("下午") }}</span>
+      <span v-if="!row.total && calendar.days.length" class="schedule-lane-hint">{{ t(row.key === 'overall' ? '双击日期空白处添加整体计划' : '双击日期空白处添加事件') }}</span>
+      <span v-else-if="row.total && !row.events.length" class="schedule-lane-hint">{{ t("事件日期已隐藏，可在事件列表中编辑") }}</span>
       <button v-for="item in row.events" :key="item.event.id" type="button" class="schedule-event" :class="{ selected: selectedId === item.event.id, 'event-half': item.event.height === .5, 'event-drag-source': preview?.id === item.event.id && !copyMode }" :style="eventStyle(item, row.color, row.key)" :data-testid="`schedule-event-${item.event.id}`" :data-event-id="item.event.id" :data-role-id="item.event.roleId ?? 'overall'" :data-height="item.event.height" :data-slot="item.event.slot" :data-start-date="item.event.startDate" :data-end-date="item.event.endDate" :aria-label="eventTitle(item.event)" :aria-pressed="selectedId === item.event.id" :title="eventTitle(item.event)" :disabled="disabled || !active" @pointerdown="startGesture($event, item.event, row.key)" @pointerenter="hoverEvent($event, item.event)" @pointermove="hoverEvent($event, item.event)" @pointerleave="leaveEvent(item.event.id)" @contextmenu="eventContextMenu($event, item.event.id)" @click="selectEvent($event, item.event.id)" @dblclick="editEvent($event, item.event.id)" @keydown="eventKeyboard($event, item.event)">
-       <span class="schedule-resize-handle resize-start" data-testid="resize-start" data-resize="start" title="拖动调整开始日期" aria-hidden="true" />
+       <span class="schedule-resize-handle resize-start" data-testid="resize-start" data-resize="start" :title="t('拖动调整开始日期')" aria-hidden="true" />
        <strong class="schedule-event-title">{{ item.event.title }}</strong>
-       <span class="schedule-event-dates">{{ item.event.startDate.slice(5).replace('-', '/') }} — {{ item.event.endDate.slice(5).replace('-', '/') }}</span>
+       <span class="schedule-event-dates">{{ scheduleDate(item.event.startDate, true) }} — {{ scheduleDate(item.event.endDate, true) }}</span>
        <span v-if="mode === 'global' && item.event.roleId" class="schedule-event-owner">{{ roleById.get(item.event.roleId)?.name }}</span>
-       <span class="schedule-resize-handle resize-end" data-testid="resize-end" data-resize="end" title="拖动调整结束日期" aria-hidden="true" />
-       <span class="schedule-resize-handle resize-height" data-testid="resize-height" data-resize="height" title="拖动调整为整行或半行高度" aria-hidden="true" />
+       <span class="schedule-resize-handle resize-end" data-testid="resize-end" data-resize="end" :title="t('拖动调整结束日期')" aria-hidden="true" />
+       <span class="schedule-resize-handle resize-height" data-testid="resize-height" data-resize="height" :title="t('拖动调整为整行或半行高度')" aria-hidden="true" />
       </button>
      </div>
-     <button type="button" role="separator" aria-orientation="horizontal" class="schedule-track-resize" :data-testid="`track-resize-${rowTestKey(row)}`" :data-track-key="row.key" :aria-label="`调整${row.name}轨道高度`" :aria-valuemin="MIN_TRACK_HEIGHT" :aria-valuemax="MAX_TRACK_HEIGHT" :aria-valuenow="rowHeight(row.key)" :aria-valuetext="`${rowHeight(row.key) / TRACK_STEP} 格，每格 ${TRACK_STEP} 像素`" :title="`拖动调整轨道高度（每格 ${TRACK_STEP} px）；方向键逐格调整，Home / End 最小 / 最大`" :disabled="disabled || !active" @pointerdown="startTrackGesture($event, row)" @keydown="trackKeyboard($event, row)" @dblclick.stop @click.stop><span /></button>
+     <button type="button" role="separator" aria-orientation="horizontal" class="schedule-track-resize" :data-testid="`track-resize-${rowTestKey(row)}`" :data-track-key="row.key" :aria-label="t('调整{name}轨道高度', {name: rowName(row)})" :aria-valuemin="MIN_TRACK_HEIGHT" :aria-valuemax="MAX_TRACK_HEIGHT" :aria-valuenow="rowHeight(row.key)" :aria-valuetext="t('{count} 格，每格 {step} 像素', {count: rowHeight(row.key) / TRACK_STEP, step: TRACK_STEP})" :title="t('拖动调整轨道高度（每格 {step} px）；方向键逐格调整，Home / End 最小 / 最大', {step: TRACK_STEP})" :disabled="disabled || !active" @pointerdown="startTrackGesture($event, row)" @keydown="trackKeyboard($event, row)" @dblclick.stop @click.stop><span /></button>
     </div>
-    <div v-if="!calendar.days.length" class="schedule-calendar-empty">当前日期范围中的日期全部被隐藏，请调整日期范围或显示周末、节假日。</div>
-    <div v-else-if="mode === 'people' && !project.roles.length" class="schedule-timeline-empty">先添加项目角色，再安排每个人的事件。</div>
-    <div v-else-if="mode === 'global' && rows.length === 1" class="schedule-timeline-empty">人员事件会按开始日期汇总显示在这里。</div>
+    <div v-if="!calendar.days.length" class="schedule-calendar-empty">{{ t("当前日期范围中的日期全部被隐藏，请调整日期范围或显示周末、节假日。") }}</div>
+    <div v-else-if="mode === 'people' && !project.roles.length" class="schedule-timeline-empty">{{ t("先添加项目角色，再安排每个人的事件。") }}</div>
+    <div v-else-if="mode === 'global' && rows.length === 1" class="schedule-timeline-empty">{{ t("人员事件会按开始日期汇总显示在这里。") }}</div>
    </div>
   </div>
-  <div v-if="preview" class="schedule-preview-overlay" aria-hidden="true"><div class="schedule-event schedule-event-ghost" :class="{ 'event-half': preview.height === .5, 'event-copy-ghost': copyMode }" :style="ghostStyle" :data-slot="preview.slot" :data-copy="copyMode"><strong class="schedule-event-title">{{ preview.title }}</strong><span class="schedule-event-dates">{{ preview.startDate.slice(5).replace('-', '/') }} — {{ preview.endDate.slice(5).replace('-', '/') }}</span><span class="schedule-event-owner">{{ dragKind === 'height' ? `${preview.height * 100}% · ${preview.height === 1 ? '全天' : preview.slot === 1 ? '下午' : '上午'}` : `${previewOwner} · ${preview.height === 1 ? '全天' : preview.slot === 1 ? '下午' : '上午'}` }}</span></div><span v-if="copyMode" class="schedule-copy-preview" data-testid="schedule-copy-preview" :style="{ left: ghostStyle.left, top: ghostStyle.top }">复制</span></div>
-  <div class="schedule-timeline-help"><span>双击添加或编辑 · 拖动移动 · Ctrl+拖动复制 · 边缘拉伸日期 · 事件底边调整比例 · 轨道底边按 28 px 吸附</span><span v-if="hiddenEvents">{{ hiddenEvents }} 个事件日期已隐藏</span><span v-else>Shift+↑↓ 切换上下午 · Ctrl+滚轮缩放</span></div>
-  <span class="schedule-sr-only" role="status" aria-live="polite">{{ announcement }}</span>
+  <div v-if="preview" class="schedule-preview-overlay" aria-hidden="true"><div class="schedule-event schedule-event-ghost" :class="{ 'event-half': preview.height === .5, 'event-copy-ghost': copyMode }" :style="ghostStyle" :data-slot="preview.slot" :data-copy="copyMode"><strong class="schedule-event-title">{{ preview.title }}</strong><span class="schedule-event-dates">{{ scheduleDate(preview.startDate, true) }} — {{ scheduleDate(preview.endDate, true) }}</span><span class="schedule-event-owner">{{ dragKind === 'height' ? `${preview.height * 100}% · ${preview.height === 1 ? t('全天') : preview.slot === 1 ? t('下午') : t('上午')}` : `${previewOwner} · ${preview.height === 1 ? t('全天') : preview.slot === 1 ? t('下午') : t('上午')}` }}</span></div><span v-if="copyMode" class="schedule-copy-preview" data-testid="schedule-copy-preview" :style="{ left: ghostStyle.left, top: ghostStyle.top }">{{ t("复制") }}</span></div>
+  <div class="schedule-timeline-help"><span>{{ t("双击添加或编辑 · 拖动移动 · Ctrl+拖动复制 · 边缘拉伸日期 · 事件底边调整比例 · 轨道底边按 28 px 吸附") }}</span><span v-if="hiddenEvents">{{ t('{count} 个事件日期已隐藏', {count: hiddenEvents}) }}</span><span v-else>{{ t("Shift+↑↓ 切换上下午 · Ctrl+滚轮缩放") }}</span></div>
+  <span class="schedule-sr-only" role="status" aria-live="polite">{{ scheduleError(announcement) }}</span>
  </section>
 </template>
 

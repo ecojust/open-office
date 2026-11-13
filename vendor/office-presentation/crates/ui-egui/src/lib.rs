@@ -444,6 +444,8 @@ struct AnimPreview {
 
 pub struct SlideApp {
     host_ime_active: bool,
+    /// Interface-only host preference, independent of document content and embedding behavior.
+    pub(crate) interface_chinese: bool,
     /// Session-only host panel state, deliberately excluded from saved documents and UI preferences.
     pub(crate) template_panel_open: bool,
     /// Geometry of the last rendered ribbon row, for UI inspection and interaction automation.
@@ -547,6 +549,7 @@ impl SlideApp {
         let audio_out = services.audio_out.take();
         SlideApp {
             host_ime_active: false,
+            interface_chinese: services.embedded_editor,
             template_panel_open: false,
             ribbon_tabs: Vec::new(),
             table_pen: serde_json::json!({"width": 1.0}),
@@ -609,8 +612,8 @@ impl SlideApp {
     /// Translate structured engine feedback for display without changing engine errors or
     /// treating arbitrary returned text as a command/error template.
     pub(crate) fn engine_error_text(&self, error: &office_presentation_engine::EngineError) -> String {
-        let _language = i18n::scope(self.services.embedded_editor);
-        if !self.services.embedded_editor {
+        let _language = i18n::scope(self.interface_chinese);
+        if !self.interface_chinese {
             return error.to_string();
         }
         let (command, reason, template) = match error {
@@ -626,18 +629,16 @@ impl SlideApp {
     }
 
     pub fn set_status(&mut self, msg: impl Into<String>) {
-        let _language = i18n::scope(self.services.embedded_editor);
+        let _language = i18n::scope(self.interface_chinese);
         let msg = msg.into();
-        let msg = if self.services.embedded_editor { msg } else { msg };
         self.status = Some((i18n::tr(&msg).to_owned(), now_ms()));
     }
 
     /// A message that must be seen wherever the user is: a toast, which also shows over the start
     /// screen and the File tab, where there is no status bar.
     pub fn notify(&mut self, msg: impl Into<String>) {
-        let _language = i18n::scope(self.services.embedded_editor);
+        let _language = i18n::scope(self.interface_chinese);
         let msg = msg.into();
-        let msg = if self.services.embedded_editor { msg } else { msg };
         self.toast = Some(toast::Toast { text: i18n::tr(&msg).to_owned(), at: now_ms() });
     }
 
@@ -694,7 +695,7 @@ impl SlideApp {
     /// Run a command by id (UI commands here, everything else in the engine). Errors show in the
     /// status bar and are returned.
     pub fn run(&mut self, id: &str, params: Value) -> Result<Value, String> {
-        let _language = i18n::scope(self.services.embedded_editor);
+        let _language = i18n::scope(self.interface_chinese);
         if id == "host.setTemplatePanelOpen" {
             return self.set_host_template_panel_open(&params);
         }
@@ -1078,7 +1079,10 @@ impl SlideApp {
             "app.smartArtPictureDialog" => {
                 if self.services.pick_open.is_none() {
                     if self.services.embedded_editor {
-                        return Err("当前版本暂不支持从文件替换 SmartArt 图片；可使用“插入图片”添加独立图片。".into());
+                        return Err(i18n::tr(
+                            "Replacing SmartArt pictures from files is not available yet. Use Insert Picture to add a separate picture.",
+                        )
+                        .into());
                     }
                     return Err("picking a SmartArt picture needs the desktop app".into());
                 }
@@ -1098,7 +1102,7 @@ impl SlideApp {
                 if self.services.pick_open.is_some() {
                     self.pick_and_insert("theme", "design.browseTheme");
                 } else if self.services.embedded_editor {
-                    return Err("当前版本暂不支持导入外部主题；可使用内置主题、配色和字体。".into());
+                    return Err(i18n::tr("Importing external themes is not available yet. Use built-in themes, colors, and fonts.").into());
                 } else {
                     // The browser's asynchronous picker would open the file as a new document.
                     self.set_status("Browse for Themes needs the desktop app for now".to_string());
@@ -1118,7 +1122,9 @@ impl SlideApp {
                 if self.services.pick_open.is_some() {
                     self.pick_and_insert("open", "review.compare");
                 } else if self.services.embedded_editor {
-                    return Err("当前版本暂不支持与外部演示文稿比较；可在独立标签页打开文稿查看。".into());
+                    return Err(
+                        i18n::tr("Comparing with an external presentation is not available yet. Open it in a separate tab to review it.").into()
+                    );
                 } else {
                     // The browser's asynchronous picker would open the file as a new document.
                     self.set_status("Compare needs the desktop app for now".to_string());
@@ -1305,7 +1311,7 @@ impl SlideApp {
         if self.services.pick_open.is_some() {
             self.pick_and_insert("audio", "transition.sound");
         } else if self.services.embedded_editor {
-            self.set_status("当前版本暂不支持从文件添加切换音效。".to_string());
+            self.set_status(i18n::tr("Adding transition sounds from files is not available yet.").to_string());
         }
     }
 
@@ -1314,7 +1320,7 @@ impl SlideApp {
     fn pick_and_reuse(&mut self, keep: bool) {
         let Some(pick) = self.services.pick_open.as_mut() else {
             self.set_status(if self.services.embedded_editor {
-                "当前版本暂不支持从外部文件重用幻灯片。".to_string()
+                i18n::tr("Reusing slides from external files is not available yet.").to_string()
             } else {
                 "Reuse Slides needs the desktop app".to_string()
             });
@@ -1554,7 +1560,7 @@ impl SlideApp {
     /// Run `cmd` on the document and slide captured for the request, then put the view back
     /// if the user has since moved. A missing document or slide cancels the file.
     fn execute_on_target(&mut self, target: &FileTarget, name: &str, cmd: &str, params: &Value) -> Result<(), String> {
-        let _language = i18n::scope(self.services.embedded_editor);
+        let _language = i18n::scope(self.interface_chinese);
         let FileTarget::Document { doc, place } = target else {
             self.session.execute("file.new", &json!({})).map_err(|e| self.engine_error_text(&e))?;
             return self.session.execute(cmd, params).map(|_| ()).map_err(|e| self.engine_error_text(&e));
@@ -1631,7 +1637,7 @@ impl SlideApp {
 
     /// Per-frame logic before layout: styles, control requests, screenshots, shortcuts.
     pub fn logic(&mut self, ctx: &egui::Context) {
-        let _language = i18n::scope(self.services.embedded_editor);
+        let _language = i18n::scope(self.interface_chinese);
         let scale = self.ui.ui_scale.clamp(0.5, 3.0);
         if (ctx.zoom_factor() - scale).abs() > 1e-3 {
             ctx.set_zoom_factor(scale);
@@ -1903,7 +1909,7 @@ impl SlideApp {
 
     /// Lay out the whole window.
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        let _language = i18n::scope(self.services.embedded_editor);
+        let _language = i18n::scope(self.interface_chinese);
         let ctx = ui.ctx().clone();
         if !self.fonts_ready {
             ctx.request_repaint();

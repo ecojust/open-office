@@ -1,5 +1,6 @@
 import type { NativeDocument } from '../../types'
 import type { Appearance } from '../../shared/appearance'
+import { locale, t, translate, type Locale } from '../../shared/i18n'
 import { base64ToBytes } from '../../shared/document'
 import { createId } from '../../shared/id'
 import { normalizePdfAuthor, pdfAuthorPreference } from '../author'
@@ -19,6 +20,7 @@ interface OfficePdfHost {
   drainDiscardedInput(): Promise<void>
   setActive(active: boolean): void
   setTheme(theme: Appearance): void
+  setLocale(locale: Locale): void
   destroy(): void
 }
 type Bindings = { default(options: { module_or_path: URL }): Promise<unknown>; createHost(callback: (event: string) => void): OfficePdfHost; inspectBytes(bytes: Uint8Array): string }
@@ -71,6 +73,7 @@ async function loadHost(): Promise<OfficePdfHost> {
   inspectBytes = bindings.inspectBytes
   host = bindings.createHost(receive)
   host.setTheme(interfaceTheme)
+  host.setLocale(locale.value)
   return host
 }
 function getHost() { return runtime ??= loadHost().catch(cause => { runtime = undefined; throw cause }) }
@@ -79,6 +82,13 @@ function getHost() { return runtime ??= loadHost().catch(cause => { runtime = un
 export function setRustPdfTheme(theme: Appearance): Promise<void> {
   interfaceTheme = theme
   return serialize(() => { host?.setTheme(interfaceTheme) })
+}
+/** Change interface labels without flushing drafts, switching tabs or creating document edits. */
+export function setRustPdfLocale(value: Locale): Promise<void> {
+  return serialize(() => {
+    host?.setLocale(value)
+    canvas?.setAttribute('aria-label', translate(value, 'PDF 页面与编辑工具'))
+  })
 }
 function parkingElement() {
   if (!parking) {
@@ -109,7 +119,7 @@ function newCanvas() {
   const element = document.createElement('canvas')
   element.id = 'open-office-pdf-canvas'
   element.dataset.testid = 'pdf-canvas'
-  element.setAttribute('aria-label', 'PDF 页面与编辑工具')
+  element.setAttribute('aria-label', t('PDF 页面与编辑工具'))
   element.tabIndex = 0
   Object.assign(element.style, { display: 'block', width: '100%', height: '100%', outline: 'none' })
   return element

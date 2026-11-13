@@ -112,12 +112,12 @@ fn bounded_menu(ui: &mut egui::Ui, id: &str, body: impl FnOnce(&mut egui::Ui)) {
 fn advanced(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
     bounded_menu(ui, "advanced", |ui| {
         for (label, groups) in [
-            ("页面管理", &["organize"][..]),
-            ("页面内容与装饰", &["edit"][..]),
-            ("填写与表单", &["fill_sign", "form"][..]),
-            ("安全与签名验证", &["protect", "redact", "certificate"][..]),
-            ("检查与测量", &["scan", "accessibility", "standards", "measure"][..]),
-            ("优化与脚本", &["compress", "javascript"][..]),
+            (tl!("Manage pages"), &["organize"][..]),
+            (tl!("Page content and decoration"), &["edit"][..]),
+            (tl!("Fill and forms"), &["fill_sign", "form"][..]),
+            (tl!("Security and signature validation"), &["protect", "redact", "certificate"][..]),
+            (tl!("Inspect and measure"), &["scan", "accessibility", "standards", "measure"][..]),
+            (tl!("Optimize and scripts"), &["compress", "javascript"][..]),
         ] {
             ui.menu_button(label, |ui| {
                 bounded_menu(ui, label, |ui| {
@@ -138,33 +138,35 @@ fn advanced(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
 fn stamp_label(kind: StampKind) -> &'static str {
     use StampKind::*;
     match kind {
-        Approved | DynApproved => "已批准",
-        Completed => "已完成",
-        Confidential | DynConfidential => "保密",
-        Draft => "草稿",
-        Final => "定稿",
-        ForComment => "征求意见",
-        ForPublicRelease => "可公开发布",
-        InformationOnly => "仅供参考",
-        NotApproved => "未批准",
-        NotForPublicRelease => "禁止公开",
-        PreliminaryResults => "初步结果",
-        Void => "作废",
-        Accepted => "已接受",
-        InitialHere => "在此简签",
-        Rejected => "已拒绝",
-        SignHere => "在此签名",
-        Witness => "见证人",
-        DynReceived => "已收到",
-        DynReviewed => "已审阅",
-        DynRevised => "已修订",
+        Approved | DynApproved => tl!("Approved"),
+        Completed => tl!("Completed"),
+        Confidential | DynConfidential => tl!("Confidential"),
+        Draft => tl!("Draft"),
+        Final => tl!("Final"),
+        ForComment => tl!("For Comment"),
+        ForPublicRelease => tl!("For Public Release"),
+        InformationOnly => tl!("Information Only"),
+        NotApproved => tl!("Not Approved"),
+        NotForPublicRelease => tl!("Not For Public Release"),
+        PreliminaryResults => tl!("Preliminary Results"),
+        Void => tl!("Void"),
+        Accepted => tl!("Accepted"),
+        InitialHere => tl!("Initial Here"),
+        Rejected => tl!("Rejected"),
+        SignHere => tl_ctx!("embedded", "Sign Here"),
+        Witness => tl!("Witness"),
+        DynReceived => tl!("Received"),
+        DynReviewed => tl!("Reviewed"),
+        DynRevised => tl!("Revised"),
     }
 }
 
 fn stamps(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
     bounded_menu(ui, "stamp-picker", |ui| {
-        ui.label(egui::RichText::new("选好图章后，在页面上单击放置").small());
-        for (group, label) in [(StampGroup::Dynamic, "动态"), (StampGroup::SignHere, "签署提示"), (StampGroup::StandardBusiness, "常用")] {
+        ui.label(egui::RichText::new(tl!("Choose a stamp, then click the page to place it")).small());
+        for (group, label) in
+            [(StampGroup::Dynamic, tl!("Dynamic")), (StampGroup::SignHere, tl!("Signing prompts")), (StampGroup::StandardBusiness, tl!("Common"))]
+        {
             ui.menu_button(label, |ui| {
                 for kind in StampKind::ALL.into_iter().filter(|kind| kind.group() == group) {
                     // The preview names the actual appearance written into the document.
@@ -185,8 +187,8 @@ fn stamps(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
 
 fn signature(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
     bounded_menu(ui, "signature-picker", |ui| {
-        ui.label(egui::RichText::new("可视签名").strong());
-        ui.label(egui::RichText::new("手绘、输入或导入图片，再单击页面放置。").small());
+        ui.label(egui::RichText::new(tl!("Visual signature")).strong());
+        ui.label(egui::RichText::new(tl!("Draw, type, or import an image, then click the page to place it.")).small());
         let t = theme::Tokens::get(ui.ctx());
         if let Some(command) = crate::fill_sign::signature_entries(ui, app, &t) {
             app.run_command(command);
@@ -194,7 +196,11 @@ fn signature(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
         }
         ui.separator();
         ui.label(
-            egui::RichText::new("可视签名不含数字证书。当前支持查看、验证已有证书签名。").small().color(theme::Tokens::get(ui.ctx()).text_muted),
+            egui::RichText::new(tl!(
+                "Visual signatures do not contain digital certificates. Existing certificate signatures can be viewed and validated."
+            ))
+            .small()
+            .color(theme::Tokens::get(ui.ctx()).text_muted),
         );
         menu_command(app, ui, "sign.validate");
     });
@@ -203,13 +209,13 @@ fn signature(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
 fn view_menu(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
     bounded_menu(ui, "view-picker", |ui| {
         if let Some(view) = app.active.and_then(|index| app.views.get_mut(index)) {
-            for (fit, label) in [(Fit::Page, "适合整页"), (Fit::Width, "适合宽度"), (Fit::Height, "适合高度")] {
+            for (fit, label) in [(Fit::Page, tl!("Fit page")), (Fit::Width, tl!("Fit width")), (Fit::Height, tl!("Fit height"))] {
                 if ui.selectable_label(view.fit == fit, label).clicked() {
                     view.set_fit(fit);
                     ui.close();
                 }
             }
-            if ui.button("实际大小").clicked() {
+            if ui.button(tl!("Actual size")).clicked() {
                 view.set_zoom(1.0);
                 ui.close();
             }
@@ -218,15 +224,15 @@ fn view_menu(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
             menu_command(app, ui, id);
         }
         ui.separator();
-        ui.menu_button("侧栏", |ui| {
+        ui.menu_button(tl!("Sidebar"), |ui| {
             for (panel, label) in [
-                (RightPanel::Pages, "页面缩略图"),
-                (RightPanel::Bookmarks, "书签"),
-                (RightPanel::Comments, "批注"),
-                (RightPanel::Fields, "表单字段"),
-                (RightPanel::Layers, "图层"),
-                (RightPanel::Attachments, "附件"),
-                (RightPanel::Signatures, "已有签名"),
+                (RightPanel::Pages, tl!("Page thumbnails")),
+                (RightPanel::Bookmarks, tl!("Bookmarks")),
+                (RightPanel::Comments, tl_ctx!("embedded", "Comments")),
+                (RightPanel::Fields, tl_ctx!("embedded", "Form fields")),
+                (RightPanel::Layers, tl!("Layers")),
+                (RightPanel::Attachments, tl!("Attachments")),
+                (RightPanel::Signatures, tl!("Existing signatures")),
             ] {
                 if ui.selectable_label(app.right == Some(panel), label).clicked() {
                     app.choose_right_panel(if app.right == Some(panel) { None } else { Some(panel) });
@@ -249,7 +255,7 @@ pub(crate) fn show(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
                 ui.spacing_mut().item_spacing = vec2(5.0, 5.0);
                 ui.add_enabled_ui(app.active.is_some(), |ui| {
                     for (tool, id, icon, label) in
-                        [(QuickTool::Select, "select", "mouse-pointer-2", "选择"), (QuickTool::Hand, "hand", "hand", "拖动")]
+                        [(QuickTool::Select, "select", "mouse-pointer-2", tl!("Select")), (QuickTool::Hand, "hand", "hand", tl!("Hand"))]
                     {
                         if button(ui, id, icon, label, app.quick_tool == tool, compact).clicked() {
                             app.put_down_edit_text();
@@ -257,22 +263,29 @@ pub(crate) fn show(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
                             app.left_open = false;
                         }
                     }
-                    command_button(app, ui, "edit.edit_text", "编辑文字", compact);
-                    command_button(app, ui, "edit.text", "添加文字", compact);
-                    command_button(app, ui, "comment.highlight", "高亮", compact);
+                    command_button(app, ui, "edit.edit_text", tl_ctx!("embedded", "Edit text"), compact);
+                    command_button(app, ui, "edit.text", tl_ctx!("embedded", "Add text"), compact);
+                    command_button(app, ui, "comment.highlight", tl_ctx!("embedded", "Highlight"), compact);
                     let annotations =
-                        button(ui, "annotations", "message-square-text", "标注", matches!(app.quick_tool, QuickTool::Comment(_)), compact);
+                        button(ui, "annotations", "message-square-text", tl!("Annotate"), matches!(app.quick_tool, QuickTool::Comment(_)), compact);
                     egui::Popup::menu(&annotations).show(|ui| bounded_menu(ui, "annotations", |ui| group_menu(app, ui, "comment")));
                     let sig = ui.add_enabled(enabled(app, "sign.fill.signature"), |ui: &mut egui::Ui| {
-                        button(ui, "signature", "signature", "签名", matches!(app.quick_tool, QuickTool::Fill(_)), compact)
+                        button(ui, "signature", "signature", tl!("Signature"), matches!(app.quick_tool, QuickTool::Fill(_)), compact)
                     });
                     egui::Popup::menu(&sig).show(|ui| signature(app, ui));
                     let stamp = ui.add_enabled(enabled(app, "comment.stamp"), |ui: &mut egui::Ui| {
-                        button(ui, "stamps", "stamp", "图章", matches!(app.quick_tool, QuickTool::Stamp(_) | QuickTool::CustomStamp(_)), compact)
+                        button(
+                            ui,
+                            "stamps",
+                            "stamp",
+                            tl!("Stamps"),
+                            matches!(app.quick_tool, QuickTool::Stamp(_) | QuickTool::CustomStamp(_)),
+                            compact,
+                        )
                     });
                     egui::Popup::menu(&stamp).show(|ui| stamps(app, ui));
                     if matches!(app.quick_tool, QuickTool::AddText | QuickTool::EditText) {
-                        let format = button(ui, "format", "settings-2", "文字格式", false, compact);
+                        let format = button(ui, "format", "settings-2", tl!("Text formatting"), false, compact);
                         egui::Popup::menu(&format).show(|ui| {
                             bounded_menu(ui, "text-format", |ui| {
                                 let t = theme::Tokens::get(ui.ctx());
@@ -280,12 +293,13 @@ pub(crate) fn show(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
                             })
                         });
                     }
-                    let view = button(ui, "view", "panels-top-left", "视图", false, false);
+                    let view = button(ui, "view", "panels-top-left", tl!("View"), false, false);
                     egui::Popup::menu(&view).show(|ui| view_menu(app, ui));
-                    let more = button(ui, "advanced", "sliders-horizontal", "高级", false, false);
+                    let more = button(ui, "advanced", "sliders-horizontal", tl!("Advanced"), false, false);
                     egui::Popup::menu(&more).show(|ui| advanced(app, ui));
                     if app.unfinished_comment().is_some()
-                        && button(ui, "comment-draft", "message-square-text", "待完成批注", app.comment_draft_dialog.is_some(), false).clicked()
+                        && button(ui, "comment-draft", "message-square-text", tl!("Pending comments"), app.comment_draft_dialog.is_some(), false)
+                            .clicked()
                     {
                         app.open_comment_drafts();
                     }
@@ -294,26 +308,29 @@ pub(crate) fn show(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
             if app.active.is_some() {
                 ui.horizontal_wrapped(|ui| {
                     if let Some(view) = app.active.and_then(|index| app.views.get_mut(index)) {
-                        if icons::button(ui, "chevron-left", 26.0, false, "上一页").clicked() {
+                        if icons::button(ui, "chevron-left", 26.0, false, tl!("Previous page")).clicked() {
                             view.step_page(false);
                         }
                         let count = app.session.get(view.id).map_or(0, |doc| doc.info.pages.len());
-                        ui.label(format!("{} / {} 页", view.current + 1, count));
-                        if icons::button(ui, "chevron-right", 26.0, false, "下一页").clicked() {
+                        ui.label(crate::i18n::fmt(
+                            tl!("Page {page} of {count}"),
+                            &[("page", &(view.current + 1).to_string()), ("count", &count.to_string())],
+                        ));
+                        if icons::button(ui, "chevron-right", 26.0, false, tl!("Next page")).clicked() {
                             view.step_page(true);
                         }
                         ui.add_space(6.0);
-                        if icons::button(ui, "zoom-out", 26.0, false, "缩小").clicked() {
+                        if icons::button(ui, "zoom-out", 26.0, false, tl!("Zoom out")).clicked() {
                             view.zoom_step(false);
                         }
                         ui.label(format!("{:.0}%", view.zoom * 100.0));
-                        if icons::button(ui, "zoom-in", 26.0, false, "放大").clicked() {
+                        if icons::button(ui, "zoom-in", 26.0, false, tl!("Zoom in")).clicked() {
                             view.zoom_step(true);
                         }
                     }
-                    command_button(app, ui, "edit.find", "查找", true);
-                    command_button(app, ui, "edit.undo", "撤销", true);
-                    command_button(app, ui, "edit.redo", "重做", true);
+                    command_button(app, ui, "edit.find", tl!("Find"), true);
+                    command_button(app, ui, "edit.undo", tl!("Undo"), true);
+                    command_button(app, ui, "edit.redo", tl!("Redo"), true);
                     if let QuickTool::Comment(tool) = app.quick_tool {
                         if let Some(color) = crate::comments::quick_bar_controls(ui, tool, &mut app.comment_prefs)
                             && let Some((index, id)) = app.active_ids()
@@ -337,7 +354,7 @@ pub(crate) fn show(app: &mut OfficePdfApp, ui: &mut egui::Ui) {
                     }
                     if app.left_open && app.left != LeftPanel::AllTools {
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            if ui.small_button("收起工具设置").clicked() {
+                            if ui.small_button(tl!("Collapse tool settings")).clicked() {
                                 app.left_open = false;
                             }
                         });
@@ -375,6 +392,38 @@ mod tests {
             egui::pos2(rect[0].as_f64().unwrap() as f32, rect[1].as_f64().unwrap() as f32),
             vec2(rect[2].as_f64().unwrap() as f32, rect[3].as_f64().unwrap() as f32),
         )
+    }
+
+    #[test]
+    fn embedded_toolbar_language_switch_translates_visible_controls_without_editing() {
+        let ctx = egui::Context::default();
+        ctx.set_fonts(theme::font_definitions());
+        egui_extras::install_image_loaders(&ctx);
+        let mut app = document();
+        let id = app.views[0].id;
+        let generation = app.session.get(id).unwrap().edit_generation();
+        let original_language = crate::i18n::current();
+        for (locale, labels) in
+            [("en", ["Edit text", "Signature", "View"]), ("zh-hans", ["编辑文字", "签名", "视图"]), ("en", ["Edit text", "Signature", "View"])]
+        {
+            crate::i18n::set_current(crate::i18n::Lang::from_pref(locale));
+            let output = ctx.run_ui(
+                egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(1280.0, 700.0))), ..Default::default() },
+                |ui| show(&mut app, ui),
+            );
+            let text: Vec<_> = output
+                .shapes
+                .iter()
+                .filter_map(|shape| if let egui::Shape::Text(text) = &shape.shape { Some(text.galley.job.text.as_str()) } else { None })
+                .collect();
+            for label in labels {
+                assert!(text.contains(&label), "{locale} is missing {label:?}: {text:?}");
+            }
+            assert_eq!(app.session.get(id).unwrap().edit_generation(), generation);
+            assert!(!app.host_dirty());
+            output.drop_without_applying_deltas();
+        }
+        crate::i18n::set_current(original_language);
     }
 
     #[test]

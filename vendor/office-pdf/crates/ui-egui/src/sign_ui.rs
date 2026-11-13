@@ -269,7 +269,9 @@ impl OfficePdfApp {
     /// Start signing: the rectangle (or field) is known; show Sign with a Digital ID.
     pub fn start_signing(&mut self, page: usize, rect: Option<[f64; 4]>, field: Option<String>, certify: Option<u8>) {
         if self.embedded {
-            self.notify("当前 PDF 工作区暂不支持数字证书签署。可查看和验证已有签名。");
+            self.notify(tl!(
+                "This PDF workspace does not support signing with digital certificates yet. Existing signatures can be viewed and validated."
+            ));
             return;
         }
         self.refresh_os_key_store_ids();
@@ -538,7 +540,7 @@ impl OfficePdfApp {
     /// Open saved revision `n` (1 = the oldest) of the active document as a new document.
     pub fn open_revision(&mut self, n: usize) {
         if self.embedded {
-            self.notify("当前版本尚不支持在新标签页查看签名历史版本，原文稿已保留");
+            self.notify(tl!("Opening signature history in a new tab is not available yet. The original document is preserved"));
             return;
         }
         let Some((_, id)) = self.active_ids() else { return };
@@ -557,7 +559,7 @@ impl OfficePdfApp {
     /// Open the signed version of a signature as a new document (View signed version).
     pub fn view_signed_version(&mut self, len: usize) {
         if self.embedded {
-            self.notify("当前版本尚不支持在新标签页查看签名副本，原文稿已保留");
+            self.notify(tl!("Opening a signed copy in a new tab is not available yet. The original document is preserved"));
             return;
         }
         let Some((_, id)) = self.active_ids() else { return };

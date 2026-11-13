@@ -1791,7 +1791,9 @@ impl WordApp {
         i18n::set_current(lang);
         // New documents are written in the interface's language when OfficeWord can proof it
         // (a Polish interface: Polish spelling, grammar and hyphenation from the first word).
-        if self.applied_editing != Some(lang) {
+        // The embedded shell's language is a display preference. Even an untouched blank
+        // document keeps its proofing language and content when that preference changes.
+        if !self.services.embedded_editor && self.applied_editing != Some(lang) {
             self.session.set_editing_language(lang.editing_lang());
             self.applied_editing = Some(lang);
         }
