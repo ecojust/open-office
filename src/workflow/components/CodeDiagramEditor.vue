@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from '../../shared/i18n'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { compileCodeDiagram, DiagramSyntaxError, lookupDiagramSource, type CodeDiagramResult } from '../core/code-diagram.ts'
+import { compileCodeDiagram, DiagramSyntaxError, lookupDiagramSource, type CodeDiagramResult, type DiagramSourceRange } from '../core/code-diagram.ts'
 import { sceneToSvg } from '../core/svg.ts'
 import { combineBounds, edgePoints, elementBounds, pointsPath } from '../core/geometry.ts'
 import { clone, DEFAULT_STYLE, newId, type Scene } from '../core/types.ts'
@@ -13,7 +13,7 @@ import AppIcon from './AppIcon.vue'
 import DiagramSourceEditor from './DiagramSourceEditor.vue'
 import { tokenizeDiagramSource } from '../core/diagram-source-language.ts'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 
 const props = withDefaults(defineProps<{ source: string; theme: 'light' | 'dark'; diagramStyle?: DiagramStyleId; erStyle?: ERDiagramStyle; active?: boolean; disabled?: boolean }>(), { active: true, disabled: false })
 const emit = defineEmits<{ change: [source: string]; changeStyle: [id: DiagramStyleId]; changeERStyle: [style: ERDiagramStyle]; createFlow: [scene: Scene]; export: [format: 'png' | 'svg']; status: [message: string]; pending: [value: boolean] }>()
@@ -28,6 +28,9 @@ const localizedError = computed(() => {
 const compiled = ref<CodeDiagramResult | null>(null), parsing = ref(false), zoom = ref(1)
 const compiledSource = ref(''), selection = ref({ start: 0, end: 0, head: 0 })
 const previewScroll = ref<HTMLElement>(), previewPage = ref<HTMLElement>(), sourceOverlay = ref<SVGSVGElement>()
+const panning = ref(false)
+let panGesture: { pointerId: number; target: HTMLElement; button: number; x: number; y: number; left: number; top: number; moved: boolean; definition?: DiagramSourceRange } | undefined
+let suppressPreviewClick = false
 const workspace = ref<HTMLElement>(), stacked = ref(false), columnRatio = ref(38), rowRatio = ref(43), resizing = ref(false)
 const splitRatio = computed(() => stacked.value ? rowRatio.value : columnRatio.value)
 const workspaceStyle = computed(() => ({ '--diagram-source-size': `${splitRatio.value}fr`, '--diagram-preview-size': `${100 - splitRatio.value}fr` }))
@@ -52,7 +55,9 @@ let timer: ReturnType<typeof setTimeout> | undefined, published = props.source
 const styledScene = computed(() => compiled.value ? applyERColors(applyDiagramStyle(compiled.value.scene, currentStyleId.value), props.erStyle) : undefined)
 const erRoleLabels: Record<ERTextRole, string> = { title: '表名', tableComment: '表注释', field: '字段', comment: '字段注释' }
 const erTextStyles = computed(() => ER_TEXT_ROLES.map(role => ({ role, label: erRoleLabels[role], style: resolveERTextStyle(role, props.erStyle) })))
-const svg = computed(() => styledScene.value ? sceneToSvg(styledScene.value, { background: true }) : '')
+const svg = computed(() => styledScene.value ? sceneToSvg(styledScene.value, { background: true, interactive: true }) : '')
+const sourceDefinitions = computed(() => compiled.value?.kind === 'er' ? compiled.value.sourceDefinitions ?? [] : [])
+const definitionByElement = computed(() => new Map(sourceDefinitions.value.flatMap(range => range.elementIds.map(id => [id, range] as const))))
 // Match the rendered page exactly, including its export padding and aspect ratio.
 const previewViewBox = computed(() => svg.value.match(/\bviewBox="([^"]+)"/)?.[1] || '0 0 1 1')
 const cursorLine = computed(() => draft.value.slice(0, selection.value.head).split(/\r\n|\r|\n/).length)
@@ -258,6 +263,7 @@ watch(canExport, value => { if (!value) closeExportMenu() })
 
 function publish() { if (composing.value) return; if (draft.value !== published) { published = draft.value; emit('change', draft.value) } }
 function parse() {
+  endPreviewPan()
   parsing.value = false
   try {
     compiled.value = compileCodeDiagram(draft.value, { erStyle: props.erStyle }); error.value = ''; errorLine.value = 0
@@ -289,10 +295,96 @@ function locateCurrent() {
   const screen = point.matrixTransform(transform), viewport = container.getBoundingClientRect()
   container.scrollTo({ left: container.scrollLeft + screen.x - viewport.left - container.clientWidth / 2, top: container.scrollTop + screen.y - viewport.top - container.clientHeight / 2, behavior: 'auto' })
 }
+function previewDefinition(target: EventTarget | null): DiagramSourceRange | undefined {
+  if (!(target instanceof Element)) return
+  const element = target.closest('[data-element-id]')
+  if (!element || !previewPage.value?.contains(element)) return
+  return definitionByElement.value.get(element.getAttribute('data-element-id') || '')
+}
+function revealDefinition(definition?: DiagramSourceRange) {
+  if (!definition || !interactive.value || modalOpen.value || composing.value || !canExport.value) return
+  sourceInput.value?.revealSource(definition.start, definition.end)
+  emit('status', '已定位表定义源码')
+}
+function startPreviewPan(event: PointerEvent) {
+  suppressPreviewClick = false
+  if (event.pointerType !== 'mouse' || !interactive.value || modalOpen.value || !previewScroll.value || ![0, 1].includes(event.button)) return
+  endPreviewPan()
+  const target = previewScroll.value
+  // Leave native scrollbar dragging available along the viewport's edges.
+  const bounds = target.getBoundingClientRect()
+  if (event.clientX >= bounds.left + target.clientWidth || event.clientY >= bounds.top + target.clientHeight) return
+  event.preventDefault()
+  suppressPreviewClick = true
+  panGesture = { pointerId: event.pointerId, target, button: event.button, x: event.clientX, y: event.clientY, left: target.scrollLeft, top: target.scrollTop, moved: false, definition: previewDefinition(event.target) }
+  target.setPointerCapture(event.pointerId)
+}
+function movePreviewPan(event: PointerEvent) {
+  const gesture = panGesture
+  if (!gesture || event.pointerId !== gesture.pointerId) return
+  if (!(event.buttons & (gesture.button === 1 ? 4 : 1))) { endPreviewPan(); return }
+  const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y
+  if (!gesture.moved && Math.hypot(dx, dy) < 4) return
+  event.preventDefault()
+  gesture.moved = true; panning.value = true
+  gesture.target.scrollLeft = gesture.left - dx
+  gesture.target.scrollTop = gesture.top - dy
+}
+function finishPreviewPan(event: PointerEvent) {
+  const gesture = panGesture
+  if (!gesture || event.pointerId !== gesture.pointerId) return
+  const clicked = !gesture.moved && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) < 4 && gesture.button === 0
+  endPreviewPan()
+  if (clicked) revealDefinition(gesture.definition)
+}
+function endPreviewPan() {
+  const gesture = panGesture
+  panGesture = undefined; panning.value = false
+  if (gesture?.target.hasPointerCapture(gesture.pointerId)) gesture.target.releasePointerCapture(gesture.pointerId)
+}
+function cancelPreviewPanOnEscape(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !panGesture) return
+  event.preventDefault(); event.stopPropagation(); endPreviewPan()
+}
+function previewClick(event: MouseEvent) {
+  if (suppressPreviewClick && event.detail !== 0) { suppressPreviewClick = false; return }
+  suppressPreviewClick = false
+  // Touch taps and assistive-technology clicks do not use mouse pan gestures.
+  revealDefinition(previewDefinition(event.target))
+}
+function previewKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && panGesture) { event.preventDefault(); endPreviewPan(); return }
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  const definition = previewDefinition(event.target)
+  if (!definition) return
+  event.preventDefault(); event.stopPropagation(); revealDefinition(definition)
+}
+function updatePreviewTargets() {
+  const root = previewPage.value?.querySelector<SVGSVGElement>('.diagram-preview-art > svg')
+  if (!root) return
+  const nodes = new Map([...root.querySelectorAll<SVGGElement>('[data-element-id]')].map(node => [node.getAttribute('data-element-id'), node]))
+  if (sourceDefinitions.value.length) {
+    root.setAttribute('role', 'group')
+    root.setAttribute('aria-label', t('实体关系图，点击表格定位源码'))
+  }
+  for (const definition of sourceDefinitions.value) {
+    for (const id of definition.elementIds.filter(value => /^er-\d+$/.test(value))) {
+      const node = nodes.get(id)
+      if (!node) continue
+      const title = compiled.value?.scene.elements.find(element => element.id === `${id}-title`)
+      node.setAttribute('role', 'button'); node.setAttribute('tabindex', canExport.value ? '0' : '-1')
+      node.setAttribute('aria-disabled', String(!canExport.value))
+      node.setAttribute('aria-label', t('定位表 {table} 的源码', { table: title?.type === 'shape' ? title.text : id }))
+      node.setAttribute('data-testid', 'diagram-table-source')
+    }
+  }
+}
+watch([svg, canExport, locale, previewPage], updatePreviewTargets, { flush: 'post' })
 function zoomPreview(next: number, pointer?: { clientX: number; clientY: number }) {
   if (!interactive.value || modalOpen.value || !Number.isFinite(next)) return
   const nextZoom = Math.max(minPreviewZoom, Math.min(maxPreviewZoom, next))
   if (nextZoom === zoom.value) return
+  endPreviewPan()
   const container = previewScroll.value, page = previewPage.value
   if (!container || !page) { zoom.value = nextZoom; return }
   const viewport = container.getBoundingClientRect(), before = page.getBoundingClientRect()
@@ -311,6 +403,7 @@ function zoomPreview(next: number, pointer?: { clientX: number; clientY: number 
   })
 }
 function previewWheel(event: WheelEvent) {
+  endPreviewPan()
   // Keep the browser's native vertical/horizontal scrolling for ordinary wheels.
   if (!event.ctrlKey) return
   event.preventDefault()
@@ -336,10 +429,14 @@ function previewGesture(event: Event) {
 }
 watch(previewScroll, (container, _, onCleanup) => {
   if (!container) return
+  // Extra bounded space permits dragging in either direction even at fit zoom.
+  const margin = parseFloat(getComputedStyle(container.querySelector('.diagram-preview')!).marginLeft) || 0
+  container.scrollTo({ left: margin, top: margin, behavior: 'auto' })
   container.addEventListener('wheel', previewWheel, { passive: false })
   // Safari / macOS WKWebView sends GestureEvents instead of Ctrl+wheel.
   for (const name of ['gesturestart', 'gesturechange', 'gestureend']) container.addEventListener(name, previewGesture, { passive: false })
   onCleanup(() => {
+    endPreviewPan()
     pinchZoom = undefined
     zoomRequest++
     container.removeEventListener('wheel', previewWheel)
@@ -402,6 +499,8 @@ function reflowLoadedFonts() {
 }
 onMounted(() => {
   mounted = true
+  window.addEventListener('blur', endPreviewPan)
+  window.addEventListener('keydown', cancelPreviewPanOnEscape, true)
   // The first preview may be measured before the document's fonts finish loading.
   void document.fonts?.ready.then(reflowLoadedFonts)
   document.fonts?.addEventListener('loadingdone', reflowLoadedFonts)
@@ -409,6 +508,9 @@ onMounted(() => {
   narrowLayout = window.matchMedia('(max-width: 760px)'); updateLayout(); narrowLayout.addEventListener('change', updateLayout)
 })
 onBeforeUnmount(() => {
+  endPreviewPan()
+  window.removeEventListener('blur', endPreviewPan)
+  window.removeEventListener('keydown', cancelPreviewPanOnEscape, true)
   mounted = false; document.fonts?.removeEventListener('loadingdone', reflowLoadedFonts)
   endResize(); narrowLayout?.removeEventListener('change', updateLayout)
   document.removeEventListener('pointerdown', closeExportOutside, true); document.removeEventListener('focusin', closeExportOutside); clearTimeout(timer)
@@ -417,7 +519,7 @@ function hasDirtyDraft() { return composing.value || draft.value !== props.sourc
 function hasPendingEdits(options?: { allowStyleDialog?: boolean }) { return hasDirtyDraft() || templatesOpen.value || stylesOpen.value && !options?.allowStyleDialog }
 watch([draft, composing, () => props.source], () => emit('pending', hasDirtyDraft()), { flush: 'sync' })
 watch(() => props.active, value => { if (!value) { closeExportMenu(); stylesOpen.value = false; templatesOpen.value = false; pendingTemplate.value = undefined; pinchZoom = undefined; zoomRequest++ } })
-watch([interactive, modalOpen], () => { if (!interactive.value || modalOpen.value) endResize() })
+watch([interactive, modalOpen], () => { if (!interactive.value || modalOpen.value) { endResize(); endPreviewPan() } })
 defineExpose({ flush, hasPendingEdits, hasDirtyDraft, focus: () => sourceInput.value?.focus() })
 parse()
 </script>
@@ -445,17 +547,18 @@ parse()
           <p>{{ t('模板包含{kinds}。示例源码可直接编辑。点击行号旁的箭头可折叠或展开代码块。', { kinds: kindsList }) }}</p>
           <p>{{ t('支持 # 注释，可独占一行或放在语句后；行内 # 两侧需留空格。') }}</p>
           <p v-if="compiled?.kind === 'er'" data-testid="er-syntax-help">{{ t('ER 图使用 ENTITY["表注释"] 显示表名与表注释；字段末尾的双引号文字为字段注释。在图表风格中可分别设置四类文字。') }}</p>
+          <p v-if="compiled?.kind === 'er'">{{ t('拖动预览可平移图表；点击表格可定位并展开对应源码。也可用 Tab 选择表格，再按 Enter 或空格。') }}</p>
           <p>{{ t('支持这些类型的常用语法子集；未实现的指令会提示具体行号。源码独立保存，创建独立画布后可调整图元；副本的修改不会反写源码。') }}</p>
         </details>
       </div>
       <div class="diagram-splitter" data-testid="diagram-splitter" role="separator" tabindex="0" :aria-label="t('调整源码与预览大小')" :aria-orientation="stacked ? 'horizontal' : 'vertical'" :aria-valuenow="Math.round(splitRatio)" :aria-valuemin="20" :aria-valuemax="80" :aria-valuetext="t('源码占 {value0}%', { value0: Math.round(splitRatio) })" :title="t('拖动调整大小，双击恢复；方向键微调')" @pointerdown="startResize" @pointermove="resizeMove" @pointerup="endResize" @pointercancel="endResize" @lostpointercapture="endResize" @keydown="splitKeydown" @dblclick="setSplitRatio(stacked ? 43 : 38)" />
       <div class="diagram-preview-panel">
-        <div class="diagram-panel-title"><span>{{ t('预览') }} <span v-if="compiled" class="diagram-preview-kind"><AppIcon :name="compiled.kind" :size="12"/>{{ kindLabel }}</span></span><div class="diagram-zoom"><span class="diagram-zoom-hint">{{ t('滚轮滚动 · Ctrl + 滚轮缩放') }}</span><button type="button" :aria-label="t('缩小预览')" :disabled="zoom <= minPreviewZoom" @click="zoomPreview(zoom - .2)"><AppIcon name="minus" :size="13"/></button><button type="button" :aria-label="t('重置预览缩放')" :title="t('重置为 100% · Ctrl + 滚轮或捏合缩放')" @click="zoomPreview(1)">{{ Math.round(zoom * 100) }}%</button><button type="button" :aria-label="t('放大预览')" :disabled="zoom >= maxPreviewZoom" @click="zoomPreview(zoom + .2)"><AppIcon name="plus" :size="13"/></button></div></div>
+        <div class="diagram-panel-title"><span>{{ t('预览') }} <span v-if="compiled" class="diagram-preview-kind"><AppIcon :name="compiled.kind" :size="12"/>{{ kindLabel }}</span></span><div class="diagram-zoom"><span class="diagram-zoom-hint">{{ t('拖动平移 · Ctrl + 滚轮缩放') }}</span><button type="button" :aria-label="t('缩小预览')" :disabled="zoom <= minPreviewZoom" @click="zoomPreview(zoom - .2)"><AppIcon name="minus" :size="13"/></button><button type="button" :aria-label="t('重置预览缩放')" :title="t('重置为 100% · Ctrl + 滚轮或捏合缩放')" @click="zoomPreview(1)">{{ Math.round(zoom * 100) }}%</button><button type="button" :aria-label="t('放大预览')" :disabled="zoom >= maxPreviewZoom" @click="zoomPreview(zoom + .2)"><AppIcon name="plus" :size="13"/></button></div></div>
         <div v-if="parsing" class="diagram-parsing" role="status"><span class="diagram-spinner" />{{ t('正在解析…') }}</div>
         <div v-if="error && !parsing" :id="errorId" class="diagram-error" role="alert" data-testid="diagram-error">
           <strong><AppIcon name="alert" :size="16"/>{{ t('源码需要修正') }}</strong><p>{{ localizedError }}</p><button v-if="errorLine" type="button" @click="locateError"><AppIcon name="search" :size="14"/>{{ t('定位到第 {line} 行', { line: errorLine }) }}</button>
         </div>
-        <div v-if="compiled" ref="previewScroll" class="diagram-preview-scroll" :aria-busy="parsing" :aria-label="t('图表预览，滚轮滚动，Ctrl 加滚轮或捏合缩放')" data-testid="diagram-preview-viewport">
+        <div v-if="compiled" ref="previewScroll" class="diagram-preview-scroll" :class="{ 'is-panning': panning }" :aria-busy="parsing" :aria-label="t('图表预览，拖动平移，滚轮滚动，Ctrl 加滚轮或捏合缩放')" data-testid="diagram-preview-viewport" @pointerdown="startPreviewPan" @pointermove="movePreviewPan" @pointerup="finishPreviewPan" @pointercancel="endPreviewPan" @lostpointercapture="endPreviewPan" @click="previewClick" @keydown="previewKeydown" @dragstart.prevent @auxclick.prevent>
           <div class="diagram-preview" :style="{ width: `${zoom * 100}%`, minWidth: `${zoom * 100}%` }">
             <div ref="previewPage" class="diagram-preview-page">
               <div class="diagram-preview-art" data-testid="diagram-preview" v-html="svg"/>
@@ -549,6 +652,11 @@ parse()
   .diagram-splitter::after { width: 32px; height: 2px; }
 }
 .diagram-preview-page { width: 100%; min-width: 0; position: relative; }
+.diagram-preview { margin: 240px; }
+.diagram-preview-scroll { cursor: grab; user-select: none; }
+.diagram-preview-scroll.is-panning { cursor: grabbing; }
+.diagram-preview-art :deep(svg) { -webkit-user-drag: none; }
+.diagram-preview-art :deep([data-testid="diagram-table-source"]:focus-visible) { outline: 3px solid var(--ui-accent, #3577e5); outline-offset: 4px; }
 .diagram-source-overlay { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .diagram-source-overlay path, .diagram-source-overlay rect { vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
 .diagram-highlight-halo, .diagram-highlight-path-halo { fill: none; stroke: #fff; stroke-width: 5; stroke-opacity: .85; }

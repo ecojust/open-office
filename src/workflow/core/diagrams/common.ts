@@ -3,7 +3,11 @@ import { validateScene } from '../documents.ts'
 
 export type DiagramKind = 'flowchart' | 'sequence' | 'class' | 'state' | 'er' | 'gitgraph' | 'pie' | 'gantt' | 'xychart' | 'quadrant' | 'mindmap' | 'timeline' | 'journey' | 'kanban' | 'requirement' | 'c4' | 'architecture' | 'sankey' | 'radar' | 'treemap' | 'block' | 'packet'
 export interface DiagramSourceRange { start: number; end: number; elementIds: string[] }
-export interface DiagramResult { kind: DiagramKind; scene: Scene; warnings: string[]; sourceMap: DiagramSourceRange[] }
+export interface DiagramResult {
+  kind: DiagramKind; scene: Scene; warnings: string[]; sourceMap: DiagramSourceRange[]
+  /** Preferred declaration locations for preview-to-source navigation, never persisted. */
+  sourceDefinitions?: DiagramSourceRange[]
+}
 export interface DiagramTemplate { kind?: DiagramKind; id: string; title: string; description: string; category: string; source: string }
 export interface SourceLine { text: string; line: number; start: number; end: number }
 export class DiagramSyntaxError extends Error {

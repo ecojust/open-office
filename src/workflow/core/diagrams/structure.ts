@@ -324,6 +324,7 @@ function crowfoot(edge: EdgeElement, elements: SceneElement[], side: 'start' | '
 }
 function compileER(lines: SourceLine[], erStyle?: ERDiagramStyle): DiagramResult {
   const sources = new DiagramSourceMap(lines)
+  const definitions = new Map<string, number>()
   const fields = new Map<string, ERField[]>(), comments = new Map<string, string>()
   const boxes = new Map<string, Box>(), links: Link[] = []; let active: Box | undefined, opening = 1, direction: Direction = 'LR'
   for (const entry of lines.slice(1)) {
@@ -338,7 +339,7 @@ function compileER(lines: SourceLine[], erStyle?: ERDiagramStyle): DiagramResult
       active.sourceLines.push(line); active.fields.push(label); continue
     }
     if ((m = text.match(/^direction\s+(LR|RL|TB|TD|BT)$/))) { direction = m[1] as Direction; continue }
-    if ((m = text.match(new RegExp(`^(${ID})(?:\\s*\\[\\s*("(?:[^"\\\\]|\\\\.)*")\\s*\\])?\\s*\\{$`, 'u')))) { active = addBox(boxes, m[1]!, line); if (m[2]) comments.set(active.key, value(m[2], line)); opening = line; continue }
+    if ((m = text.match(new RegExp(`^(${ID})(?:\\s*\\[\\s*("(?:[^"\\\\]|\\\\.)*")\\s*\\])?\\s*\\{$`, 'u')))) { active = addBox(boxes, m[1]!, line); if (!definitions.has(active.key)) definitions.set(active.key, line); if (m[2]) comments.set(active.key, value(m[2], line)); opening = line; continue }
     if ((m = text.match(new RegExp(`^(${ID})\\s+(\\|\\||\\|o|o\\||\\}\\||\\}o)(--|\\.\\.)(\\|\\||o\\||\\|o|\\|\\{|o\\{)\\s+(${ID})\\s*:\\s*(.+)$`, 'u')))) {
       addBox(boxes, m[1]!, line); addBox(boxes, m[5]!, line); addLink(links, { a: m[1]!, b: m[5]!, left: m[2]!, right: m[4]!, op: m[3]!, label: value(m[6]!, line), line }); continue
     }
@@ -360,7 +361,12 @@ function compileER(lines: SourceLine[], erStyle?: ERDiagramStyle): DiagramResult
     crowfoot(edge, elements, 'start', link.left!, `${edge.id}-left`); crowfoot(edge, elements, 'end', link.right!, `${edge.id}-right`)
   })
   mapStructureSources(sources, boxes, nodes, elements, links, 'er')
-  return finishDiagram('er', elements, links.length ? ['ER 基数端标为静态装饰；创建可编辑副本后，移动实体卡片不会自动重算这些端标。'] : [], sources)
+  const targets = new DiagramSourceMap(lines)
+  for (const box of boxes.values()) {
+    const node = nodes.get(box.key)!
+    targets.add(definitions.get(box.key) ?? box.line, ...elements.filter(element => element.groupId === node.groupId).map(element => element.id))
+  }
+  return { ...finishDiagram('er', elements, links.length ? ['ER 基数端标为静态装饰；创建可编辑副本后，移动实体卡片不会自动重算这些端标。'] : [], sources), sourceDefinitions: targets.entries(elements) }
 }
 interface Commit { id: string; branch: string; parents: string[]; tag: string; type: string; line: number; pickedFrom?: string; pickedParent?: string }
 function gitOptions(text: string, line: number, allowed = ['id', 'tag', 'type']): Record<string, string> {

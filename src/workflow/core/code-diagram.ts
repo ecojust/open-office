@@ -611,5 +611,6 @@ export function compileCodeDiagram(source: string, options: CodeDiagramOptions =
   offsets.push(source.length)
   const result = compileNormalized(characters.join(''), options)
   result.sourceMap = result.sourceMap.map(range => ({ ...range, start: offsets[range.start]!, end: offsets[range.end]! }))
+  if (result.sourceDefinitions) result.sourceDefinitions = result.sourceDefinitions.map(range => ({ ...range, start: offsets[range.start]!, end: offsets[range.end]! }))
   return result
 }

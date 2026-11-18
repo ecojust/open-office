@@ -158,9 +158,12 @@ function textMarkup(node: ShapeElement): string {
   if (wrapped.length > maxLines) lines[lines.length - 1] = `${lines[lines.length - 1]!.slice(0, -1)}…`
   const align = node.shape === 'frame' ? 'left' : node.style.textAlign, insets = textHorizontalInsets(node.style)
   const x = align === 'left' ? node.x + insets.left : align === 'right' ? node.x + node.width - insets.right : node.x + node.width / 2
-  const y = node.shape === 'frame' ? node.y + Math.min(node.height, Math.max(28, fontSize * 1.5 + 12)) / 2 : node.y + node.height / 2 - (lines.length - 1) * lineHeight / 2
+  const nowrap = node.style.textWrap === 'nowrap'
+  // WebKit and Chromium disagree on the central baseline for fallback fonts.
+  // Place single-line table cells on an explicit alphabetic baseline instead.
+  const y = (node.shape === 'frame' ? node.y + Math.min(node.height, Math.max(28, fontSize * 1.5 + 12)) / 2 : node.y + node.height / 2 - (lines.length - 1) * lineHeight / 2) + (nowrap ? fontSize * .35 : 0)
   const textColor = ['transparent', 'none'].includes(node.style.stroke.toLowerCase()) ? '#334155' : node.style.stroke
-  return `<text fill="${color(textColor)}" opacity="${node.style.opacity}" font-family="${TEXT_FONT_FAMILY}" font-size="${fontSize}"${textFontAttrs(node.style)} text-anchor="${align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle'}" dominant-baseline="central" pointer-events="none">${lines.map((line, i) => `<tspan x="${x}" y="${y + i * lineHeight}">${escapeXml(line)}</tspan>`).join('')}</text>`
+  return `<text fill="${color(textColor)}" opacity="${node.style.opacity}" font-family="${TEXT_FONT_FAMILY}" font-size="${fontSize}"${textFontAttrs(node.style)} text-anchor="${align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle'}" dominant-baseline="${nowrap ? 'alphabetic' : 'central'}" pointer-events="none">${lines.map((line, i) => `<tspan x="${x}" y="${y + i * lineHeight}">${escapeXml(line)}</tspan>`).join('')}</text>`
 }
 function braceLabelHitBounds(node: ShapeElement): ReturnType<typeof braceTextBounds> {
   const bounds = braceTextBounds(node), fontSize = Math.max(1, Math.min(500, node.style.fontSize)), lineHeight = fontSize * 1.35
@@ -218,7 +221,7 @@ export function elementToSvg(element: SceneElement, scene: Scene, hitTargets = f
   const rotation = normalizedRotation(element.rotation ?? 0), pivot = center(element)
   return rotation ? `<g transform="rotate(${rotation} ${pivot.x} ${pivot.y})">${markup}</g>` : markup
 }
-export function sceneToSvg(scene: Scene, options: { background?: boolean } = {}): string {
+export function sceneToSvg(scene: Scene, options: { background?: boolean; interactive?: boolean } = {}): string {
   const bounds = sceneBounds(scene), pad = Math.max(32, ...scene.elements.map(e => e.style.strokeWidth / 2 + 12 + (e.type === 'edge' && e.arrow !== 'none' ? Math.max(8, e.style.strokeWidth * 3.5) : 0))), x = bounds.x - pad, y = bounds.y - pad, width = Math.max(64, bounds.width + pad * 2), height = Math.max(64, bounds.height + pad * 2)
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(width)}" height="${Math.ceil(height)}" viewBox="${x} ${y} ${width} ${height}" role="img" aria-label="Open Office 图表">${options.background === false ? '' : `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${color(scene.background)}"/>`}${scene.elements.map(element => `<g>${elementToSvg(element, scene)}</g>`).join('')}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(width)}" height="${Math.ceil(height)}" viewBox="${x} ${y} ${width} ${height}" role="${options.interactive ? 'group' : 'img'}" aria-label="Open Office 图表">${options.background === false ? '' : `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${color(scene.background)}"/>`}${scene.elements.map(element => `<g${options.interactive ? ` data-element-id="${escapeXml(element.id)}"` : ''}>${elementToSvg(element, scene)}</g>`).join('')}</svg>`
 }

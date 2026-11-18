@@ -103,6 +103,19 @@ function setSelectionRange(start: number, end: number, direction: 'forward' | 'b
   editor.dispatch({ selection: EditorSelection.single(direction === 'backward' ? to : from, direction === 'backward' ? from : to), effects, scrollIntoView: true })
   syncSelection()
 }
+function revealSource(start: number, end: number) {
+  if (!editor) return
+  const from = coordinates.toEditor(start), to = coordinates.toEditor(end), effects = []
+  const headerLine = editor.state.doc.lineAt(from).number
+  const folds = foldedRanges(editor.state).iter()
+  while (folds.value) {
+    // Inline comments can put the fold start after the parser's header range.
+    if (folds.from <= to && folds.to >= from || editor.state.doc.lineAt(folds.from).number === headerLine) effects.push(unfoldEffect.of({ from: folds.from, to: folds.to }))
+    folds.next()
+  }
+  editor.dispatch({ selection: EditorSelection.single(from, to), effects: [...effects, EditorView.scrollIntoView(from, { y: 'start', yMargin: 24 })] })
+  editor.focus(); syncSelection()
+}
 function scrollToStart() { if (editor) { editor.scrollDOM.scrollTop = 0; editor.scrollDOM.scrollLeft = 0 } }
 onMounted(() => {
   editor = new EditorView({ parent: container.value!, state: EditorState.create({
@@ -154,7 +167,7 @@ watch(locale, () => {
   updateFoldingLabels()
 })
 onBeforeUnmount(() => { clearTimeout(compositionTimer); editor?.destroy(); editor = undefined })
-defineExpose({ focus, setSelectionRange, scrollToStart, syncSelection, get value() { return rawSource }, get selectionStart() { return coordinates.toRaw(editor?.state.selection.main.from ?? 0) }, get selectionEnd() { return coordinates.toRaw(editor?.state.selection.main.to ?? 0) }, get selectionDirection() { const selection = editor?.state.selection.main; return selection && selection.head < selection.anchor ? 'backward' : 'forward' } })
+defineExpose({ focus, setSelectionRange, revealSource, scrollToStart, syncSelection, get value() { return rawSource }, get selectionStart() { return coordinates.toRaw(editor?.state.selection.main.from ?? 0) }, get selectionEnd() { return coordinates.toRaw(editor?.state.selection.main.to ?? 0) }, get selectionDirection() { const selection = editor?.state.selection.main; return selection && selection.head < selection.anchor ? 'backward' : 'forward' } })
 </script>
 
 <template><div ref="container" class="diagram-source-editor" /></template>

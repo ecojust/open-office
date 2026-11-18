@@ -26,6 +26,8 @@ const model = () => page.evaluate(() => window.__erEditor.value.inspectModel());
 const state = () => page.evaluate(() => window.__erEditor.value.inspect());
 const scene = () => page.evaluate(async () => (await import('/src/workflow/core/files.ts')).documentScene(await window.__erEditor.value.inspectModel()));
 const preview = () => page.getByTestId('diagram-preview');
+const viewport = () => page.getByTestId('diagram-preview-viewport');
+const sourceInput = () => page.getByTestId('diagram-source');
 const panel = () => page.getByTestId('diagram-style-panel');
 const control = (role, property) => page.getByTestId(`er-${role}-${property}`);
 async function check(name, run) { report.stage = name; persist(); await run(); report.checks.push(name); persist(); }
@@ -44,6 +46,27 @@ async function size(role, value) { await control(role, 'font-size').fill(String(
 async function color(role, value) { await control(role, 'color').evaluate((element, value) => { element.value = value; element.dispatchEvent(new Event('change', { bubbles: true })); }, value); await frame(); }
 async function exportFile(format = 'owflow') { return page.evaluate(format => window.__erEditor.value.exportFile({ format }), format); }
 async function screenshot(name) { const file = `${name}.png`; await page.screenshot({ path: path.join(output, file), fullPage: true }); report.screenshots.push(file); persist(); }
+async function sourceSelection() { return sourceInput().evaluate(element => { const api = element.closest('.diagram-source-editor').__vueParentComponent.exposed; return { start: api.selectionStart, end: api.selectionEnd, text: api.value.slice(api.selectionStart, api.selectionEnd), focused: document.activeElement === element }; }); }
+async function selectSource(start = 0) { await sourceInput().evaluate((element, start) => { const api = element.closest('.diagram-source-editor').__vueParentComponent.exposed; api.setSelectionRange(start, start); api.focus(); }, start); await frame(); }
+async function scrollPosition() { return viewport().evaluate(element => ({ x: element.scrollLeft, y: element.scrollTop })); }
+async function worldPoint(point) { return preview().locator('svg').evaluate((svg, point) => { const p = new DOMPoint(point.x, point.y).matrixTransform(svg.getScreenCTM()); return { x: p.x, y: p.y }; }, point); }
+async function foldHeader(label) {
+  const header = sourceInput().locator('.cm-line').filter({ hasText: label }); await header.waitFor();
+  const box = await header.boundingBox();
+  const point = await page.locator('.cm-foldGutter').evaluate((gutter, y) => {
+    const marker = [...gutter.querySelectorAll('.cm-gutterElement')].find(element => element.textContent === '⌄' && Math.abs(element.getBoundingClientRect().top - y) < 3);
+    if (!marker) throw Error('Missing fold marker for visible declaration');
+    const box = marker.getBoundingClientRect(); return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  }, box.y);
+  await page.mouse.click(point.x, point.y); await frame(); assert.equal(await page.locator('.cm-foldPlaceholder').count(), 1);
+}
+async function assertRevealed(source, declaration) {
+  const selected = await sourceSelection();
+  assert.equal(selected.start, source.indexOf(declaration)); assert.equal(selected.text, declaration); assert.equal(selected.focused, true);
+  const bounds = await sourceInput().locator('.cm-line').filter({ hasText: declaration }).boundingBox();
+  const scroller = await page.locator('.diagram-source-editor .cm-scroller').boundingBox();
+  assert.ok(bounds && bounds.y >= scroller.y - 1 && bounds.y + bounds.height <= scroller.y + scroller.height + 1, 'declaration and source selection are visible');
+}
 function shape(scene, value) { const result = scene.elements.find(element => element.type === 'shape' && element.text === value); assert.ok(result, `Missing text shape ${value}`); return result; }
 function assertGeometry(measurements, expectedScene, label) {
   for (const measurement of measurements) {
@@ -104,8 +127,8 @@ async function measureStandalone(scene, svg) {
     const harness = `import { createApp, h, ref, nextTick } from 'vue';
       import WorkflowEditor from '/src/components/WorkflowEditor.vue'; import '/src/style.css';
       window.__erNative = ref({ id: 'initial', name: 'ER表格.owflow', kind: 'diagram' });
-      window.__erEditor = ref(); window.__erNextTick = nextTick; window.__erTheme = ref('light');
-      createApp({ setup() { return () => h(WorkflowEditor, { key: window.__erNative.value.id, ref: window.__erEditor, document: window.__erNative.value, theme: window.__erTheme.value }); } }).mount('#er-app');`;
+      window.__erEditor = ref(); window.__erNextTick = nextTick; window.__erTheme = ref('light'); window.__erActive = ref(true);
+      createApp({ setup() { return () => h(WorkflowEditor, { key: window.__erNative.value.id, ref: window.__erEditor, document: window.__erNative.value, theme: window.__erTheme.value, active: window.__erActive.value }); } }).mount('#er-app');`;
     const html = '<!doctype html><html data-theme="light"><head><meta charset="utf-8"><link rel="icon" href="data:,"><style>html,body,#er-app{margin:0;width:100%;height:100%;overflow:hidden}#er-app{display:flex}</style></head><body><div id="er-app"></div><script type="module" src="/__er_harness__.js"></script></body></html>';
     server = await createServer({ root, clearScreen: false, cacheDir: path.join(output, 'vite-cache'), plugins: [{ name: 'er-harness', resolveId(id) { if (id === '/__er_harness__.js') return '\0er-harness'; }, load(id) { if (id === '\0er-harness') return harness; }, configureServer(server) { server.middlewares.use((request, response, next) => { if (request.url !== '/__er__') return next(); response.setHeader('Content-Type', 'text/html;charset=utf-8'); response.end(html); }); } }], server: { host: '127.0.0.1', port: Number(process.env.OFFICE_ER_PORT || 5368), strictPort: true, hmr: false, watch: { ignored: ['**/vendor/**', '**/target/**', '**/.build/**', '**/test-results/**'] } } });
     await server.listen();
@@ -198,6 +221,88 @@ async function measureStandalone(scene, svg) {
       await control('title', 'font-size').focus();
       await screenshot('04-narrow-controls');
       await page.keyboard.press('Escape'); await page.setViewportSize({ width: 1480, height: 1000 }); await frame();
+    });
+    await check('table-header-body-field-and-comment-clicks-reveal-the-correct-declaration', async () => {
+      const source = ['# 前言😀', 'erDiagram', 'A ||--o{ B : 先引用后定义', ...Array.from({ length: 60 }, (_, index) => `# source spacing ${index}`), 'A["重复别名"] { # 表定义后有注释', ' string left_name "左字段注释😀"', '}', 'B["重复别名"] { # 第二张表', ' int right_id PK "右字段注释😀"', '}'].join('\r\n');
+      await load(source); const before = await model(), initial = await state();
+      for (const [id, declaration] of [['er-0-title', 'A["重复别名"] {'], ['er-0-tableComment', 'A["重复别名"] {'], ['er-0-field-0', 'A["重复别名"] {'], ['er-0-comment-0', 'A["重复别名"] {'], ['er-1-title', 'B["重复别名"] {'], ['er-1-field-0', 'B["重复别名"] {'], ['er-1-comment-0', 'B["重复别名"] {']]) {
+        await selectSource(); await preview().locator(`[data-element-id="${id}"]`).click(); await frame(); await assertRevealed(source, declaration);
+      }
+      await selectSource(); const table = (await scene()).elements.find(element => element.id === 'er-1');
+      const body = await worldPoint({ x: table.x + table.width - 4, y: table.y + table.height - 4 });
+      await page.mouse.click(body.x, body.y); await frame(); await assertRevealed(source, 'B["重复别名"] {');
+      const declaration = 'A["重复别名"] {';
+      await selectSource(source.indexOf(declaration)); await foldHeader(declaration); await selectSource();
+      await preview().locator('[data-element-id="er-0-field-0"]').click(); await frame();
+      assert.equal(await page.locator('.cm-foldPlaceholder').count(), 0, 'table click unfolds the declaration despite its inline comment');
+      await assertRevealed(source, declaration);
+      assert.deepEqual(await model(), before); assert.deepEqual(await state(), initial, 'source navigation creates no content or history changes');
+      await screenshot('05-table-source-navigation');
+    });
+    await check('keyboard-table-navigation-supports-declared-and-implicit-entities', async () => {
+      const examples = [[fixture, ['CUSTOMER["客户"] {', 'ORDER {']], ['erDiagram\nA ||--o{ B : implicit', ['A ||--o{ B : implicit', 'A ||--o{ B : implicit']]];
+      for (const [source, expected] of examples) {
+        await load(source); const initial = await state();
+        assert.equal(await preview().getByTestId('diagram-table-source').count(), 2);
+        for (const [index, key] of [[0, 'Enter'], [1, 'Space']]) {
+          await selectSource(); const target = preview().locator(`[data-testid="diagram-table-source"][data-element-id="er-${index}"]`);
+          assert.equal(await target.getAttribute('role'), 'button'); assert.equal(await target.getAttribute('tabindex'), '0');
+          await target.focus(); await page.keyboard.press(key); await frame(); await assertRevealed(source, expected[index]);
+        }
+        assert.deepEqual(await state(), initial);
+      }
+    });
+    await check('blank-and-table-drag-pan-with-sticky-threshold-and-outside-pointer-capture', async () => {
+      await load(); const before = await model(), initial = await state(); await selectSource();
+      const bounds = await viewport().boundingBox(), blank = { x: bounds.x + bounds.width - 100, y: bounds.y + bounds.height - 80 };
+      const start = await scrollPosition();
+      await page.mouse.move(blank.x, blank.y); await page.mouse.down(); await page.mouse.move(blank.x + 50, blank.y + 45, { steps: 6 }); await page.mouse.up(); await frame();
+      const moved = await scrollPosition(); assert.ok(Math.abs(moved.x - (start.x - 50)) < 2 && Math.abs(moved.y - (start.y - 45)) < 2, 'blank drag follows the pointer');
+      assert.equal((await sourceSelection()).start, 0);
+      await viewport().evaluate(element => { element.scrollLeft = 240; element.scrollTop = 240; }); await frame();
+      const titleBox = await preview().locator('[data-element-id="er-0-title"]').boundingBox(), point = { x: titleBox.x + titleBox.width / 2, y: titleBox.y + titleBox.height / 2 };
+      await page.mouse.move(point.x, point.y); await page.mouse.down(); await page.mouse.move(point.x - 40, point.y + 15, { steps: 4 });
+      assert.ok((await scrollPosition()).x > 260); await page.mouse.move(point.x, point.y, { steps: 4 }); await page.mouse.up(); await frame();
+      assert.equal((await sourceSelection()).start, 0, 'returning to the original point after a drag does not activate the table');
+      await page.mouse.move(point.x, point.y); await page.mouse.down(); await page.mouse.move(point.x + 1, point.y + 1); await page.mouse.up(); await frame();
+      await assertRevealed(fixture, 'CUSTOMER["客户"] {');
+      await selectSource(); await page.mouse.move(point.x, point.y); await page.mouse.down();
+      await page.mouse.move(bounds.x - 80, point.y + 50, { steps: 8 }); await frame();
+      assert.equal(await viewport().evaluate(element => element.classList.contains('is-panning')), true);
+      assert.ok((await scrollPosition()).x > 300, 'pointer capture keeps panning outside the viewport');
+      await page.mouse.up(); await frame(); assert.equal((await sourceSelection()).start, 0);
+      assert.equal(await viewport().evaluate(element => element.classList.contains('is-panning')), false);
+      assert.deepEqual(await model(), before); assert.deepEqual(await state(), initial);
+    });
+    await check('native-wheel-scroll-and-control-wheel-zoom-remain-available', async () => {
+      await load(); const initial = await state(), box = await viewport().boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      const start = await scrollPosition(); await page.mouse.wheel(0, 120);
+      await page.waitForFunction(y => document.querySelector('[data-testid="diagram-preview-viewport"]').scrollTop > y + 30, start.y);
+      const reset = page.getByRole('button', { name: '重置预览缩放', exact: true }); assert.equal(await reset.textContent(), '100%');
+      await page.keyboard.down('Control'); await page.mouse.wheel(0, -100); await page.keyboard.up('Control');
+      await page.waitForFunction(() => Number(document.querySelector('[aria-label="重置预览缩放"]').textContent.replace('%', '')) > 100);
+      await reset.click(); await frame(); assert.equal(await reset.textContent(), '100%'); assert.deepEqual(await state(), initial);
+    });
+    await check('escape-blur-pointer-cancel-modal-and-tab-deactivation-end-drag-cleanly', async () => {
+      for (const cancel of ['escape', 'blur', 'pointercancel', 'lostpointercapture', 'modal', 'inactive']) {
+        await load(); await selectSource(); const initial = await state();
+        const box = await preview().locator('[data-element-id="er-0-title"]').boundingBox(), point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+        await page.mouse.move(point.x, point.y); await page.mouse.down(); await page.mouse.move(point.x - 30, point.y + 15, { steps: 3 }); await frame();
+        if (cancel === 'escape') await page.keyboard.press('Escape');
+        else if (cancel === 'blur') await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+        else if (cancel === 'modal') await page.getByTestId('diagram-style-toggle').evaluate(element => element.click());
+        else if (cancel === 'inactive') await page.evaluate(() => { window.__erActive.value = false; });
+        else await viewport().dispatchEvent(cancel, { pointerId: 1, pointerType: 'mouse', bubbles: true });
+        await frame(); const stopped = await scrollPosition();
+        await page.mouse.move(point.x - 90, point.y + 55, { steps: 3 }); await page.mouse.up(); await frame();
+        assert.deepEqual(await scrollPosition(), stopped, `${cancel}: pointer movement after cancellation does not pan`);
+        assert.equal((await sourceSelection()).start, 0, `${cancel}: ending a canceled drag does not select source`);
+        assert.equal(await viewport().evaluate(element => element.classList.contains('is-panning')), false);
+        if (cancel === 'modal') { await page.keyboard.press('Escape'); await frame(); }
+        if (cancel === 'inactive') { await page.evaluate(() => { window.__erActive.value = true; }); await frame(); }
+        assert.deepEqual(await state(), initial);
+      }
     });
     await check('ER-controls-are-hidden-for-class-diagrams', async () => {
       await load('classDiagram\nclass CUSTOMER["客户"] {\n+String name\n+run()\n}');
