@@ -15,6 +15,7 @@ import { documentScene, exportDocument, importText, type ExportFormat } from '..
 import { sceneToSvg } from '../workflow/core/svg'
 import { clone, newId, DEFAULT_STYLE, type Scene, type WorkflowDocument, type ShapeElement } from '../workflow/core/types'
 import type { DiagramStyleId } from '../workflow/core/diagram-appearance'
+import { normalizeERDiagramStyle, type ERDiagramStyle } from '../workflow/core/er-style'
 import type { NativeDocument } from '../types'
 import { base64ToBytes, bytesToBase64, saveFileName, type EditorExport, type Extension } from '../shared/document'
 import { printHtml, type PrintOutcome } from '../shared/printing'
@@ -63,16 +64,21 @@ function changeScene(scene: Scene, label: string) {
 }
 function changeSource(source: string) { change(document => { document.source = source }) }
 function changeStyle(style: DiagramStyleId) { change(document => { document.diagramStyle = style }) }
+function changeERStyle(style: ERDiagramStyle) {
+ const normalized = normalizeERDiagramStyle(style)
+ change(document => { if (Object.keys(normalized).length) document.erStyle = normalized; else delete document.erStyle })
+}
 function child() { return diagram.value ? codeEditor.value : sceneEditor.value }
 function requireLoaded() {
  if (!session || loading.value || disposed) throw Error('请等待文档打开。')
  return session
 }
-async function flush() {
+async function flush(allowStyleDialog = false) {
  requireLoaded()
  if (child()?.flush() === false) throw Error('请先完成输入法文字或当前画布操作，再保存或切换文档。')
  await nextTick()
- if (child()?.hasPendingEdits()) throw Error('请先完成当前编辑或关闭操作面板，再保存或切换文档。')
+ const unfinished = diagram.value && allowStyleDialog ? codeEditor.value?.hasPendingEdits({ allowStyleDialog: true }) : child()?.hasPendingEdits()
+ if (unfinished) throw Error('请先完成当前编辑或关闭操作面板，再保存或切换文档。')
  pending.value = false; accept()
 }
 async function inspect() {
@@ -118,8 +124,8 @@ async function discardChanges(options: { force?: boolean } = {}) {
  if (options.force) { token++; lastExport = undefined; return }
  if ((await prepareDeactivate()).dirty) throw Error('文档还有未保存的修改，请先保存或确认不保存后关闭。')
 }
-async function undo() { await flush(); if (requireLoaded().undo()) { accept(); await nextTick() } }
-async function redo() { await flush(); if (requireLoaded().redo()) { accept(); await nextTick() } }
+async function undo() { await flush(true); if (requireLoaded().undo()) { accept(); await nextTick() } }
+async function redo() { await flush(true); if (requireLoaded().redo()) { accept(); await nextTick() } }
 function keydown(event: KeyboardEvent) {
  if (!interactive.value || event.defaultPrevented || event.isComposing || !(event.ctrlKey || event.metaKey) || event.altKey) return
  if (event.key.toLowerCase() === 'z' || event.key.toLowerCase() === 'y') {
@@ -207,7 +213,7 @@ async function mcpExecute(name: string, args: Record<string, unknown>, assertCur
  }
  if (name === 'diagram_read' && diagram.value) {
   let parseError: string | undefined
-  try { compileCodeDiagram(current.model.source) } catch (cause) { parseError = cause instanceof Error ? cause.message : String(cause) }
+  try { compileCodeDiagram(current.model.source, { erStyle: current.model.erStyle }) } catch (cause) { parseError = cause instanceof Error ? cause.message : String(cause) }
   return { title: current.model.title, source: current.model.source, style: current.model.diagramStyle ?? 'classic', valid: !parseError, parseError }
  }
  if (name === 'canvas_select_elements' && !diagram.value && args.fit === true && args.focus === true) throw Error('适应画布与保持缩放的聚焦不能同时开启。')
@@ -253,7 +259,7 @@ defineExpose({ mcpExecute, setDocumentTitle, prepareDeactivate, exportFile, mark
     <span>{{ diagram ? t('修改源码，实时生成图表') : t('自由排版 · 图形、连线与手绘') }}</span>
     <button v-if="!diagram" :disabled="!interactive" :aria-label="t('适应画布')" @click="sceneEditor?.fitCanvas()"><Icon name="search" :size="16" /><span>{{ t('适应画布') }}</span></button>
    </div>
-   <CodeDiagramEditor v-if="diagram" ref="codeEditor" :source="model.source" :diagram-style="model.diagramStyle" :theme="theme" :active="active" :disabled="disabled" @change="changeSource" @change-style="changeStyle" @pending="setPending" @status="emit('status', $event)" @create-flow="createCanvas" @export="exportImage" />
+   <CodeDiagramEditor v-if="diagram" ref="codeEditor" :source="model.source" :diagram-style="model.diagramStyle" :er-style="model.erStyle" :theme="theme" :active="active" :disabled="disabled" @change="changeSource" @change-style="changeStyle" @change-e-r-style="changeERStyle" @pending="setPending" @status="emit('status', $event)" @create-flow="createCanvas" @export="exportImage" />
    <SceneEditor v-else ref="sceneEditor" :scene="model.scene" :mode="model.kind === 'flow' ? 'flow' : 'board'" :theme="theme" :active="active" :disabled="disabled" @change="changeScene" @pending="setPending" @status="emit('status', $event)" @export="exportImage" />
   </template>
  </section>

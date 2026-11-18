@@ -4,6 +4,42 @@ import { anchoredPolygon, sketchEllipse, sketchPolyline } from './sketch.ts'
 import { resolveStrokePattern } from './appearance.ts'
 import { brushOutlinePath, brushPaintPasses, brushPolyline, brushRadiusAt, rainbowSegments } from './brushes.ts'
 
+const TEXT_FONT_FAMILY = "'Office UI', 'Office UI CJK', system-ui, sans-serif"
+let textMeasureContext: CanvasRenderingContext2D | null | undefined
+function singleLineText(text: string): string { return text.replace(/\r\n?|\n|\u2028|\u2029/g, ' ') }
+/** Keep single-line italic ink within its text cell at either alignment. */
+export function textHorizontalInsets(style: Pick<ElementStyle, 'fontSize' | 'fontStyle' | 'textWrap'>): { left: number; right: number } {
+  const extra = style.textWrap === 'nowrap' && style.fontStyle === 'italic' ? Math.ceil(Math.max(1, Math.min(500, style.fontSize)) * .35) : 0
+  return { left: 12 + extra, right: 10 + extra }
+}
+/** Include the webfont preview and the system fallback used by SVG/PNG exports. */
+export function measureTextWidth(text: string, fontSize: number, fontWeight: ElementStyle['fontWeight'] = 'normal', fontStyle: ElementStyle['fontStyle'] = 'normal'): number {
+  const size = Math.max(1, Math.min(500, fontSize)), value = singleLineText(text)
+  if (!value) return 0
+  if (textMeasureContext === undefined && typeof document !== 'undefined') {
+    try { textMeasureContext = document.createElement('canvas').getContext?.('2d') ?? null } catch { textMeasureContext = null }
+  }
+  const overhang = fontStyle === 'italic' ? size * .2 : 0
+  if (textMeasureContext) {
+    let width = 0
+    for (const family of [TEXT_FONT_FAMILY, 'system-ui, sans-serif']) {
+      textMeasureContext.font = `${fontStyle} ${fontWeight} ${size}px ${family}`
+      const metrics = textMeasureContext.measureText(value)
+      const ink = (metrics.actualBoundingBoxLeft || 0) + (metrics.actualBoundingBoxRight || 0)
+      width = Math.max(width, metrics.width, ink)
+    }
+    if (Number.isFinite(width)) return Math.ceil(width + overhang + 1)
+  }
+  // Server-side compilation has no font engine. Leave room for wide glyphs,
+  // bold faces and italic ink instead of underestimating them with an average.
+  let ems = 0
+  for (const character of value) ems += /[WwMm@%&]/.test(character) ? 1.1 : /[ilIjtfr.,:;'!| ]/.test(character) ? .5 : /[\u0000-\u007f]/.test(character) ? .85 : 1.1
+  return Math.ceil(ems * size * (fontWeight === 'bold' ? 1.08 : 1) + overhang + 1)
+}
+function textFontAttrs(style: ElementStyle): string {
+  return `${style.fontWeight === 'bold' ? ' font-weight="bold"' : ''}${style.fontStyle === 'italic' ? ' font-style="italic"' : ''}`
+}
+
 export function escapeXml(value: unknown): string { return String(value).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff\ufffe\uffff]/gu, '\uFFFD').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]!) }
 export function safeImageData(value: unknown): value is string {
   if (typeof value !== 'string' || value.length > 16_000_000 || !/^data:image\/(?:png|jpeg|webp);base64,/.test(value)) return false
@@ -118,16 +154,17 @@ function textMarkup(node: ShapeElement): string {
   const fontSize = Math.max(1, Math.min(500, node.style.fontSize)), lineHeight = fontSize * 1.35
   const innerWidth = node.shape === 'diamond' ? node.width * .58 : node.shape === 'star' ? node.width * .46 : node.shape === 'triangle' ? node.width * .56 : ['cloud', 'parallelogram', 'hexagon'].includes(node.shape) ? node.width * .7 : node.width - 20
   const maxLines = node.shape === 'frame' ? 1 : Math.max(1, Math.floor((node.height - 12) / lineHeight))
-  const wrapped = wrapText(node.text, innerWidth, fontSize), lines = wrapped.slice(0, maxLines)
+  const wrapped = node.style.textWrap === 'nowrap' ? [singleLineText(node.text)] : wrapText(node.text, innerWidth, fontSize), lines = wrapped.slice(0, maxLines)
   if (wrapped.length > maxLines) lines[lines.length - 1] = `${lines[lines.length - 1]!.slice(0, -1)}…`
-  const align = node.shape === 'frame' ? 'left' : node.style.textAlign, x = align === 'left' ? node.x + 12 : align === 'right' ? node.x + node.width - 10 : node.x + node.width / 2
+  const align = node.shape === 'frame' ? 'left' : node.style.textAlign, insets = textHorizontalInsets(node.style)
+  const x = align === 'left' ? node.x + insets.left : align === 'right' ? node.x + node.width - insets.right : node.x + node.width / 2
   const y = node.shape === 'frame' ? node.y + Math.min(node.height, Math.max(28, fontSize * 1.5 + 12)) / 2 : node.y + node.height / 2 - (lines.length - 1) * lineHeight / 2
   const textColor = ['transparent', 'none'].includes(node.style.stroke.toLowerCase()) ? '#334155' : node.style.stroke
-  return `<text fill="${color(textColor)}" opacity="${node.style.opacity}" font-family="'Office UI', 'Office UI CJK', system-ui, sans-serif" font-size="${fontSize}" text-anchor="${align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle'}" dominant-baseline="central" pointer-events="none">${lines.map((line, i) => `<tspan x="${x}" y="${y + i * lineHeight}">${escapeXml(line)}</tspan>`).join('')}</text>`
+  return `<text fill="${color(textColor)}" opacity="${node.style.opacity}" font-family="${TEXT_FONT_FAMILY}" font-size="${fontSize}"${textFontAttrs(node.style)} text-anchor="${align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle'}" dominant-baseline="central" pointer-events="none">${lines.map((line, i) => `<tspan x="${x}" y="${y + i * lineHeight}">${escapeXml(line)}</tspan>`).join('')}</text>`
 }
 function braceLabelHitBounds(node: ShapeElement): ReturnType<typeof braceTextBounds> {
   const bounds = braceTextBounds(node), fontSize = Math.max(1, Math.min(500, node.style.fontSize)), lineHeight = fontSize * 1.35
-  const lines = wrapText(node.text, bounds.width - 20, fontSize).slice(0, Math.max(1, Math.floor((bounds.height - 12) / lineHeight)))
+  const lines = (node.style.textWrap === 'nowrap' ? [singleLineText(node.text)] : wrapText(node.text, bounds.width - 20, fontSize)).slice(0, Math.max(1, Math.floor((bounds.height - 12) / lineHeight)))
   const width = Math.min(bounds.width, Math.max(8, ...lines.map(line => [...line].reduce((sum, char) => sum + (/[^\x00-\x7F]/.test(char) ? 1 : .57) * fontSize, 8))))
   const height = Math.min(bounds.height, Math.max(lineHeight, lines.length * lineHeight))
   return { x: node.style.textAlign === 'left' ? bounds.x + 8 : node.style.textAlign === 'right' ? bounds.x + bounds.width - width - 6 : bounds.x + (bounds.width - width) / 2, y: bounds.y + (bounds.height - height) / 2, width, height }
@@ -152,7 +189,7 @@ export function elementToSvg(element: SceneElement, scene: Scene, hitTargets = f
     const before = [...points].reverse().find(p => p.x !== end.x || p.y !== end.y) || start
     const after = points.find(p => p.x !== start.x || p.y !== start.y) || end
     const arrows = `${element.arrow !== 'none' ? arrowMarkup(end, before, element.style, `${element.id}:end`, hitTargets) : ''}${element.arrow === 'both' ? arrowMarkup(start, after, element.style, `${element.id}:start`, hitTargets) : ''}`
-    const label = element.label ? `<text x="${middle.x}" y="${middle.y - 9}" font-size="${element.style.fontSize}" font-family="'Office UI', 'Office UI CJK', system-ui, sans-serif" text-anchor="middle" fill="${color(element.style.stroke)}" stroke="${color(scene.background)}" stroke-width="5" paint-order="stroke" stroke-linejoin="round">${escapeXml(element.label)}</text>` : ''
+    const label = element.label ? `<text x="${middle.x}" y="${middle.y - 9}" font-size="${element.style.fontSize}" font-family="${TEXT_FONT_FAMILY}"${textFontAttrs(element.style)} text-anchor="middle" fill="${color(element.style.stroke)}" stroke="${color(scene.background)}" stroke-width="5" paint-order="stroke" stroke-linejoin="round">${escapeXml(element.style.textWrap === 'nowrap' ? singleLineText(element.label) : element.label)}</text>` : ''
     return `${hitTargets ? `<path d="${d}" fill="none" stroke="transparent" stroke-width="${Math.max(18, element.style.strokeWidth)}"/>` : ''}${strokeMarkup(points, element.id, element.style)}${arrows}${label}`
   }
   const { x, y, width: w, height: h, shape } = element, attrs = styleAttrs(element.style)

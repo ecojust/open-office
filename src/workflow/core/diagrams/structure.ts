@@ -1,6 +1,8 @@
 import type { SceneElement, ShapeElement, Point, EdgeElement } from '../types.ts'
 import { center, edgePoints } from '../geometry.ts'
 import { wrapText } from '../svg.ts'
+import type { ERDiagramStyle } from '../er-style.ts'
+import { erTable, sizeERTable, type ERField } from './er-table.ts'
 import { DiagramSyntaxError, DiagramSourceMap, sourceLines, diagramNode, diagramText, diagramEdge, diagramStroke, finishDiagram, type DiagramResult, type DiagramTemplate, type SourceLine } from './common.ts'
 
 type Direction = 'LR' | 'RL' | 'TB' | 'TD' | 'BT'
@@ -320,20 +322,23 @@ function crowfoot(edge: EdgeElement, elements: SceneElement[], side: 'start' | '
   if (symbol.includes('o')) { const c = at(25, 0); elements.push(diagramNode(`${id}-optional`, '', c.x - 5, c.y - 5, 10, 10, 'ellipse', { fill: '#ffffff', strokeWidth: 1.5 })) }
   else elements.push(diagramStroke(`${id}-required`, [at(24, -8), at(24, 8)], { strokeWidth: 1.5 }))
 }
-function compileER(lines: SourceLine[]): DiagramResult {
+function compileER(lines: SourceLine[], erStyle?: ERDiagramStyle): DiagramResult {
   const sources = new DiagramSourceMap(lines)
+  const fields = new Map<string, ERField[]>(), comments = new Map<string, string>()
   const boxes = new Map<string, Box>(), links: Link[] = []; let active: Box | undefined, opening = 1, direction: Direction = 'LR'
   for (const entry of lines.slice(1)) {
     const text = entry.text.trim(), line = entry.line; let m: RegExpMatchArray | null
     if (active) {
       if (text === '}') { active = undefined; continue }
       if (!(m = text.match(/^([\p{L}_][\p{L}\p{N}_()[\]-]*)\s+([\p{L}_][\p{L}\p{N}_-]*)(?:\s+((?:PK|FK|UK)(?:\s*,\s*(?:PK|FK|UK))*))?(?:\s+("(?:[^"\\]|\\.)*"))?$/u))) fail('实体属性格式应为：类型 名称 [PK, FK, UK] ["说明"]。', line)
-      const label = `${m[1]}    ${m[2]}${m[3] ? `    [${m[3].replace(/\s/g, '')}]` : ''}${m[4] ? `  ${value(m[4], line)}` : ''}`
+      const label = `${m[1]}  ${m[2]}${m[3] ? `  [${m[3].replace(/\s/g, '')}]` : ''}`
+      const rows = fields.get(active.key) ?? []
+      rows.push({ text: label, comment: m[4] ? value(m[4], line) : '' }); fields.set(active.key, rows)
       if (active.fields.length >= 40) fail('每个实体最多支持 40 个属性。', line)
       active.sourceLines.push(line); active.fields.push(label); continue
     }
     if ((m = text.match(/^direction\s+(LR|RL|TB|TD|BT)$/))) { direction = m[1] as Direction; continue }
-    if ((m = text.match(new RegExp(`^(${ID})(?:\\s*\\[\\s*("(?:[^"\\\\]|\\\\.)*")\\s*\\])?\\s*\\{$`, 'u')))) { active = addBox(boxes, m[1]!, line); if (m[2]) active.title = value(m[2], line); opening = line; continue }
+    if ((m = text.match(new RegExp(`^(${ID})(?:\\s*\\[\\s*("(?:[^"\\\\]|\\\\.)*")\\s*\\])?\\s*\\{$`, 'u')))) { active = addBox(boxes, m[1]!, line); if (m[2]) comments.set(active.key, value(m[2], line)); opening = line; continue }
     if ((m = text.match(new RegExp(`^(${ID})\\s+(\\|\\||\\|o|o\\||\\}\\||\\}o)(--|\\.\\.)(\\|\\||o\\||\\|o|\\|\\{|o\\{)\\s+(${ID})\\s*:\\s*(.+)$`, 'u')))) {
       addBox(boxes, m[1]!, line); addBox(boxes, m[5]!, line); addLink(links, { a: m[1]!, b: m[5]!, left: m[2]!, right: m[4]!, op: m[3]!, label: value(m[6]!, line), line }); continue
     }
@@ -342,10 +347,14 @@ function compileER(lines: SourceLine[]): DiagramResult {
   }
   if (active) fail('实体定义缺少右花括号。', opening)
   if (!boxes.size) fail('ER 图至少需要一个实体。', lines[0]!.line)
-  for (const box of boxes.values()) sizeCard(box)
+  const metrics = new Map<string, ReturnType<typeof sizeERTable>>()
+  for (const box of boxes.values()) {
+    const size = sizeERTable(box.key, comments.get(box.key) ?? '', fields.get(box.key) ?? [], erStyle)
+    metrics.set(box.key, size); box.width = size.width; box.height = size.height
+  }
   layout(boxes, links, direction)
   const elements: SceneElement[] = [], nodes = new Map<string, ShapeElement>()
-  for (const box of boxes.values()) nodes.set(box.key, card(box, `er-${nodes.size}`, elements, '#f0fdf4'))
+  for (const box of boxes.values()) nodes.set(box.key, erTable(`er-${nodes.size}`, box.key, comments.get(box.key) ?? '', fields.get(box.key) ?? [], box.x, box.y, metrics.get(box.key)!, elements))
   links.forEach((link, i) => {
     const edge = diagramEdge(`er-edge-${i}`, endpoint(nodes.get(link.a)!), endpoint(nodes.get(link.b)!), link.label, { arrow: 'none', style: { dashed: link.op === '..' } }); elements.push(edge)
     crowfoot(edge, elements, 'start', link.left!, `${edge.id}-left`); crowfoot(edge, elements, 'end', link.right!, `${edge.id}-right`)
@@ -691,7 +700,7 @@ function compileArchitecture(lines: SourceLine[]): DiagramResult {
   mapStructureSources(sources, boxes, nodes, elements, links, 'architecture', groups)
   return finishDiagram('architecture', elements, ['架构图标使用本地基础图形与图标名称，不下载远程 logos；端口连接保留精确 L/R/T/B 坐标，转换为画布后为自由端点。'], sources)
 }
-export function compileStructureDiagram(source: string): DiagramResult | undefined {
+export function compileStructureDiagram(source: string, erStyle?: ERDiagramStyle): DiagramResult | undefined {
   const lines = sourceLines(source), header = lines[0]?.text.trim() ?? ''
   const kind = header.split(/\s/)[0]
   if (!['classDiagram', 'stateDiagram', 'stateDiagram-v2', 'erDiagram', 'gitGraph', 'gitGraph:', 'requirementDiagram', 'C4Context', 'C4Container', 'C4Component', 'architecture-beta'].includes(kind!)) return undefined
@@ -700,7 +709,7 @@ export function compileStructureDiagram(source: string): DiagramResult | undefin
   if (header !== kind) fail('图表标题后不支持额外参数，请把指令另起一行。', lines[0]!.line)
   if (kind === 'classDiagram') return compileClass(lines)
   if (kind === 'stateDiagram' || kind === 'stateDiagram-v2') return compileState(lines)
-  if (kind === 'erDiagram') return compileER(lines)
+  if (kind === 'erDiagram') return compileER(lines, erStyle)
   if (kind === 'requirementDiagram') return compileRequirement(lines)
   if (kind === 'C4Context' || kind === 'C4Container' || kind === 'C4Component') return compileC4(lines)
   return compileArchitecture(lines)
