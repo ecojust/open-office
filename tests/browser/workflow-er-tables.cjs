@@ -1,4 +1,4 @@
-/* Real ER table preview, role controls, history and production file exports.
+/* Real ER table preview, source navigation, panning and production file exports.
  * Run: node tests/browser/workflow-er-tables.cjs
  */
 const assert = require('node:assert/strict');
@@ -29,21 +29,19 @@ const preview = () => page.getByTestId('diagram-preview');
 const viewport = () => page.getByTestId('diagram-preview-viewport');
 const sourceInput = () => page.getByTestId('diagram-source');
 const panel = () => page.getByTestId('diagram-style-panel');
-const control = (role, property) => page.getByTestId(`er-${role}-${property}`);
 async function check(name, run) { report.stage = name; persist(); await run(); report.checks.push(name); persist(); }
-async function load(source = fixture, erStyle) {
-  await page.evaluate(async ({ source, erStyle }) => {
+async function load(source = fixture, legacyERStyle) {
+  await page.evaluate(async ({ source, legacyERStyle }) => {
     const { createDocument, serializeDocument } = await import('/src/workflow/core/documents.ts');
     const { bytesToBase64 } = await import('/src/shared/document.ts');
     const document = createDocument('mermaid'); document.source = source;
-    if (erStyle) document.erStyle = erStyle;
-    window.__erNative.value = { id: crypto.randomUUID(), name: 'ER表格.owflow', kind: 'diagram', base64: bytesToBase64(new TextEncoder().encode(serializeDocument(document))) };
+    const payload = JSON.parse(serializeDocument(document));
+    if (legacyERStyle) payload.erStyle = legacyERStyle;
+    window.__erNative.value = { id: crypto.randomUUID(), name: 'ER表格.owflow', kind: 'diagram', base64: bytesToBase64(new TextEncoder().encode(JSON.stringify(payload))) };
     await window.__erNextTick();
-  }, { source, erStyle });
+  }, { source, legacyERStyle });
   await preview().waitFor(); await page.evaluate(() => document.fonts.ready); await frame();
 }
-async function size(role, value) { await control(role, 'font-size').fill(String(value)); await control(role, 'font-size').press('Tab'); await frame(); }
-async function color(role, value) { await control(role, 'color').evaluate((element, value) => { element.value = value; element.dispatchEvent(new Event('change', { bubbles: true })); }, value); await frame(); }
 async function exportFile(format = 'owflow') { return page.evaluate(format => window.__erEditor.value.exportFile({ format }), format); }
 async function screenshot(name) { const file = `${name}.png`; await page.screenshot({ path: path.join(output, file), fullPage: true }); report.screenshots.push(file); persist(); }
 async function sourceSelection() { return sourceInput().evaluate(element => { const api = element.closest('.diagram-source-editor').__vueParentComponent.exposed; return { start: api.selectionStart, end: api.selectionEnd, text: api.value.slice(api.selectionStart, api.selectionEnd), focused: document.activeElement === element }; }); }
@@ -146,81 +144,104 @@ async function measureStandalone(scene, svg) {
       assert.equal(measured.preview.find(item => item.text === 'CUSTOMER').attributes['font-weight'], 'bold');
       await screenshot('01-default');
     });
-    await check('wide-Latin-CJK-emoji-at-large-fonts-fit-every-cell-in-all-directions', async () => {
+    await check('wide-Latin-CJK-emoji-fit-every-cell-at-default-typography-in-all-directions', async () => {
       for (const direction of ['LR', 'RL', 'TB', 'BT']) {
         const source = `erDiagram\ndirection ${direction}\nCUSTOMER["WWWM客户资料😀"] {\n string WWWM_${'wide_'.repeat(15)} "${'WWMW 中文😀 '.repeat(14).trim()}"\n int identifier PK "第二行"\n string optional\n}\nEMPTY\nCUSTOMER ||--o{ EMPTY : owns`;
-        await load(source, { title: { fontSize: 48, fontStyle: 'italic' }, tableComment: { fontSize: 35, fontWeight: 'bold' }, field: { fontSize: direction === 'LR' ? 10 : 48, fontWeight: 'bold', fontStyle: 'italic' }, comment: { fontSize: direction === 'LR' ? 48 : 10, fontWeight: 'bold', fontStyle: 'italic' } });
+        await load(source);
         const result = await measurePreviewAndExport();
         assert.ok(result.scene.elements.find(element => element.id === 'er-0').width > 680);
         await measureStandalone(result.scene, result.svg);
       }
     });
-    await check('all-four-role-controls-change-preview-independently-and-undo-inside-panel', async () => {
-      await load(); await page.getByTestId('diagram-style-toggle').click(); await page.getByTestId('er-text-styles').waitFor();
-      for (const role of ['title', 'tableComment', 'field', 'comment']) assert.equal(await page.getByTestId(`er-text-style-${role}`).count(), 1);
-      await size('title', 31); await control('title', 'bold').click(); await frame();
-      assert.equal(shape(await scene(), 'CUSTOMER').style.fontWeight, 'normal');
-      await page.keyboard.press('Control+z'); await frame();
-      assert.equal(shape(await scene(), 'CUSTOMER').style.fontWeight, 'bold');
-      assert.equal(await panel().isVisible(), true);
-      await page.keyboard.press('Control+Shift+z'); await frame();
-      assert.equal(shape(await scene(), 'CUSTOMER').style.fontWeight, 'normal');
-      await control('tableComment', 'italic').click(); await control('tableComment', 'align').selectOption('left'); await color('tableComment', '#7050aa');
-      await size('field', 36); await control('field', 'bold').click(); await control('field', 'align').selectOption('center'); await color('field', '#0088cc');
-      await size('comment', 48); await control('comment', 'bold').click(); await control('comment', 'italic').click(); await control('comment', 'align').selectOption('right'); await color('comment', '#bb2244');
-      const current = await scene(), title = shape(current, 'CUSTOMER'), annotation = shape(current, '客户'), comment = shape(current, '客户编号😀');
-      assert.equal(title.style.fontSize, 31); assert.equal(title.style.fontWeight, 'normal');
-      assert.equal(annotation.style.fontStyle, 'italic'); assert.equal(annotation.style.textAlign, 'left'); assert.equal(annotation.style.stroke, '#7050aa');
-      assert.equal(comment.style.fontSize, 48); assert.equal(comment.style.fontWeight, 'bold'); assert.equal(comment.style.fontStyle, 'italic'); assert.equal(comment.style.stroke, '#bb2244');
-      assert.equal((await model()).source, fixture);
-      await screenshot('02-role-controls');
+    await check('legacy-role-styles-are-ignored-and-no-independent-ER-controls-remain', async () => {
+      await load(); const defaults = await scene();
+      await load(fixture, { title: { fontSize: 48, fontWeight: 'normal', color: '#ee1122' }, tableComment: { fontSize: 40, fontStyle: 'italic' }, field: { fontSize: 30, textAlign: 'right' }, comment: { fontSize: 48, textAlign: 'left', color: '#bb2244' } });
+      assert.equal(Object.hasOwn(await model(), 'erStyle'), false);
+      assert.deepEqual(await scene(), defaults, 'legacy appearance overrides do not change default rendering');
+      await measurePreviewAndExport();
+      await page.getByTestId('diagram-style-toggle').click(); await panel().waitFor();
+      assert.equal(await page.getByTestId('er-text-styles').count(), 0);
+      assert.equal(await panel().locator('[data-er-role], [data-testid^="er-"]').count(), 0);
+      assert.equal(await panel().getByTestId('diagram-style-card').count(), 10);
+      await screenshot('02-theme-controls');
     });
-    await check('explicit-role-colors-survive-theme-switch-and-follow-theme-is-undoable', async () => {
+    await check('theme-changes-and-undo-preserve-default-ER-typography-and-source', async () => {
+      const before = await scene();
       await page.locator('[data-diagram-style="midnight"]').click(); await frame();
-      assert.equal(shape(await scene(), '客户编号😀').style.stroke, '#bb2244');
-      assert.equal(shape(await scene(), '客户').style.stroke, '#7050aa');
-      assert.equal(await control('comment', 'color-reset').getAttribute('aria-pressed'), 'false');
-      await control('comment', 'color-reset').click(); await frame();
-      assert.equal((await model()).erStyle.comment.color, undefined);
-      assert.notEqual(shape(await scene(), '客户编号😀').style.stroke, '#bb2244');
+      const themed = await scene(); assert.notEqual(themed.background, before.background);
+      for (const element of before.elements.filter(element => element.type === 'shape' && element.text)) {
+        const actual = themed.elements.find(candidate => candidate.id === element.id);
+        for (const property of ['fontSize', 'fontWeight', 'fontStyle', 'textAlign', 'textWrap']) assert.equal(actual.style[property], element.style[property]);
+      }
       await page.keyboard.press('Control+z'); await frame();
-      assert.equal(shape(await scene(), '客户编号😀').style.stroke, '#bb2244');
+      assert.deepEqual(await scene(), before); assert.equal(await panel().isVisible(), true);
+      await page.keyboard.press('Control+Shift+z'); await frame(); assert.deepEqual(await scene(), themed);
+      assert.equal((await model()).source, fixture); assert.equal(Object.hasOwn(await model(), 'erStyle'), false);
       await page.keyboard.press('Escape'); await frame();
       await measurePreviewAndExport(); await screenshot('03-styled-midnight');
     });
-    await check('native-save-reopen-preserves-source-and-role-style-and-all-exported-glyphs', async () => {
+    await check('native-save-reopen-preserves-source-and-theme-without-legacy-ER-overrides', async () => {
       const before = await model(), saved = await exportFile();
       const persisted = JSON.parse(Buffer.from(saved.base64, 'base64').toString('utf8'));
-      assert.deepEqual(persisted.erStyle, before.erStyle); assert.equal(persisted.source, fixture);
+      assert.equal(Object.hasOwn(persisted, 'erStyle'), false); assert.equal(persisted.diagramStyle, before.diagramStyle); assert.equal(persisted.source, fixture);
       await page.evaluate(base64 => window.__erEditor.value.markSaved(base64), saved.base64); assert.equal((await state()).dirty, false);
       const mmd = await exportFile('mmd'); assert.equal(Buffer.from(mmd.base64, 'base64').toString('utf8'), fixture);
       await page.evaluate(async base64 => { window.__erNative.value = { id: crypto.randomUUID(), name: 'reopened.owflow', kind: 'diagram', base64 }; await window.__erNextTick(); }, saved.base64);
       await preview().waitFor(); await frame();
-      assert.deepEqual((await model()).erStyle, before.erStyle); assert.equal((await model()).source, fixture); assert.equal((await state()).dirty, false);
+      assert.equal(Object.hasOwn(await model(), 'erStyle'), false); assert.equal((await model()).diagramStyle, before.diagramStyle); assert.equal((await model()).source, fixture); assert.equal((await state()).dirty, false);
       await measurePreviewAndExport();
       const png = await exportFile('png'); assert.equal(Buffer.from(png.base64, 'base64').subarray(1, 4).toString(), 'PNG');
     });
-    await check('narrow-style-panel-fits-and-keeps-native-input-keys-and-tab-focus', async () => {
+    await check('narrow-theme-panel-fits-and-keeps-focus-without-independent-ER-settings', async () => {
       await page.setViewportSize({ width: 640, height: 850 }); await frame();
       await page.getByTestId('diagram-style-toggle').click(); await panel().waitFor();
-      assert.equal(await control('title', 'font-size').evaluate(element => element === document.activeElement), true);
+      const selected = panel().locator('[data-diagram-style="midnight"]');
+      assert.equal(await selected.evaluate(element => element === document.activeElement), true);
+      assert.equal(await panel().locator('input, select, [data-er-role]').count(), 0);
       const bounds = await panel().evaluate(element => ({ width: element.getBoundingClientRect().width, client: element.clientWidth, scroll: element.scrollWidth, viewport: innerWidth }));
       assert.ok(bounds.width <= bounds.viewport && bounds.scroll <= bounds.client + 1, 'dialog has no horizontal overflow');
-      const previous = Number(await control('title', 'font-size').inputValue());
-      await control('title', 'font-size').press('ArrowUp');
-      assert.equal(Number(await control('title', 'font-size').inputValue()), previous + 1, 'numeric arrows edit the font size');
-      await control('title', 'font-size').press('Tab'); await frame();
-      assert.equal((await model()).erStyle.title.fontSize, previous + 1);
-      await page.keyboard.press('Control+z'); await frame();
-      assert.equal((await model()).erStyle.title.fontSize, previous);
       const focusables = panel().locator('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]');
       await focusables.last().focus(); await page.keyboard.press('Tab');
       assert.equal(await focusables.first().evaluate(element => element === document.activeElement), true);
       await page.keyboard.press('Shift+Tab');
       assert.equal(await focusables.last().evaluate(element => element === document.activeElement), true);
-      await control('title', 'font-size').focus();
+      await selected.focus();
       await screenshot('04-narrow-controls');
       await page.keyboard.press('Escape'); await page.setViewportSize({ width: 1480, height: 1000 }); await frame();
+    });
+    await check('source-entity-styles-survive-theme-and-export-without-document-role-settings', async () => {
+      const styledSource = `${fixture}\nclassDef highlighted fill:#ffffcc,stroke:#112233,stroke-width:3px,color:#123456,font-size:48px,font-weight:bold,font-style:italic\nclass CUSTOMER highlighted\nstyle ORDER fill:#e2e8f0,stroke:#556677,color:#334455`;
+      await load(styledSource); const styled = await scene();
+      const table = styled.elements.find(element => element.id === 'er-0');
+      assert.equal(table.style.fill, '#ffffcc'); assert.equal(table.style.stroke, '#112233'); assert.equal(table.style.strokeWidth, 3);
+      const textMembers = styled.elements.filter(element => element.groupId === 'er-0-card' && element.type === 'shape' && element.text);
+      for (const member of textMembers) {
+        assert.equal(member.style.fontSize, 48); assert.equal(member.style.fontWeight, 'bold'); assert.equal(member.style.fontStyle, 'italic'); assert.equal(member.style.stroke, '#123456');
+      }
+      assert.equal(shape(styled, 'ORDER').style.fontSize, 16, 'entity colors alone leave default typography unchanged');
+      const field = styled.elements.find(element => element.id === 'er-1-field-0'); assert.equal(field.style.fontSize, 14); assert.equal(field.style.fontWeight, 'normal');
+      await page.getByTestId('diagram-style-toggle').click(); await page.locator('[data-diagram-style="midnight"]').click(); await page.keyboard.press('Escape'); await frame();
+      const result = await measurePreviewAndExport(); await measureStandalone(result.scene, result.svg);
+      for (const id of ['er-0', 'er-1', ...textMembers.map(element => element.id)]) {
+        const expected = styled.elements.find(element => element.id === id), actual = result.scene.elements.find(element => element.id === id);
+        assert.equal(actual.style.stroke, expected.style.stroke); assert.equal(actual.style.fill, expected.style.fill);
+      }
+      assert.equal((await model()).source, styledSource); assert.equal(Object.hasOwn(await model(), 'erStyle'), false);
+      const mmd = await exportFile('mmd'); assert.equal(Buffer.from(mmd.base64, 'base64').toString('utf8'), styledSource);
+      const saved = JSON.parse(Buffer.from((await exportFile()).base64, 'base64').toString('utf8'));
+      assert.equal(saved.source, styledSource); assert.equal(Object.hasOwn(saved, 'erStyle'), false);
+      await screenshot('05-source-entity-style');
+      await load(`${fixture}\nstyle CUSTOMER fill:#ffffff`);
+      await page.getByTestId('diagram-style-toggle').click(); await page.locator('[data-diagram-style="midnight"]').click(); await page.keyboard.press('Escape'); await frame();
+      const whiteTable = await measurePreviewAndExport();
+      assert.equal(whiteTable.scene.elements.find(element => element.id === 'er-0').style.fill, '#ffffff');
+      for (const member of whiteTable.scene.elements.filter(element => element.groupId === 'er-0-card' && element.type === 'shape' && element.text)) {
+        const color = member.style.stroke; assert.match(color, /^#[0-9a-f]{6}$/i);
+        const rgb = [1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16) / 255);
+        const linear = rgb.map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+        const luminance = .2126 * linear[0] + .7152 * linear[1] + .0722 * linear[2];
+        assert.ok(1.05 / (luminance + .05) >= 4.5, `Default text stays readable on the source-defined white table after midnight theme: ${member.text} (${color})`);
+      }
     });
     await check('table-header-body-field-and-comment-clicks-reveal-the-correct-declaration', async () => {
       const source = ['# 前言😀', 'erDiagram', 'A ||--o{ B : 先引用后定义', ...Array.from({ length: 60 }, (_, index) => `# source spacing ${index}`), 'A["重复别名"] { # 表定义后有注释', ' string left_name "左字段注释😀"', '}', 'B["重复别名"] { # 第二张表', ' int right_id PK "右字段注释😀"', '}'].join('\r\n');

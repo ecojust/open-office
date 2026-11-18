@@ -2,7 +2,6 @@ import { DEFAULT_STYLE, clone, emptyScene, newId } from './types.ts'
 import type { DocumentKind, ElementStyle, Scene, SceneElement, WorkflowDocument } from './types.ts'
 import { resolveStrokePattern, sceneDefaultStyle } from './appearance.ts'
 import { normalizeDiagramStyle } from './diagram-appearance.ts'
-import { normalizeERDiagramStyle } from './er-style.ts'
 import { readBrushData } from './brushes.ts'
 import { normalizedRotation } from './geometry.ts'
 
@@ -109,8 +108,6 @@ export function validateDocument(value: unknown): WorkflowDocument {
     diagramStyle: normalizeDiagramStyle(raw.diagramStyle),
     createdAt: validDate(raw.createdAt), updatedAt: validDate(raw.updatedAt),
   }
-  const erStyle = normalizeERDiagramStyle(raw.erStyle)
-  if (Object.keys(erStyle).length) doc.erStyle = erStyle
   if (raw.importSource) {
     const source = object(raw.importSource)
     doc.importSource = { name: string(source.name, '来源文件名', 500), format: string(source.format, '来源格式', 30), text: string(source.text, '原始导入内容', MAX_FILE_BYTES) }
@@ -145,8 +142,6 @@ export function contentKey(doc: WorkflowDocument): string {
   const diagramStyle = normalizeDiagramStyle(doc.diagramStyle)
   // Preserve v0.1.0 saved keys byte-for-byte for the default presentation.
   if (diagramStyle !== 'classic') identity.push(diagramStyle)
-  const erStyle = normalizeERDiagramStyle(doc.erStyle)
-  if (Object.keys(erStyle).length) identity.push({ erStyle })
   return JSON.stringify(identity)
 }
 export const CODE_DIAGRAM_SAMPLE = `sequenceDiagram

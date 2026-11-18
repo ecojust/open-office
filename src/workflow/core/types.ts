@@ -1,5 +1,4 @@
 import type { DiagramStyleId } from './diagram-appearance.ts'
-import type { ERDiagramStyle } from './er-style.ts'
 
 // These persisted kind and format values preserve compatibility with existing document files.
 export type DocumentKind = 'flow' | 'board' | 'mermaid'
@@ -75,8 +74,6 @@ export interface WorkflowDocument {
   source: string
   /** Presentation only: source remains authoritative and unchanged. */
   diagramStyle?: DiagramStyleId
-  /** ER typography is applied before table measurement and layout. */
-  erStyle?: ERDiagramStyle
   createdAt: string
   updatedAt: string
   importSource?: { name: string; format: string; text: string }

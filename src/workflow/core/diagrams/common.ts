@@ -7,6 +7,8 @@ export interface DiagramResult {
   kind: DiagramKind; scene: Scene; warnings: string[]; sourceMap: DiagramSourceRange[]
   /** Preferred declaration locations for preview-to-source navigation, never persisted. */
   sourceDefinitions?: DiagramSourceRange[]
+  /** Explicit source colors take precedence over the selected presentation theme. Never persisted. */
+  sourceStyles?: Array<{ id: string; style: Partial<ElementStyle> }>
 }
 export interface DiagramTemplate { kind?: DiagramKind; id: string; title: string; description: string; category: string; source: string }
 export interface SourceLine { text: string; line: number; start: number; end: number }

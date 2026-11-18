@@ -59,7 +59,7 @@ export function tokenizeDiagramLine(line: string, preserveProtectedMembers = fal
     if (color) { add(pos + color[0].length, 'atom'); continue }
     const arrow = rest.match(/^(?:<<-->>|<-->|<==>|<-.->|-->>|->>|--x|--o|o--o|x--x|-->|---|==>|===|-\.->|-\.-|\.\.>|--|->|<\|--|\*--|o--|\|\|--o\{|:::)/)
     if (arrow) { add(pos + arrow[0].length, 'operator'); continue }
-    const number = rest.match(/^(?:\d+(?:\.\d+)?|\.\d+)(?:%|px|ms|[dhmsw])?\b/)
+    const number = rest.match(/^(?:\d+(?:\.\d+)?|\.\d+)(?:%|px|pt|ms|[dhmsw])?\b/)
     if (number) { add(pos + number[0].length, 'number'); continue }
     const word = rest.match(/^[\p{L}_][\p{L}\p{N}_]*(?:[-.][\p{L}\p{N}_]+)*/u)
     if (word) {

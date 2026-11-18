@@ -1,7 +1,6 @@
 import { createDocument, MAX_FILE_BYTES, parseDocument, serializeDocument, validateScene } from './documents.ts'
 import { compileCodeDiagram } from './code-diagram.ts'
-import { applyDiagramStyle } from './diagram-appearance.ts'
-import { applyERColors } from './er-style.ts'
+import { presentCodeDiagram } from './diagram-presentation.ts'
 import { sceneToSvg } from './svg.ts'
 import { importGraphXml, exportGraphXml } from '../formats/graph-xml.ts'
 import { importBoardJson, exportBoardJson } from '../formats/board-json.ts'
@@ -51,7 +50,7 @@ export function importText(name: string, text: string): ImportResult {
   throw new Error('JSON 文件格式不受支持。')
 }
 export function documentScene(doc: WorkflowDocument): Scene {
-  return doc.kind === 'mermaid' ? applyERColors(applyDiagramStyle(compileCodeDiagram(doc.source, { erStyle: doc.erStyle }).scene, doc.diagramStyle), doc.erStyle) : doc.scene
+  return doc.kind === 'mermaid' ? presentCodeDiagram(compileCodeDiagram(doc.source), doc.diagramStyle) : doc.scene
 }
 export function documentBytes(doc: WorkflowDocument): Uint8Array { return new TextEncoder().encode(serializeDocument(doc)) }
 export async function exportDocument(doc: WorkflowDocument, format: ExportFormat): Promise<{ name: string; bytes: Uint8Array; mime: string }> {

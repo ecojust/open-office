@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { DOMParser } from '@xmldom/xmldom'
 import { DEFAULT_STYLE } from '../src/workflow/core/types.ts'
 import { createDocument, serializeDocument, parseDocument, contentKey, validateElementStyle, DocumentHistory } from '../src/workflow/core/documents.ts'
+import { documentScene, exportDocument } from '../src/workflow/core/files.ts'
 import { elementToSvg, measureTextWidth, textHorizontalInsets } from '../src/workflow/core/svg.ts'
 
 const node = (style = {}, text = 'Wide fields and comments') => ({
@@ -118,18 +119,30 @@ test('Canvas measurement reserves space for both webfonts and standalone export 
   }
 })
 
-test('ER role style persistence has canonical keys and leaves old default documents unchanged', () => {
-  const doc = createDocument('mermaid'), original = structuredClone(doc), originalKey = contentKey(doc)
-  doc.erStyle = { title: { fontSize: 16, fontWeight: 'bold', textAlign: 'center' }, field: { fontSize: 14, textAlign: 'left' }, comment: {} }
+test('legacy ER role configuration is ignored without altering source, scene typography or content identity', async () => {
+  const doc = createDocument('mermaid')
+  doc.source = '\uFEFF# Original source 😀\r\nerDiagram\r\nTABLE["表说明"] {\r\n string id PK "字段说明"\r\n}\r\n'
+  doc.diagramStyle = 'midnight'
+  doc.scene.elements = [node({ fontWeight: 'bold', fontStyle: 'italic', textWrap: 'nowrap' }, 'Saved canvas typography')]
+  const original = structuredClone(doc), originalKey = contentKey(doc), originalRendered = documentScene(doc)
+  doc.erStyle = {
+    title: { fontSize: 48, fontWeight: 'normal', textAlign: 'right', color: '#ff0000' },
+    tableComment: { fontSize: 10, fontStyle: 'italic' },
+    field: { fontSize: 32, fontWeight: 'bold', textAlign: 'center' },
+    comment: { fontSize: 48, fontStyle: 'italic', color: '#abcdef' },
+  }
   assert.equal(contentKey(doc), originalKey)
-  assert.deepEqual(parseDocument(serializeDocument(doc)), original)
-  const history = new DocumentHistory(original)
-  doc.erStyle = { comment: { color: '#ABCD12', fontStyle: 'italic' }, title: { fontWeight: 'normal', fontSize: 24 } }
-  const key = contentKey(doc), restored = parseDocument(serializeDocument(doc))
-  assert.notEqual(key, originalKey)
-  assert.deepEqual(restored.erStyle, { title: { fontSize: 24, fontWeight: 'normal' }, comment: { fontStyle: 'italic', color: '#abcd12' } })
-  assert.equal(contentKey(restored), key)
-  history.commit(doc)
-  assert.equal(contentKey(history.undo()), originalKey)
-  assert.equal(contentKey(history.redo()), key)
+  assert.deepEqual(documentScene(doc), originalRendered, 'legacy settings cannot affect rendering even before native validation')
+  const restored = parseDocument(JSON.stringify(doc))
+  assert.equal(Object.hasOwn(restored, 'erStyle'), false)
+  assert.deepEqual(restored, original)
+  assert.deepEqual(restored.scene.elements[0].style, doc.scene.elements[0].style)
+  assert.equal(contentKey(restored), originalKey)
+  assert.deepEqual(documentScene(restored), originalRendered)
+  const saved = serializeDocument(doc), reopened = parseDocument(saved)
+  assert.equal(saved.includes('"erStyle"'), false)
+  assert.deepEqual(reopened, restored)
+  assert.equal(contentKey(reopened), originalKey)
+  assert.equal(new TextDecoder('utf-8', { ignoreBOM: true }).decode((await exportDocument(reopened, 'mmd')).bytes), original.source)
+  assert.deepEqual((await exportDocument(doc, 'svg')).bytes, (await exportDocument(reopened, 'svg')).bytes)
 })

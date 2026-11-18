@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DOMParser } from '@xmldom/xmldom'
 import { compileCodeDiagram, lookupDiagramSource } from '../src/workflow/core/code-diagram.ts'
-import { createDocument } from '../src/workflow/core/documents.ts'
+import { contentKey, createDocument, parseDocument, serializeDocument } from '../src/workflow/core/documents.ts'
 import { documentScene, exportDocument, importText } from '../src/workflow/core/files.ts'
 import { sceneToSvg } from '../src/workflow/core/svg.ts'
 
@@ -70,58 +70,54 @@ test('ER table name appears bold above its optional comment and fields occupy in
 test('long Latin, wide capitals, CJK, emoji and escaped comments grow tables beyond the old width cap without truncation', () => {
   const comment = 'WWMW宽字符😀 mixed Latin & <xml> '.repeat(12).trim()
   const source = `erDiagram\nWIDE_TABLE["${'WWWW数据表😀'.repeat(18)}"] {\n  varchar ${'WIDE_FIELD_'.repeat(14)} "${comment}"\n}`
-  const { scene } = compileCodeDiagram(source, { erStyle: { title: { fontSize: 48 }, field: { fontSize: 32, fontWeight: 'bold' }, comment: { fontSize: 48, fontStyle: 'italic' } } })
+  const { scene } = compileCodeDiagram(source)
   assert.ok(table(scene).width > 680)
   const rendered = svgTexts(sceneToSvg(scene))
   for (const shape of texts(scene)) {
     inside(shape, table(scene))
     assert.equal(rendered.find(item => item.text === shape.text)?.lines, 1, `Full single line: ${shape.text}`)
   }
-  assert.equal(text(scene, comment).style.fontSize, 48)
+  assert.equal(text(scene, comment).style.fontSize, 14)
   assert.ok(!rendered.some(item => item.text.includes('…')))
 })
 
-test('row centers and nonoverlapping columns survive independent role fonts and alignment', () => {
-  const source = 'erDiagram\nACCOUNT["账户"] {\n  int first PK "第一行"\n  string second "second 😀"\n  string third\n}'
-  for (const [fieldSize, commentSize] of [[10, 48], [48, 10], [27, 41]]) {
-    const erStyle = {
-      title: { fontSize: 35, fontWeight: 'normal', fontStyle: 'italic', textAlign: 'left' },
-      tableComment: { fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
-      field: { fontSize: fieldSize, fontWeight: 'bold', textAlign: 'center' },
-      comment: { fontSize: commentSize, fontStyle: 'italic', textAlign: 'left' },
-    }
-    const { scene } = compileCodeDiagram(source, { erStyle })
+test('default row centers and left/right columns remain aligned with short and long comments', () => {
+  for (const secondComment of ['second 😀', 'WWMW客户资料😀 '.repeat(30)]) {
+    const source = `erDiagram\nACCOUNT["账户"] {\n  int first PK "第一行"\n  string second "${secondComment}"\n  string third\n}`
+    const { scene } = compileCodeDiagram(source)
     const first = field(scene, 'first'), second = field(scene, 'second'), third = field(scene, 'third')
-    for (const [cell, label] of [[first, '第一行'], [second, 'second 😀']]) {
+    for (const [cell, label] of [[first, '第一行'], [second, secondComment]]) {
       const annotation = text(scene, label)
       assert.equal(middle(cell), middle(annotation))
-      assert.equal(cell.style.fontSize, fieldSize)
-      assert.equal(annotation.style.fontSize, commentSize)
-      assert.equal(cell.style.fontWeight, 'bold')
-      assert.equal(cell.style.textAlign, 'center')
-      assert.equal(annotation.style.fontStyle, 'italic')
-      assert.equal(annotation.style.textAlign, 'left')
+      assert.equal(cell.style.fontSize, 14)
+      assert.equal(annotation.style.fontSize, 14)
+      assert.equal(cell.style.fontWeight, 'normal')
+      assert.equal(cell.style.textAlign, 'left')
+      assert.equal(annotation.style.fontStyle, 'normal')
+      assert.equal(annotation.style.textAlign, 'right')
       assert.ok(cell.x + cell.width <= annotation.x)
     }
     assert.ok(first.y + first.height <= second.y)
     assert.ok(second.y + second.height <= third.y)
-    assert.equal(text(scene, 'ACCOUNT').style.fontWeight, 'normal')
-    assert.equal(text(scene, '账户').style.fontSize, 11)
+    assert.equal(text(scene, 'ACCOUNT').style.fontWeight, 'bold')
+    assert.equal(text(scene, 'ACCOUNT').style.fontSize, 16)
+    assert.equal(text(scene, '账户').style.fontSize, 13)
     for (const shape of texts(scene)) inside(shape, table(scene))
   }
 })
 
-test('changing only comment style preserves the other three roles and relation bindings', () => {
-  const before = compileCodeDiagram(fixture).scene
-  const after = compileCodeDiagram(fixture, { erStyle: { comment: { fontSize: 48, fontWeight: 'bold', fontStyle: 'italic', textAlign: 'center', color: '#a12345' } } }).scene
-  for (const label of ['CUSTOMER', '客户', 'ORDER']) assert.deepEqual(text(after, label).style, text(before, label).style)
-  const beforeFields = texts(before).filter(element => /customer_id|display_name|email/.test(element.text))
-  for (const shape of beforeFields) assert.deepEqual(after.elements.find(element => element.id === shape.id).style, shape.style)
-  assert.ok(table(after).height > table(before).height, 'taller comments enlarge the rows')
-  for (const scene of [before, after]) {
-    const edge = scene.elements.find(element => element.type === 'edge')
-    assert.equal(edge.from.nodeId, 'er-0')
-    assert.equal(edge.to.nodeId, 'er-1')
+test('legacy document ER typography is ignored, dropped on save and excluded from dirty tracking', () => {
+  const document = createDocument('mermaid'); document.source = fixture
+  for (const erStyle of [
+    { title: { fontSize: 48, fontWeight: 'normal', color: '#ee1122' }, tableComment: { fontStyle: 'italic' }, field: { textAlign: 'right' }, comment: { fontSize: 48, textAlign: 'left' } },
+    { title: { fontSize: -100, color: 'invalid' } }, 'obsolete', null,
+  ]) {
+    const legacy = { ...document, erStyle }, reopened = parseDocument(JSON.stringify(legacy))
+    assert.equal(Object.hasOwn(reopened, 'erStyle'), false)
+    assert.deepEqual(documentScene(legacy), documentScene(document))
+    assert.equal(contentKey(legacy), contentKey(document))
+    assert.equal(Object.hasOwn(JSON.parse(serializeDocument(legacy)), 'erStyle'), false)
+    assert.equal(reopened.source, fixture)
   }
 })
 
@@ -139,7 +135,8 @@ test('entities without comments and empty entities have no phantom header or com
 
 test('all ER layout directions keep enlarged tables separate and relationships bound to their original IDs', () => {
   for (const direction of ['LR', 'RL', 'TB', 'BT']) {
-    const { scene } = compileCodeDiagram(fixture.replace('erDiagram', `erDiagram\ndirection ${direction}`), { erStyle: { title: { fontSize: 48 }, comment: { fontSize: 48 } } })
+    const source = fixture.replace('erDiagram', `erDiagram\ndirection ${direction}`).replace('客户编号', 'WWMW客户编号😀 '.repeat(30))
+    const { scene } = compileCodeDiagram(source)
     const a = table(scene), b = table(scene, 'er-1'), edge = scene.elements.find(element => element.type === 'edge')
     assert.equal(edge.from.nodeId, a.id)
     assert.equal(edge.to.nodeId, b.id)
@@ -173,22 +170,23 @@ test('quoted line breaks render as spaces while original source and exported sou
   assert.deepEqual((await exportDocument(document, 'mmd')).bytes, new TextEncoder().encode(source))
 })
 
-test('SVG file export preserves the full ER table geometry, text and role appearance after a theme', async () => {
+test('SVG file export preserves default ER typography, complete text and geometry after a theme', async () => {
   const document = createDocument('mermaid')
   document.source = fixture
   document.diagramStyle = 'midnight'
-  document.erStyle = { title: { fontSize: 31, fontWeight: 'bold', color: '#ffcc88' }, tableComment: { fontStyle: 'italic' }, field: { textAlign: 'left' }, comment: { fontSize: 26, fontStyle: 'italic', textAlign: 'right', color: '#ff88cc' } }
   const scene = documentScene(document), exported = new TextDecoder().decode((await exportDocument(document, 'svg')).bytes)
   assert.equal(exported, sceneToSvg(scene, { background: true }))
   const rendered = svgTexts(exported), name = rendered.find(item => item.text === 'CUSTOMER'), comment = rendered.find(item => item.text === '客户编号')
-  assert.deepEqual({ size: name.size, weight: name.weight, color: name.color }, { size: 31, weight: 'bold', color: '#ffcc88' })
-  assert.deepEqual({ size: comment.size, italic: comment.italic, anchor: comment.anchor, color: comment.color }, { size: 26, italic: 'italic', anchor: 'end', color: '#ff88cc' })
+  assert.deepEqual({ size: name.size, weight: name.weight }, { size: 16, weight: 'bold' })
+  assert.deepEqual({ size: comment.size, italic: comment.italic, anchor: comment.anchor }, { size: 14, italic: 'normal', anchor: 'end' })
+  assert.equal(name.color, text(scene, 'CUSTOMER').style.stroke)
+  assert.notEqual(name.color, text(compileCodeDiagram(fixture).scene, 'CUSTOMER').style.stroke)
   for (const shape of texts(scene)) assert.equal(rendered.find(item => item.text === shape.text)?.lines, 1)
 })
 
-test('ER-specific style options do not alter class cards or other diagram families', () => {
+test('removed ER typography options have no effect on ER or other diagram families', () => {
   const erStyle = { title: { fontSize: 48, fontWeight: 'bold' }, field: { fontSize: 48 }, comment: { fontSize: 48, color: '#ee1122' } }
-  for (const source of ['classDiagram\nclass CUSTOMER["客户"] {\n+String name\n+run()\n}', 'flowchart LR\nA[客户] --> B[订单]', 'requirementDiagram\nrequirement A {\nid: R1\ntext: 客户资料\n}']) {
+  for (const source of [fixture, 'classDiagram\nclass CUSTOMER["客户"] {\n+String name\n+run()\n}', 'flowchart LR\nA[客户] --> B[订单]', 'requirementDiagram\nrequirement A {\nid: R1\ntext: 客户资料\n}']) {
     assert.deepEqual(compileCodeDiagram(source, { erStyle }), compileCodeDiagram(source))
   }
 })
