@@ -1,3 +1,4 @@
+import type { ERDiagramStyle } from './er-style.ts'
 import { DiagramSyntaxError, DiagramSourceMap, sourceLines, type DiagramResult } from './diagrams/common.ts'
 import { compileStructureDiagram } from './diagrams/structure.ts'
 import { compileChartDiagram } from './diagrams/charts.ts'
@@ -571,14 +572,14 @@ function compileSequence(statements: Statement[]): CodeDiagramResult {
   return { kind: 'sequence', scene, warnings: [...warnings], sourceMap: sourceMap.entries(scene.elements) }
 }
 
-function compileNormalized(source: string): CodeDiagramResult {
+function compileNormalized(source: string, options: CodeDiagramOptions): CodeDiagramResult {
   if (typeof source !== 'string') throw new DiagramSyntaxError('源码必须是文本。', 1)
   if (source.length > 200_000) throw new DiagramSyntaxError('源码不能超过 200,000 个字符。', 1)
   // Sequence message text may contain punctuation/brackets, so only flowcharts use bracket-aware splitting.
   const normalized = maskHashComments(source)
   const first = normalized.split('\n').find(line => line.trim() && !/^\s*%%(?!\{)/.test(line))?.trim()
   if (!first) throw new DiagramSyntaxError('请输入图表源码，或从模板库选择一种图表。', 1)
-  const extended = compileStructureDiagram(normalized) ?? compileChartDiagram(normalized) ?? compilePlanningDiagram(normalized)
+  const extended = compileStructureDiagram(normalized, options.erStyle) ?? compileChartDiagram(normalized) ?? compilePlanningDiagram(normalized)
   if (extended) return extended
   if (first === 'sequenceDiagram' || /^sequenceDiagram\s*%%(?!\{)/.test(first)) {
     const lines = sourceLines(normalized).map(entry => {
@@ -596,10 +597,11 @@ function compileNormalized(source: string): CodeDiagramResult {
 }
 
 /** Normalize line endings once and translate metadata back to the original editor buffer. */
-export function compileCodeDiagram(source: string): CodeDiagramResult {
+export interface CodeDiagramOptions { erStyle?: ERDiagramStyle }
+export function compileCodeDiagram(source: string, options: CodeDiagramOptions = {}): CodeDiagramResult {
   if (typeof source !== 'string') throw new DiagramSyntaxError('源码必须是文本。', 1)
   if (source.length > 200_000) throw new DiagramSyntaxError('源码不能超过 200,000 个字符。', 1)
-  if (!source.startsWith('\uFEFF') && !source.includes('\r')) return compileNormalized(source)
+  if (!source.startsWith('\uFEFF') && !source.includes('\r')) return compileNormalized(source, options)
   const offsets: number[] = [], characters: string[] = []
   for (let i = source.startsWith('\uFEFF') ? 1 : 0; i < source.length; i++) {
     offsets.push(i)
@@ -607,7 +609,8 @@ export function compileCodeDiagram(source: string): CodeDiagramResult {
     else characters.push(source[i]!)
   }
   offsets.push(source.length)
-  const result = compileNormalized(characters.join(''))
+  const result = compileNormalized(characters.join(''), options)
   result.sourceMap = result.sourceMap.map(range => ({ ...range, start: offsets[range.start]!, end: offsets[range.end]! }))
+  if (result.sourceDefinitions) result.sourceDefinitions = result.sourceDefinitions.map(range => ({ ...range, start: offsets[range.start]!, end: offsets[range.end]! }))
   return result
 }

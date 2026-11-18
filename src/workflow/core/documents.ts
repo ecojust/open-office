@@ -2,6 +2,7 @@ import { DEFAULT_STYLE, clone, emptyScene, newId } from './types.ts'
 import type { DocumentKind, ElementStyle, Scene, SceneElement, WorkflowDocument } from './types.ts'
 import { resolveStrokePattern, sceneDefaultStyle } from './appearance.ts'
 import { normalizeDiagramStyle } from './diagram-appearance.ts'
+import { normalizeERDiagramStyle } from './er-style.ts'
 import { readBrushData } from './brushes.ts'
 import { normalizedRotation } from './geometry.ts'
 
@@ -48,6 +49,9 @@ export function validateElementStyle(value: unknown): ElementStyle {
     textAlign: choice(input.textAlign ?? 'center', ['left', 'center', 'right'], '文字对齐'),
     opacity: number(input.opacity ?? 1, '透明度', 0, 1), dashed: strokePattern !== 'solid', strokePattern,
     roughness: choice(input.roughness ?? 'clean', ['clean', 'sketch'] as const, '线条外观'),
+    ...(input.fontWeight !== undefined ? { fontWeight: choice(input.fontWeight, ['normal', 'bold'] as const, '字重') } : {}),
+    ...(input.fontStyle !== undefined ? { fontStyle: choice(input.fontStyle, ['normal', 'italic'] as const, '字体样式') } : {}),
+    ...(input.textWrap !== undefined ? { textWrap: choice(input.textWrap, ['wrap', 'nowrap'] as const, '文字换行') } : {}),
   }
 }
 export function validateScene(value: unknown): Scene {
@@ -105,6 +109,8 @@ export function validateDocument(value: unknown): WorkflowDocument {
     diagramStyle: normalizeDiagramStyle(raw.diagramStyle),
     createdAt: validDate(raw.createdAt), updatedAt: validDate(raw.updatedAt),
   }
+  const erStyle = normalizeERDiagramStyle(raw.erStyle)
+  if (Object.keys(erStyle).length) doc.erStyle = erStyle
   if (raw.importSource) {
     const source = object(raw.importSource)
     doc.importSource = { name: string(source.name, '来源文件名', 500), format: string(source.format, '来源格式', 30), text: string(source.text, '原始导入内容', MAX_FILE_BYTES) }
@@ -123,7 +129,12 @@ export function serializeDocument(doc: WorkflowDocument): string {
 }
 export function contentKey(doc: WorkflowDocument): string {
   // Object insertion order and non-document metadata must not make a saved file dirty.
-  const styleKey = (s: ElementStyle) => [s.stroke, s.fill, s.strokeWidth, s.fontSize, s.textAlign, s.opacity, resolveStrokePattern(s), s.roughness ?? 'clean']
+  const styleKey = (s: ElementStyle) => {
+    const key: unknown[] = [s.stroke, s.fill, s.strokeWidth, s.fontSize, s.textAlign, s.opacity, resolveStrokePattern(s), s.roughness ?? 'clean']
+    const typography = { ...(s.fontWeight === 'bold' ? { fontWeight: s.fontWeight } : {}), ...(s.fontStyle === 'italic' ? { fontStyle: s.fontStyle } : {}), ...(s.textWrap === 'nowrap' ? { textWrap: s.textWrap } : {}) }
+    if (Object.keys(typography).length) key.push(typography)
+    return key
+  }
   const elements = doc.scene.elements.map(element => {
     const base = [element.id, element.type, element.locked, styleKey(element.style), ...(element.groupId ? [element.groupId] : [])]
     if (element.type === 'shape') return [...base, element.shape, element.x, element.y, element.width, element.height, element.text, element.imageData ?? null, ...(element.shape === 'rectangle' && element.cornerRadius ? [{ cornerRadius: element.cornerRadius }] : []), ...(normalizedRotation(element.rotation ?? 0) ? [{ rotation: normalizedRotation(element.rotation!) }] : [])]
@@ -134,6 +145,8 @@ export function contentKey(doc: WorkflowDocument): string {
   const diagramStyle = normalizeDiagramStyle(doc.diagramStyle)
   // Preserve v0.1.0 saved keys byte-for-byte for the default presentation.
   if (diagramStyle !== 'classic') identity.push(diagramStyle)
+  const erStyle = normalizeERDiagramStyle(doc.erStyle)
+  if (Object.keys(erStyle).length) identity.push({ erStyle })
   return JSON.stringify(identity)
 }
 export const CODE_DIAGRAM_SAMPLE = `sequenceDiagram

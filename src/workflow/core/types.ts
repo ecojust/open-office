@@ -1,4 +1,5 @@
 import type { DiagramStyleId } from './diagram-appearance.ts'
+import type { ERDiagramStyle } from './er-style.ts'
 
 // These persisted kind and format values preserve compatibility with existing document files.
 export type DocumentKind = 'flow' | 'board' | 'mermaid'
@@ -9,6 +10,10 @@ export interface ElementStyle {
   fill: string
   strokeWidth: number
   fontSize: number
+  /** Omitted typography properties preserve the original normal, wrapping text. */
+  fontWeight?: 'normal' | 'bold'
+  fontStyle?: 'normal' | 'italic'
+  textWrap?: 'wrap' | 'nowrap'
   textAlign: 'left' | 'center' | 'right'
   opacity: number
   dashed: boolean
@@ -70,6 +75,8 @@ export interface WorkflowDocument {
   source: string
   /** Presentation only: source remains authoritative and unchanged. */
   diagramStyle?: DiagramStyleId
+  /** ER typography is applied before table measurement and layout. */
+  erStyle?: ERDiagramStyle
   createdAt: string
   updatedAt: string
   importSource?: { name: string; format: string; text: string }

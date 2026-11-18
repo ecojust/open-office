@@ -1,21 +1,22 @@
 <script setup lang="ts">
 import { useI18n } from '../../shared/i18n'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { compileCodeDiagram, DiagramSyntaxError, lookupDiagramSource, type CodeDiagramResult } from '../core/code-diagram.ts'
+import { compileCodeDiagram, DiagramSyntaxError, lookupDiagramSource, type CodeDiagramResult, type DiagramSourceRange } from '../core/code-diagram.ts'
 import { sceneToSvg } from '../core/svg.ts'
 import { combineBounds, edgePoints, elementBounds, pointsPath } from '../core/geometry.ts'
 import { clone, DEFAULT_STYLE, newId, type Scene } from '../core/types.ts'
 import { DIAGRAM_TEMPLATES, DIAGRAM_KIND_LABELS } from '../core/diagrams/catalog.ts'
 import { applyDiagramStyle, DIAGRAM_STYLES, normalizeDiagramStyle, type DiagramStyleId } from '../core/diagram-appearance.ts'
+import { applyERColors, ER_TEXT_ROLES, normalizeERDiagramStyle, resolveERTextStyle, type ERDiagramStyle, type ERTextRole, type ERTextStyle } from '../core/er-style.ts'
 import type { DiagramKind, DiagramTemplate } from '../core/diagrams/common.ts'
 import AppIcon from './AppIcon.vue'
 import DiagramSourceEditor from './DiagramSourceEditor.vue'
 import { tokenizeDiagramSource } from '../core/diagram-source-language.ts'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 
-const props = withDefaults(defineProps<{ source: string; theme: 'light' | 'dark'; diagramStyle?: DiagramStyleId; active?: boolean; disabled?: boolean }>(), { active: true, disabled: false })
-const emit = defineEmits<{ change: [source: string]; changeStyle: [id: DiagramStyleId]; createFlow: [scene: Scene]; export: [format: 'png' | 'svg']; status: [message: string]; pending: [value: boolean] }>()
+const props = withDefaults(defineProps<{ source: string; theme: 'light' | 'dark'; diagramStyle?: DiagramStyleId; erStyle?: ERDiagramStyle; active?: boolean; disabled?: boolean }>(), { active: true, disabled: false })
+const emit = defineEmits<{ change: [source: string]; changeStyle: [id: DiagramStyleId]; changeERStyle: [style: ERDiagramStyle]; createFlow: [scene: Scene]; export: [format: 'png' | 'svg']; status: [message: string]; pending: [value: boolean] }>()
 const composing = ref(false)
 const interactive = computed(() => props.active && !props.disabled)
 const draft = ref(props.source), sourceInput = ref<InstanceType<typeof DiagramSourceEditor>>(), error = ref(''), errorLine = ref(0)
@@ -27,11 +28,15 @@ const localizedError = computed(() => {
 const compiled = ref<CodeDiagramResult | null>(null), parsing = ref(false), zoom = ref(1)
 const compiledSource = ref(''), selection = ref({ start: 0, end: 0, head: 0 })
 const previewScroll = ref<HTMLElement>(), previewPage = ref<HTMLElement>(), sourceOverlay = ref<SVGSVGElement>()
+const panning = ref(false)
+let panGesture: { pointerId: number; target: HTMLElement; button: number; x: number; y: number; left: number; top: number; moved: boolean; definition?: DiagramSourceRange } | undefined
+let suppressPreviewClick = false
 const workspace = ref<HTMLElement>(), stacked = ref(false), columnRatio = ref(38), rowRatio = ref(43), resizing = ref(false)
 const splitRatio = computed(() => stacked.value ? rowRatio.value : columnRatio.value)
 const workspaceStyle = computed(() => ({ '--diagram-source-size': `${splitRatio.value}fr`, '--diagram-preview-size': `${100 - splitRatio.value}fr` }))
 let splitGesture: { pointerId: number; target: HTMLElement; offset: number; initial: number } | undefined
 let narrowLayout: MediaQueryList | undefined
+let mounted = false
 const minPreviewZoom = .4, maxPreviewZoom = 3
 let zoomRequest = 0, pinchZoom: number | undefined
 type LibraryTemplate = DiagramTemplate & { kind: DiagramKind }
@@ -47,8 +52,12 @@ const currentStyleId = computed(() => normalizeDiagramStyle(props.diagramStyle))
 const currentStyle = computed(() => DIAGRAM_STYLES.find(style => style.id === currentStyleId.value)!)
 const modalOpen = computed(() => templatesOpen.value || stylesOpen.value)
 let timer: ReturnType<typeof setTimeout> | undefined, published = props.source
-const styledScene = computed(() => compiled.value ? applyDiagramStyle(compiled.value.scene, currentStyleId.value) : undefined)
-const svg = computed(() => styledScene.value ? sceneToSvg(styledScene.value, { background: true }) : '')
+const styledScene = computed(() => compiled.value ? applyERColors(applyDiagramStyle(compiled.value.scene, currentStyleId.value), props.erStyle) : undefined)
+const erRoleLabels: Record<ERTextRole, string> = { title: '表名', tableComment: '表注释', field: '字段', comment: '字段注释' }
+const erTextStyles = computed(() => ER_TEXT_ROLES.map(role => ({ role, label: erRoleLabels[role], style: resolveERTextStyle(role, props.erStyle) })))
+const svg = computed(() => styledScene.value ? sceneToSvg(styledScene.value, { background: true, interactive: true }) : '')
+const sourceDefinitions = computed(() => compiled.value?.kind === 'er' ? compiled.value.sourceDefinitions ?? [] : [])
+const definitionByElement = computed(() => new Map(sourceDefinitions.value.flatMap(range => range.elementIds.map(id => [id, range] as const))))
 // Match the rendered page exactly, including its export padding and aspect ratio.
 const previewViewBox = computed(() => svg.value.match(/\bviewBox="([^"]+)"/)?.[1] || '0 0 1 1')
 const cursorLine = computed(() => draft.value.slice(0, selection.value.head).split(/\r\n|\r|\n/).length)
@@ -110,6 +119,11 @@ async function openStyles() {
   if (!interactive.value || !flush()) return
   closeExportMenu(); templatesOpen.value = false; pendingTemplate.value = undefined; stylesOpen.value = true
   await nextTick()
+  if (compiled.value?.kind === 'er') {
+    styleDialog.value?.querySelector<HTMLInputElement>('[data-testid="er-title-font-size"]')?.focus({ preventScroll: true })
+    styleDialog.value?.querySelector<HTMLElement>('.diagram-style-content')?.scrollTo({ top: 0 })
+    return
+  }
   const selected = styleDialog.value?.querySelector<HTMLButtonElement>('[data-diagram-style][aria-pressed="true"]')
   selected?.scrollIntoView({ block: 'nearest' }); selected?.focus({ preventScroll: true })
 }
@@ -123,11 +137,28 @@ function chooseStyle(id: DiagramStyleId) {
   emit('changeStyle', id)
   emit('status', `已应用“${DIAGRAM_STYLES.find(style => style.id === id)!.label}”风格，可撤销恢复`)
 }
+function changeERTextStyle(role: ERTextRole, patch: Partial<ERTextStyle>) {
+  if (!interactive.value || !flush()) return
+  const current = normalizeERDiagramStyle(props.erStyle)
+  const next = normalizeERDiagramStyle({ ...current, [role]: { ...current[role], ...patch } })
+  if (JSON.stringify(current) === JSON.stringify(next)) return
+  emit('changeERStyle', next)
+  emit('status', '已更新 ER 文字样式，可撤销恢复')
+}
+function changeERFontSize(role: ERTextRole, event: Event) {
+  const input = event.target as HTMLInputElement
+  if (Number.isFinite(input.valueAsNumber)) changeERTextStyle(role, { fontSize: Math.max(10, Math.min(48, input.valueAsNumber)) })
+  nextTick(() => { input.value = String(resolveERTextStyle(role, props.erStyle).fontSize) })
+}
+function erColorValue(role: ERTextRole) {
+  const color = resolveERTextStyle(role, props.erStyle).color || styledScene.value?.elements.find(element => new RegExp(`^er-\\d+-${role}(?:-\\d+)?$`).test(element.id))?.style.stroke || currentStyle.value.foreground
+  return /^#[\da-f]{6}$/i.test(color) ? color : /^#[\da-f]{3}$/i.test(color) ? `#${[...color.slice(1)].map(character => character.repeat(2)).join('')}` : currentStyle.value.foreground
+}
 function styleDialogKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeStyles(); return }
   if (!styleDialog.value) return
   if (event.key === 'Tab') {
-    const controls = [...styleDialog.value.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')].filter(element => element.getClientRects().length)
+    const controls = [...styleDialog.value.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]')].filter(element => element.getClientRects().length)
     const first = controls[0], last = controls.at(-1)
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
@@ -232,9 +263,10 @@ watch(canExport, value => { if (!value) closeExportMenu() })
 
 function publish() { if (composing.value) return; if (draft.value !== published) { published = draft.value; emit('change', draft.value) } }
 function parse() {
+  endPreviewPan()
   parsing.value = false
   try {
-    compiled.value = compileCodeDiagram(draft.value); error.value = ''; errorLine.value = 0
+    compiled.value = compileCodeDiagram(draft.value, { erStyle: props.erStyle }); error.value = ''; errorLine.value = 0
     compiledSource.value = draft.value
     emit('status', `${compiled.value ? DIAGRAM_KIND_LABELS[compiled.value.kind] : '图表'} · ${elementCount.value} 个图元`)
   } catch (cause) {
@@ -263,10 +295,96 @@ function locateCurrent() {
   const screen = point.matrixTransform(transform), viewport = container.getBoundingClientRect()
   container.scrollTo({ left: container.scrollLeft + screen.x - viewport.left - container.clientWidth / 2, top: container.scrollTop + screen.y - viewport.top - container.clientHeight / 2, behavior: 'auto' })
 }
+function previewDefinition(target: EventTarget | null): DiagramSourceRange | undefined {
+  if (!(target instanceof Element)) return
+  const element = target.closest('[data-element-id]')
+  if (!element || !previewPage.value?.contains(element)) return
+  return definitionByElement.value.get(element.getAttribute('data-element-id') || '')
+}
+function revealDefinition(definition?: DiagramSourceRange) {
+  if (!definition || !interactive.value || modalOpen.value || composing.value || !canExport.value) return
+  sourceInput.value?.revealSource(definition.start, definition.end)
+  emit('status', '已定位表定义源码')
+}
+function startPreviewPan(event: PointerEvent) {
+  suppressPreviewClick = false
+  if (event.pointerType !== 'mouse' || !interactive.value || modalOpen.value || !previewScroll.value || ![0, 1].includes(event.button)) return
+  endPreviewPan()
+  const target = previewScroll.value
+  // Leave native scrollbar dragging available along the viewport's edges.
+  const bounds = target.getBoundingClientRect()
+  if (event.clientX >= bounds.left + target.clientWidth || event.clientY >= bounds.top + target.clientHeight) return
+  event.preventDefault()
+  suppressPreviewClick = true
+  panGesture = { pointerId: event.pointerId, target, button: event.button, x: event.clientX, y: event.clientY, left: target.scrollLeft, top: target.scrollTop, moved: false, definition: previewDefinition(event.target) }
+  target.setPointerCapture(event.pointerId)
+}
+function movePreviewPan(event: PointerEvent) {
+  const gesture = panGesture
+  if (!gesture || event.pointerId !== gesture.pointerId) return
+  if (!(event.buttons & (gesture.button === 1 ? 4 : 1))) { endPreviewPan(); return }
+  const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y
+  if (!gesture.moved && Math.hypot(dx, dy) < 4) return
+  event.preventDefault()
+  gesture.moved = true; panning.value = true
+  gesture.target.scrollLeft = gesture.left - dx
+  gesture.target.scrollTop = gesture.top - dy
+}
+function finishPreviewPan(event: PointerEvent) {
+  const gesture = panGesture
+  if (!gesture || event.pointerId !== gesture.pointerId) return
+  const clicked = !gesture.moved && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) < 4 && gesture.button === 0
+  endPreviewPan()
+  if (clicked) revealDefinition(gesture.definition)
+}
+function endPreviewPan() {
+  const gesture = panGesture
+  panGesture = undefined; panning.value = false
+  if (gesture?.target.hasPointerCapture(gesture.pointerId)) gesture.target.releasePointerCapture(gesture.pointerId)
+}
+function cancelPreviewPanOnEscape(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !panGesture) return
+  event.preventDefault(); event.stopPropagation(); endPreviewPan()
+}
+function previewClick(event: MouseEvent) {
+  if (suppressPreviewClick && event.detail !== 0) { suppressPreviewClick = false; return }
+  suppressPreviewClick = false
+  // Touch taps and assistive-technology clicks do not use mouse pan gestures.
+  revealDefinition(previewDefinition(event.target))
+}
+function previewKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && panGesture) { event.preventDefault(); endPreviewPan(); return }
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  const definition = previewDefinition(event.target)
+  if (!definition) return
+  event.preventDefault(); event.stopPropagation(); revealDefinition(definition)
+}
+function updatePreviewTargets() {
+  const root = previewPage.value?.querySelector<SVGSVGElement>('.diagram-preview-art > svg')
+  if (!root) return
+  const nodes = new Map([...root.querySelectorAll<SVGGElement>('[data-element-id]')].map(node => [node.getAttribute('data-element-id'), node]))
+  if (sourceDefinitions.value.length) {
+    root.setAttribute('role', 'group')
+    root.setAttribute('aria-label', t('实体关系图，点击表格定位源码'))
+  }
+  for (const definition of sourceDefinitions.value) {
+    for (const id of definition.elementIds.filter(value => /^er-\d+$/.test(value))) {
+      const node = nodes.get(id)
+      if (!node) continue
+      const title = compiled.value?.scene.elements.find(element => element.id === `${id}-title`)
+      node.setAttribute('role', 'button'); node.setAttribute('tabindex', canExport.value ? '0' : '-1')
+      node.setAttribute('aria-disabled', String(!canExport.value))
+      node.setAttribute('aria-label', t('定位表 {table} 的源码', { table: title?.type === 'shape' ? title.text : id }))
+      node.setAttribute('data-testid', 'diagram-table-source')
+    }
+  }
+}
+watch([svg, canExport, locale, previewPage], updatePreviewTargets, { flush: 'post' })
 function zoomPreview(next: number, pointer?: { clientX: number; clientY: number }) {
   if (!interactive.value || modalOpen.value || !Number.isFinite(next)) return
   const nextZoom = Math.max(minPreviewZoom, Math.min(maxPreviewZoom, next))
   if (nextZoom === zoom.value) return
+  endPreviewPan()
   const container = previewScroll.value, page = previewPage.value
   if (!container || !page) { zoom.value = nextZoom; return }
   const viewport = container.getBoundingClientRect(), before = page.getBoundingClientRect()
@@ -285,6 +403,7 @@ function zoomPreview(next: number, pointer?: { clientX: number; clientY: number 
   })
 }
 function previewWheel(event: WheelEvent) {
+  endPreviewPan()
   // Keep the browser's native vertical/horizontal scrolling for ordinary wheels.
   if (!event.ctrlKey) return
   event.preventDefault()
@@ -310,10 +429,14 @@ function previewGesture(event: Event) {
 }
 watch(previewScroll, (container, _, onCleanup) => {
   if (!container) return
+  // Extra bounded space permits dragging in either direction even at fit zoom.
+  const margin = parseFloat(getComputedStyle(container.querySelector('.diagram-preview')!).marginLeft) || 0
+  container.scrollTo({ left: margin, top: margin, behavior: 'auto' })
   container.addEventListener('wheel', previewWheel, { passive: false })
   // Safari / macOS WKWebView sends GestureEvents instead of Ctrl+wheel.
   for (const name of ['gesturestart', 'gesturechange', 'gestureend']) container.addEventListener(name, previewGesture, { passive: false })
   onCleanup(() => {
+    endPreviewPan()
     pinchZoom = undefined
     zoomRequest++
     container.removeEventListener('wheel', previewWheel)
@@ -332,6 +455,8 @@ watch(() => props.source, value => {
   if (composing.value) return
   clearTimeout(timer); published = value; draft.value = value; parse()
 })
+// Reflow text without replacing the editor document, selection, or folded ranges.
+watch(() => props.erStyle, () => parse(), { deep: true })
 function setSplitRatio(value: number) {
   const ratio = Math.max(20, Math.min(80, value))
   if (stacked.value) rowRatio.value = ratio
@@ -369,19 +494,32 @@ function splitKeydown(event: KeyboardEvent) {
   setSplitRatio(event.key === 'Home' ? 20 : event.key === 'End' ? 80 : splitRatio.value + (event.key === decrease ? -1 : 1) * (event.shiftKey ? 10 : 2))
 }
 function updateLayout() { endResize(); stacked.value = narrowLayout?.matches ?? false }
+function reflowLoadedFonts() {
+  if (mounted && compiled.value?.kind === 'er' && !composing.value && !parsing.value && compiledSource.value === draft.value) parse()
+}
 onMounted(() => {
+  mounted = true
+  window.addEventListener('blur', endPreviewPan)
+  window.addEventListener('keydown', cancelPreviewPanOnEscape, true)
+  // The first preview may be measured before the document's fonts finish loading.
+  void document.fonts?.ready.then(reflowLoadedFonts)
+  document.fonts?.addEventListener('loadingdone', reflowLoadedFonts)
   document.addEventListener('pointerdown', closeExportOutside, true); document.addEventListener('focusin', closeExportOutside)
   narrowLayout = window.matchMedia('(max-width: 760px)'); updateLayout(); narrowLayout.addEventListener('change', updateLayout)
 })
 onBeforeUnmount(() => {
+  endPreviewPan()
+  window.removeEventListener('blur', endPreviewPan)
+  window.removeEventListener('keydown', cancelPreviewPanOnEscape, true)
+  mounted = false; document.fonts?.removeEventListener('loadingdone', reflowLoadedFonts)
   endResize(); narrowLayout?.removeEventListener('change', updateLayout)
   document.removeEventListener('pointerdown', closeExportOutside, true); document.removeEventListener('focusin', closeExportOutside); clearTimeout(timer)
 })
 function hasDirtyDraft() { return composing.value || draft.value !== props.source }
-function hasPendingEdits() { return hasDirtyDraft() || modalOpen.value }
+function hasPendingEdits(options?: { allowStyleDialog?: boolean }) { return hasDirtyDraft() || templatesOpen.value || stylesOpen.value && !options?.allowStyleDialog }
 watch([draft, composing, () => props.source], () => emit('pending', hasDirtyDraft()), { flush: 'sync' })
 watch(() => props.active, value => { if (!value) { closeExportMenu(); stylesOpen.value = false; templatesOpen.value = false; pendingTemplate.value = undefined; pinchZoom = undefined; zoomRequest++ } })
-watch([interactive, modalOpen], () => { if (!interactive.value || modalOpen.value) endResize() })
+watch([interactive, modalOpen], () => { if (!interactive.value || modalOpen.value) { endResize(); endPreviewPan() } })
 defineExpose({ flush, hasPendingEdits, hasDirtyDraft, focus: () => sourceInput.value?.focus() })
 parse()
 </script>
@@ -408,17 +546,19 @@ parse()
           <pre class="diagram-syntax-example"><span v-for="(token, index) in syntaxTokens" :key="index" :class="token.kind ? `diagram-token-${token.kind}` : undefined">{{ token.text }}</span></pre>
           <p>{{ t('模板包含{kinds}。示例源码可直接编辑。点击行号旁的箭头可折叠或展开代码块。', { kinds: kindsList }) }}</p>
           <p>{{ t('支持 # 注释，可独占一行或放在语句后；行内 # 两侧需留空格。') }}</p>
+          <p v-if="compiled?.kind === 'er'" data-testid="er-syntax-help">{{ t('ER 图使用 ENTITY["表注释"] 显示表名与表注释；字段末尾的双引号文字为字段注释。在图表风格中可分别设置四类文字。') }}</p>
+          <p v-if="compiled?.kind === 'er'">{{ t('拖动预览可平移图表；点击表格可定位并展开对应源码。也可用 Tab 选择表格，再按 Enter 或空格。') }}</p>
           <p>{{ t('支持这些类型的常用语法子集；未实现的指令会提示具体行号。源码独立保存，创建独立画布后可调整图元；副本的修改不会反写源码。') }}</p>
         </details>
       </div>
       <div class="diagram-splitter" data-testid="diagram-splitter" role="separator" tabindex="0" :aria-label="t('调整源码与预览大小')" :aria-orientation="stacked ? 'horizontal' : 'vertical'" :aria-valuenow="Math.round(splitRatio)" :aria-valuemin="20" :aria-valuemax="80" :aria-valuetext="t('源码占 {value0}%', { value0: Math.round(splitRatio) })" :title="t('拖动调整大小，双击恢复；方向键微调')" @pointerdown="startResize" @pointermove="resizeMove" @pointerup="endResize" @pointercancel="endResize" @lostpointercapture="endResize" @keydown="splitKeydown" @dblclick="setSplitRatio(stacked ? 43 : 38)" />
       <div class="diagram-preview-panel">
-        <div class="diagram-panel-title"><span>{{ t('预览') }} <span v-if="compiled" class="diagram-preview-kind"><AppIcon :name="compiled.kind" :size="12"/>{{ kindLabel }}</span></span><div class="diagram-zoom"><span class="diagram-zoom-hint">{{ t('滚轮滚动 · Ctrl + 滚轮缩放') }}</span><button type="button" :aria-label="t('缩小预览')" :disabled="zoom <= minPreviewZoom" @click="zoomPreview(zoom - .2)"><AppIcon name="minus" :size="13"/></button><button type="button" :aria-label="t('重置预览缩放')" :title="t('重置为 100% · Ctrl + 滚轮或捏合缩放')" @click="zoomPreview(1)">{{ Math.round(zoom * 100) }}%</button><button type="button" :aria-label="t('放大预览')" :disabled="zoom >= maxPreviewZoom" @click="zoomPreview(zoom + .2)"><AppIcon name="plus" :size="13"/></button></div></div>
+        <div class="diagram-panel-title"><span>{{ t('预览') }} <span v-if="compiled" class="diagram-preview-kind"><AppIcon :name="compiled.kind" :size="12"/>{{ kindLabel }}</span></span><div class="diagram-zoom"><span class="diagram-zoom-hint">{{ t('拖动平移 · Ctrl + 滚轮缩放') }}</span><button type="button" :aria-label="t('缩小预览')" :disabled="zoom <= minPreviewZoom" @click="zoomPreview(zoom - .2)"><AppIcon name="minus" :size="13"/></button><button type="button" :aria-label="t('重置预览缩放')" :title="t('重置为 100% · Ctrl + 滚轮或捏合缩放')" @click="zoomPreview(1)">{{ Math.round(zoom * 100) }}%</button><button type="button" :aria-label="t('放大预览')" :disabled="zoom >= maxPreviewZoom" @click="zoomPreview(zoom + .2)"><AppIcon name="plus" :size="13"/></button></div></div>
         <div v-if="parsing" class="diagram-parsing" role="status"><span class="diagram-spinner" />{{ t('正在解析…') }}</div>
         <div v-if="error && !parsing" :id="errorId" class="diagram-error" role="alert" data-testid="diagram-error">
           <strong><AppIcon name="alert" :size="16"/>{{ t('源码需要修正') }}</strong><p>{{ localizedError }}</p><button v-if="errorLine" type="button" @click="locateError"><AppIcon name="search" :size="14"/>{{ t('定位到第 {line} 行', { line: errorLine }) }}</button>
         </div>
-        <div v-if="compiled" ref="previewScroll" class="diagram-preview-scroll" :aria-busy="parsing" :aria-label="t('图表预览，滚轮滚动，Ctrl 加滚轮或捏合缩放')" data-testid="diagram-preview-viewport">
+        <div v-if="compiled" ref="previewScroll" class="diagram-preview-scroll" :class="{ 'is-panning': panning }" :aria-busy="parsing" :aria-label="t('图表预览，拖动平移，滚轮滚动，Ctrl 加滚轮或捏合缩放')" data-testid="diagram-preview-viewport" @pointerdown="startPreviewPan" @pointermove="movePreviewPan" @pointerup="finishPreviewPan" @pointercancel="endPreviewPan" @lostpointercapture="endPreviewPan" @click="previewClick" @keydown="previewKeydown" @dragstart.prevent @auxclick.prevent>
           <div class="diagram-preview" :style="{ width: `${zoom * 100}%`, minWidth: `${zoom * 100}%` }">
             <div ref="previewPage" class="diagram-preview-page">
               <div class="diagram-preview-art" data-testid="diagram-preview" v-html="svg"/>
@@ -439,12 +579,27 @@ parse()
       <section ref="styleDialog" class="diagram-library diagram-style-library" role="dialog" aria-modal="true" :aria-labelledby="styleTitleId" :aria-describedby="styleDescriptionId" data-testid="diagram-style-panel">
         <header><div><AppIcon name="palette" :size="20"/><h2 :id="styleTitleId">{{ t('图表风格') }}</h2></div><button type="button" class="diagram-library-close" :aria-label="t('关闭图表风格')" @click="closeStyles"><AppIcon name="close" :size="17"/></button></header>
         <p :id="styleDescriptionId" class="diagram-style-description">{{ t('选择代码图表的配色与线条外观，源码保持不变。修改后可随时撤销。') }}</p>
+        <div class="diagram-style-content">
+          <section v-if="compiled?.kind === 'er'" class="diagram-er-styles" :aria-label="t('ER 文字样式')" data-testid="er-text-styles">
+            <h3>{{ t('ER 文字样式') }}</h3>
+            <p>{{ t('分别设置表名、表注释、字段和字段注释；未指定的文字颜色跟随图表风格。') }}</p>
+            <fieldset v-for="item in erTextStyles" :key="item.role" class="diagram-er-style-row" :data-er-role="item.role" :data-testid="`er-text-style-${item.role}`">
+              <legend>{{ t(item.label) }}</legend>
+              <label class="diagram-er-size"><span>{{ t('字号') }}</span><input type="number" min="10" max="48" step="1" :value="item.style.fontSize" :aria-label="t('{role}字号', { role: t(item.label) })" :data-testid="`er-${item.role}-font-size`" @change="changeERFontSize(item.role, $event)" /></label>
+              <button type="button" class="diagram-er-bold" :aria-label="t('{role}粗体', { role: t(item.label) })" :title="t('粗体')" :aria-pressed="item.style.fontWeight === 'bold'" :data-testid="`er-${item.role}-bold`" @click="changeERTextStyle(item.role, { fontWeight: item.style.fontWeight === 'bold' ? 'normal' : 'bold' })">B</button>
+              <button type="button" class="diagram-er-italic" :aria-label="t('{role}斜体', { role: t(item.label) })" :title="t('斜体')" :aria-pressed="item.style.fontStyle === 'italic'" :data-testid="`er-${item.role}-italic`" @click="changeERTextStyle(item.role, { fontStyle: item.style.fontStyle === 'italic' ? 'normal' : 'italic' })">I</button>
+              <label class="diagram-er-align"><span>{{ t('对齐') }}</span><select :value="item.style.textAlign" :aria-label="t('{role}对齐', { role: t(item.label) })" :data-testid="`er-${item.role}-align`" @change="changeERTextStyle(item.role, { textAlign: ($event.target as HTMLSelectElement).value as ERTextStyle['textAlign'] })"><option value="left">{{ t('左对齐') }}</option><option value="center">{{ t('居中') }}</option><option value="right">{{ t('右对齐') }}</option></select></label>
+              <label class="diagram-er-color"><span>{{ t('文字颜色') }}</span><input type="color" :value="erColorValue(item.role)" :aria-label="t('{role}文字颜色', { role: t(item.label) })" :data-testid="`er-${item.role}-color`" @change="changeERTextStyle(item.role, { color: ($event.target as HTMLInputElement).value })" /></label>
+              <button type="button" class="diagram-er-color-reset" :aria-label="t('{role}颜色跟随主题', { role: t(item.label) })" :aria-pressed="!item.style.color" :data-testid="`er-${item.role}-color-reset`" @click="changeERTextStyle(item.role, { color: undefined })">{{ t('跟随主题') }}</button>
+            </fieldset>
+          </section>
         <div class="diagram-style-grid" role="group" :aria-label="t('代码图表风格')">
           <button v-for="style in stylePreviews" :key="style.id" type="button" class="diagram-style-card" :data-diagram-style="style.id" :aria-label="t('{value0}风格，{value1}', { value0: t(style.label), value1: t(style.description) })" :aria-pressed="currentStyleId === style.id" data-testid="diagram-style-card" @click="chooseStyle(style.id)">
             <span class="diagram-style-preview" aria-hidden="true" v-html="style.svg"/>
             <span class="diagram-style-card-heading"><strong>{{ t(style.label) }}</strong><AppIcon v-if="currentStyleId === style.id" name="check" :size="15"/><span v-else class="diagram-style-swatches" aria-hidden="true"><i v-for="color in style.palette.slice(0, 3)" :key="color" :style="{ background: color }"/></span></span>
             <small>{{ t(style.description) }}</small>
           </button>
+        </div>
         </div>
         <footer><span aria-live="polite">{{ t('当前风格：{style}', { style: t(currentStyle.label) }) }}</span><button type="button" @click="closeStyles"><AppIcon name="check" :size="15"/>{{ t('完成') }}</button></footer>
       </section>
@@ -497,6 +652,11 @@ parse()
   .diagram-splitter::after { width: 32px; height: 2px; }
 }
 .diagram-preview-page { width: 100%; min-width: 0; position: relative; }
+.diagram-preview { margin: 240px; }
+.diagram-preview-scroll { cursor: grab; user-select: none; }
+.diagram-preview-scroll.is-panning { cursor: grabbing; }
+.diagram-preview-art :deep(svg) { -webkit-user-drag: none; }
+.diagram-preview-art :deep([data-testid="diagram-table-source"]:focus-visible) { outline: 3px solid var(--ui-accent, #3577e5); outline-offset: 4px; }
 .diagram-source-overlay { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .diagram-source-overlay path, .diagram-source-overlay rect { vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
 .diagram-highlight-halo, .diagram-highlight-path-halo { fill: none; stroke: #fff; stroke-width: 5; stroke-opacity: .85; }
@@ -574,7 +734,26 @@ parse()
 .diagram-replace-content pre { max-height: 28vh; overflow: auto; margin: 0; padding: 12px; border: 1px solid var(--ui-line, #e2e8f0); border-radius: 6px; background: var(--ui-bg, #f4f6fa); color: var(--ui-text, #273449); font: 11px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .diagram-style-library { width: 820px; }
 .diagram-style-description { flex: none; margin: 0; padding: 12px 18px 0; font-size: 12px; line-height: 1.7; color: var(--ui-muted, #64748b); }
-.diagram-style-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 14px 17px 17px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--ui-line, #cbd5e1) transparent; }
+.diagram-style-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--ui-line, #cbd5e1) transparent; }
+.diagram-style-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 14px 17px 17px; }
+.diagram-er-styles { margin: 14px 17px 0; }
+.diagram-er-styles h3 { margin: 0; font-size: 13px; }
+.diagram-er-styles > p { margin: 6px 0 10px; font-size: 11px; line-height: 1.6; color: var(--ui-muted, #64748b); }
+.diagram-er-style-row { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; min-width: 0; margin: 0 0 8px; padding: 7px 10px 10px; border: 1px solid var(--ui-line, #dce3ed); border-radius: var(--ui-radius, 6px); }
+.diagram-er-style-row legend { padding: 0 5px; font-size: 11px; font-weight: 600; }
+.diagram-er-style-row label { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ui-muted, #64748b); }
+.diagram-er-style-row input, .diagram-er-style-row select { box-sizing: border-box; height: 29px; min-width: 0; padding: 4px 6px; border: 1px solid var(--ui-line, #dce3ed); border-radius: var(--ui-radius, 6px); background: var(--ui-surface, #fff); color: var(--ui-text, #273449); font: inherit; }
+.diagram-er-style-row input:focus-visible, .diagram-er-style-row select:focus-visible { outline: 2px solid var(--ui-accent, #3577e5); outline-offset: 2px; }
+.diagram-er-size input { width: 59px; }
+.diagram-er-style-row .diagram-er-bold, .diagram-er-style-row .diagram-er-italic { height: 29px; width: 29px; padding: 3px; font-size: 14px; }
+.diagram-er-bold { font-weight: 700 !important; }
+.diagram-er-italic { font-style: italic !important; }
+.diagram-er-align { margin-left: 3px; }
+.diagram-er-align select { max-width: 120px; }
+.diagram-er-color { margin-left: auto; }
+.diagram-er-color input { width: 34px; padding: 3px; cursor: pointer; }
+.diagram-er-style-row .diagram-er-color-reset { height: 29px; padding: 4px 7px; font-size: 11px; }
+.diagram-er-style-row button[aria-pressed="true"] { color: var(--ui-accent, #3577e5); border-color: var(--ui-accent, #3577e5); background: var(--ui-accent-soft, #eaf1ff); }
 .diagram-style-grid .diagram-style-card { display: flex; flex-direction: column; align-items: stretch; gap: 7px; min-width: 0; border-radius: 9px; padding: 7px; text-align: left; background: var(--ui-surface, #fff); }
 .diagram-style-card[aria-pressed="true"] { border-color: var(--ui-accent, #3577e5); box-shadow: 0 0 0 1px var(--ui-accent, #3577e5); background: var(--ui-bg, #f4f6fa); }
 .diagram-style-preview { display: block; height: 66px; overflow: hidden; border: 1px solid var(--ui-line, #dce3ed); border-radius: 5px; }
@@ -610,6 +789,10 @@ parse()
   .diagram-library > footer { padding: 10px 12px; }.diagram-library > footer > span { max-width: 60%; line-height: 1.5; }
   .diagram-replace-content { padding: 12px; }
   .diagram-style-description { padding: 10px 12px 0; font-size: 11px; }
+  .diagram-er-styles { margin: 12px 12px 0; }
+  .diagram-er-style-row { column-gap: 6px; }
+  .diagram-er-align { margin-left: 0; }
+  .diagram-er-color { margin-left: 0; }
   .diagram-style-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px; }
   .diagram-style-preview { height: 58px; }
   .diagram-style-card > small { font-size: 9px; }
