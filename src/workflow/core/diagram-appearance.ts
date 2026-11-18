@@ -74,9 +74,10 @@ function readable(candidate: string, background: RGB, style: DiagramStyle): stri
 }
 interface Paint { index: number; element: SceneElement; bounds: ReturnType<typeof elementBounds>; color: Color }
 /** Apply to the freshly compiled scene, never to a previously styled preview. */
-export function applyDiagramStyle(scene: Scene, styleId: unknown): Scene {
+export function applyDiagramStyle(scene: Scene, styleId: unknown, sourceStyles: readonly { id: string; style: Partial<ElementStyle> }[] = []): Scene {
   const id = normalizeDiagramStyle(styleId), result = clone(scene)
   if (id === 'classic') return result
+  const overrides = new Map(sourceStyles.map(entry => [entry.id, entry.style]))
   const preset = DIAGRAM_STYLES.find(style => style.id === id)!, background = parseColor(preset.background)!.rgb
   result.background = preset.background
   // One canonical color map is shared by shapes, paths, data series and legends.
@@ -107,7 +108,8 @@ export function applyDiagramStyle(scene: Scene, styleId: unknown): Scene {
   function appearance(input: ElementStyle): ElementStyle {
     return { ...input, fill: recolor(input.fill, 'fill'), stroke: recolor(input.stroke, 'stroke'), roughness: preset.roughness }
   }
-  result.elements = result.elements.map(element => ({ ...element, style: appearance(element.style) }))
+  // Resolve authored colors before measuring contrast against the actual surfaces.
+  result.elements = result.elements.map(element => ({ ...element, style: { ...appearance(element.style), ...overrides.get(element.id) } }))
   if (result.defaultStyle) result.defaultStyle = appearance(result.defaultStyle)
   const paints: Paint[] = []
   result.elements.forEach((element, index) => {
@@ -128,10 +130,10 @@ export function applyDiagramStyle(scene: Scene, styleId: unknown): Scene {
   }
   result.elements.forEach((element, index) => {
     if (element.type === 'shape' && element.shape === 'text') element.style.fill = 'none'
-    if (element.type === 'shape' && element.text) {
+    if (element.type === 'shape' && element.text && overrides.get(element.id)?.stroke === undefined) {
       const behind = under(center(element), index + (element.shape === 'text' || element.shape === 'frame' ? 0 : 1))
       element.style.stroke = readable(element.style.stroke, behind, preset)
-    } else if (element.type === 'edge' && element.label) element.style.stroke = readable(element.style.stroke, background, preset)
+    } else if (element.type === 'edge' && element.label && overrides.get(element.id)?.stroke === undefined) element.style.stroke = readable(element.style.stroke, background, preset)
   })
   return result
 }

@@ -1,7 +1,7 @@
-import type { SceneElement, ShapeElement, Point, EdgeElement } from '../types.ts'
+import type { SceneElement, ShapeElement, Point, EdgeElement, ElementStyle } from '../types.ts'
 import { center, edgePoints } from '../geometry.ts'
 import { wrapText } from '../svg.ts'
-import type { ERDiagramStyle } from '../er-style.ts'
+import { ERStyleSheet } from '../er-style.ts'
 import { erTable, sizeERTable, type ERField } from './er-table.ts'
 import { DiagramSyntaxError, DiagramSourceMap, sourceLines, diagramNode, diagramText, diagramEdge, diagramStroke, finishDiagram, type DiagramResult, type DiagramTemplate, type SourceLine } from './common.ts'
 
@@ -322,11 +322,18 @@ function crowfoot(edge: EdgeElement, elements: SceneElement[], side: 'start' | '
   if (symbol.includes('o')) { const c = at(25, 0); elements.push(diagramNode(`${id}-optional`, '', c.x - 5, c.y - 5, 10, 10, 'ellipse', { fill: '#ffffff', strokeWidth: 1.5 })) }
   else elements.push(diagramStroke(`${id}-required`, [at(24, -8), at(24, 8)], { strokeWidth: 1.5 }))
 }
-function compileER(lines: SourceLine[], erStyle?: ERDiagramStyle): DiagramResult {
+function compileER(lines: SourceLine[]): DiagramResult {
   const sources = new DiagramSourceMap(lines)
+  const styles = new ERStyleSheet()
+  const classNames = `${ID}(?:,${ID})*`, entity = `${ID}(?::::${classNames})?`
   const definitions = new Map<string, number>()
   const fields = new Map<string, ERField[]>(), comments = new Map<string, string>()
   const boxes = new Map<string, Box>(), links: Link[] = []; let active: Box | undefined, opening = 1, direction: Direction = 'LR'
+  const addEntity = (token: string, line: number): Box => {
+    const [id, names] = token.split(':::')
+    styles.attach(id!, names, line)
+    return addBox(boxes, id!, line)
+  }
   for (const entry of lines.slice(1)) {
     const text = entry.text.trim(), line = entry.line; let m: RegExpMatchArray | null
     if (active) {
@@ -339,18 +346,26 @@ function compileER(lines: SourceLine[], erStyle?: ERDiagramStyle): DiagramResult
       active.sourceLines.push(line); active.fields.push(label); continue
     }
     if ((m = text.match(/^direction\s+(LR|RL|TB|TD|BT)$/))) { direction = m[1] as Direction; continue }
-    if ((m = text.match(new RegExp(`^(${ID})(?:\\s*\\[\\s*("(?:[^"\\\\]|\\\\.)*")\\s*\\])?\\s*\\{$`, 'u')))) { active = addBox(boxes, m[1]!, line); if (!definitions.has(active.key)) definitions.set(active.key, line); if (m[2]) comments.set(active.key, value(m[2], line)); opening = line; continue }
-    if ((m = text.match(new RegExp(`^(${ID})\\s+(\\|\\||\\|o|o\\||\\}\\||\\}o)(--|\\.\\.)(\\|\\||o\\||\\|o|\\|\\{|o\\{)\\s+(${ID})\\s*:\\s*(.+)$`, 'u')))) {
-      addBox(boxes, m[1]!, line); addBox(boxes, m[5]!, line); addLink(links, { a: m[1]!, b: m[5]!, left: m[2]!, right: m[4]!, op: m[3]!, label: value(m[6]!, line), line }); continue
+    if ((m = text.match(new RegExp(`^(${ID})(?:\\s*\\[\\s*("(?:[^"\\\\]|\\\\.)*")\\s*\\])?(?::::(${classNames}))?\\s*\\{$`, 'u')))) {
+      active = addBox(boxes, m[1]!, line); styles.attach(active.key, m[3], line)
+      if (!definitions.has(active.key)) definitions.set(active.key, line)
+      if (m[2]) comments.set(active.key, value(m[2], line))
+      opening = line; continue
     }
-    if (ident.test(text)) { addBox(boxes, text, line); continue }
+    if ((m = text.match(new RegExp(`^(${entity})\\s*(\\|\\||\\|o|o\\||\\}\\||\\}o)(--|\\.\\.)(\\|\\||o\\||\\|o|\\|\\{|o\\{)\\s*(${entity})\\s*:\\s*(.+)$`, 'u')))) {
+      const a = addEntity(m[1]!, line), b = addEntity(m[5]!, line)
+      addLink(links, { a: a.key, b: b.key, left: m[2]!, right: m[4]!, op: m[3]!, label: value(m[6]!, line), line }); continue
+    }
+    if (new RegExp(`^${entity}$`, 'u').test(text)) { addEntity(text, line); continue }
+    if (styles.read(text, line)) continue
     fail('不支持此 ER 图语法。请使用实体属性块及 ||--o{ 等基数关系。', line)
   }
   if (active) fail('实体定义缺少右花括号。', opening)
   if (!boxes.size) fail('ER 图至少需要一个实体。', lines[0]!.line)
+  const appearances = styles.resolve(boxes.keys())
   const metrics = new Map<string, ReturnType<typeof sizeERTable>>()
   for (const box of boxes.values()) {
-    const size = sizeERTable(box.key, comments.get(box.key) ?? '', fields.get(box.key) ?? [], erStyle)
+    const size = sizeERTable(box.key, comments.get(box.key) ?? '', fields.get(box.key) ?? [], appearances.get(box.key)!.style)
     metrics.set(box.key, size); box.width = size.width; box.height = size.height
   }
   layout(boxes, links, direction)
@@ -362,11 +377,25 @@ function compileER(lines: SourceLine[], erStyle?: ERDiagramStyle): DiagramResult
   })
   mapStructureSources(sources, boxes, nodes, elements, links, 'er')
   const targets = new DiagramSourceMap(lines)
+  const sourceStyles: NonNullable<DiagramResult['sourceStyles']> = []
   for (const box of boxes.values()) {
     const node = nodes.get(box.key)!
-    targets.add(definitions.get(box.key) ?? box.line, ...elements.filter(element => element.groupId === node.groupId).map(element => element.id))
+    const members = elements.filter(element => element.groupId === node.groupId), ids = members.map(element => element.id)
+    targets.add(definitions.get(box.key) ?? box.line, ...ids)
+    const appearance = appearances.get(box.key)!
+    for (const line of appearance.lines) sources.add(line, ...ids)
+    for (const member of members) {
+      const style: Partial<ElementStyle> = {}
+      if (member.type === 'shape' && member.shape === 'text') {
+        if (appearance.style.color !== undefined) style.stroke = appearance.style.color
+      } else {
+        if (appearance.style.stroke !== undefined) style.stroke = appearance.style.stroke
+        if (member.id === node.id && appearance.style.fill !== undefined) style.fill = appearance.style.fill
+      }
+      if (Object.keys(style).length) sourceStyles.push({ id: member.id, style })
+    }
   }
-  return { ...finishDiagram('er', elements, links.length ? ['ER 基数端标为静态装饰；创建可编辑副本后，移动实体卡片不会自动重算这些端标。'] : [], sources), sourceDefinitions: targets.entries(elements) }
+  return { ...finishDiagram('er', elements, links.length ? ['ER 基数端标为静态装饰；创建可编辑副本后，移动实体卡片不会自动重算这些端标。'] : [], sources), sourceDefinitions: targets.entries(elements), ...(sourceStyles.length ? { sourceStyles } : {}) }
 }
 interface Commit { id: string; branch: string; parents: string[]; tag: string; type: string; line: number; pickedFrom?: string; pickedParent?: string }
 function gitOptions(text: string, line: number, allowed = ['id', 'tag', 'type']): Record<string, string> {
@@ -706,7 +735,7 @@ function compileArchitecture(lines: SourceLine[]): DiagramResult {
   mapStructureSources(sources, boxes, nodes, elements, links, 'architecture', groups)
   return finishDiagram('architecture', elements, ['架构图标使用本地基础图形与图标名称，不下载远程 logos；端口连接保留精确 L/R/T/B 坐标，转换为画布后为自由端点。'], sources)
 }
-export function compileStructureDiagram(source: string, erStyle?: ERDiagramStyle): DiagramResult | undefined {
+export function compileStructureDiagram(source: string): DiagramResult | undefined {
   const lines = sourceLines(source), header = lines[0]?.text.trim() ?? ''
   const kind = header.split(/\s/)[0]
   if (!['classDiagram', 'stateDiagram', 'stateDiagram-v2', 'erDiagram', 'gitGraph', 'gitGraph:', 'requirementDiagram', 'C4Context', 'C4Container', 'C4Component', 'architecture-beta'].includes(kind!)) return undefined
@@ -715,7 +744,7 @@ export function compileStructureDiagram(source: string, erStyle?: ERDiagramStyle
   if (header !== kind) fail('图表标题后不支持额外参数，请把指令另起一行。', lines[0]!.line)
   if (kind === 'classDiagram') return compileClass(lines)
   if (kind === 'stateDiagram' || kind === 'stateDiagram-v2') return compileState(lines)
-  if (kind === 'erDiagram') return compileER(lines, erStyle)
+  if (kind === 'erDiagram') return compileER(lines)
   if (kind === 'requirementDiagram') return compileRequirement(lines)
   if (kind === 'C4Context' || kind === 'C4Container' || kind === 'C4Component') return compileC4(lines)
   return compileArchitecture(lines)

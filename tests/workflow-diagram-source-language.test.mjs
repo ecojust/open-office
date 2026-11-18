@@ -46,6 +46,13 @@ test('multiline quoted labels retain their lexical state across comment-looking 
   assert.equal(state.labelClose, '')
 })
 
+test('standard ER styles retain syntax colors, hash comments and entity block folds', () => {
+  const source = 'erDiagram\nCUSTOMER:::accent { # entity\n string name "Name"\n}\nclassDef accent font-size:12pt,color:#334155; # style\nclass CUSTOMER accent\nstyle CUSTOMER fill:#eff6ff'
+  for (const [text, kind] of [['classDef', 'keyword'], ['class CUSTOMER', 'keyword'], ['style CUSTOMER', 'keyword'], [':::', 'operator'], ['12pt', 'number'], ['#334155', 'atom'], ['# style', 'comment']]) assert.equal(tokenAt(source, text), kind, text)
+  const fold = diagramFoldRanges(source).find(range => range.lineStart === source.indexOf('CUSTOMER:::'))
+  assert.equal(source.slice(fold.from, fold.to), '\n string name "Name"')
+})
+
 test('folds follow nested blocks while ignoring closing words in strings and comments', () => {
   const source = 'flowchart LR\nsubgraph outer\n  A["end"]\n  subgraph inner\n    B[body]\n    # end\n  end\nend\nC[tail]'
   const folds = diagramFoldRanges(source)

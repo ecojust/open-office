@@ -42,7 +42,28 @@ CUSTOMER["客户资料"] {
 }
 ```
 
-在 ER 图的「图表风格」中，可分别调整表名、表注释、字段和字段注释的字号、加粗、斜体、对齐及颜色。文字变大时，表宽与行高会同步调整；颜色默认跟随图表风格，也可单独指定。设置支持撤销和重做，并随 `.owflow` 文件保存；SVG、PNG、打印及创建的独立画布保留样式。`.mmd` 仅保存原始源码。
+未编写样式语句时，表格保持上述默认排版，并跟随所选「图表风格」。如需修改整张表的样式，可使用 [Mermaid ER 官方样式语法](https://mermaid.js.org/syntax/entityRelationshipDiagram.html#styling-a-node)中的 `style`、`classDef`、`class` 和 `:::`：
+
+```text
+erDiagram
+CUSTOMER["客户资料"]:::accent {
+  string id PK "客户编号"
+  string email UK "邮箱"
+}
+ORDER {
+  string id PK "订单编号"
+}
+CUSTOMER ||--o{ ORDER : places
+classDef accent fill:#eff6ff,color:#334155
+class ORDER accent
+style CUSTOMER stroke:#2563eb,stroke-width:2px
+```
+
+`style` 直接设置指定表，`classDef` 定义可复用的样式类，`class` 或实体名称后的 `:::` 应用样式类；逗号可分隔多个表名或类名。`classDef default` 适用于所有表，随后叠加已应用的样式类，最后由 `style` 中的同名属性覆盖。源码明确设置的颜色优先于「图表风格」。
+
+支持表格填充 `fill`、边框颜色 `stroke`、边框宽度 `stroke-width`、文字颜色 `color`、字号 `font-size`、字重 `font-weight`、斜体 `font-style` 和透明度 `opacity`。颜色接受十六进制、常用颜色名、`rgb()` 和 `rgba()`；字号接受数值、`px` 或 `pt`，换算后须在 8–72px 之间；边框宽度为 0–16px；透明度为 0–1。字重支持 `normal`、`bold`、`400` 和 `700`；斜体支持 `normal` 和 `italic`；`stroke-dasharray` 支持实线 `none` / `0` 或虚线 `8 5`。文字属性同时作用于整张表的表名、说明、字段和注释，表宽与行高会随字号调整。未支持的属性会显示具体提示。
+
+这些样式保存在源码中，随 `.owflow` 和 `.mmd` 一起保存，SVG、PNG、打印及创建的独立画布保留呈现结果。旧文件中的独立文字样式设置不再使用，重新保存时会移除；表定义和原始源码保留。
 
 源码始终保留在当前文档中；转换为画布会创建独立的可编辑文档，之后两份文档可分别修改。即使源码暂时存在语法错误，也可以保存当前内容，之后继续修正；图片导出需要先生成有效预览。
 

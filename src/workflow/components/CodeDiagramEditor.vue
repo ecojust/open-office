@@ -7,7 +7,7 @@ import { combineBounds, edgePoints, elementBounds, pointsPath } from '../core/ge
 import { clone, DEFAULT_STYLE, newId, type Scene } from '../core/types.ts'
 import { DIAGRAM_TEMPLATES, DIAGRAM_KIND_LABELS } from '../core/diagrams/catalog.ts'
 import { applyDiagramStyle, DIAGRAM_STYLES, normalizeDiagramStyle, type DiagramStyleId } from '../core/diagram-appearance.ts'
-import { applyERColors, ER_TEXT_ROLES, normalizeERDiagramStyle, resolveERTextStyle, type ERDiagramStyle, type ERTextRole, type ERTextStyle } from '../core/er-style.ts'
+import { presentCodeDiagram } from '../core/diagram-presentation.ts'
 import type { DiagramKind, DiagramTemplate } from '../core/diagrams/common.ts'
 import AppIcon from './AppIcon.vue'
 import DiagramSourceEditor from './DiagramSourceEditor.vue'
@@ -15,8 +15,8 @@ import { tokenizeDiagramSource } from '../core/diagram-source-language.ts'
 
 const { locale, t } = useI18n()
 
-const props = withDefaults(defineProps<{ source: string; theme: 'light' | 'dark'; diagramStyle?: DiagramStyleId; erStyle?: ERDiagramStyle; active?: boolean; disabled?: boolean }>(), { active: true, disabled: false })
-const emit = defineEmits<{ change: [source: string]; changeStyle: [id: DiagramStyleId]; changeERStyle: [style: ERDiagramStyle]; createFlow: [scene: Scene]; export: [format: 'png' | 'svg']; status: [message: string]; pending: [value: boolean] }>()
+const props = withDefaults(defineProps<{ source: string; theme: 'light' | 'dark'; diagramStyle?: DiagramStyleId; active?: boolean; disabled?: boolean }>(), { active: true, disabled: false })
+const emit = defineEmits<{ change: [source: string]; changeStyle: [id: DiagramStyleId]; createFlow: [scene: Scene]; export: [format: 'png' | 'svg']; status: [message: string]; pending: [value: boolean] }>()
 const composing = ref(false)
 const interactive = computed(() => props.active && !props.disabled)
 const draft = ref(props.source), sourceInput = ref<InstanceType<typeof DiagramSourceEditor>>(), error = ref(''), errorLine = ref(0)
@@ -52,9 +52,7 @@ const currentStyleId = computed(() => normalizeDiagramStyle(props.diagramStyle))
 const currentStyle = computed(() => DIAGRAM_STYLES.find(style => style.id === currentStyleId.value)!)
 const modalOpen = computed(() => templatesOpen.value || stylesOpen.value)
 let timer: ReturnType<typeof setTimeout> | undefined, published = props.source
-const styledScene = computed(() => compiled.value ? applyERColors(applyDiagramStyle(compiled.value.scene, currentStyleId.value), props.erStyle) : undefined)
-const erRoleLabels: Record<ERTextRole, string> = { title: '表名', tableComment: '表注释', field: '字段', comment: '字段注释' }
-const erTextStyles = computed(() => ER_TEXT_ROLES.map(role => ({ role, label: erRoleLabels[role], style: resolveERTextStyle(role, props.erStyle) })))
+const styledScene = computed(() => compiled.value ? presentCodeDiagram(compiled.value, currentStyleId.value) : undefined)
 const svg = computed(() => styledScene.value ? sceneToSvg(styledScene.value, { background: true, interactive: true }) : '')
 const sourceDefinitions = computed(() => compiled.value?.kind === 'er' ? compiled.value.sourceDefinitions ?? [] : [])
 const definitionByElement = computed(() => new Map(sourceDefinitions.value.flatMap(range => range.elementIds.map(id => [id, range] as const))))
@@ -119,11 +117,6 @@ async function openStyles() {
   if (!interactive.value || !flush()) return
   closeExportMenu(); templatesOpen.value = false; pendingTemplate.value = undefined; stylesOpen.value = true
   await nextTick()
-  if (compiled.value?.kind === 'er') {
-    styleDialog.value?.querySelector<HTMLInputElement>('[data-testid="er-title-font-size"]')?.focus({ preventScroll: true })
-    styleDialog.value?.querySelector<HTMLElement>('.diagram-style-content')?.scrollTo({ top: 0 })
-    return
-  }
   const selected = styleDialog.value?.querySelector<HTMLButtonElement>('[data-diagram-style][aria-pressed="true"]')
   selected?.scrollIntoView({ block: 'nearest' }); selected?.focus({ preventScroll: true })
 }
@@ -136,23 +129,6 @@ function chooseStyle(id: DiagramStyleId) {
   if (id === currentStyleId.value) return
   emit('changeStyle', id)
   emit('status', `已应用“${DIAGRAM_STYLES.find(style => style.id === id)!.label}”风格，可撤销恢复`)
-}
-function changeERTextStyle(role: ERTextRole, patch: Partial<ERTextStyle>) {
-  if (!interactive.value || !flush()) return
-  const current = normalizeERDiagramStyle(props.erStyle)
-  const next = normalizeERDiagramStyle({ ...current, [role]: { ...current[role], ...patch } })
-  if (JSON.stringify(current) === JSON.stringify(next)) return
-  emit('changeERStyle', next)
-  emit('status', '已更新 ER 文字样式，可撤销恢复')
-}
-function changeERFontSize(role: ERTextRole, event: Event) {
-  const input = event.target as HTMLInputElement
-  if (Number.isFinite(input.valueAsNumber)) changeERTextStyle(role, { fontSize: Math.max(10, Math.min(48, input.valueAsNumber)) })
-  nextTick(() => { input.value = String(resolveERTextStyle(role, props.erStyle).fontSize) })
-}
-function erColorValue(role: ERTextRole) {
-  const color = resolveERTextStyle(role, props.erStyle).color || styledScene.value?.elements.find(element => new RegExp(`^er-\\d+-${role}(?:-\\d+)?$`).test(element.id))?.style.stroke || currentStyle.value.foreground
-  return /^#[\da-f]{6}$/i.test(color) ? color : /^#[\da-f]{3}$/i.test(color) ? `#${[...color.slice(1)].map(character => character.repeat(2)).join('')}` : currentStyle.value.foreground
 }
 function styleDialogKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeStyles(); return }
@@ -266,7 +242,7 @@ function parse() {
   endPreviewPan()
   parsing.value = false
   try {
-    compiled.value = compileCodeDiagram(draft.value, { erStyle: props.erStyle }); error.value = ''; errorLine.value = 0
+    compiled.value = compileCodeDiagram(draft.value); error.value = ''; errorLine.value = 0
     compiledSource.value = draft.value
     emit('status', `${compiled.value ? DIAGRAM_KIND_LABELS[compiled.value.kind] : '图表'} · ${elementCount.value} 个图元`)
   } catch (cause) {
@@ -455,8 +431,6 @@ watch(() => props.source, value => {
   if (composing.value) return
   clearTimeout(timer); published = value; draft.value = value; parse()
 })
-// Reflow text without replacing the editor document, selection, or folded ranges.
-watch(() => props.erStyle, () => parse(), { deep: true })
 function setSplitRatio(value: number) {
   const ratio = Math.max(20, Math.min(80, value))
   if (stacked.value) rowRatio.value = ratio
@@ -546,7 +520,14 @@ parse()
           <pre class="diagram-syntax-example"><span v-for="(token, index) in syntaxTokens" :key="index" :class="token.kind ? `diagram-token-${token.kind}` : undefined">{{ token.text }}</span></pre>
           <p>{{ t('模板包含{kinds}。示例源码可直接编辑。点击行号旁的箭头可折叠或展开代码块。', { kinds: kindsList }) }}</p>
           <p>{{ t('支持 # 注释，可独占一行或放在语句后；行内 # 两侧需留空格。') }}</p>
-          <p v-if="compiled?.kind === 'er'" data-testid="er-syntax-help">{{ t('ER 图使用 ENTITY["表注释"] 显示表名与表注释；字段末尾的双引号文字为字段注释。在图表风格中可分别设置四类文字。') }}</p>
+          <p v-if="compiled?.kind === 'er'" data-testid="er-syntax-help">{{ t('ER 图使用 ENTITY["表注释"] 显示表名与表注释；字段末尾的双引号文字为字段注释。') }}</p>
+          <template v-if="compiled?.kind === 'er'">
+            <p>{{ t('使用标准 Mermaid 的 style 设置整表样式，或用 classDef 定义样式类，再通过 class 或 ::: 应用。') }}</p>
+            <pre class="diagram-syntax-example" data-testid="er-style-syntax-help">style CUSTOMER fill:#eff6ff,stroke:#2563eb,color:#334155
+classDef accent fill:#eff6ff
+class CUSTOMER accent
+CUSTOMER:::accent</pre>
+          </template>
           <p v-if="compiled?.kind === 'er'">{{ t('拖动预览可平移图表；点击表格可定位并展开对应源码。也可用 Tab 选择表格，再按 Enter 或空格。') }}</p>
           <p>{{ t('支持这些类型的常用语法子集；未实现的指令会提示具体行号。源码独立保存，创建独立画布后可调整图元；副本的修改不会反写源码。') }}</p>
         </details>
@@ -579,27 +560,12 @@ parse()
       <section ref="styleDialog" class="diagram-library diagram-style-library" role="dialog" aria-modal="true" :aria-labelledby="styleTitleId" :aria-describedby="styleDescriptionId" data-testid="diagram-style-panel">
         <header><div><AppIcon name="palette" :size="20"/><h2 :id="styleTitleId">{{ t('图表风格') }}</h2></div><button type="button" class="diagram-library-close" :aria-label="t('关闭图表风格')" @click="closeStyles"><AppIcon name="close" :size="17"/></button></header>
         <p :id="styleDescriptionId" class="diagram-style-description">{{ t('选择代码图表的配色与线条外观，源码保持不变。修改后可随时撤销。') }}</p>
-        <div class="diagram-style-content">
-          <section v-if="compiled?.kind === 'er'" class="diagram-er-styles" :aria-label="t('ER 文字样式')" data-testid="er-text-styles">
-            <h3>{{ t('ER 文字样式') }}</h3>
-            <p>{{ t('分别设置表名、表注释、字段和字段注释；未指定的文字颜色跟随图表风格。') }}</p>
-            <fieldset v-for="item in erTextStyles" :key="item.role" class="diagram-er-style-row" :data-er-role="item.role" :data-testid="`er-text-style-${item.role}`">
-              <legend>{{ t(item.label) }}</legend>
-              <label class="diagram-er-size"><span>{{ t('字号') }}</span><input type="number" min="10" max="48" step="1" :value="item.style.fontSize" :aria-label="t('{role}字号', { role: t(item.label) })" :data-testid="`er-${item.role}-font-size`" @change="changeERFontSize(item.role, $event)" /></label>
-              <button type="button" class="diagram-er-bold" :aria-label="t('{role}粗体', { role: t(item.label) })" :title="t('粗体')" :aria-pressed="item.style.fontWeight === 'bold'" :data-testid="`er-${item.role}-bold`" @click="changeERTextStyle(item.role, { fontWeight: item.style.fontWeight === 'bold' ? 'normal' : 'bold' })">B</button>
-              <button type="button" class="diagram-er-italic" :aria-label="t('{role}斜体', { role: t(item.label) })" :title="t('斜体')" :aria-pressed="item.style.fontStyle === 'italic'" :data-testid="`er-${item.role}-italic`" @click="changeERTextStyle(item.role, { fontStyle: item.style.fontStyle === 'italic' ? 'normal' : 'italic' })">I</button>
-              <label class="diagram-er-align"><span>{{ t('对齐') }}</span><select :value="item.style.textAlign" :aria-label="t('{role}对齐', { role: t(item.label) })" :data-testid="`er-${item.role}-align`" @change="changeERTextStyle(item.role, { textAlign: ($event.target as HTMLSelectElement).value as ERTextStyle['textAlign'] })"><option value="left">{{ t('左对齐') }}</option><option value="center">{{ t('居中') }}</option><option value="right">{{ t('右对齐') }}</option></select></label>
-              <label class="diagram-er-color"><span>{{ t('文字颜色') }}</span><input type="color" :value="erColorValue(item.role)" :aria-label="t('{role}文字颜色', { role: t(item.label) })" :data-testid="`er-${item.role}-color`" @change="changeERTextStyle(item.role, { color: ($event.target as HTMLInputElement).value })" /></label>
-              <button type="button" class="diagram-er-color-reset" :aria-label="t('{role}颜色跟随主题', { role: t(item.label) })" :aria-pressed="!item.style.color" :data-testid="`er-${item.role}-color-reset`" @click="changeERTextStyle(item.role, { color: undefined })">{{ t('跟随主题') }}</button>
-            </fieldset>
-          </section>
         <div class="diagram-style-grid" role="group" :aria-label="t('代码图表风格')">
           <button v-for="style in stylePreviews" :key="style.id" type="button" class="diagram-style-card" :data-diagram-style="style.id" :aria-label="t('{value0}风格，{value1}', { value0: t(style.label), value1: t(style.description) })" :aria-pressed="currentStyleId === style.id" data-testid="diagram-style-card" @click="chooseStyle(style.id)">
             <span class="diagram-style-preview" aria-hidden="true" v-html="style.svg"/>
             <span class="diagram-style-card-heading"><strong>{{ t(style.label) }}</strong><AppIcon v-if="currentStyleId === style.id" name="check" :size="15"/><span v-else class="diagram-style-swatches" aria-hidden="true"><i v-for="color in style.palette.slice(0, 3)" :key="color" :style="{ background: color }"/></span></span>
             <small>{{ t(style.description) }}</small>
           </button>
-        </div>
         </div>
         <footer><span aria-live="polite">{{ t('当前风格：{style}', { style: t(currentStyle.label) }) }}</span><button type="button" @click="closeStyles"><AppIcon name="check" :size="15"/>{{ t('完成') }}</button></footer>
       </section>
@@ -734,26 +700,7 @@ parse()
 .diagram-replace-content pre { max-height: 28vh; overflow: auto; margin: 0; padding: 12px; border: 1px solid var(--ui-line, #e2e8f0); border-radius: 6px; background: var(--ui-bg, #f4f6fa); color: var(--ui-text, #273449); font: 11px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .diagram-style-library { width: 820px; }
 .diagram-style-description { flex: none; margin: 0; padding: 12px 18px 0; font-size: 12px; line-height: 1.7; color: var(--ui-muted, #64748b); }
-.diagram-style-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--ui-line, #cbd5e1) transparent; }
-.diagram-style-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 14px 17px 17px; }
-.diagram-er-styles { margin: 14px 17px 0; }
-.diagram-er-styles h3 { margin: 0; font-size: 13px; }
-.diagram-er-styles > p { margin: 6px 0 10px; font-size: 11px; line-height: 1.6; color: var(--ui-muted, #64748b); }
-.diagram-er-style-row { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; min-width: 0; margin: 0 0 8px; padding: 7px 10px 10px; border: 1px solid var(--ui-line, #dce3ed); border-radius: var(--ui-radius, 6px); }
-.diagram-er-style-row legend { padding: 0 5px; font-size: 11px; font-weight: 600; }
-.diagram-er-style-row label { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ui-muted, #64748b); }
-.diagram-er-style-row input, .diagram-er-style-row select { box-sizing: border-box; height: 29px; min-width: 0; padding: 4px 6px; border: 1px solid var(--ui-line, #dce3ed); border-radius: var(--ui-radius, 6px); background: var(--ui-surface, #fff); color: var(--ui-text, #273449); font: inherit; }
-.diagram-er-style-row input:focus-visible, .diagram-er-style-row select:focus-visible { outline: 2px solid var(--ui-accent, #3577e5); outline-offset: 2px; }
-.diagram-er-size input { width: 59px; }
-.diagram-er-style-row .diagram-er-bold, .diagram-er-style-row .diagram-er-italic { height: 29px; width: 29px; padding: 3px; font-size: 14px; }
-.diagram-er-bold { font-weight: 700 !important; }
-.diagram-er-italic { font-style: italic !important; }
-.diagram-er-align { margin-left: 3px; }
-.diagram-er-align select { max-width: 120px; }
-.diagram-er-color { margin-left: auto; }
-.diagram-er-color input { width: 34px; padding: 3px; cursor: pointer; }
-.diagram-er-style-row .diagram-er-color-reset { height: 29px; padding: 4px 7px; font-size: 11px; }
-.diagram-er-style-row button[aria-pressed="true"] { color: var(--ui-accent, #3577e5); border-color: var(--ui-accent, #3577e5); background: var(--ui-accent-soft, #eaf1ff); }
+.diagram-style-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 14px 17px 17px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--ui-line, #cbd5e1) transparent; }
 .diagram-style-grid .diagram-style-card { display: flex; flex-direction: column; align-items: stretch; gap: 7px; min-width: 0; border-radius: 9px; padding: 7px; text-align: left; background: var(--ui-surface, #fff); }
 .diagram-style-card[aria-pressed="true"] { border-color: var(--ui-accent, #3577e5); box-shadow: 0 0 0 1px var(--ui-accent, #3577e5); background: var(--ui-bg, #f4f6fa); }
 .diagram-style-preview { display: block; height: 66px; overflow: hidden; border: 1px solid var(--ui-line, #dce3ed); border-radius: 5px; }
@@ -789,10 +736,6 @@ parse()
   .diagram-library > footer { padding: 10px 12px; }.diagram-library > footer > span { max-width: 60%; line-height: 1.5; }
   .diagram-replace-content { padding: 12px; }
   .diagram-style-description { padding: 10px 12px 0; font-size: 11px; }
-  .diagram-er-styles { margin: 12px 12px 0; }
-  .diagram-er-style-row { column-gap: 6px; }
-  .diagram-er-align { margin-left: 0; }
-  .diagram-er-color { margin-left: 0; }
   .diagram-style-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px; }
   .diagram-style-preview { height: 58px; }
   .diagram-style-card > small { font-size: 9px; }
